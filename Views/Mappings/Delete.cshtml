@@ -1,0 +1,31 @@
+@model ProductMapping
+@{
+    ViewData["Title"] = "Delete Mapping";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Mapping CRUD</span>
+        <h1>Delete mapping?</h1>
+        <p>This removes one HERM relationship from <strong>@Model.ProductCatalogItem?.Name</strong>.</p>
+    </div>
+</section>
+
+<section class="content-card">
+    <dl class="detail-grid mb-4">
+        <dt>Product</dt>
+        <dd>@Model.ProductCatalogItem?.Name</dd>
+        <dt>Domain</dt>
+        <dd>@(Model.TrmDomain is null ? "-" : $"{Model.TrmDomain.Code} {Model.TrmDomain.Name}")</dd>
+        <dt>Capability</dt>
+        <dd>@(Model.TrmCapability is null ? "-" : $"{Model.TrmCapability.Code} {Model.TrmCapability.Name}")</dd>
+        <dt>Component</dt>
+        <dd>@(Model.TrmComponent is null ? "-" : $"{Model.TrmComponent.Code} {Model.TrmComponent.Name}")</dd>
+    </dl>
+
+    <form asp-action="Delete" method="post" class="d-flex gap-2">
+        <input type="hidden" asp-for="Id" />
+        <button type="submit" class="btn btn-danger">Delete mapping</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </form>
+</section>

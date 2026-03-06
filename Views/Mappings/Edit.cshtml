@@ -1,0 +1,71 @@
+@model MappingEditViewModel
+@{
+    var isEdit = Model.MappingId.HasValue;
+    ViewData["Title"] = isEdit ? "Edit Mapping" : "Add Mapping";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Map to HERM TRM</span>
+        <h1>@Model.ProductName</h1>
+        <p>@Model.Vendor @Model.Version</p>
+    </div>
+    <a class="btn btn-outline-secondary" asp-action="Index">Back to board</a>
+</section>
+
+@if (isEdit)
+{
+    <form asp-action="Edit" asp-route-id="@Model.MappingId" method="post">
+        <input type="hidden" asp-for="MappingId" />
+        <input type="hidden" asp-for="ProductId" />
+        <partial name="_MappingFormContent" model="Model" />
+    </form>
+}
+else
+{
+    <form asp-action="Create" method="post">
+        <input type="hidden" asp-for="ProductId" />
+        <partial name="_MappingFormContent" model="Model" />
+    </form>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        const domainSelect = document.getElementById("domainSelect");
+        const capabilitySelect = document.getElementById("capabilitySelect");
+        const componentSelect = document.getElementById("componentSelect");
+
+        async function loadOptions(url, target, placeholder, selectedValue) {
+            const response = await fetch(url);
+            const items = await response.json();
+
+            target.innerHTML = "";
+            const defaultOption = document.createElement("option");
+            defaultOption.value = "";
+            defaultOption.textContent = placeholder;
+            target.appendChild(defaultOption);
+
+            items.forEach(item => {
+                const option = document.createElement("option");
+                option.value = item.id;
+                option.textContent = item.text;
+                if (selectedValue && String(item.id) === String(selectedValue)) {
+                    option.selected = true;
+                }
+                target.appendChild(option);
+            });
+        }
+
+        domainSelect.addEventListener("change", async () => {
+            const domainId = domainSelect.value;
+            await loadOptions(`/Mappings/Capabilities?domainId=${domainId}`, capabilitySelect, "Choose a capability", null);
+            await loadOptions("/Mappings/Components", componentSelect, "Choose a component", null);
+        });
+
+        capabilitySelect.addEventListener("change", async () => {
+            const capabilityId = capabilitySelect.value;
+            await loadOptions(`/Mappings/Components?capabilityId=${capabilityId}`, componentSelect, "Choose a component", null);
+        });
+    </script>
+}

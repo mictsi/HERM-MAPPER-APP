@@ -1,0 +1,113 @@
+@model ReferenceCatalogueViewModel
+@{
+    ViewData["Title"] = "HERM Catalogue";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Imported HERM TRM reference</span>
+        <h1>Browse domains, capabilities, and components</h1>
+        <p>Seeded from <code>@Model.WorkbookPath</code> on first run.</p>
+    </div>
+</section>
+
+<section class="content-card">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-lg-5">
+            <label class="form-label" for="search">Search components</label>
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Code, name, description, product examples" />
+        </div>
+        <div class="col-lg-3">
+            <label class="form-label" for="domainId">Domain</label>
+            <select class="form-select" id="domainId" name="domainId">
+                <option value="">All domains</option>
+                @foreach (var domain in Model.Domains)
+                {
+                    <option value="@domain.Id" selected="@(Model.DomainId == domain.Id ? "selected" : null)">@domain.Code @domain.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-3">
+            <label class="form-label" for="capabilityId">Capability</label>
+            <select class="form-select" id="capabilityId" name="capabilityId">
+                <option value="">All capabilities</option>
+                @foreach (var capability in Model.Capabilities)
+                {
+                    <option value="@capability.Id" selected="@(Model.CapabilityId == capability.Id ? "selected" : null)">@capability.Code @capability.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-1 d-grid">
+            <button class="btn btn-primary" type="submit">Go</button>
+        </div>
+    </form>
+</section>
+
+<div class="row g-4">
+    <div class="col-xl-4">
+        <section class="content-card h-100">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Domains</span>
+                    <h2>@Model.Domains.Count imported</h2>
+                </div>
+            </div>
+            <div class="stack-list">
+                @foreach (var domain in Model.Domains)
+                {
+                    <article class="stack-item @(Model.DomainId == domain.Id ? "is-selected" : string.Empty)">
+                        <div class="stack-title">@domain.Code @domain.Name</div>
+                        <div class="stack-body">@domain.Description</div>
+                    </article>
+                }
+            </div>
+        </section>
+    </div>
+    <div class="col-xl-8">
+        <section class="content-card">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Components</span>
+                    <h2>@Model.Components.Count result(s)</h2>
+                </div>
+            </div>
+
+            @if (Model.Components.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <h3>No matching components</h3>
+                    <p>Try a wider search or clear the filters.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                <th>Capability</th>
+                                <th>Domain</th>
+                                <th>Product examples</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var component in Model.Components)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@component.Code @component.Name</strong>
+                                    <div class="table-subline">@component.Description</div>
+                                </td>
+                                <td>@(component.ParentCapability is null ? "-" : $"{component.ParentCapability.Code} {component.ParentCapability.Name}")</td>
+                                <td>@(component.ParentCapability?.ParentDomain is null ? "-" : $"{component.ParentCapability.ParentDomain.Code} {component.ParentCapability.ParentDomain.Name}")</td>
+                                <td>@(string.IsNullOrWhiteSpace(component.ProductExamples) ? "-" : component.ProductExamples)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

@@ -1,0 +1,20 @@
+@model ProductCatalogItem
+@{
+    ViewData["Title"] = "Edit Product";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Catalogue CRUD</span>
+        <h1>Edit @Model.Name</h1>
+        <p>Update the product record without losing any existing HERM mappings.</p>
+    </div>
+</section>
+
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

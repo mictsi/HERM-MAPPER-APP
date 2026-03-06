@@ -1,0 +1,136 @@
+@model MappingBoardViewModel
+@{
+    ViewData["Title"] = "Mapping Board";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Mapping workspace</span>
+        <h1>Review and complete HERM mappings</h1>
+        <p>Products can have multiple mappings. Export follows the uploaded sample format: <code>LEVEL0;LEVEL1;LEVEL2;LEVEL3</code>.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="ExportCsv" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-domainId="@Model.DomainId" asp-route-capabilityId="@Model.CapabilityId">Export completed CSV</a>
+</section>
+
+<section class="stats-grid stats-grid-compact">
+    <article class="stat-card">
+        <span class="stat-label">Draft</span>
+        <span class="stat-value">@Model.DraftCount</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">In review</span>
+        <span class="stat-value">@Model.InReviewCount</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Complete</span>
+        <span class="stat-value">@Model.CompleteCount</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Out of scope</span>
+        <span class="stat-value">@Model.OutOfScopeCount</span>
+    </article>
+</section>
+
+<section class="content-card">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-lg-4">
+            <label class="form-label" for="search">Search</label>
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Product or mapped component" />
+        </div>
+        <div class="col-lg-2">
+            <label class="form-label" for="status">Status</label>
+            <select class="form-select" id="status" name="status" asp-for="Status" asp-items="Html.GetEnumSelectList<MappingStatus>()">
+                <option value="">All statuses</option>
+            </select>
+        </div>
+        <div class="col-lg-3">
+            <label class="form-label" for="domainId">Domain</label>
+            <select class="form-select" id="domainId" name="domainId">
+                <option value="">All domains</option>
+                @foreach (var domain in Model.Domains)
+                {
+                    <option value="@domain.Id" selected="@(Model.DomainId == domain.Id ? "selected" : null)">@domain.Code @domain.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-3">
+            <label class="form-label" for="capabilityId">Capability</label>
+            <select class="form-select" id="capabilityId" name="capabilityId">
+                <option value="">All capabilities</option>
+                @foreach (var capability in Model.Capabilities)
+                {
+                    <option value="@capability.Id" selected="@(Model.CapabilityId == capability.Id ? "selected" : null)">@capability.Code @capability.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
+        </div>
+    </form>
+</section>
+
+<section class="content-card">
+    @if (Model.Products.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No products matched the selected filters</h3>
+            <p>Reset the board filters or add more catalogue records.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Mappings</th>
+                        <th>Latest mapping</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var product in Model.Products)
+                {
+                    var latestMapping = product.Mappings.OrderByDescending(x => x.UpdatedUtc).FirstOrDefault();
+                    <tr>
+                        <td>
+                            <strong>@product.Name</strong>
+                            <div class="table-subline">@product.Vendor @product.Version</div>
+                        </td>
+                        <td>
+                            <strong>@product.Mappings.Count mapping(s)</strong>
+                            @if (product.Mappings.Count > 0)
+                            {
+                                <div class="mapping-chip-list mt-2">
+                                    @foreach (var mapping in product.Mappings.OrderBy(x => x.TrmDomain?.Name ?? string.Empty).ThenBy(x => x.TrmComponent?.Name ?? string.Empty).Take(3))
+                                    {
+                                        <span class="mapping-chip">@((mapping.TrmComponent is null) ? mapping.MappingStatus.ToString() : $"{mapping.TrmDomain?.Name}: {mapping.TrmComponent.Name}")</span>
+                                    }
+                                </div>
+                            }
+                        </td>
+                        <td>
+                            @if (latestMapping is null)
+                            {
+                                <span class="status-pill status-draft">Unmapped</span>
+                            }
+                            else
+                            {
+                                <span class="status-pill status-@latestMapping.MappingStatus.ToString().ToLowerInvariant()">@latestMapping.MappingStatus</span>
+                                <div class="table-subline">@(latestMapping.TrmComponent is null ? "No component selected" : $"{latestMapping.TrmComponent.Code} {latestMapping.TrmComponent.Name}")</div>
+                            }
+                        </td>
+                        <td>@product.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary" asp-action="Create" asp-route-productId="@product.Id">Add mapping</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
