@@ -16,6 +16,7 @@ The web application now lives under `src/HERM-MAPPER-APP` and automated tests li
 ## Project Structure
 - `src/HERM-MAPPER-APP/`: ASP.NET Core MVC application
 - `tests/HERM-MAPPER-APP.Tests/`: unit tests
+- `scripts/`: deployment and automation scripts
 - `src/HERM-MAPPER-APP/Controllers/`: MVC controllers for app logic
 - `src/HERM-MAPPER-APP/Data/`: Entity Framework database context
 - `src/HERM-MAPPER-APP/Models/`: data models
@@ -86,6 +87,19 @@ $env:HERM_Database__ConnectionString = "Server=localhost;Database=HermMapper;Tru
 $env:HERM_Diagnostics__Sql__Enabled = "true"
 $env:HERM_Diagnostics__Sql__LogLevel = "Information"
 ```
+
+## Azure App Service Deploy
+Use `scripts/deploy-appservice.ps1` to publish the app, create the web app if it does not exist, create the App Service plan if it is missing, and sync settings from an appsettings JSON file into App Service application settings.
+
+Example:
+```powershell
+.\scripts\deploy-appservice.ps1 -SubscriptionId $SUBID -ResourceGroupName $RG -WebAppName "securejournal" -SettingsFile $SettingsFile -AppEnvironment "Production" -appplan $appplan
+```
+
+Notes:
+- The resource group must already exist because the script derives the location from it.
+- If the App Service plan is missing, the script creates a Linux `S1` plan by default.
+- Settings are flattened into App Service environment variables using `Section__Key` naming.
 
 ## License
 See LICENSE for details.
