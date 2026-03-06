@@ -1,5 +1,5 @@
 param(
-    [string]$Project = (Join-Path $PSScriptRoot "HERM-MAPPER-APP.csproj"),
+    [string]$Project = (Join-Path $PSScriptRoot "src\HERM-MAPPER-APP\HERM-MAPPER-APP.csproj"),
     [string]$Urls = "http://127.0.0.1:5056",
     [switch]$NoBuild
 )

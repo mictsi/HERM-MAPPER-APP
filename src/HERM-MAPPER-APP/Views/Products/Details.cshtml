@@ -1,0 +1,117 @@
+@model ProductCatalogItem
+@{
+    ViewData["Title"] = "Component Details";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Catalogue record</span>
+        <h1>@Model.Name</h1>
+        <p>@Model.Vendor @Model.Version</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@Model.Id">Add mapping</a>
+        <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.Id">Visualize</a>
+        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">Edit component</a>
+    </div>
+</section>
+
+<section class="content-card mb-4">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Component metadata</span>
+            <h2>Details</h2>
+        </div>
+    </div>
+    <dl class="detail-grid">
+        <dt>Vendor</dt>
+        <dd>@(Model.Vendor ?? "-")</dd>
+        <dt>Version</dt>
+        <dd>@(Model.Version ?? "-")</dd>
+        <dt>Owner</dt>
+        <dd>@(Model.Owner ?? "-")</dd>
+        <dt>Lifecycle</dt>
+        <dd>@(Model.LifecycleStatus ?? "-")</dd>
+        <dt>Description</dt>
+        <dd>@(Model.Description ?? "-")</dd>
+        <dt>Notes</dt>
+        <dd>@(Model.Notes ?? "-")</dd>
+    </dl>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">HERM alignment</span>
+            <h2>@Model.Mappings.Count mapping(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.Mappings.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No mappings yet</h3>
+            <p>Create the first HERM TRM relationship for this component.</p>
+        </div>
+    }
+    else
+    {
+        <div class="mapping-flow-list mb-4">
+            @foreach (var mapping in Model.Mappings.OrderBy(x => x.TrmDomain?.Name ?? string.Empty).ThenBy(x => x.TrmComponent?.Name ?? string.Empty))
+            {
+                <article class="mapping-flow-card">
+                    <div class="mapping-node">
+                        <span class="eyebrow text-dark">Domain</span>
+                        <strong>@(mapping.TrmDomain is null ? "-" : $"{mapping.TrmDomain.Code} {mapping.TrmDomain.Name}")</strong>
+                    </div>
+                    <div class="mapping-flow-arrow">→</div>
+                    <div class="mapping-node">
+                        <span class="eyebrow text-dark">Capability</span>
+                        <strong>@(mapping.TrmCapability is null ? "-" : $"{mapping.TrmCapability.Code} {mapping.TrmCapability.Name}")</strong>
+                    </div>
+                    <div class="mapping-flow-arrow">→</div>
+                    <div class="mapping-node">
+                        <span class="eyebrow text-dark">Component</span>
+                        <strong>@(mapping.TrmComponent is null ? "-" : mapping.TrmComponent.DisplayLabel)</strong>
+                    </div>
+                    <div class="mapping-flow-arrow">→</div>
+                    <div class="mapping-node">
+                        <span class="eyebrow text-dark">Component</span>
+                        <strong>@Model.Name</strong>
+                    </div>
+                </article>
+            }
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Domain</th>
+                        <th>Capability</th>
+                        <th>Component</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var mapping in Model.Mappings.OrderBy(x => x.TrmDomain?.Name ?? string.Empty).ThenBy(x => x.TrmComponent?.Name ?? string.Empty))
+                {
+                    <tr>
+                        <td><span class="status-pill status-@mapping.MappingStatus.ToString().ToLowerInvariant()">@mapping.MappingStatus</span></td>
+                        <td>@(mapping.TrmDomain is null ? "-" : $"{mapping.TrmDomain.Code} {mapping.TrmDomain.Name}")</td>
+                        <td>@(mapping.TrmCapability is null ? "-" : $"{mapping.TrmCapability.Code} {mapping.TrmCapability.Name}")</td>
+                        <td>@(mapping.TrmComponent is null ? "-" : mapping.TrmComponent.DisplayLabel)</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a class="btn btn-outline-secondary" asp-controller="Mappings" asp-action="Edit" asp-route-id="@mapping.Id">Modify mapping</a>
+                                <a class="btn btn-outline-danger" asp-controller="Mappings" asp-action="Delete" asp-route-id="@mapping.Id">Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

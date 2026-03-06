@@ -1,0 +1,82 @@
+@model ProductsIndexViewModel
+@{
+    ViewData["Title"] = "Component Catalogue";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Working catalogue</span>
+        <h1>Components to classify</h1>
+        <p>Track what needs to be mapped and keep ownership, versioning, and notes in one place.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">Add component</a>
+</section>
+
+<section class="content-card">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-lg-9">
+            <label class="form-label" for="search">Search</label>
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Search by component, vendor, version, or owner" />
+        </div>
+        <div class="col-lg-3 d-flex gap-2">
+            <button class="btn btn-primary flex-fill" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
+        </div>
+    </form>
+</section>
+
+<section class="content-card">
+    @if (Model.Products.Count == 0)
+    {
+        <div class="empty-state">
+            <h3>No catalogue entries found</h3>
+            <p>Add a component to start mapping it against the HERM reference model.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Owner</th>
+                        <th>Lifecycle</th>
+                        <th>Mappings</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in Model.Products)
+                {
+                    var latestMapping = item.Mappings.OrderByDescending(x => x.UpdatedUtc).FirstOrDefault();
+                    <tr>
+                        <td>
+                            <strong>@item.Name</strong>
+                            <div class="table-subline">@item.Vendor @item.Version</div>
+                        </td>
+                        <td>@(string.IsNullOrWhiteSpace(item.Owner) ? "-" : item.Owner)</td>
+                        <td>@(string.IsNullOrWhiteSpace(item.LifecycleStatus) ? "-" : item.LifecycleStatus)</td>
+                        <td>
+                            <strong>@item.Mappings.Count mapping(s)</strong>
+                            <div class="table-subline">
+                                @(latestMapping?.TrmComponent is null ? "No mapped component yet" : latestMapping.TrmComponent.DisplayLabel)
+                            </div>
+                        </td>
+                        <td>@item.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@item.Id">Show details</a>
+                                <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@item.Id">Visualize</a>
+                                <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@item.Id">Edit</a>
+                                <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

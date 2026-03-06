@@ -2,7 +2,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HERM-MAPPER-APP", "HERM-MAPPER-APP.csproj", "{144C7E8D-3310-91D1-3EE5-E0B09F9E3A24}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HERM-MAPPER-APP", "src\HERM-MAPPER-APP\HERM-MAPPER-APP.csproj", "{144C7E8D-3310-91D1-3EE5-E0B09F9E3A24}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HERM-MAPPER-APP.Tests", "tests\HERM-MAPPER-APP.Tests\HERM-MAPPER-APP.Tests.csproj", "{9D2B9097-01E0-48A7-B69A-61B1B9608F10}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,6 +16,10 @@ Global
 		{144C7E8D-3310-91D1-3EE5-E0B09F9E3A24}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{144C7E8D-3310-91D1-3EE5-E0B09F9E3A24}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{144C7E8D-3310-91D1-3EE5-E0B09F9E3A24}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D2B9097-01E0-48A7-B69A-61B1B9608F10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D2B9097-01E0-48A7-B69A-61B1B9608F10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D2B9097-01E0-48A7-B69A-61B1B9608F10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D2B9097-01E0-48A7-B69A-61B1B9608F10}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

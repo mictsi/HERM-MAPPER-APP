@@ -1,0 +1,44 @@
+@model ProductVisualizationViewModel
+@{
+    ViewData["Title"] = "Visualize Component Dependencies";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Dependency view</span>
+        <h1>@Model.Product.Name</h1>
+        <p>Complete domain, capability, component, and source component routes for this catalogue entry.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Product.Id">Back to component</a>
+        <a class="btn btn-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@Model.Product.Id">Add mapping</a>
+    </div>
+</section>
+
+<section class="content-card">
+    @if (Model.Paths.Count == 0)
+    {
+        <div class="empty-state">
+            <h3>No dependencies available yet</h3>
+            <p>Create at least one mapping to build the dependency graph.</p>
+        </div>
+    }
+    else
+    {
+        <div class="dependency-paths">
+            @foreach (var path in Model.Paths)
+            {
+                <article class="dependency-path-card">
+                    <span class="status-pill status-@path.Status.ToLowerInvariant().Replace(" ", string.Empty)">@path.Status</span>
+                    <div class="dependency-step">@path.DomainLabel</div>
+                    <div class="dependency-arrow">→</div>
+                    <div class="dependency-step">@path.CapabilityLabel</div>
+                    <div class="dependency-arrow">→</div>
+                    <div class="dependency-step">@path.ComponentLabel</div>
+                    <div class="dependency-arrow">→</div>
+                    <div class="dependency-step">@Model.Product.Name</div>
+                </article>
+            }
+        </div>
+    }
+</section>
