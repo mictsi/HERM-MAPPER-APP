@@ -8,6 +8,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<TrmDomain> TrmDomains => Set<TrmDomain>();
     public DbSet<TrmCapability> TrmCapabilities => Set<TrmCapability>();
     public DbSet<TrmComponent> TrmComponents => Set<TrmComponent>();
+    public DbSet<TrmComponentCapabilityLink> TrmComponentCapabilityLinks => Set<TrmComponentCapabilityLink>();
+    public DbSet<TrmComponentVersion> TrmComponentVersions => Set<TrmComponentVersion>();
+    public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<ProductCatalogItem> ProductCatalogItems => Set<ProductCatalogItem>();
     public DbSet<ProductMapping> ProductMappings => Set<ProductMapping>();
 
@@ -43,6 +46,41 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(x => x.Components)
                 .HasForeignKey(x => x.ParentCapabilityId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TrmComponentCapabilityLink>(entity =>
+        {
+            entity.HasIndex(x => new { x.TrmComponentId, x.TrmCapabilityId }).IsUnique();
+            entity.HasOne(x => x.TrmComponent)
+                .WithMany(x => x.CapabilityLinks)
+                .HasForeignKey(x => x.TrmComponentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.TrmCapability)
+                .WithMany(x => x.ComponentLinks)
+                .HasForeignKey(x => x.TrmCapabilityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TrmComponentVersion>(entity =>
+        {
+            entity.HasIndex(x => new { x.TrmComponentId, x.VersionNumber }).IsUnique();
+            entity.Property(x => x.ChangeType).HasMaxLength(40);
+            entity.Property(x => x.ModelCode).HasMaxLength(32);
+            entity.Property(x => x.TechnologyComponentCode).HasMaxLength(32);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.HasOne(x => x.TrmComponent)
+                .WithMany(x => x.Versions)
+                .HasForeignKey(x => x.TrmComponentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AuditLogEntry>(entity =>
+        {
+            entity.HasIndex(x => x.OccurredUtc);
+            entity.Property(x => x.Category).HasMaxLength(80);
+            entity.Property(x => x.Action).HasMaxLength(80);
+            entity.Property(x => x.EntityType).HasMaxLength(80);
+            entity.Property(x => x.Summary).HasMaxLength(400);
         });
 
         modelBuilder.Entity<ProductCatalogItem>(entity =>

@@ -1,0 +1,68 @@
+@model ChangeLogIndexViewModel
+@{
+    ViewData["Title"] = "Change Log";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Operations audit</span>
+        <h1>Central changelog</h1>
+        <p>Search imports, component changes, product updates, and mapping activity.</p>
+    </div>
+</section>
+
+<section class="content-card">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-lg-10">
+            <label class="form-label" for="search">Search</label>
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Category, action, entity, summary, or details" />
+        </div>
+        <div class="col-lg-2 d-grid">
+            <button class="btn btn-primary" type="submit">Search</button>
+        </div>
+    </form>
+</section>
+
+<section class="content-card">
+    @if (Model.Entries.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No matching entries</h3>
+            <p>Try a broader search term.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Category</th>
+                        <th>Action</th>
+                        <th>Entity</th>
+                        <th>Summary</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var entry in Model.Entries)
+                {
+                    <tr>
+                        <td>@entry.OccurredUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@entry.Category</td>
+                        <td>@entry.Action</td>
+                        <td>@(entry.EntityType is null ? "-" : $"{entry.EntityType} #{entry.EntityId}")</td>
+                        <td>
+                            <strong>@entry.Summary</strong>
+                            @if (!string.IsNullOrWhiteSpace(entry.Details))
+                            {
+                                <div class="table-subline">@entry.Details</div>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

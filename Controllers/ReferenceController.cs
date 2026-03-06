@@ -1,4 +1,5 @@
 using HERM_MAPPER_APP.Data;
+using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,8 @@ namespace HERM_MAPPER_APP.Controllers;
 public sealed class ReferenceController(
     AppDbContext dbContext,
     TrmWorkbookImportService workbookImportService,
+    ComponentVersioningService componentVersioningService,
+    AuditLogService auditLogService,
     IWebHostEnvironment environment) : Controller
 {
     public async Task<IActionResult> Index(string? search, int? domainId, int? capabilityId)
@@ -68,6 +71,14 @@ public sealed class ReferenceController(
             System.IO.File.Delete(pendingPath);
         }
 
+        await auditLogService.WriteAsync(
+            "Reference",
+            "VerifyImport",
+            "TrmWorkbook",
+            null,
+            $"Verified workbook {workbook.FileName}.",
+            verification.IsValid ? "Verification passed." : string.Join(" | ", verification.Errors));
+
         return View("Index", await BuildViewModelAsync(
             null,
             null,
@@ -124,6 +135,86 @@ public sealed class ReferenceController(
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteComponent(int id)
+    {
+        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id);
+        if (component is null)
+        {
+            return NotFound();
+        }
+
+        component.IsDeleted = true;
+        component.DeletedUtc = DateTime.UtcNow;
+        component.DeletedReason = "Moved to trash from the reference catalogue.";
+
+        await dbContext.SaveChangesAsync();
+        await componentVersioningService.RecordVersionAsync(component.Id, "Deleted", component.DeletedReason);
+        await auditLogService.WriteAsync(
+            "Component",
+            "Delete",
+            nameof(TrmComponent),
+            component.Id,
+            $"Moved component {component.DisplayLabel} to trash.",
+            component.DeletedReason);
+
+        TempData["ImportStatusMessage"] = $"Moved component {component.DisplayLabel} to trash.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreComponent(int id)
+    {
+        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id);
+        if (component is null)
+        {
+            return NotFound();
+        }
+
+        component.IsDeleted = false;
+        component.DeletedUtc = null;
+        component.DeletedReason = null;
+
+        await dbContext.SaveChangesAsync();
+        await componentVersioningService.RecordVersionAsync(component.Id, "Restored", "Restored from trash.");
+        await auditLogService.WriteAsync(
+            "Component",
+            "Restore",
+            nameof(TrmComponent),
+            component.Id,
+            $"Restored component {component.DisplayLabel} from trash.");
+
+        TempData["ImportStatusMessage"] = $"Restored component {component.DisplayLabel}.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    public async Task<IActionResult> History(int id)
+    {
+        var component = await dbContext.TrmComponents
+            .AsNoTracking()
+            .Include(x => x.CapabilityLinks)
+            .ThenInclude(x => x.TrmCapability)
+            .FirstOrDefaultAsync(x => x.Id == id);
+        if (component is null)
+        {
+            return NotFound();
+        }
+
+        var versions = await dbContext.TrmComponentVersions
+            .AsNoTracking()
+            .Where(x => x.TrmComponentId == id)
+            .OrderByDescending(x => x.VersionNumber)
+            .ToListAsync();
+
+        return View(new ComponentHistoryViewModel
+        {
+            Component = component,
+            Versions = versions
+        });
+    }
+
     private async Task<ReferenceCatalogueViewModel> BuildViewModelAsync(
         string? search,
         int? domainId,
@@ -152,18 +243,20 @@ public sealed class ReferenceController(
 
         var componentsQuery = dbContext.TrmComponents
             .AsNoTracking()
-            .Include(x => x.ParentCapability)
+            .Include(x => x.CapabilityLinks)
+            .ThenInclude(x => x.TrmCapability)
             .ThenInclude(x => x!.ParentDomain)
+            .Where(x => !x.IsDeleted)
             .AsQueryable();
 
         if (domainId.HasValue)
         {
-            componentsQuery = componentsQuery.Where(x => x.ParentCapability!.ParentDomainId == domainId);
+            componentsQuery = componentsQuery.Where(x => x.CapabilityLinks.Any(link => link.TrmCapability!.ParentDomainId == domainId));
         }
 
         if (capabilityId.HasValue)
         {
-            componentsQuery = componentsQuery.Where(x => x.ParentCapabilityId == capabilityId);
+            componentsQuery = componentsQuery.Where(x => x.CapabilityLinks.Any(link => link.TrmCapabilityId == capabilityId));
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -186,6 +279,14 @@ public sealed class ReferenceController(
             Components = await componentsQuery
                 .OrderBy(x => x.IsCustom)
                 .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
+                .ToListAsync(),
+            TrashedComponents = await dbContext.TrmComponents
+                .AsNoTracking()
+                .Include(x => x.CapabilityLinks)
+                .ThenInclude(x => x.TrmCapability)
+                .Where(x => x.IsDeleted)
+                .OrderByDescending(x => x.DeletedUtc)
+                .ThenBy(x => x.Name)
                 .ToListAsync(),
             ImportReview = importReview ?? new WorkbookImportReviewViewModel(),
             ImportStatusMessage = importStatusMessage

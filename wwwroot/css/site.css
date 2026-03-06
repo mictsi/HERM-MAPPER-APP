@@ -448,6 +448,35 @@ a {
   background: rgba(11, 110, 79, 0.06);
 }
 
+.dependency-paths {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.dependency-path-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 1.2rem minmax(0, 1fr) 1.2rem minmax(0, 1fr) 1.2rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.dependency-step {
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(11, 110, 79, 0.06);
+  font-weight: 600;
+}
+
+.dependency-arrow {
+  text-align: center;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
 @media (max-width: 991.98px) {
   .hero-panel,
   .stats-grid,
@@ -467,6 +496,14 @@ a {
 
   .mapping-flow-card {
     grid-template-columns: 1fr;
+  }
+
+  .dependency-path-card {
+    grid-template-columns: 1fr;
+  }
+
+  .dependency-arrow {
+    display: none;
   }
 }
 

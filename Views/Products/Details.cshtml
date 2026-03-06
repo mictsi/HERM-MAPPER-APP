@@ -11,6 +11,7 @@
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@Model.Id">Add mapping</a>
+        <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.Id">Visualize</a>
         <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">Edit product</a>
     </div>
 </section>

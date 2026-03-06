@@ -14,7 +14,7 @@ public sealed class HomeController(AppDbContext dbContext) : Controller
         {
             ProductCount = await dbContext.ProductCatalogItems.CountAsync(),
             CompletedMappings = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.Complete),
-            ReferenceComponentCount = await dbContext.TrmComponents.CountAsync(),
+            ReferenceComponentCount = await dbContext.TrmComponents.CountAsync(x => !x.IsDeleted),
             DomainCount = await dbContext.TrmDomains.CountAsync(),
             CapabilityCount = await dbContext.TrmCapabilities.CountAsync(),
             HasReferenceModel = await dbContext.TrmDomains.AnyAsync(),

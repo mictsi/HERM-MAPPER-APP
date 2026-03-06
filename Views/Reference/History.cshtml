@@ -1,0 +1,53 @@
+@model ComponentHistoryViewModel
+@{
+    ViewData["Title"] = "Component History";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Component version history</span>
+        <h1>@Model.Component.DisplayLabel</h1>
+        <p>Every imported, updated, deleted, and restored state for this component.</p>
+    </div>
+    <a class="btn btn-outline-secondary" asp-action="Index">Back to catalogue</a>
+</section>
+
+<section class="content-card">
+    @if (Model.Versions.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No versions captured yet</h3>
+            <p>The next change to this component will create the first history record.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Version</th>
+                        <th>Change</th>
+                        <th>Capabilities</th>
+                        <th>State</th>
+                        <th>Changed</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var version in Model.Versions)
+                {
+                    <tr>
+                        <td>#@version.VersionNumber</td>
+                        <td>@version.ChangeType</td>
+                        <td>@(string.IsNullOrWhiteSpace(version.CapabilityCodes) ? "-" : version.CapabilityCodes)</td>
+                        <td>@(version.IsDeleted ? "Deleted" : "Active")</td>
+                        <td>@version.ChangedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@(version.Details ?? "-")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

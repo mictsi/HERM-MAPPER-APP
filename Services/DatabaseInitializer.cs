@@ -94,6 +94,115 @@ public sealed class DatabaseInitializer(
                     "ALTER TABLE TrmComponents ADD COLUMN IsCustom INTEGER NOT NULL DEFAULT 0",
                     cancellationToken);
             }
+
+            if (!columns.Contains("IsDeleted"))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE TrmComponents ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+
+            if (!columns.Contains("DeletedUtc"))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE TrmComponents ADD COLUMN DeletedUtc TEXT NULL",
+                    cancellationToken);
+            }
+
+            if (!columns.Contains("DeletedReason"))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE TrmComponents ADD COLUMN DeletedReason TEXT NULL",
+                    cancellationToken);
+            }
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "TrmComponentCapabilityLinks" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_TrmComponentCapabilityLinks" PRIMARY KEY AUTOINCREMENT,
+                    "TrmComponentId" INTEGER NOT NULL,
+                    "TrmCapabilityId" INTEGER NOT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    CONSTRAINT "FK_TrmComponentCapabilityLinks_TrmCapabilities_TrmCapabilityId" FOREIGN KEY ("TrmCapabilityId") REFERENCES "TrmCapabilities" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_TrmComponentCapabilityLinks_TrmComponents_TrmComponentId" FOREIGN KEY ("TrmComponentId") REFERENCES "TrmComponents" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_TrmComponentCapabilityLinks_TrmComponentId_TrmCapabilityId"
+                ON "TrmComponentCapabilityLinks" ("TrmComponentId", "TrmCapabilityId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO "TrmComponentCapabilityLinks" ("TrmComponentId", "TrmCapabilityId", "CreatedUtc")
+                SELECT c."Id", c."ParentCapabilityId", CURRENT_TIMESTAMP
+                FROM "TrmComponents" c
+                WHERE c."ParentCapabilityId" IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM "TrmComponentCapabilityLinks" l
+                      WHERE l."TrmComponentId" = c."Id"
+                        AND l."TrmCapabilityId" = c."ParentCapabilityId"
+                  )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "TrmComponentVersions" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_TrmComponentVersions" PRIMARY KEY AUTOINCREMENT,
+                    "TrmComponentId" INTEGER NOT NULL,
+                    "VersionNumber" INTEGER NOT NULL,
+                    "ChangeType" TEXT NOT NULL,
+                    "ModelCode" TEXT NULL,
+                    "TechnologyComponentCode" TEXT NULL,
+                    "Name" TEXT NOT NULL,
+                    "IsCustom" INTEGER NOT NULL,
+                    "IsDeleted" INTEGER NOT NULL,
+                    "CapabilityCodes" TEXT NULL,
+                    "CapabilityNames" TEXT NULL,
+                    "Description" TEXT NULL,
+                    "Comments" TEXT NULL,
+                    "ProductExamples" TEXT NULL,
+                    "Details" TEXT NULL,
+                    "ChangedUtc" TEXT NOT NULL,
+                    CONSTRAINT "FK_TrmComponentVersions_TrmComponents_TrmComponentId" FOREIGN KEY ("TrmComponentId") REFERENCES "TrmComponents" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_TrmComponentVersions_TrmComponentId_VersionNumber"
+                ON "TrmComponentVersions" ("TrmComponentId", "VersionNumber")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "AuditLogEntries" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_AuditLogEntries" PRIMARY KEY AUTOINCREMENT,
+                    "Category" TEXT NOT NULL,
+                    "Action" TEXT NOT NULL,
+                    "EntityType" TEXT NULL,
+                    "EntityId" INTEGER NULL,
+                    "Summary" TEXT NOT NULL,
+                    "Details" TEXT NULL,
+                    "OccurredUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_AuditLogEntries_OccurredUtc"
+                ON "AuditLogEntries" ("OccurredUtc")
+                """,
+                cancellationToken);
         }
         finally
         {

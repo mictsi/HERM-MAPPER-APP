@@ -9,7 +9,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
-public sealed class MappingsController(AppDbContext dbContext, CsvExportService csvExportService) : Controller
+public sealed class MappingsController(
+    AppDbContext dbContext,
+    CsvExportService csvExportService,
+    AuditLogService auditLogService,
+    ComponentVersioningService componentVersioningService) : Controller
 {
     public async Task<IActionResult> Index(string? search, MappingStatus? status, int? domainId, int? capabilityId)
     {
@@ -95,7 +99,8 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             UpdatedUtc = DateTime.UtcNow
         };
 
-        if (!await PopulateAndValidateMapping(model, mapping))
+        var mappingUpdate = await PopulateAndValidateMapping(model, mapping);
+        if (mappingUpdate is null)
         {
             return View("Edit", await BuildMappingEditViewModel(product, model));
         }
@@ -103,6 +108,8 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         dbContext.ProductMappings.Add(mapping);
         product.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
+        await WriteMappingAuditAsync(mapping, "Create", "Created mapping.");
+        await WriteCustomComponentHistoryAsync(mappingUpdate, mapping.TrmComponent);
 
         return RedirectToAction(nameof(Index));
     }
@@ -135,7 +142,8 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             return NotFound();
         }
 
-        if (!await PopulateAndValidateMapping(model, mapping))
+        var mappingUpdate = await PopulateAndValidateMapping(model, mapping);
+        if (mappingUpdate is null)
         {
             return View(await BuildMappingEditViewModel(mapping.ProductCatalogItem, model, mapping.Id));
         }
@@ -143,6 +151,8 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         mapping.UpdatedUtc = DateTime.UtcNow;
         mapping.ProductCatalogItem.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
+        await WriteMappingAuditAsync(mapping, "Update", "Updated mapping.");
+        await WriteCustomComponentHistoryAsync(mappingUpdate, mapping.TrmComponent);
 
         return RedirectToAction(nameof(Index));
     }
@@ -180,6 +190,12 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
 
         dbContext.ProductMappings.Remove(mapping);
         await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Mapping",
+            "Delete",
+            nameof(ProductMapping),
+            id,
+            $"Deleted mapping for {mapping.ProductCatalogItem?.Name ?? "product"}.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -206,7 +222,11 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         var query = dbContext.TrmComponents.AsNoTracking().AsQueryable();
         if (capabilityId.HasValue)
         {
-            query = query.Where(x => x.ParentCapabilityId == capabilityId);
+            query = query.Where(x => !x.IsDeleted && x.CapabilityLinks.Any(link => link.TrmCapabilityId == capabilityId));
+        }
+        else
+        {
+            query = query.Where(x => !x.IsDeleted);
         }
 
         var components = await query
@@ -274,11 +294,12 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         return query;
     }
 
-    private async Task<bool> PopulateAndValidateMapping(MappingEditViewModel model, ProductMapping mapping)
+    private async Task<MappingUpdateResult?> PopulateAndValidateMapping(MappingEditViewModel model, ProductMapping mapping)
     {
         TrmDomain? domain = null;
         TrmCapability? capability = null;
         TrmComponent? component = null;
+        var mappingUpdate = new MappingUpdateResult();
         var customTechnologyComponentCode = NormalizeInput(model.CustomTechnologyComponentCode);
         var customComponentName = NormalizeInput(model.CustomComponentName);
 
@@ -320,6 +341,7 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
                     else
                     {
                         component = customComponentResult.Component;
+                        mappingUpdate = new MappingUpdateResult(customComponentResult.WasCreated, customComponentResult.WasChanged);
                     }
                 }
             }
@@ -327,9 +349,10 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         else if (model.SelectedComponentId.HasValue)
         {
             component = await dbContext.TrmComponents
-                .Include(x => x.ParentCapability)
+                .Include(x => x.CapabilityLinks)
+                .ThenInclude(x => x.TrmCapability)
                 .ThenInclude(x => x!.ParentDomain)
-                .FirstOrDefaultAsync(x => x.Id == model.SelectedComponentId.Value);
+                .FirstOrDefaultAsync(x => x.Id == model.SelectedComponentId.Value && !x.IsDeleted);
 
             if (component is null)
             {
@@ -337,7 +360,20 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             }
             else
             {
-                capability = component.ParentCapability;
+                capability = model.SelectedCapabilityId.HasValue
+                    ? component.CapabilityLinks
+                        .Where(x => x.TrmCapabilityId == model.SelectedCapabilityId.Value)
+                        .Select(x => x.TrmCapability)
+                        .FirstOrDefault()
+                    : component.CapabilityLinks
+                        .Select(x => x.TrmCapability)
+                        .FirstOrDefault();
+
+                if (model.SelectedCapabilityId.HasValue && capability is null)
+                {
+                    ModelState.AddModelError(nameof(model.SelectedCapabilityId), "The selected component is not linked to that TRM capability.");
+                }
+
                 domain = capability?.ParentDomain;
             }
         }
@@ -372,7 +408,7 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
 
         if (!ModelState.IsValid)
         {
-            return false;
+            return null;
         }
 
         mapping.TrmDomainId = domain?.Id;
@@ -384,7 +420,7 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         mapping.MappingStatus = model.MappingStatus;
         mapping.MappingRationale = model.MappingRationale;
         mapping.LastReviewedUtc = DateTime.UtcNow;
-        return true;
+        return mappingUpdate;
     }
 
     private async Task<IReadOnlyList<TrmCapability>> BuildCapabilityFilter(int? domainId)
@@ -420,10 +456,14 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString()))
             .ToListAsync();
 
-        var componentsQuery = dbContext.TrmComponents.AsNoTracking().OrderBy(x => x.Code).AsQueryable();
+        var componentsQuery = dbContext.TrmComponents
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Code)
+            .AsQueryable();
         if (selectedCapabilityId.HasValue)
         {
-            componentsQuery = componentsQuery.Where(x => x.ParentCapabilityId == selectedCapabilityId);
+            componentsQuery = componentsQuery.Where(x => x.CapabilityLinks.Any(link => link.TrmCapabilityId == selectedCapabilityId));
         }
 
         var components = await componentsQuery
@@ -471,10 +511,14 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString()))
             .ToListAsync();
 
-        var componentsQuery = dbContext.TrmComponents.AsNoTracking().OrderBy(x => x.Code).AsQueryable();
+        var componentsQuery = dbContext.TrmComponents
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Code)
+            .AsQueryable();
         if (postedModel.SelectedCapabilityId.HasValue)
         {
-            componentsQuery = componentsQuery.Where(x => x.ParentCapabilityId == postedModel.SelectedCapabilityId);
+            componentsQuery = componentsQuery.Where(x => x.CapabilityLinks.Any(link => link.TrmCapabilityId == postedModel.SelectedCapabilityId));
         }
 
         var components = await componentsQuery
@@ -506,7 +550,7 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         };
     }
 
-    private async Task<(TrmComponent? Component, string? ErrorMessage)> ResolveOrCreateCustomComponentAsync(
+    private async Task<(TrmComponent? Component, string? ErrorMessage, bool WasCreated, bool WasChanged)> ResolveOrCreateCustomComponentAsync(
         TrmCapability capability,
         string technologyComponentCode,
         string componentName)
@@ -516,26 +560,40 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
 
         if (modelCodeExists)
         {
-            return (null, "That Technology Component Code already exists in the imported TRM model. Choose the model component instead.");
+            return (null, "That Technology Component Code already exists in the imported TRM model. Choose the model component instead.", false, false);
         }
 
         var existingCustomComponent = await dbContext.TrmComponents
-            .Include(x => x.ParentCapability)
-            .ThenInclude(x => x!.ParentDomain)
+            .Include(x => x.CapabilityLinks)
             .FirstOrDefaultAsync(x =>
                 x.IsCustom &&
+                !x.IsDeleted &&
                 x.TechnologyComponentCode != null &&
                 x.TechnologyComponentCode.ToLower() == technologyComponentCode.ToLower());
 
         if (existingCustomComponent is not null)
         {
-            if (existingCustomComponent.ParentCapabilityId != capability.Id)
+            var wasChanged = existingCustomComponent.Name != componentName;
+            existingCustomComponent.Name = componentName;
+
+            if (!existingCustomComponent.CapabilityLinks.Any(x => x.TrmCapabilityId == capability.Id))
             {
-                return (null, "That Technology Component Code is already assigned to another TRM capability.");
+                existingCustomComponent.CapabilityLinks.Add(new TrmComponentCapabilityLink
+                {
+                    TrmCapabilityId = capability.Id,
+                    CreatedUtc = DateTime.UtcNow
+                });
+                wasChanged = true;
             }
 
-            existingCustomComponent.Name = componentName;
-            return (existingCustomComponent, null);
+            if (existingCustomComponent.ParentCapabilityId is null)
+            {
+                existingCustomComponent.ParentCapabilityId = capability.Id;
+                existingCustomComponent.ParentCapabilityCode = capability.Code;
+                wasChanged = true;
+            }
+
+            return (existingCustomComponent, null, false, wasChanged);
         }
 
         var component = new TrmComponent
@@ -549,8 +607,14 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             IsCustom = true
         };
 
+        component.CapabilityLinks.Add(new TrmComponentCapabilityLink
+        {
+            TrmCapabilityId = capability.Id,
+            CreatedUtc = DateTime.UtcNow
+        });
+
         dbContext.TrmComponents.Add(component);
-        return (component, null);
+        return (component, null, true, true);
     }
 
     private static string GenerateInternalCustomComponentCode() =>
@@ -558,4 +622,38 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
 
     private static string? NormalizeInput(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task WriteMappingAuditAsync(ProductMapping mapping, string action, string details)
+    {
+        await auditLogService.WriteAsync(
+            "Mapping",
+            action,
+            nameof(ProductMapping),
+            mapping.Id,
+            $"{action}d mapping for {mapping.ProductCatalogItem?.Name ?? "product"}.",
+            details);
+    }
+
+    private async Task WriteCustomComponentHistoryAsync(MappingUpdateResult updateResult, TrmComponent? component)
+    {
+        if (component is null || !component.IsCustom || !updateResult.CustomComponentChanged)
+        {
+            return;
+        }
+
+        await componentVersioningService.RecordVersionAsync(
+            component.Id,
+            updateResult.CustomComponentCreated ? "Created" : "Updated",
+            "Custom component maintained from mapping.");
+
+        await auditLogService.WriteAsync(
+            "Component",
+            updateResult.CustomComponentCreated ? "Create" : "Update",
+            nameof(TrmComponent),
+            component.Id,
+            $"{(updateResult.CustomComponentCreated ? "Created" : "Updated")} custom component {component.DisplayLabel}.",
+            "Triggered from mapping edit.");
+    }
+
+    private sealed record MappingUpdateResult(bool CustomComponentCreated = false, bool CustomComponentChanged = false);
 }

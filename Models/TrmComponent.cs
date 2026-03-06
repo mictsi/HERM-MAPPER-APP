@@ -17,6 +17,12 @@ public sealed class TrmComponent
     public string Name { get; set; } = string.Empty;
 
     public bool IsCustom { get; set; }
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedUtc { get; set; }
+
+    [StringLength(400)]
+    public string? DeletedReason { get; set; }
 
     [StringLength(200)]
     public string? SourceTitle { get; set; }
@@ -35,6 +41,9 @@ public sealed class TrmComponent
 
     [StringLength(4000)]
     public string? ProductExamples { get; set; }
+
+    public ICollection<TrmComponentCapabilityLink> CapabilityLinks { get; set; } = new List<TrmComponentCapabilityLink>();
+    public ICollection<TrmComponentVersion> Versions { get; set; } = new List<TrmComponentVersion>();
 
     [NotMapped]
     public string DisplayCode => IsCustom && !string.IsNullOrWhiteSpace(TechnologyComponentCode)

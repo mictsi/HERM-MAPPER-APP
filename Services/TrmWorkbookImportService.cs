@@ -9,7 +9,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Services;
 
-public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
+public sealed partial class TrmWorkbookImportService(
+    AppDbContext dbContext,
+    ComponentVersioningService componentVersioningService,
+    AuditLogService auditLogService)
 {
     private static readonly XNamespace SpreadsheetNs = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     private static readonly XNamespace RelationshipNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -193,26 +196,53 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
 
         var componentsByCode = await dbContext.TrmComponents
             .Where(x => !x.IsCustom)
+            .Include(x => x.CapabilityLinks)
             .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
         var componentsAdded = 0;
         var componentsUpdated = 0;
+        var changedComponentIds = new List<int>();
+        var addedComponents = new List<TrmComponent>();
         foreach (var row in snapshot.Components)
         {
-            trackedCapabilitiesByCode.TryGetValue(row.ParentCapabilityCode, out var parentCapability);
+            var capabilityIds = row.ParentCapabilityCodes
+                .Where(trackedCapabilitiesByCode.ContainsKey)
+                .Select(code => trackedCapabilitiesByCode[code].Id)
+                .Distinct()
+                .ToList();
+            var primaryCapability = capabilityIds.Count > 0
+                ? trackedCapabilitiesByCode[row.ParentCapabilityCodes[0]]
+                : null;
 
             if (componentsByCode.TryGetValue(row.Code, out var existingComponent))
             {
+                var changed = existingComponent.SourceTitle != row.SourceTitle ||
+                              existingComponent.Name != row.Name ||
+                              existingComponent.ParentCapabilityCode != (row.ParentCapabilityCodes.FirstOrDefault() ?? string.Empty) ||
+                              existingComponent.ParentCapabilityId != primaryCapability?.Id ||
+                              existingComponent.Description != row.Description ||
+                              existingComponent.Comments != row.Comments ||
+                              existingComponent.ProductExamples != row.ProductExamples ||
+                              existingComponent.TechnologyComponentCode is not null ||
+                              existingComponent.IsCustom;
+
                 existingComponent.SourceTitle = row.SourceTitle;
                 existingComponent.Name = row.Name;
-                existingComponent.ParentCapabilityCode = row.ParentCapabilityCode;
-                existingComponent.ParentCapabilityId = parentCapability?.Id;
+                existingComponent.ParentCapabilityCode = row.ParentCapabilityCodes.FirstOrDefault() ?? string.Empty;
+                existingComponent.ParentCapabilityId = primaryCapability?.Id;
                 existingComponent.Description = row.Description;
                 existingComponent.Comments = row.Comments;
                 existingComponent.ProductExamples = row.ProductExamples;
                 existingComponent.TechnologyComponentCode = null;
                 existingComponent.IsCustom = false;
-                componentsUpdated++;
+                changed |= await SyncCapabilityLinksAsync(existingComponent, capabilityIds, cancellationToken);
+
+                if (changed)
+                {
+                    componentsUpdated++;
+                    changedComponentIds.Add(existingComponent.Id);
+                }
+
                 continue;
             }
 
@@ -221,8 +251,8 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
                 SourceTitle = row.SourceTitle,
                 Code = row.Code,
                 Name = row.Name,
-                ParentCapabilityCode = row.ParentCapabilityCode,
-                ParentCapabilityId = parentCapability?.Id,
+                ParentCapabilityCode = row.ParentCapabilityCodes.FirstOrDefault() ?? string.Empty,
+                ParentCapabilityId = primaryCapability?.Id,
                 Description = row.Description,
                 Comments = row.Comments,
                 ProductExamples = row.ProductExamples,
@@ -230,11 +260,40 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
             };
 
             dbContext.TrmComponents.Add(component);
+            addedComponents.Add(component);
+            foreach (var capabilityId in capabilityIds)
+            {
+                component.CapabilityLinks.Add(new TrmComponentCapabilityLink
+                {
+                    TrmCapabilityId = capabilityId,
+                    CreatedUtc = DateTime.UtcNow
+                });
+            }
+
             componentsByCode[row.Code] = component;
             componentsAdded++;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        foreach (var component in addedComponents)
+        {
+            await componentVersioningService.RecordVersionAsync(component.Id, "Imported", "Workbook import", cancellationToken);
+        }
+
+        foreach (var componentId in changedComponentIds.Distinct())
+        {
+            await componentVersioningService.RecordVersionAsync(componentId, "Updated", "Workbook import", cancellationToken);
+        }
+
+        await auditLogService.WriteAsync(
+            "Reference",
+            "Import",
+            "TrmWorkbook",
+            null,
+            $"Imported TRM workbook: {domainsAdded} domains added, {capabilitiesAdded} capabilities added, {componentsAdded} components added.",
+            $"Updated {domainsUpdated} domains, {capabilitiesUpdated} capabilities, {componentsUpdated} components.",
+            cancellationToken);
 
         return new TrmWorkbookImportSummary
         {
@@ -281,7 +340,7 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
                 GetValue(row, "A"),
                 GetValue(row, "B"),
                 GetValue(row, "C"),
-                ExtractCode(GetValue(row, "D")) ?? string.Empty,
+                ExtractCodes(GetValue(row, "D")),
                 GetValue(row, "E"),
                 GetValue(row, "F"),
                 GetValue(row, "G")))
@@ -325,9 +384,15 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
         var capabilityCodes = snapshot.Capabilities
             .Select(x => x.Code)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var row in snapshot.Components.Where(x => string.IsNullOrWhiteSpace(x.ParentCapabilityCode) || !capabilityCodes.Contains(x.ParentCapabilityCode)))
+        foreach (var row in snapshot.Components.Where(x => x.ParentCapabilityCodes.Count == 0))
         {
-            errors.Add($"Component {row.Code} references a missing TRM capability code '{row.ParentCapabilityCode}'.");
+            errors.Add($"Component {row.Code} must reference at least one TRM capability code.");
+        }
+
+        foreach (var row in snapshot.Components.Where(x => x.ParentCapabilityCodes.Any(code => !capabilityCodes.Contains(code))))
+        {
+            var missingCodes = row.ParentCapabilityCodes.Where(code => !capabilityCodes.Contains(code));
+            errors.Add($"Component {row.Code} references missing TRM capability code(s): {string.Join(", ", missingCodes)}.");
         }
 
         return errors
@@ -477,6 +542,56 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
         return match.Success ? match.Value : rawValue.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
     }
 
+    private static IReadOnlyList<string> ExtractCodes(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return [];
+        }
+
+        return rawValue
+            .Split([',', ';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(ExtractCode)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private async Task<bool> SyncCapabilityLinksAsync(TrmComponent component, IReadOnlyList<int> capabilityIds, CancellationToken cancellationToken)
+    {
+        var existingLinks = await dbContext.TrmComponentCapabilityLinks
+            .Where(x => x.TrmComponentId == component.Id)
+            .ToListAsync(cancellationToken);
+
+        var existingCapabilityIds = existingLinks
+            .Select(x => x.TrmCapabilityId)
+            .ToHashSet();
+        var targetCapabilityIds = capabilityIds
+            .ToHashSet();
+
+        var changed = false;
+
+        foreach (var link in existingLinks.Where(x => !targetCapabilityIds.Contains(x.TrmCapabilityId)))
+        {
+            dbContext.TrmComponentCapabilityLinks.Remove(link);
+            changed = true;
+        }
+
+        foreach (var capabilityId in capabilityIds.Where(x => !existingCapabilityIds.Contains(x)))
+        {
+            dbContext.TrmComponentCapabilityLinks.Add(new TrmComponentCapabilityLink
+            {
+                TrmComponentId = component.Id,
+                TrmCapabilityId = capabilityId,
+                CreatedUtc = DateTime.UtcNow
+            });
+            changed = true;
+        }
+
+        return changed;
+    }
+
     [GeneratedRegex(@"^[A-Z]{2}\d{3}", RegexOptions.CultureInvariant)]
     private static partial Regex TrmCodeRegex();
 
@@ -504,7 +619,7 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
         string SourceTitle,
         string Code,
         string Name,
-        string ParentCapabilityCode,
+        IReadOnlyList<string> ParentCapabilityCodes,
         string Description,
         string Comments,
         string ProductExamples);

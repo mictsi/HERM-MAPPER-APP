@@ -28,4 +28,5 @@ public sealed class TrmCapability
     public string? Comments { get; set; }
 
     public ICollection<TrmComponent> Components { get; set; } = new List<TrmComponent>();
+    public ICollection<TrmComponentCapabilityLink> ComponentLinks { get; set; } = new List<TrmComponentCapabilityLink>();
 }

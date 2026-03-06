@@ -178,14 +178,26 @@
                             <tr>
                                 <th>Component</th>
                                 <th>Type</th>
-                                <th>Capability</th>
-                                <th>Domain</th>
+                                <th>Capabilities</th>
+                                <th>Domains</th>
                                 <th>Product examples</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
                         @foreach (var component in Model.Components)
                         {
+                            var linkedCapabilities = component.CapabilityLinks
+                                .Where(x => x.TrmCapability is not null)
+                                .Select(x => x.TrmCapability!)
+                                .OrderBy(x => x.Code)
+                                .ToList();
+                            var linkedDomains = linkedCapabilities
+                                .Where(x => x.ParentDomain is not null)
+                                .Select(x => x.ParentDomain!)
+                                .DistinctBy(x => x.Id)
+                                .OrderBy(x => x.Code)
+                                .ToList();
                             <tr>
                                 <td>
                                     <strong>@component.DisplayLabel</strong>
@@ -196,9 +208,46 @@
                                         @(component.IsCustom ? "Custom" : "Model")
                                     </span>
                                 </td>
-                                <td>@(component.ParentCapability is null ? "-" : $"{component.ParentCapability.Code} {component.ParentCapability.Name}")</td>
-                                <td>@(component.ParentCapability?.ParentDomain is null ? "-" : $"{component.ParentCapability.ParentDomain.Code} {component.ParentCapability.ParentDomain.Name}")</td>
+                                <td>
+                                    @if (linkedCapabilities.Count == 0)
+                                    {
+                                        <span>-</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="mapping-chip-list">
+                                            @foreach (var capability in linkedCapabilities)
+                                            {
+                                                <span class="mapping-chip">@capability.Code @capability.Name</span>
+                                            }
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    @if (linkedDomains.Count == 0)
+                                    {
+                                        <span>-</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="mapping-chip-list">
+                                            @foreach (var domain in linkedDomains)
+                                            {
+                                                <span class="mapping-chip">@domain.Code @domain.Name</span>
+                                            }
+                                        </div>
+                                    }
+                                </td>
                                 <td>@(string.IsNullOrWhiteSpace(component.ProductExamples) ? "-" : component.ProductExamples)</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <a class="btn btn-outline-secondary" asp-action="History" asp-route-id="@component.Id">History</a>
+                                        <form asp-action="DeleteComponent" method="post" class="d-inline">
+                                            <input type="hidden" name="id" value="@component.Id" />
+                                            <button class="btn btn-outline-danger" type="submit">Trash</button>
+                                        </form>
+                                    </div>
+                                </td>
                             </tr>
                         }
                         </tbody>
@@ -208,3 +257,54 @@
         </section>
     </div>
 </div>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Trash</span>
+            <h2>@Model.TrashedComponents.Count deleted component(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.TrashedComponents.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>Trash is empty</h3>
+            <p>Deleted components stay here until they are restored.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Deleted</th>
+                        <th>Reason</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var component in Model.TrashedComponents)
+                {
+                    <tr>
+                        <td>@component.DisplayLabel</td>
+                        <td>@component.DeletedUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@(component.DeletedReason ?? "-")</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a class="btn btn-outline-secondary" asp-action="History" asp-route-id="@component.Id">History</a>
+                                <form asp-action="RestoreComponent" method="post" class="d-inline">
+                                    <input type="hidden" name="id" value="@component.Id" />
+                                    <button class="btn btn-outline-primary" type="submit">Restore</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
