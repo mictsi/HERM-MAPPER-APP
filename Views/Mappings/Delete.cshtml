@@ -20,7 +20,7 @@
         <dt>Capability</dt>
         <dd>@(Model.TrmCapability is null ? "-" : $"{Model.TrmCapability.Code} {Model.TrmCapability.Name}")</dd>
         <dt>Component</dt>
-        <dd>@(Model.TrmComponent is null ? "-" : $"{Model.TrmComponent.Code} {Model.TrmComponent.Name}")</dd>
+        <dd>@(Model.TrmComponent is null ? "-" : Model.TrmComponent.DisplayLabel)</dd>
     </dl>
 
     <form asp-action="Delete" method="post" class="d-flex gap-2">

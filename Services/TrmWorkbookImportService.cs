@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using HERM_MAPPER_APP.Data;
 using HERM_MAPPER_APP.Models;
+using HERM_MAPPER_APP.ViewModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Services;
@@ -14,93 +15,352 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
     private static readonly XNamespace RelationshipNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private static readonly XNamespace PackageRelationshipNs = "http://schemas.openxmlformats.org/package/2006/relationships";
 
-    public async Task ImportAsync(string workbookPath, CancellationToken cancellationToken = default)
+    public async Task<TrmWorkbookVerificationResult> VerifyAsync(string workbookPath, CancellationToken cancellationToken = default)
     {
-        if (await dbContext.TrmDomains.AnyAsync(cancellationToken))
+        try
         {
-            return;
+            using var archive = ZipFile.OpenRead(workbookPath);
+            var snapshot = LoadSnapshot(archive);
+            return await BuildVerificationResultAsync(snapshot, cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or InvalidDataException)
+        {
+            return new TrmWorkbookVerificationResult
+            {
+                Errors = [ex.Message]
+            };
+        }
+    }
+
+    public async Task<TrmWorkbookImportSummary> ImportAsync(string workbookPath, CancellationToken cancellationToken = default)
+    {
+        using var archive = ZipFile.OpenRead(workbookPath);
+        var snapshot = LoadSnapshot(archive);
+        var verification = await BuildVerificationResultAsync(snapshot, cancellationToken);
+
+        if (!verification.IsValid)
+        {
+            throw new InvalidOperationException("Workbook verification failed. Resolve the reported errors before importing.");
         }
 
-        using var archive = ZipFile.OpenRead(workbookPath);
+        return await UpsertSnapshotAsync(snapshot, cancellationToken);
+    }
+
+    private async Task<TrmWorkbookVerificationResult> BuildVerificationResultAsync(
+        TrmWorkbookSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var errors = ValidateSnapshot(snapshot);
+        var warnings = new List<string>();
+
+        var existingDomainCodes = await dbContext.TrmDomains
+            .AsNoTracking()
+            .Select(x => x.Code)
+            .ToListAsync(cancellationToken);
+        var existingCapabilityCodes = await dbContext.TrmCapabilities
+            .AsNoTracking()
+            .Select(x => x.Code)
+            .ToListAsync(cancellationToken);
+        var existingComponentCodes = await dbContext.TrmComponents
+            .AsNoTracking()
+            .Where(x => !x.IsCustom)
+            .Select(x => x.Code)
+            .ToListAsync(cancellationToken);
+
+        var existingDomainCodeSet = new HashSet<string>(existingDomainCodes, StringComparer.OrdinalIgnoreCase);
+        var existingCapabilityCodeSet = new HashSet<string>(existingCapabilityCodes, StringComparer.OrdinalIgnoreCase);
+        var existingComponentCodeSet = new HashSet<string>(existingComponentCodes, StringComparer.OrdinalIgnoreCase);
+
+        if (snapshot.Domains.Count == 0)
+        {
+            errors.Add("The workbook does not contain any TRM domain rows.");
+        }
+
+        if (snapshot.Capabilities.Count == 0)
+        {
+            errors.Add("The workbook does not contain any TRM capability rows.");
+        }
+
+        if (snapshot.Components.Count == 0)
+        {
+            errors.Add("The workbook does not contain any TRM component rows.");
+        }
+
+        if (!errors.Any() && !existingDomainCodes.Any() && !existingCapabilityCodes.Any() && !existingComponentCodes.Any())
+        {
+            warnings.Add("This import will create the first TRM model in the database.");
+        }
+
+        return new TrmWorkbookVerificationResult
+        {
+            DomainRowCount = snapshot.Domains.Count,
+            CapabilityRowCount = snapshot.Capabilities.Count,
+            ComponentRowCount = snapshot.Components.Count,
+            DomainsToAdd = snapshot.Domains.Count(x => !existingDomainCodeSet.Contains(x.Code)),
+            DomainsToUpdate = snapshot.Domains.Count(x => existingDomainCodeSet.Contains(x.Code)),
+            CapabilitiesToAdd = snapshot.Capabilities.Count(x => !existingCapabilityCodeSet.Contains(x.Code)),
+            CapabilitiesToUpdate = snapshot.Capabilities.Count(x => existingCapabilityCodeSet.Contains(x.Code)),
+            ComponentsToAdd = snapshot.Components.Count(x => !existingComponentCodeSet.Contains(x.Code)),
+            ComponentsToUpdate = snapshot.Components.Count(x => existingComponentCodeSet.Contains(x.Code)),
+            Errors = errors,
+            Warnings = warnings
+        };
+    }
+
+    private async Task<TrmWorkbookImportSummary> UpsertSnapshotAsync(
+        TrmWorkbookSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var summary = new TrmWorkbookImportSummary();
+
+        var domainsByCode = await dbContext.TrmDomains
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var domainsAdded = 0;
+        var domainsUpdated = 0;
+        foreach (var row in snapshot.Domains)
+        {
+            if (domainsByCode.TryGetValue(row.Code, out var existingDomain))
+            {
+                existingDomain.SourceTitle = row.SourceTitle;
+                existingDomain.Name = row.Name;
+                existingDomain.Description = row.Description;
+                existingDomain.Comments = row.Comments;
+                domainsUpdated++;
+                continue;
+            }
+
+            var domain = new TrmDomain
+            {
+                SourceTitle = row.SourceTitle,
+                Code = row.Code,
+                Name = row.Name,
+                Description = row.Description,
+                Comments = row.Comments
+            };
+
+            dbContext.TrmDomains.Add(domain);
+            domainsByCode[row.Code] = domain;
+            domainsAdded++;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var trackedDomainsByCode = await dbContext.TrmDomains
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var capabilitiesByCode = await dbContext.TrmCapabilities
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var capabilitiesAdded = 0;
+        var capabilitiesUpdated = 0;
+        foreach (var row in snapshot.Capabilities)
+        {
+            trackedDomainsByCode.TryGetValue(row.ParentDomainCode, out var parentDomain);
+
+            if (capabilitiesByCode.TryGetValue(row.Code, out var existingCapability))
+            {
+                existingCapability.SourceTitle = row.SourceTitle;
+                existingCapability.Name = row.Name;
+                existingCapability.ParentDomainCode = row.ParentDomainCode;
+                existingCapability.ParentDomainId = parentDomain?.Id;
+                existingCapability.Description = row.Description;
+                existingCapability.Comments = row.Comments;
+                capabilitiesUpdated++;
+                continue;
+            }
+
+            var capability = new TrmCapability
+            {
+                SourceTitle = row.SourceTitle,
+                Code = row.Code,
+                Name = row.Name,
+                ParentDomainCode = row.ParentDomainCode,
+                ParentDomainId = parentDomain?.Id,
+                Description = row.Description,
+                Comments = row.Comments
+            };
+
+            dbContext.TrmCapabilities.Add(capability);
+            capabilitiesByCode[row.Code] = capability;
+            capabilitiesAdded++;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var trackedCapabilitiesByCode = await dbContext.TrmCapabilities
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var componentsByCode = await dbContext.TrmComponents
+            .Where(x => !x.IsCustom)
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var componentsAdded = 0;
+        var componentsUpdated = 0;
+        foreach (var row in snapshot.Components)
+        {
+            trackedCapabilitiesByCode.TryGetValue(row.ParentCapabilityCode, out var parentCapability);
+
+            if (componentsByCode.TryGetValue(row.Code, out var existingComponent))
+            {
+                existingComponent.SourceTitle = row.SourceTitle;
+                existingComponent.Name = row.Name;
+                existingComponent.ParentCapabilityCode = row.ParentCapabilityCode;
+                existingComponent.ParentCapabilityId = parentCapability?.Id;
+                existingComponent.Description = row.Description;
+                existingComponent.Comments = row.Comments;
+                existingComponent.ProductExamples = row.ProductExamples;
+                existingComponent.TechnologyComponentCode = null;
+                existingComponent.IsCustom = false;
+                componentsUpdated++;
+                continue;
+            }
+
+            var component = new TrmComponent
+            {
+                SourceTitle = row.SourceTitle,
+                Code = row.Code,
+                Name = row.Name,
+                ParentCapabilityCode = row.ParentCapabilityCode,
+                ParentCapabilityId = parentCapability?.Id,
+                Description = row.Description,
+                Comments = row.Comments,
+                ProductExamples = row.ProductExamples,
+                IsCustom = false
+            };
+
+            dbContext.TrmComponents.Add(component);
+            componentsByCode[row.Code] = component;
+            componentsAdded++;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new TrmWorkbookImportSummary
+        {
+            DomainsAdded = domainsAdded,
+            DomainsUpdated = domainsUpdated,
+            CapabilitiesAdded = capabilitiesAdded,
+            CapabilitiesUpdated = capabilitiesUpdated,
+            ComponentsAdded = componentsAdded,
+            ComponentsUpdated = componentsUpdated
+        };
+    }
+
+    private static TrmWorkbookSnapshot LoadSnapshot(ZipArchive archive)
+    {
         var sharedStrings = LoadSharedStrings(archive);
         var sheetLookup = LoadSheetLookup(archive);
 
-        var domains = ReadRows(archive, sheetLookup["TRM Domain"], sharedStrings)
+        var domains = ReadRows(archive, GetRequiredSheetPath(sheetLookup, "TRM Domain"), sharedStrings)
             .Skip(1)
-            .Select(row => new TrmDomain
-            {
-                SourceTitle = GetValue(row, "A"),
-                Code = GetValue(row, "B"),
-                Name = GetValue(row, "C"),
-                Description = GetValue(row, "D"),
-                Comments = GetValue(row, "E")
-            })
+            .Select(row => new TrmDomainRow(
+                GetValue(row, "A"),
+                GetValue(row, "B"),
+                GetValue(row, "C"),
+                GetValue(row, "D"),
+                GetValue(row, "E")))
             .Where(x => !string.IsNullOrWhiteSpace(x.Code))
             .ToList();
 
-        dbContext.TrmDomains.AddRange(domains);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        var domainIdByCode = await dbContext.TrmDomains
-            .AsNoTracking()
-            .ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
-
-        var capabilities = ReadRows(archive, sheetLookup["TRM Capability"], sharedStrings)
+        var capabilities = ReadRows(archive, GetRequiredSheetPath(sheetLookup, "TRM Capability"), sharedStrings)
             .Skip(1)
-            .Select(row => new TrmCapability
-            {
-                SourceTitle = GetValue(row, "A"),
-                Code = GetValue(row, "B"),
-                Name = GetValue(row, "C"),
-                ParentDomainCode = ExtractCode(GetValue(row, "D")),
-                Description = GetValue(row, "E"),
-                Comments = GetValue(row, "F")
-            })
+            .Select(row => new TrmCapabilityRow(
+                GetValue(row, "A"),
+                GetValue(row, "B"),
+                GetValue(row, "C"),
+                ExtractCode(GetValue(row, "D")) ?? string.Empty,
+                GetValue(row, "E"),
+                GetValue(row, "F")))
             .Where(x => !string.IsNullOrWhiteSpace(x.Code))
             .ToList();
 
-        foreach (var capability in capabilities)
+        var components = ReadRows(archive, GetRequiredSheetPath(sheetLookup, "TRM Component"), sharedStrings)
+            .Skip(1)
+            .Select(row => new TrmComponentRow(
+                GetValue(row, "A"),
+                GetValue(row, "B"),
+                GetValue(row, "C"),
+                ExtractCode(GetValue(row, "D")) ?? string.Empty,
+                GetValue(row, "E"),
+                GetValue(row, "F"),
+                GetValue(row, "G")))
+            .Where(x => !string.IsNullOrWhiteSpace(x.Code))
+            .ToList();
+
+        return new TrmWorkbookSnapshot(domains, capabilities, components);
+    }
+
+    private static List<string> ValidateSnapshot(TrmWorkbookSnapshot snapshot)
+    {
+        var errors = new List<string>();
+
+        errors.AddRange(ValidateCodes(snapshot.Domains.Select(x => x.Code), "domain"));
+        errors.AddRange(ValidateCodes(snapshot.Capabilities.Select(x => x.Code), "capability"));
+        errors.AddRange(ValidateCodes(snapshot.Components.Select(x => x.Code), "component"));
+
+        foreach (var row in snapshot.Domains.Where(x => string.IsNullOrWhiteSpace(x.Name)))
         {
-            if (capability.ParentDomainCode is not null &&
-                domainIdByCode.TryGetValue(capability.ParentDomainCode, out var domainId))
-            {
-                capability.ParentDomainId = domainId;
-            }
+            errors.Add($"Domain {row.Code} is missing a name.");
         }
 
-        dbContext.TrmCapabilities.AddRange(capabilities);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        var capabilityIdByCode = await dbContext.TrmCapabilities
-            .AsNoTracking()
-            .ToDictionaryAsync(x => x.Code, x => x.Id, cancellationToken);
-
-        var components = ReadRows(archive, sheetLookup["TRM Component"], sharedStrings)
-            .Skip(1)
-            .Select(row => new TrmComponent
-            {
-                SourceTitle = GetValue(row, "A"),
-                Code = GetValue(row, "B"),
-                Name = GetValue(row, "C"),
-                ParentCapabilityCode = ExtractCode(GetValue(row, "D")),
-                Description = GetValue(row, "E"),
-                Comments = GetValue(row, "F"),
-                ProductExamples = GetValue(row, "G")
-            })
-            .Where(x => !string.IsNullOrWhiteSpace(x.Code))
-            .ToList();
-
-        foreach (var component in components)
+        foreach (var row in snapshot.Capabilities.Where(x => string.IsNullOrWhiteSpace(x.Name)))
         {
-            if (component.ParentCapabilityCode is not null &&
-                capabilityIdByCode.TryGetValue(component.ParentCapabilityCode, out var capabilityId))
-            {
-                component.ParentCapabilityId = capabilityId;
-            }
+            errors.Add($"Capability {row.Code} is missing a name.");
         }
 
-        dbContext.TrmComponents.AddRange(components);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        foreach (var row in snapshot.Components.Where(x => string.IsNullOrWhiteSpace(x.Name)))
+        {
+            errors.Add($"Component {row.Code} is missing a name.");
+        }
+
+        var domainCodes = snapshot.Domains
+            .Select(x => x.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in snapshot.Capabilities.Where(x => string.IsNullOrWhiteSpace(x.ParentDomainCode) || !domainCodes.Contains(x.ParentDomainCode)))
+        {
+            errors.Add($"Capability {row.Code} references a missing TRM domain code '{row.ParentDomainCode}'.");
+        }
+
+        var capabilityCodes = snapshot.Capabilities
+            .Select(x => x.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in snapshot.Components.Where(x => string.IsNullOrWhiteSpace(x.ParentCapabilityCode) || !capabilityCodes.Contains(x.ParentCapabilityCode)))
+        {
+            errors.Add($"Component {row.Code} references a missing TRM capability code '{row.ParentCapabilityCode}'.");
+        }
+
+        return errors
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IEnumerable<string> ValidateCodes(IEnumerable<string> codes, string entityLabel)
+    {
+        var normalizedCodes = codes
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .ToList();
+
+        foreach (var duplicate in normalizedCodes
+                     .GroupBy(x => x, StringComparer.OrdinalIgnoreCase)
+                     .Where(x => x.Count() > 1)
+                     .Select(x => x.Key)
+                     .OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+        {
+            yield return $"The workbook contains duplicate {entityLabel} code '{duplicate}'.";
+        }
+    }
+
+    private static string GetRequiredSheetPath(IReadOnlyDictionary<string, string> sheetLookup, string sheetName)
+    {
+        if (!sheetLookup.TryGetValue(sheetName, out var worksheetPath))
+        {
+            throw new InvalidOperationException($"The workbook is missing the required '{sheetName}' sheet.");
+        }
+
+        return worksheetPath;
     }
 
     private static Dictionary<string, string> LoadSheetLookup(ZipArchive archive)
@@ -219,4 +479,33 @@ public sealed partial class TrmWorkbookImportService(AppDbContext dbContext)
 
     [GeneratedRegex(@"^[A-Z]{2}\d{3}", RegexOptions.CultureInvariant)]
     private static partial Regex TrmCodeRegex();
+
+    private sealed record TrmWorkbookSnapshot(
+        IReadOnlyList<TrmDomainRow> Domains,
+        IReadOnlyList<TrmCapabilityRow> Capabilities,
+        IReadOnlyList<TrmComponentRow> Components);
+
+    private sealed record TrmDomainRow(
+        string SourceTitle,
+        string Code,
+        string Name,
+        string Description,
+        string Comments);
+
+    private sealed record TrmCapabilityRow(
+        string SourceTitle,
+        string Code,
+        string Name,
+        string ParentDomainCode,
+        string Description,
+        string Comments);
+
+    private sealed record TrmComponentRow(
+        string SourceTitle,
+        string Code,
+        string Name,
+        string ParentCapabilityCode,
+        string Description,
+        string Comments,
+        string ProductExamples);
 }

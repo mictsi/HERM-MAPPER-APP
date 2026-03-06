@@ -10,5 +10,6 @@ public sealed class ReferenceCatalogueViewModel
     public IReadOnlyList<TrmDomain> Domains { get; init; } = [];
     public IReadOnlyList<TrmCapability> Capabilities { get; init; } = [];
     public IReadOnlyList<TrmComponent> Components { get; init; } = [];
-    public string? WorkbookPath { get; init; }
+    public WorkbookImportReviewViewModel ImportReview { get; init; } = new();
+    public string? ImportStatusMessage { get; init; }
 }

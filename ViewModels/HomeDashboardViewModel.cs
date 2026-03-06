@@ -9,6 +9,6 @@ public sealed class HomeDashboardViewModel
     public int ReferenceComponentCount { get; init; }
     public int DomainCount { get; init; }
     public int CapabilityCount { get; init; }
-    public string? WorkbookPath { get; init; }
+    public bool HasReferenceModel { get; init; }
     public IReadOnlyList<ProductCatalogItem> RecentProducts { get; init; } = [];
 }

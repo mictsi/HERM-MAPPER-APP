@@ -61,14 +61,22 @@
                         <td>
                             <strong>@item.Mappings.Count mapping(s)</strong>
                             <div class="table-subline">
-                                @(latestMapping?.TrmComponent is null ? "No mapped component yet" : $"{latestMapping.TrmComponent.Code} {latestMapping.TrmComponent.Name}")
+                                @(latestMapping?.TrmComponent is null ? "No mapped component yet" : latestMapping.TrmComponent.DisplayLabel)
                             </div>
                         </td>
                         <td>@item.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                         <td class="text-end">
                             <div class="btn-group btn-group-sm">
                                 <a class="btn btn-outline-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@item.Id">Add mapping</a>
-                                <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@item.Id">View</a>
+                                @if (latestMapping is null)
+                                {
+                                    <a class="btn btn-outline-secondary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@item.Id">Modify mapping</a>
+                                }
+                                else
+                                {
+                                    <a class="btn btn-outline-secondary" asp-controller="Mappings" asp-action="Edit" asp-route-id="@latestMapping.Id">Modify mapping</a>
+                                }
+                                <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@item.Id">Details</a>
                                 <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@item.Id">Edit</a>
                                 <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@item.Id">Delete</a>
                             </div>

@@ -78,7 +78,6 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
                 TrmCapabilityId = component?.ParentCapabilityId,
                 TrmComponentId = component?.Id,
                 MappingStatus = MappingStatus.Complete,
-                FitScore = 5,
                 MappingRationale = "Imported from sample relationship CSV.",
                 LastReviewedUtc = DateTime.UtcNow,
                 CreatedUtc = DateTime.UtcNow,

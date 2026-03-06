@@ -58,9 +58,19 @@
                     <span asp-validation-for="MappingStatus" class="text-danger"></span>
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="FitScore" class="form-label"></label>
-                    <input asp-for="FitScore" class="form-control" min="1" max="5" />
-                    <span asp-validation-for="FitScore" class="text-danger"></span>
+                    <label asp-for="CustomTechnologyComponentCode" class="form-label"></label>
+                    <input asp-for="CustomTechnologyComponentCode" class="form-control" placeholder="Optional custom code" />
+                    <span asp-validation-for="CustomTechnologyComponentCode" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="CustomComponentName" class="form-label"></label>
+                    <input asp-for="CustomComponentName" class="form-control" placeholder="Optional custom component name" />
+                    <span asp-validation-for="CustomComponentName" class="text-danger"></span>
+                </div>
+                <div class="col-12">
+                    <div class="form-note">
+                        Pick a model component from the list, or enter a custom Technology Component Code and name to extend the catalogue under the selected capability.
+                    </div>
                 </div>
                 <div class="col-12">
                     <label asp-for="MappingRationale" class="form-label"></label>

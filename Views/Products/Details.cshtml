@@ -58,12 +58,40 @@
             }
             else
             {
+                <div class="mapping-flow-list mb-4">
+                    @foreach (var mapping in Model.Mappings.OrderBy(x => x.TrmDomain?.Name ?? string.Empty).ThenBy(x => x.TrmComponent?.Name ?? string.Empty))
+                    {
+                        <article class="mapping-flow-card">
+                            <div class="mapping-node">
+                                <span class="eyebrow text-dark">Domain</span>
+                                <strong>@(mapping.TrmDomain is null ? "-" : $"{mapping.TrmDomain.Code} {mapping.TrmDomain.Name}")</strong>
+                            </div>
+                            <div class="mapping-flow-arrow">→</div>
+                            <div class="mapping-node">
+                                <span class="eyebrow text-dark">Capability</span>
+                                <strong>@(mapping.TrmCapability is null ? "-" : $"{mapping.TrmCapability.Code} {mapping.TrmCapability.Name}")</strong>
+                            </div>
+                            <div class="mapping-flow-arrow">→</div>
+                            <div class="mapping-node">
+                                <span class="eyebrow text-dark">Component</span>
+                                <strong>@(mapping.TrmComponent is null ? "-" : mapping.TrmComponent.DisplayLabel)</strong>
+                            </div>
+                            <div class="mapping-flow-arrow">→</div>
+                            <div class="mapping-node">
+                                <span class="eyebrow text-dark">Product</span>
+                                <strong>@Model.Name</strong>
+                            </div>
+                        </article>
+                    }
+                </div>
+
                 <div class="table-responsive">
                     <table class="table align-middle">
                         <thead>
                             <tr>
                                 <th>Status</th>
                                 <th>Domain</th>
+                                <th>Capability</th>
                                 <th>Component</th>
                                 <th></th>
                             </tr>
@@ -74,10 +102,11 @@
                             <tr>
                                 <td><span class="status-pill status-@mapping.MappingStatus.ToString().ToLowerInvariant()">@mapping.MappingStatus</span></td>
                                 <td>@(mapping.TrmDomain is null ? "-" : $"{mapping.TrmDomain.Code} {mapping.TrmDomain.Name}")</td>
-                                <td>@(mapping.TrmComponent is null ? "-" : $"{mapping.TrmComponent.Code} {mapping.TrmComponent.Name}")</td>
+                                <td>@(mapping.TrmCapability is null ? "-" : $"{mapping.TrmCapability.Code} {mapping.TrmCapability.Name}")</td>
+                                <td>@(mapping.TrmComponent is null ? "-" : mapping.TrmComponent.DisplayLabel)</td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
-                                        <a class="btn btn-outline-secondary" asp-controller="Mappings" asp-action="Edit" asp-route-id="@mapping.Id">Edit</a>
+                                        <a class="btn btn-outline-secondary" asp-controller="Mappings" asp-action="Edit" asp-route-id="@mapping.Id">Modify mapping</a>
                                         <a class="btn btn-outline-danger" asp-controller="Mappings" asp-action="Delete" asp-route-id="@mapping.Id">Delete</a>
                                     </div>
                                 </td>

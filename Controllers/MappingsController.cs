@@ -28,7 +28,10 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             productsQuery = productsQuery.Where(x =>
                 x.Name.Contains(search) ||
                 (x.Vendor != null && x.Vendor.Contains(search)) ||
-                x.Mappings.Any(m => m.TrmComponent != null && m.TrmComponent.Name.Contains(search)));
+                x.Mappings.Any(m => m.TrmComponent != null &&
+                    (m.TrmComponent.Name.Contains(search) ||
+                     m.TrmComponent.Code.Contains(search) ||
+                     (m.TrmComponent.TechnologyComponentCode != null && m.TrmComponent.TechnologyComponentCode.Contains(search)))));
         }
 
         if (status.HasValue)
@@ -207,8 +210,9 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         }
 
         var components = await query
-            .OrderBy(x => x.Code)
-            .Select(x => new { id = x.Id, text = x.Code + " " + x.Name })
+            .OrderBy(x => x.IsCustom)
+            .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
+            .Select(x => new { id = x.Id, text = (x.IsCustom ? (x.TechnologyComponentCode ?? x.Code) : x.Code) + " " + x.Name })
             .ToListAsync();
 
         return Json(components);
@@ -251,7 +255,10 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         {
             query = query.Where(x =>
                 (x.ProductCatalogItem != null && x.ProductCatalogItem.Name.Contains(search)) ||
-                (x.TrmComponent != null && x.TrmComponent.Name.Contains(search)));
+                (x.TrmComponent != null &&
+                    (x.TrmComponent.Name.Contains(search) ||
+                     x.TrmComponent.Code.Contains(search) ||
+                     (x.TrmComponent.TechnologyComponentCode != null && x.TrmComponent.TechnologyComponentCode.Contains(search)))));
         }
 
         if (domainId.HasValue)
@@ -272,8 +279,52 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         TrmDomain? domain = null;
         TrmCapability? capability = null;
         TrmComponent? component = null;
+        var customTechnologyComponentCode = NormalizeInput(model.CustomTechnologyComponentCode);
+        var customComponentName = NormalizeInput(model.CustomComponentName);
 
-        if (model.SelectedComponentId.HasValue)
+        if (model.SelectedComponentId.HasValue &&
+            (!string.IsNullOrWhiteSpace(customTechnologyComponentCode) || !string.IsNullOrWhiteSpace(customComponentName)))
+        {
+            ModelState.AddModelError(nameof(model.SelectedComponentId), "Choose an existing component or enter a custom component, not both.");
+        }
+
+        if (string.IsNullOrWhiteSpace(customTechnologyComponentCode) != string.IsNullOrWhiteSpace(customComponentName))
+        {
+            ModelState.AddModelError(nameof(model.CustomTechnologyComponentCode), "A custom component needs both a Technology Component Code and a custom component name.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(customTechnologyComponentCode) && !string.IsNullOrWhiteSpace(customComponentName))
+        {
+            if (!model.SelectedCapabilityId.HasValue)
+            {
+                ModelState.AddModelError(nameof(model.SelectedCapabilityId), "Choose a TRM capability before adding a custom component.");
+            }
+            else
+            {
+                capability = await dbContext.TrmCapabilities
+                    .Include(x => x.ParentDomain)
+                    .FirstOrDefaultAsync(x => x.Id == model.SelectedCapabilityId.Value);
+
+                if (capability is null)
+                {
+                    ModelState.AddModelError(nameof(model.SelectedCapabilityId), "Choose a valid HERM TRM capability.");
+                }
+                else
+                {
+                    domain = capability.ParentDomain;
+                    var customComponentResult = await ResolveOrCreateCustomComponentAsync(capability, customTechnologyComponentCode, customComponentName);
+                    if (customComponentResult.ErrorMessage is not null)
+                    {
+                        ModelState.AddModelError(nameof(model.CustomTechnologyComponentCode), customComponentResult.ErrorMessage);
+                    }
+                    else
+                    {
+                        component = customComponentResult.Component;
+                    }
+                }
+            }
+        }
+        else if (model.SelectedComponentId.HasValue)
         {
             component = await dbContext.TrmComponents
                 .Include(x => x.ParentCapability)
@@ -327,8 +378,10 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         mapping.TrmDomainId = domain?.Id;
         mapping.TrmCapabilityId = capability?.Id;
         mapping.TrmComponentId = component?.Id;
+        mapping.TrmDomain = domain;
+        mapping.TrmCapability = capability;
+        mapping.TrmComponent = component;
         mapping.MappingStatus = model.MappingStatus;
-        mapping.FitScore = model.FitScore;
         mapping.MappingRationale = model.MappingRationale;
         mapping.LastReviewedUtc = DateTime.UtcNow;
         return true;
@@ -374,7 +427,9 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         }
 
         var components = await componentsQuery
-            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString()))
+            .OrderBy(x => x.IsCustom)
+            .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
+            .Select(x => new SelectListItem((x.IsCustom ? (x.TechnologyComponentCode ?? x.Code) : x.Code) + " " + x.Name, x.Id.ToString()))
             .ToListAsync();
 
         return new MappingEditViewModel
@@ -391,7 +446,6 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             SelectedCapabilityId = selectedCapabilityId,
             SelectedComponentId = selectedComponentId,
             MappingStatus = mapping?.MappingStatus ?? MappingStatus.Draft,
-            FitScore = mapping?.FitScore,
             MappingRationale = mapping?.MappingRationale,
             Domains = domains,
             Capabilities = capabilities,
@@ -424,7 +478,9 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
         }
 
         var components = await componentsQuery
-            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString()))
+            .OrderBy(x => x.IsCustom)
+            .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
+            .Select(x => new SelectListItem((x.IsCustom ? (x.TechnologyComponentCode ?? x.Code) : x.Code) + " " + x.Name, x.Id.ToString()))
             .ToListAsync();
 
         return new MappingEditViewModel
@@ -441,11 +497,65 @@ public sealed class MappingsController(AppDbContext dbContext, CsvExportService 
             SelectedCapabilityId = postedModel.SelectedCapabilityId,
             SelectedComponentId = postedModel.SelectedComponentId,
             MappingStatus = postedModel.MappingStatus,
-            FitScore = postedModel.FitScore,
+            CustomTechnologyComponentCode = postedModel.CustomTechnologyComponentCode,
+            CustomComponentName = postedModel.CustomComponentName,
             MappingRationale = postedModel.MappingRationale,
             Domains = domains,
             Capabilities = capabilities,
             Components = components
         };
     }
+
+    private async Task<(TrmComponent? Component, string? ErrorMessage)> ResolveOrCreateCustomComponentAsync(
+        TrmCapability capability,
+        string technologyComponentCode,
+        string componentName)
+    {
+        var modelCodeExists = await dbContext.TrmComponents.AnyAsync(x =>
+            !x.IsCustom && x.Code.ToLower() == technologyComponentCode.ToLower());
+
+        if (modelCodeExists)
+        {
+            return (null, "That Technology Component Code already exists in the imported TRM model. Choose the model component instead.");
+        }
+
+        var existingCustomComponent = await dbContext.TrmComponents
+            .Include(x => x.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .FirstOrDefaultAsync(x =>
+                x.IsCustom &&
+                x.TechnologyComponentCode != null &&
+                x.TechnologyComponentCode.ToLower() == technologyComponentCode.ToLower());
+
+        if (existingCustomComponent is not null)
+        {
+            if (existingCustomComponent.ParentCapabilityId != capability.Id)
+            {
+                return (null, "That Technology Component Code is already assigned to another TRM capability.");
+            }
+
+            existingCustomComponent.Name = componentName;
+            return (existingCustomComponent, null);
+        }
+
+        var component = new TrmComponent
+        {
+            Code = GenerateInternalCustomComponentCode(),
+            TechnologyComponentCode = technologyComponentCode,
+            Name = componentName,
+            SourceTitle = "Custom technology component",
+            ParentCapabilityCode = capability.Code,
+            ParentCapabilityId = capability.Id,
+            IsCustom = true
+        };
+
+        dbContext.TrmComponents.Add(component);
+        return (component, null);
+    }
+
+    private static string GenerateInternalCustomComponentCode() =>
+        $"CUS{Guid.NewGuid():N}"[..11].ToUpperInvariant();
+
+    private static string? NormalizeInput(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

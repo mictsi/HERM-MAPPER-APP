@@ -107,7 +107,9 @@
                                 <div class="mapping-chip-list mt-2">
                                     @foreach (var mapping in product.Mappings.OrderBy(x => x.TrmDomain?.Name ?? string.Empty).ThenBy(x => x.TrmComponent?.Name ?? string.Empty).Take(3))
                                     {
-                                        <span class="mapping-chip">@((mapping.TrmComponent is null) ? mapping.MappingStatus.ToString() : $"{mapping.TrmDomain?.Name}: {mapping.TrmComponent.Name}")</span>
+                                        <a class="mapping-chip" asp-action="Edit" asp-route-id="@mapping.Id">
+                                            @((mapping.TrmComponent is null) ? mapping.MappingStatus.ToString() : $"{mapping.TrmDomain?.Name}: {mapping.TrmComponent.DisplayLabel}")
+                                        </a>
                                     }
                                 </div>
                             }
@@ -120,12 +122,19 @@
                             else
                             {
                                 <span class="status-pill status-@latestMapping.MappingStatus.ToString().ToLowerInvariant()">@latestMapping.MappingStatus</span>
-                                <div class="table-subline">@(latestMapping.TrmComponent is null ? "No component selected" : $"{latestMapping.TrmComponent.Code} {latestMapping.TrmComponent.Name}")</div>
+                                <div class="table-subline">@(latestMapping.TrmComponent is null ? "No component selected" : latestMapping.TrmComponent.DisplayLabel)</div>
                             }
                         </td>
                         <td>@product.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary" asp-action="Create" asp-route-productId="@product.Id">Add mapping</a>
+                            @if (latestMapping is null)
+                            {
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Create" asp-route-productId="@product.Id">Add mapping</a>
+                            }
+                            else
+                            {
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-id="@latestMapping.Id">Modify mapping</a>
+                            }
                         </td>
                     </tr>
                 }

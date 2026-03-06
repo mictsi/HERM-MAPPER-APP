@@ -15,7 +15,7 @@ public sealed class CsvExportService
         {
             var componentLabel = mapping.TrmComponent is null
                 ? string.Empty
-                : $"{mapping.TrmComponent.Name} ({mapping.TrmComponent.Code})";
+                : $"{mapping.TrmComponent.Name} ({mapping.TrmComponent.DisplayCode})";
 
             AppendRow(builder,
             [

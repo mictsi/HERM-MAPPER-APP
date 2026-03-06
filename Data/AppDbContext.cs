@@ -36,7 +36,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<TrmComponent>(entity =>
         {
             entity.HasIndex(x => x.Code).IsUnique();
-            entity.Property(x => x.Code).HasMaxLength(16);
+            entity.Property(x => x.Code).HasMaxLength(32);
+            entity.Property(x => x.TechnologyComponentCode).HasMaxLength(32);
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.HasOne(x => x.ParentCapability)
                 .WithMany(x => x.Components)

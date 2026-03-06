@@ -27,9 +27,13 @@ public sealed class MappingEditViewModel
     [Display(Name = "Mapping status")]
     public MappingStatus MappingStatus { get; set; }
 
-    [Range(1, 5)]
-    [Display(Name = "Fit score")]
-    public int? FitScore { get; set; }
+    [StringLength(32)]
+    [Display(Name = "Technology Component Code")]
+    public string? CustomTechnologyComponentCode { get; set; }
+
+    [StringLength(200)]
+    [Display(Name = "Custom component name")]
+    public string? CustomComponentName { get; set; }
 
     [StringLength(4000)]
     [Display(Name = "Mapping rationale")]

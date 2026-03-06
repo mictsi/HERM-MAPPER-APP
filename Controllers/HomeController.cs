@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
-public sealed class HomeController(AppDbContext dbContext, IConfiguration configuration) : Controller
+public sealed class HomeController(AppDbContext dbContext) : Controller
 {
     public async Task<IActionResult> Index()
     {
@@ -17,7 +17,7 @@ public sealed class HomeController(AppDbContext dbContext, IConfiguration config
             ReferenceComponentCount = await dbContext.TrmComponents.CountAsync(),
             DomainCount = await dbContext.TrmDomains.CountAsync(),
             CapabilityCount = await dbContext.TrmCapabilities.CountAsync(),
-            WorkbookPath = configuration["HermWorkbook:Path"],
+            HasReferenceModel = await dbContext.TrmDomains.AnyAsync(),
             RecentProducts = await dbContext.ProductCatalogItems
                 .AsNoTracking()
                 .Include(x => x.Mappings)

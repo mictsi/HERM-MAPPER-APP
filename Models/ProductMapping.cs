@@ -21,10 +21,6 @@ public sealed class ProductMapping
     [Display(Name = "Mapping status")]
     public MappingStatus MappingStatus { get; set; } = MappingStatus.Draft;
 
-    [Range(1, 5)]
-    [Display(Name = "Fit score")]
-    public int? FitScore { get; set; }
-
     [StringLength(4000)]
     [Display(Name = "Mapping rationale")]
     public string? MappingRationale { get; set; }
