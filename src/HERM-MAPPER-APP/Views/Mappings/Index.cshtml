@@ -7,7 +7,7 @@
     <div>
         <span class="eyebrow">Mapping workspace</span>
         <h1>Review and complete HERM mappings</h1>
-        <p>Components can have multiple mappings. Export follows the uploaded sample format: <code>LEVEL0;LEVEL1;LEVEL2;LEVEL3</code>.</p>
+        <p>Products can have multiple mappings. Export follows the uploaded sample format: <code>LEVEL0;LEVEL1;LEVEL2;LEVEL3</code>.</p>
     </div>
     <a class="btn btn-primary" asp-action="ExportCsv" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-domainId="@Model.DomainId" asp-route-capabilityId="@Model.CapabilityId">Export completed CSV</a>
 </section>
@@ -35,7 +35,7 @@
     <form method="get" class="row g-3 align-items-end">
         <div class="col-lg-4">
             <label class="form-label" for="search">Search</label>
-            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Component or mapped component" />
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Product or mapped component" />
         </div>
         <div class="col-lg-2">
             <label class="form-label" for="status">Status</label>
@@ -74,7 +74,7 @@
     @if (Model.Products.Count == 0)
     {
         <div class="empty-state compact">
-            <h3>No components matched the selected filters</h3>
+            <h3>No products matched the selected filters</h3>
             <p>Reset the board filters or add more catalogue records.</p>
         </div>
     }
@@ -84,7 +84,7 @@
             <table class="table align-middle">
                 <thead>
                     <tr>
-                        <th>Component</th>
+                        <th>Product</th>
                         <th>Mappings</th>
                         <th>Latest mapping</th>
                         <th>Updated</th>

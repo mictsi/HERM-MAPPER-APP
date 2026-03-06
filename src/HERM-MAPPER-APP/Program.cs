@@ -64,6 +64,7 @@ builder.Services.AddScoped<SampleRelationshipImportService>();
 builder.Services.AddScoped<DatabaseInitializer>();
 builder.Services.AddScoped<CsvExportService>();
 builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<ConfigurableFieldService>();
 builder.Services.AddScoped<ComponentVersioningService>();
 builder.Services.AddControllersWithViews();
 

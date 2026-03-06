@@ -1,0 +1,93 @@
+@model ConfigurationIndexViewModel
+@{
+    ViewData["Title"] = "Configuration";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">App settings</span>
+        <h1>Configuration</h1>
+        <p>Manage the allowed values for configurable product and mapping fields.</p>
+    </div>
+</section>
+
+@if (TempData["ConfigurationError"] is string errorMessage)
+{
+    <section class="content-card">
+        <div class="alert alert-danger mb-0">@errorMessage</div>
+    </section>
+}
+
+@foreach (var field in Model.Fields)
+{
+    <section class="content-card mb-4">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Configurable field</span>
+                <h2>@field.Label</h2>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                @if (field.Options.Count == 0)
+                {
+                    <div class="empty-state compact">
+                        <h3>No values configured</h3>
+                        <p>Add the first allowed value for this field.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Value</th>
+                                    <th>Created</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var option in field.Options)
+                            {
+                                <tr>
+                                    <td><strong>@option.Value</strong></td>
+                                    <td>@option.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td class="text-end">
+                                        <form asp-action="DeleteOption" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@option.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+            <div class="col-lg-5">
+                <section class="content-card h-100">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">Add value</span>
+                            <h3 class="mb-0">New @field.Label option</h3>
+                        </div>
+                    </div>
+
+                    <form asp-action="AddOption" method="post" class="d-grid gap-3">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="FieldName" value="@field.FieldName" />
+                        <div>
+                            <label class="form-label" for="value-@field.FieldName">Value</label>
+                            <input class="form-control" id="value-@field.FieldName" name="Value" placeholder="Enter a value" />
+                        </div>
+                        <button type="submit" class="btn btn-primary">Add value</button>
+                    </form>
+                </section>
+            </div>
+        </div>
+    </section>
+}

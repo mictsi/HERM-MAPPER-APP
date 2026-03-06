@@ -13,7 +13,8 @@ public sealed class MappingsController(
     AppDbContext dbContext,
     CsvExportService csvExportService,
     AuditLogService auditLogService,
-    ComponentVersioningService componentVersioningService) : Controller
+    ComponentVersioningService componentVersioningService,
+    ConfigurableFieldService configurableFieldService) : Controller
 {
     public async Task<IActionResult> Index(string? search, MappingStatus? status, int? domainId, int? capabilityId)
     {
@@ -106,6 +107,7 @@ public sealed class MappingsController(
         }
 
         dbContext.ProductMappings.Add(mapping);
+        product.Owner = NormalizeInput(model.Owner);
         product.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
         await WriteMappingAuditAsync(mapping, "Create", "Created mapping.");
@@ -149,6 +151,7 @@ public sealed class MappingsController(
         }
 
         mapping.UpdatedUtc = DateTime.UtcNow;
+        mapping.ProductCatalogItem.Owner = NormalizeInput(model.Owner);
         mapping.ProductCatalogItem.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
         await WriteMappingAuditAsync(mapping, "Update", "Updated mapping.");
@@ -489,7 +492,8 @@ public sealed class MappingsController(
             MappingRationale = mapping?.MappingRationale,
             Domains = domains,
             Capabilities = capabilities,
-            Components = components
+            Components = components,
+            OwnerOptions = await configurableFieldService.GetSelectListAsync(ConfigurableFieldNames.Owner, product.Owner)
         };
     }
 
@@ -536,7 +540,7 @@ public sealed class MappingsController(
             Version = product.Version,
             Description = product.Description,
             LifecycleStatus = product.LifecycleStatus,
-            Owner = product.Owner,
+            Owner = postedModel.Owner,
             SelectedDomainId = postedModel.SelectedDomainId,
             SelectedCapabilityId = postedModel.SelectedCapabilityId,
             SelectedComponentId = postedModel.SelectedComponentId,
@@ -546,7 +550,8 @@ public sealed class MappingsController(
             MappingRationale = postedModel.MappingRationale,
             Domains = domains,
             Capabilities = capabilities,
-            Components = components
+            Components = components,
+            OwnerOptions = await configurableFieldService.GetSelectListAsync(ConfigurableFieldNames.Owner, postedModel.Owner)
         };
     }
 

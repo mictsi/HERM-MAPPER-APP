@@ -1,6 +1,6 @@
 @model ProductVisualizationViewModel
 @{
-    ViewData["Title"] = "Visualize Component Dependencies";
+    ViewData["Title"] = "Visualize Product Dependencies";
 }
 
 <section class="page-header">
@@ -10,7 +10,7 @@
         <p>Complete domain, capability, component, and source component routes for this catalogue entry.</p>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Product.Id">Back to component</a>
+        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Product.Id">Back to product</a>
         <a class="btn btn-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@Model.Product.Id">Add mapping</a>
     </div>
 </section>

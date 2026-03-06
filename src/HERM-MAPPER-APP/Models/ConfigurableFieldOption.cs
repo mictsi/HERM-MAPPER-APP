@@ -1,0 +1,35 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace HERM_MAPPER_APP.Models;
+
+public sealed class ConfigurableFieldOption
+{
+    public int Id { get; set; }
+
+    [Required, StringLength(80)]
+    public string FieldName { get; set; } = string.Empty;
+
+    [Required, StringLength(120)]
+    public string Value { get; set; } = string.Empty;
+
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+}
+
+public static class ConfigurableFieldNames
+{
+    public const string Owner = "Owner";
+
+    private static readonly IReadOnlyDictionary<string, string> SupportedFields =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [Owner] = "Owner"
+        };
+
+    public static IReadOnlyDictionary<string, string> All => SupportedFields;
+
+    public static bool IsSupported(string? fieldName) =>
+        !string.IsNullOrWhiteSpace(fieldName) && SupportedFields.ContainsKey(fieldName);
+
+    public static string GetLabel(string fieldName) =>
+        SupportedFields.TryGetValue(fieldName, out var label) ? label : fieldName;
+}

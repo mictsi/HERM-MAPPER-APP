@@ -14,6 +14,7 @@ public sealed class DatabaseInitializer(
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureConfigurableFieldOptionsTableAsync(cancellationToken);
 
         if (dbContext.Database.IsSqlite())
         {
@@ -214,6 +215,61 @@ public sealed class DatabaseInitializer(
             {
                 await connection.CloseAsync();
             }
+        }
+    }
+
+    private async Task EnsureConfigurableFieldOptionsTableAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "ConfigurableFieldOptions" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_ConfigurableFieldOptions" PRIMARY KEY AUTOINCREMENT,
+                    "FieldName" TEXT NOT NULL,
+                    "Value" TEXT NOT NULL,
+                    "CreatedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_ConfigurableFieldOptions_FieldName_Value"
+                ON "ConfigurableFieldOptions" ("FieldName", "Value")
+                """,
+                cancellationToken);
+        }
+        else if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[ConfigurableFieldOptions]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [ConfigurableFieldOptions] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ConfigurableFieldOptions] PRIMARY KEY,
+                        [FieldName] NVARCHAR(80) NOT NULL,
+                        [Value] NVARCHAR(120) NOT NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ConfigurableFieldOptions_FieldName_Value'
+                      AND object_id = OBJECT_ID(N'[ConfigurableFieldOptions]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_ConfigurableFieldOptions_FieldName_Value]
+                    ON [ConfigurableFieldOptions] ([FieldName], [Value]);
+                END
+                """,
+                cancellationToken);
         }
     }
 }

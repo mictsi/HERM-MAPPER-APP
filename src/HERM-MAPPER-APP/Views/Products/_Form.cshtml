@@ -1,4 +1,8 @@
 @model ProductCatalogItem
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    var ownerOptions = ViewData["OwnerOptions"] as IEnumerable<SelectListItem> ?? [];
+}
 
 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
@@ -8,7 +12,7 @@
             <div class="section-heading">
                 <div>
                     <span class="eyebrow">Catalogue entry</span>
-                    <h2>Component details</h2>
+                    <h2>Product details</h2>
                 </div>
             </div>
 
@@ -30,7 +34,7 @@
                 </div>
                 <div class="col-md-6">
                     <label asp-for="Owner" class="form-label"></label>
-                    <input asp-for="Owner" class="form-control" />
+                    <select asp-for="Owner" asp-items="ownerOptions" class="form-select"></select>
                     <span asp-validation-for="Owner" class="text-danger"></span>
                 </div>
                 <div class="col-md-6">
@@ -61,7 +65,7 @@
             </div>
             <p class="mb-3">Save the catalogue record first. Then add one or more mappings for it from the mapping board.</p>
             <div class="d-grid gap-2">
-                <button type="submit" class="btn btn-primary">Save component</button>
+                <button type="submit" class="btn btn-primary">Save product</button>
                 <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
             </div>
         </aside>

@@ -1,19 +1,19 @@
 @model ProductCatalogItem
 @{
-    ViewData["Title"] = "Delete Component";
+    ViewData["Title"] = "Delete Product";
 }
 
 <section class="page-header">
     <div>
         <span class="eyebrow">Catalogue CRUD</span>
         <h1>Delete @Model.Name?</h1>
-        <p>This removes the component and all of its stored HERM mappings from SQLite.</p>
+        <p>This removes the product and all of its stored HERM mappings from SQLite.</p>
     </div>
 </section>
 
 <section class="content-card">
     <dl class="detail-grid mb-4">
-        <dt>Component</dt>
+        <dt>Product</dt>
         <dd>@Model.Name</dd>
         <dt>Vendor</dt>
         <dd>@(Model.Vendor ?? "-")</dd>

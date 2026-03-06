@@ -6,12 +6,12 @@
 <section class="hero-panel">
     <div>
         <span class="eyebrow">Reference-guided technology mapping</span>
-        <h1>Map your component catalogue onto the HERM TRM model.</h1>
+        <h1>Map your product catalogue onto the HERM TRM model.</h1>
         <p class="hero-copy">
-            Keep a working catalogue of components, browse the HERM technology reference hierarchy, and export completed mappings to CSV.
+            Keep a working catalogue of products, browse the HERM technology reference hierarchy, and export completed mappings to CSV.
         </p>
         <div class="d-flex flex-wrap gap-3 mt-4">
-            <a class="btn btn-primary btn-lg" asp-controller="Products" asp-action="Create">Add component</a>
+            <a class="btn btn-primary btn-lg" asp-controller="Products" asp-action="Create">Add product</a>
             <a class="btn btn-outline-light btn-lg" asp-controller="Mappings" asp-action="Index">Open mapping board</a>
         </div>
     </div>
@@ -25,7 +25,7 @@
 
 <section class="stats-grid">
     <article class="stat-card">
-        <span class="stat-label">Components</span>
+        <span class="stat-label">Products</span>
         <span class="stat-value">@Model.ProductCount</span>
         <span class="stat-meta">Catalogue items tracked in SQLite</span>
     </article>
@@ -55,7 +55,7 @@
     <div class="section-heading">
         <div>
             <span class="eyebrow">Recent catalogue changes</span>
-            <h2>Latest components</h2>
+            <h2>Latest products</h2>
         </div>
         <a class="btn btn-sm btn-outline-primary" asp-controller="Products" asp-action="Index">View all</a>
     </div>
@@ -63,8 +63,8 @@
     @if (Model.RecentProducts.Count == 0)
     {
         <div class="empty-state">
-            <h3>No components yet</h3>
-            <p>Add the components you want to classify, then use the mapping board to align them to HERM TRM.</p>
+            <h3>No products yet</h3>
+            <p>Add the products you want to classify, then use the mapping board to align them to HERM TRM.</p>
         </div>
     }
     else
@@ -73,7 +73,7 @@
             <table class="table align-middle">
                 <thead>
                     <tr>
-                        <th>Component</th>
+                        <th>Product</th>
                         <th>Status</th>
                         <th>Mapped component</th>
                         <th>Updated</th>
@@ -107,14 +107,7 @@
                         <td>@(latestMapping?.TrmComponent is null ? $"{product.Mappings.Count} mapping(s)" : latestMapping.TrmComponent.DisplayLabel)</td>
                         <td>@product.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                         <td class="text-end">
-                            @if (latestMapping is null)
-                            {
-                                <a class="btn btn-sm btn-outline-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@product.Id">Add mapping</a>
-                            }
-                            else
-                            {
-                                <a class="btn btn-sm btn-outline-primary" asp-controller="Mappings" asp-action="Edit" asp-route-id="@latestMapping.Id">Modify mapping</a>
-                            }
+                            <a class="btn btn-sm btn-outline-primary" asp-controller="Products" asp-action="Details" asp-route-id="@product.Id">Show details</a>
                         </td>
                     </tr>
                 }

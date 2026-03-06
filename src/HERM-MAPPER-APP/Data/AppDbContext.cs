@@ -11,6 +11,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<TrmComponentCapabilityLink> TrmComponentCapabilityLinks => Set<TrmComponentCapabilityLink>();
     public DbSet<TrmComponentVersion> TrmComponentVersions => Set<TrmComponentVersion>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
+    public DbSet<ConfigurableFieldOption> ConfigurableFieldOptions => Set<ConfigurableFieldOption>();
     public DbSet<ProductCatalogItem> ProductCatalogItems => Set<ProductCatalogItem>();
     public DbSet<ProductMapping> ProductMappings => Set<ProductMapping>();
 
@@ -81,6 +82,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Action).HasMaxLength(80);
             entity.Property(x => x.EntityType).HasMaxLength(80);
             entity.Property(x => x.Summary).HasMaxLength(400);
+        });
+
+        modelBuilder.Entity<ConfigurableFieldOption>(entity =>
+        {
+            entity.HasIndex(x => new { x.FieldName, x.Value }).IsUnique();
+            entity.Property(x => x.FieldName).HasMaxLength(80);
+            entity.Property(x => x.Value).HasMaxLength(120);
         });
 
         modelBuilder.Entity<ProductCatalogItem>(entity =>

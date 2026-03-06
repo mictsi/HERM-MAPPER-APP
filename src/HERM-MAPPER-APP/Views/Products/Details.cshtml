@@ -1,6 +1,6 @@
 @model ProductCatalogItem
 @{
-    ViewData["Title"] = "Component Details";
+    ViewData["Title"] = "Product Details";
 }
 
 <section class="page-header">
@@ -12,14 +12,14 @@
     <div class="d-flex gap-2">
         <a class="btn btn-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@Model.Id">Add mapping</a>
         <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.Id">Visualize</a>
-        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">Edit component</a>
+        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">Edit product</a>
     </div>
 </section>
 
 <section class="content-card mb-4">
     <div class="section-heading">
         <div>
-            <span class="eyebrow">Component metadata</span>
+            <span class="eyebrow">Product metadata</span>
             <h2>Details</h2>
         </div>
     </div>
@@ -51,7 +51,7 @@
     {
         <div class="empty-state compact">
             <h3>No mappings yet</h3>
-            <p>Create the first HERM TRM relationship for this component.</p>
+            <p>Create the first HERM TRM relationship for this product.</p>
         </div>
     }
     else
@@ -76,7 +76,7 @@
                     </div>
                     <div class="mapping-flow-arrow">→</div>
                     <div class="mapping-node">
-                        <span class="eyebrow text-dark">Component</span>
+                        <span class="eyebrow text-dark">Product</span>
                         <strong>@Model.Name</strong>
                     </div>
                 </article>

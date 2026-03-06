@@ -1,22 +1,22 @@
 @model ProductsIndexViewModel
 @{
-    ViewData["Title"] = "Component Catalogue";
+    ViewData["Title"] = "Product Catalogue";
 }
 
 <section class="page-header">
     <div>
         <span class="eyebrow">Working catalogue</span>
-        <h1>Components to classify</h1>
+        <h1>Products to classify</h1>
         <p>Track what needs to be mapped and keep ownership, versioning, and notes in one place.</p>
     </div>
-    <a class="btn btn-primary" asp-action="Create">Add component</a>
+    <a class="btn btn-primary" asp-action="Create">Add product</a>
 </section>
 
 <section class="content-card">
     <form method="get" class="row g-3 align-items-end">
         <div class="col-lg-9">
             <label class="form-label" for="search">Search</label>
-            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Search by component, vendor, version, or owner" />
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Search by product, vendor, version, or owner" />
         </div>
         <div class="col-lg-3 d-flex gap-2">
             <button class="btn btn-primary flex-fill" type="submit">Filter</button>
@@ -30,7 +30,7 @@
     {
         <div class="empty-state">
             <h3>No catalogue entries found</h3>
-            <p>Add a component to start mapping it against the HERM reference model.</p>
+            <p>Add a product to start mapping it against the HERM reference model.</p>
         </div>
     }
     else
@@ -39,7 +39,7 @@
             <table class="table align-middle">
                 <thead>
                     <tr>
-                        <th>Component</th>
+                        <th>Product</th>
                         <th>Owner</th>
                         <th>Lifecycle</th>
                         <th>Mappings</th>

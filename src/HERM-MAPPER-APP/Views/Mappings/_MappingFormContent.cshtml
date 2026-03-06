@@ -6,7 +6,7 @@
             <div class="section-heading">
                 <div>
                     <span class="eyebrow">Source record</span>
-                    <h2>Component details</h2>
+                    <h2>Product details</h2>
                 </div>
             </div>
             <dl class="detail-grid">
@@ -57,6 +57,11 @@
                         <option value="">Choose a component</option>
                     </select>
                     <span asp-validation-for="SelectedComponentId" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="Owner" class="form-label"></label>
+                    <select asp-for="Owner" asp-items="Model.OwnerOptions" class="form-select"></select>
+                    <span asp-validation-for="Owner" class="text-danger"></span>
                 </div>
                 <div class="col-md-4">
                     <label asp-for="MappingStatus" class="form-label"></label>

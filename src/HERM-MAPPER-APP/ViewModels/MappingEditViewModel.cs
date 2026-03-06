@@ -13,7 +13,9 @@ public sealed class MappingEditViewModel
     public string? Version { get; init; }
     public string? Description { get; init; }
     public string? LifecycleStatus { get; init; }
-    public string? Owner { get; init; }
+
+    [Display(Name = "Owner")]
+    public string? Owner { get; set; }
 
     [Display(Name = "TRM domain")]
     public int? SelectedDomainId { get; set; }
@@ -42,4 +44,5 @@ public sealed class MappingEditViewModel
     public IEnumerable<SelectListItem> Domains { get; init; } = [];
     public IEnumerable<SelectListItem> Capabilities { get; init; } = [];
     public IEnumerable<SelectListItem> Components { get; init; } = [];
+    public IEnumerable<SelectListItem> OwnerOptions { get; init; } = [];
 }

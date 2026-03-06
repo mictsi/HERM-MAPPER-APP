@@ -7,7 +7,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
-public sealed class ProductsController(AppDbContext dbContext, AuditLogService auditLogService) : Controller
+public sealed class ProductsController(
+    AppDbContext dbContext,
+    AuditLogService auditLogService,
+    ConfigurableFieldService configurableFieldService) : Controller
 {
     public async Task<IActionResult> Index(string? search)
     {
@@ -35,8 +38,9 @@ public sealed class ProductsController(AppDbContext dbContext, AuditLogService a
         return View(model);
     }
 
-    public IActionResult Create()
+    public async Task<IActionResult> Create()
     {
+        await PopulateOwnerOptionsAsync(null);
         return View(new ProductCatalogItem());
     }
 
@@ -44,8 +48,11 @@ public sealed class ProductsController(AppDbContext dbContext, AuditLogService a
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create([Bind("Name,Vendor,Version,LifecycleStatus,Owner,Description,Notes")] ProductCatalogItem input)
     {
+        input.Owner = NormalizeSelection(input.Owner);
+
         if (!ModelState.IsValid)
         {
+            await PopulateOwnerOptionsAsync(input.Owner);
             return View(input);
         }
 
@@ -145,6 +152,11 @@ public sealed class ProductsController(AppDbContext dbContext, AuditLogService a
     public async Task<IActionResult> Edit(int id)
     {
         var product = await dbContext.ProductCatalogItems.FindAsync(id);
+        if (product is not null)
+        {
+            await PopulateOwnerOptionsAsync(product.Owner);
+        }
+
         return product is null ? NotFound() : View(product);
     }
 
@@ -158,9 +170,12 @@ public sealed class ProductsController(AppDbContext dbContext, AuditLogService a
             return NotFound();
         }
 
+        input.Owner = NormalizeSelection(input.Owner);
+
         if (!ModelState.IsValid)
         {
             input.Id = id;
+            await PopulateOwnerOptionsAsync(input.Owner);
             return View(input);
         }
 
@@ -213,4 +228,14 @@ public sealed class ProductsController(AppDbContext dbContext, AuditLogService a
             $"Deleted product {product.Name}.");
         return RedirectToAction(nameof(Index));
     }
+
+    private async Task PopulateOwnerOptionsAsync(string? selectedValue)
+    {
+        ViewData["OwnerOptions"] = await configurableFieldService.GetSelectListAsync(
+            ConfigurableFieldNames.Owner,
+            selectedValue);
+    }
+
+    private static string? NormalizeSelection(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
