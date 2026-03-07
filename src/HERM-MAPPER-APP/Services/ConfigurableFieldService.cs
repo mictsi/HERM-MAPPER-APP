@@ -13,25 +13,20 @@ public sealed class ConfigurableFieldService(AppDbContext dbContext)
         string defaultLabel = "Choose",
         CancellationToken cancellationToken = default)
     {
-        var configuredValues = await dbContext.ConfigurableFieldOptions
-            .AsNoTracking()
-            .Where(x => x.FieldName == fieldName)
-            .Select(x => x.Value)
-            .ToListAsync(cancellationToken);
-        var orderedValues = ConfigurableFieldNames.OrderValues(fieldName, configuredValues);
+        var configuredOptions = await GetOptionsAsync(fieldName, cancellationToken);
 
         var items = new List<SelectListItem>
         {
             new(defaultLabel, string.Empty, string.IsNullOrWhiteSpace(selectedValue))
         };
 
-        foreach (var value in orderedValues.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var value in configuredOptions.Select(x => x.Value).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             items.Add(new SelectListItem(value, value, string.Equals(value, selectedValue, StringComparison.OrdinalIgnoreCase)));
         }
 
         if (!string.IsNullOrWhiteSpace(selectedValue) &&
-            configuredValues.All(x => !string.Equals(x, selectedValue, StringComparison.OrdinalIgnoreCase)))
+            configuredOptions.All(x => !string.Equals(x.Value, selectedValue, StringComparison.OrdinalIgnoreCase)))
         {
             items.Add(new SelectListItem(selectedValue, selectedValue, true));
         }
@@ -43,19 +38,12 @@ public sealed class ConfigurableFieldService(AppDbContext dbContext)
         string fieldName,
         CancellationToken cancellationToken = default)
     {
-        var options = await dbContext.ConfigurableFieldOptions
+        return await dbContext.ConfigurableFieldOptions
             .AsNoTracking()
             .Where(x => x.FieldName == fieldName)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedUtc)
+            .ThenBy(x => x.Value)
             .ToListAsync(cancellationToken);
-
-        var orderedValues = ConfigurableFieldNames.OrderValues(fieldName, options.Select(x => x.Value));
-        var orderLookup = orderedValues
-            .Select((value, index) => new { value, index })
-            .ToDictionary(x => x.value, x => x.index, StringComparer.OrdinalIgnoreCase);
-
-        return options
-            .OrderBy(x => orderLookup.TryGetValue(x.Value, out var index) ? index : int.MaxValue)
-            .ThenBy(x => x.Value, StringComparer.OrdinalIgnoreCase)
-            .ToList();
     }
 }

@@ -270,6 +270,7 @@ public sealed class ConfigurationController(
         {
             FieldName = input.FieldName,
             Value = input.Value,
+            SortOrder = await GetNextSortOrderAsync(input.FieldName),
             CreatedUtc = DateTime.UtcNow
         };
 
@@ -288,6 +289,46 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateOptionOrder(UpdateConfigurationOptionOrderInputModel input)
+    {
+        var option = await dbContext.ConfigurableFieldOptions.FindAsync(input.Id);
+        if (option is null)
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        var fieldOptions = await dbContext.ConfigurableFieldOptions
+            .Where(x => x.FieldName == option.FieldName)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedUtc)
+            .ThenBy(x => x.Id)
+            .ToListAsync();
+
+        fieldOptions.RemoveAll(x => x.Id == option.Id);
+
+        var targetIndex = Math.Clamp(input.SortOrder, 1, fieldOptions.Count + 1) - 1;
+        fieldOptions.Insert(targetIndex, option);
+
+        for (var index = 0; index < fieldOptions.Count; index++)
+        {
+            fieldOptions[index].SortOrder = index + 1;
+        }
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "Reorder",
+            nameof(ConfigurableFieldOption),
+            option.Id,
+            $"Changed order for configuration value '{option.Value}' in {option.FieldName}.",
+            $"New position: {option.SortOrder}.");
+
+        TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(option.FieldName)} order was updated.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteOption(int id)
     {
         var option = await dbContext.ConfigurableFieldOptions.FindAsync(id);
@@ -298,6 +339,7 @@ public sealed class ConfigurationController(
 
         dbContext.ConfigurableFieldOptions.Remove(option);
         await dbContext.SaveChangesAsync();
+        await NormalizeSortOrderAsync(option.FieldName);
         await auditLogService.WriteAsync(
             "Configuration",
             "Delete",
@@ -307,6 +349,44 @@ public sealed class ConfigurationController(
 
         TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(option.FieldName)} value '{option.Value}' was removed.";
         return RedirectToAction(nameof(Index));
+    }
+
+    private async Task<int> GetNextSortOrderAsync(string fieldName)
+    {
+        var maxSortOrder = await dbContext.ConfigurableFieldOptions
+            .Where(x => x.FieldName == fieldName)
+            .Select(x => (int?)x.SortOrder)
+            .MaxAsync();
+
+        return (maxSortOrder ?? 0) + 1;
+    }
+
+    private async Task NormalizeSortOrderAsync(string fieldName)
+    {
+        var options = await dbContext.ConfigurableFieldOptions
+            .Where(x => x.FieldName == fieldName)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedUtc)
+            .ThenBy(x => x.Id)
+            .ToListAsync();
+
+        var hasChanges = false;
+        for (var index = 0; index < options.Count; index++)
+        {
+            var expectedSortOrder = index + 1;
+            if (options[index].SortOrder == expectedSortOrder)
+            {
+                continue;
+            }
+
+            options[index].SortOrder = expectedSortOrder;
+            hasChanges = true;
+        }
+
+        if (hasChanges)
+        {
+            await dbContext.SaveChangesAsync();
+        }
     }
 
     private async Task<ConfigurationIndexViewModel> BuildViewModelAsync(

@@ -278,6 +278,7 @@
                         <table class="table align-middle">
                             <thead>
                                 <tr>
+                                    <th>Order</th>
                                     <th>Value</th>
                                     <th>Created</th>
                                     <th></th>
@@ -287,6 +288,14 @@
                             @foreach (var option in field.Options)
                             {
                                 <tr>
+                                    <td>
+                                        <form asp-action="UpdateOptionOrder" method="post" class="d-flex gap-2 align-items-center">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="Id" value="@option.Id" />
+                                            <input class="form-control form-control-sm" type="number" name="SortOrder" value="@option.SortOrder" min="1" style="width: 5.5rem;" />
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
+                                        </form>
+                                    </td>
                                     <td><strong>@option.Value</strong></td>
                                     <td>@option.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
                                     <td class="text-end">

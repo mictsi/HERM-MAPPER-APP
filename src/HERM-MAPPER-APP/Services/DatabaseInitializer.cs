@@ -16,6 +16,7 @@ public sealed class DatabaseInitializer(
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureConfigurableFieldOptionsTableAsync(cancellationToken);
+        await NormalizeConfigurableFieldOptionSortOrdersAsync(cancellationToken);
         await EnsureDefaultConfigurableFieldOptionsAsync(cancellationToken);
 
         if (dbContext.Database.IsSqlite())
@@ -230,10 +231,13 @@ public sealed class DatabaseInitializer(
                     "Id" INTEGER NOT NULL CONSTRAINT "PK_ConfigurableFieldOptions" PRIMARY KEY AUTOINCREMENT,
                     "FieldName" TEXT NOT NULL,
                     "Value" TEXT NOT NULL,
+                    "SortOrder" INTEGER NOT NULL DEFAULT 0,
                     "CreatedUtc" TEXT NOT NULL
                 )
                 """,
                 cancellationToken);
+
+            await EnsureSqliteConfigurableFieldOptionColumnsAsync(cancellationToken);
 
             await dbContext.Database.ExecuteSqlRawAsync(
                 """
@@ -252,8 +256,19 @@ public sealed class DatabaseInitializer(
                         [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ConfigurableFieldOptions] PRIMARY KEY,
                         [FieldName] NVARCHAR(80) NOT NULL,
                         [Value] NVARCHAR(120) NOT NULL,
+                        [SortOrder] INT NOT NULL CONSTRAINT [DF_ConfigurableFieldOptions_SortOrder] DEFAULT 0,
                         [CreatedUtc] DATETIME2 NOT NULL
                     );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ConfigurableFieldOptions]', N'SortOrder') IS NULL
+                BEGIN
+                    ALTER TABLE [ConfigurableFieldOptions]
+                    ADD [SortOrder] INT NOT NULL CONSTRAINT [DF_ConfigurableFieldOptions_SortOrder] DEFAULT 0;
                 END
                 """,
                 cancellationToken);
@@ -285,10 +300,11 @@ public sealed class DatabaseInitializer(
 
         var missingLifecycleStatuses = ConfigurableFieldNames.GetDefaultValues(ConfigurableFieldNames.LifecycleStatus)
             .Where(value => existingLifecycleStatuses.All(existing => !string.Equals(existing, value, StringComparison.OrdinalIgnoreCase)))
-            .Select(value => new ConfigurableFieldOption
+            .Select((value, index) => new ConfigurableFieldOption
             {
                 FieldName = ConfigurableFieldNames.LifecycleStatus,
                 Value = value,
+                SortOrder = existingLifecycleStatuses.Count + index + 1,
                 CreatedUtc = DateTime.UtcNow
             })
             .ToList();
@@ -300,5 +316,79 @@ public sealed class DatabaseInitializer(
 
         dbContext.ConfigurableFieldOptions.AddRange(missingLifecycleStatuses);
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureSqliteConfigurableFieldOptionColumnsAsync(CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        if (shouldClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA table_info('ConfigurableFieldOptions')";
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                columns.Add(reader.GetString(1));
+            }
+
+            if (!columns.Contains("SortOrder"))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ConfigurableFieldOptions ADD COLUMN SortOrder INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private async Task NormalizeConfigurableFieldOptionSortOrdersAsync(CancellationToken cancellationToken)
+    {
+        var optionsByField = await dbContext.ConfigurableFieldOptions
+            .OrderBy(x => x.FieldName)
+            .ThenBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedUtc)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        var hasChanges = false;
+        foreach (var fieldGroup in optionsByField.GroupBy(x => x.FieldName, StringComparer.OrdinalIgnoreCase))
+        {
+            var orderedOptions = fieldGroup
+                .OrderBy(x => x.SortOrder <= 0 ? int.MaxValue : x.SortOrder)
+                .ThenBy(x => x.CreatedUtc)
+                .ThenBy(x => x.Id)
+                .ToList();
+
+            for (var index = 0; index < orderedOptions.Count; index++)
+            {
+                var expectedSortOrder = index + 1;
+                if (orderedOptions[index].SortOrder == expectedSortOrder)
+                {
+                    continue;
+                }
+
+                orderedOptions[index].SortOrder = expectedSortOrder;
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 }

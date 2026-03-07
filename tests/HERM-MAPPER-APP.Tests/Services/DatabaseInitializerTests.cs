@@ -34,7 +34,8 @@ public sealed class DatabaseInitializerTests
         fixture.DbContext.ConfigurableFieldOptions.Add(new ConfigurableFieldOption
         {
             FieldName = ConfigurableFieldNames.LifecycleStatus,
-            Value = "Production"
+            Value = "Production",
+            SortOrder = 1
         });
         await fixture.DbContext.SaveChangesAsync();
 
@@ -47,6 +48,38 @@ public sealed class DatabaseInitializerTests
             .CountAsync(x => x.FieldName == ConfigurableFieldNames.LifecycleStatus && x.Value == "Production");
 
         Assert.Equal(1, productionCount);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_BackfillsAndNormalizesSortOrder_ForExistingOptions()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        fixture.DbContext.ConfigurableFieldOptions.AddRange(
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Team B",
+                SortOrder = 0,
+                CreatedUtc = DateTime.UtcNow.AddMinutes(1)
+            },
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Team A",
+                SortOrder = 0,
+                CreatedUtc = DateTime.UtcNow
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var initializer = fixture.CreateInitializer();
+
+        await initializer.InitializeAsync();
+
+        var ownerOptions = await new ConfigurableFieldService(fixture.DbContext)
+            .GetOptionsAsync(ConfigurableFieldNames.Owner);
+
+        Assert.Equal([1, 2], ownerOptions.Select(x => x.SortOrder).ToArray());
+        Assert.Equal(["Team A", "Team B"], ownerOptions.Select(x => x.Value).ToArray());
     }
 
     private sealed class TestFixture : IAsyncDisposable

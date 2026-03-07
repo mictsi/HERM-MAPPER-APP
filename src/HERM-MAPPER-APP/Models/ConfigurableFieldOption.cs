@@ -12,6 +12,7 @@ public sealed class ConfigurableFieldOption
     [Required, StringLength(120)]
     public string Value { get; set; } = string.Empty;
 
+    public int SortOrder { get; set; }
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 }
 
@@ -51,22 +52,4 @@ public static class ConfigurableFieldNames
             ? LifecycleStatusOrder
             : [];
 
-    public static IReadOnlyList<string> OrderValues(string fieldName, IEnumerable<string> values)
-    {
-        if (!fieldName.Equals(LifecycleStatus, StringComparison.OrdinalIgnoreCase))
-        {
-            return values
-                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-
-        var preferredOrder = LifecycleStatusOrder
-            .Select((value, index) => new { value, index })
-            .ToDictionary(x => x.value, x => x.index, StringComparer.OrdinalIgnoreCase);
-
-        return values
-            .OrderBy(x => preferredOrder.TryGetValue(x, out var index) ? index : int.MaxValue)
-            .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
 }

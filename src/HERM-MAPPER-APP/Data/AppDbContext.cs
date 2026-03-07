@@ -89,6 +89,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(x => new { x.FieldName, x.Value }).IsUnique();
             entity.Property(x => x.FieldName).HasMaxLength(80);
             entity.Property(x => x.Value).HasMaxLength(120);
+            entity.Property(x => x.SortOrder);
         });
 
         modelBuilder.Entity<ProductCatalogItem>(entity =>

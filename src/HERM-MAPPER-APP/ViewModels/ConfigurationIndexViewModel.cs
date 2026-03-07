@@ -30,6 +30,16 @@ public sealed class AddConfigurationOptionInputModel
     public string Value { get; set; } = string.Empty;
 }
 
+public sealed class UpdateConfigurationOptionOrderInputModel
+{
+    [Required]
+    public int Id { get; set; }
+
+    [Range(1, int.MaxValue)]
+    [Display(Name = "Order")]
+    public int SortOrder { get; set; }
+}
+
 public sealed class ProductImportReviewViewModel
 {
     public bool HasReview => Verification is not null;
