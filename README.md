@@ -93,7 +93,7 @@ Use `scripts/deploy-appservice.ps1` to publish the app, create the web app if it
 
 Example:
 ```powershell
-.\scripts\deploy-appservice.ps1 -SubscriptionId $SUBID -ResourceGroupName $RG -WebAppName "securejournal" -SettingsFile $SettingsFile -AppEnvironment "Production" -appplan $appplan
+.\scripts\deploy-appservice.ps1 -SubscriptionId $SUBID -ResourceGroupName $RG -WebAppName "HERM-MAPPER-APP" -SettingsFile $SettingsFile -AppEnvironment "Production" -appplan $appplan
 ```
 
 Notes:
