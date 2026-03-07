@@ -1,4 +1,5 @@
 using HERM_MAPPER_APP.Data;
+using HERM_MAPPER_APP.Infrastructure;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
@@ -259,14 +260,33 @@ public sealed class ReferenceController(
             componentsQuery = componentsQuery.Where(x => x.CapabilityLinks.Any(link => link.TrmCapabilityId == capabilityId));
         }
 
-        if (!string.IsNullOrWhiteSpace(search))
+        var likePattern = SearchPattern.CreateContainsPattern(search);
+        var matchesModelType = search is not null && "Model".Contains(search.Trim(), StringComparison.OrdinalIgnoreCase);
+        var matchesCustomType = search is not null && "Custom".Contains(search.Trim(), StringComparison.OrdinalIgnoreCase);
+
+        if (likePattern is not null)
         {
             componentsQuery = componentsQuery.Where(x =>
-                x.Code.Contains(search) ||
-                (x.TechnologyComponentCode != null && x.TechnologyComponentCode.Contains(search)) ||
-                x.Name.Contains(search) ||
-                (x.Description != null && x.Description.Contains(search)) ||
-                (x.ProductExamples != null && x.ProductExamples.Contains(search)));
+                EF.Functions.Like(x.Code, likePattern) ||
+                (x.TechnologyComponentCode != null && EF.Functions.Like(x.TechnologyComponentCode, likePattern)) ||
+                EF.Functions.Like(x.Name, likePattern) ||
+                (x.Description != null && EF.Functions.Like(x.Description, likePattern)) ||
+                (x.ProductExamples != null && EF.Functions.Like(x.ProductExamples, likePattern)) ||
+                (matchesModelType && !x.IsCustom) ||
+                (matchesCustomType && x.IsCustom) ||
+                x.CapabilityLinks.Any(link =>
+                    link.TrmCapability != null &&
+                    (
+                        EF.Functions.Like(link.TrmCapability.Code, likePattern) ||
+                        EF.Functions.Like(link.TrmCapability.Name, likePattern) ||
+                        (
+                            link.TrmCapability.ParentDomain != null &&
+                            (
+                                EF.Functions.Like(link.TrmCapability.ParentDomain.Code, likePattern) ||
+                                EF.Functions.Like(link.TrmCapability.ParentDomain.Name, likePattern)
+                            )
+                        )
+                    )));
         }
 
         return new ReferenceCatalogueViewModel

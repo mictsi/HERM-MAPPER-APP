@@ -1,4 +1,5 @@
 using HERM_MAPPER_APP.Data;
+using HERM_MAPPER_APP.Infrastructure;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
@@ -20,13 +21,17 @@ public sealed class ProductsController(
             .ThenInclude(x => x.TrmComponent)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(search))
+        var likePattern = SearchPattern.CreateContainsPattern(search);
+        if (likePattern is not null)
         {
             query = query.Where(x =>
-                x.Name.Contains(search) ||
-                (x.Vendor != null && x.Vendor.Contains(search)) ||
-                (x.Version != null && x.Version.Contains(search)) ||
-                (x.Owner != null && x.Owner.Contains(search)));
+                EF.Functions.Like(x.Name, likePattern) ||
+                (x.Vendor != null && EF.Functions.Like(x.Vendor, likePattern)) ||
+                (x.Version != null && EF.Functions.Like(x.Version, likePattern)) ||
+                (x.Owner != null && EF.Functions.Like(x.Owner, likePattern)) ||
+                (x.LifecycleStatus != null && EF.Functions.Like(x.LifecycleStatus, likePattern)) ||
+                (x.Description != null && EF.Functions.Like(x.Description, likePattern)) ||
+                (x.Notes != null && EF.Functions.Like(x.Notes, likePattern)));
         }
 
         var model = new ProductsIndexViewModel
