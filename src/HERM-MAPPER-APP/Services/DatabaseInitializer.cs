@@ -1,4 +1,5 @@
 using HERM_MAPPER_APP.Data;
+using HERM_MAPPER_APP.Models;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ public sealed class DatabaseInitializer(
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureConfigurableFieldOptionsTableAsync(cancellationToken);
+        await EnsureDefaultConfigurableFieldOptionsAsync(cancellationToken);
 
         if (dbContext.Database.IsSqlite())
         {
@@ -271,5 +273,32 @@ public sealed class DatabaseInitializer(
                 """,
                 cancellationToken);
         }
+    }
+
+    private async Task EnsureDefaultConfigurableFieldOptionsAsync(CancellationToken cancellationToken)
+    {
+        var existingLifecycleStatuses = await dbContext.ConfigurableFieldOptions
+            .AsNoTracking()
+            .Where(x => x.FieldName == ConfigurableFieldNames.LifecycleStatus)
+            .Select(x => x.Value)
+            .ToListAsync(cancellationToken);
+
+        var missingLifecycleStatuses = ConfigurableFieldNames.GetDefaultValues(ConfigurableFieldNames.LifecycleStatus)
+            .Where(value => existingLifecycleStatuses.All(existing => !string.Equals(existing, value, StringComparison.OrdinalIgnoreCase)))
+            .Select(value => new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.LifecycleStatus,
+                Value = value,
+                CreatedUtc = DateTime.UtcNow
+            })
+            .ToList();
+
+        if (missingLifecycleStatuses.Count == 0)
+        {
+            return;
+        }
+
+        dbContext.ConfigurableFieldOptions.AddRange(missingLifecycleStatuses);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

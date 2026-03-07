@@ -18,11 +18,24 @@ public sealed class ConfigurableFieldOption
 public static class ConfigurableFieldNames
 {
     public const string Owner = "Owner";
+    public const string LifecycleStatus = "LifecycleStatus";
+    private static readonly string[] LifecycleStatusOrder =
+    [
+        "Propose",
+        "Development",
+        "Trial",
+        "Production",
+        "Under review",
+        "Appointed",
+        "Deprecate",
+        "Sunset"
+    ];
 
     private static readonly IReadOnlyDictionary<string, string> SupportedFields =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            [Owner] = "Owner"
+            [Owner] = "Owner",
+            [LifecycleStatus] = "Lifecycle status"
         };
 
     public static IReadOnlyDictionary<string, string> All => SupportedFields;
@@ -32,4 +45,28 @@ public static class ConfigurableFieldNames
 
     public static string GetLabel(string fieldName) =>
         SupportedFields.TryGetValue(fieldName, out var label) ? label : fieldName;
+
+    public static IReadOnlyList<string> GetDefaultValues(string fieldName) =>
+        fieldName.Equals(LifecycleStatus, StringComparison.OrdinalIgnoreCase)
+            ? LifecycleStatusOrder
+            : [];
+
+    public static IReadOnlyList<string> OrderValues(string fieldName, IEnumerable<string> values)
+    {
+        if (!fieldName.Equals(LifecycleStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            return values
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        var preferredOrder = LifecycleStatusOrder
+            .Select((value, index) => new { value, index })
+            .ToDictionary(x => x.value, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+        return values
+            .OrderBy(x => preferredOrder.TryGetValue(x, out var index) ? index : int.MaxValue)
+            .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 }

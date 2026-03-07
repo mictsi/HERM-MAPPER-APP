@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
 @{
     var ownerOptions = ViewData["OwnerOptions"] as IEnumerable<SelectListItem> ?? [];
+    var lifecycleStatusOptions = ViewData["LifecycleStatusOptions"] as IEnumerable<SelectListItem> ?? [];
 }
 
 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
@@ -39,7 +40,7 @@
                 </div>
                 <div class="col-md-6">
                     <label asp-for="LifecycleStatus" class="form-label"></label>
-                    <input asp-for="LifecycleStatus" class="form-control" placeholder="Active, pilot, retired..." />
+                    <select asp-for="LifecycleStatus" asp-items="lifecycleStatusOptions" class="form-select"></select>
                     <span asp-validation-for="LifecycleStatus" class="text-danger"></span>
                 </div>
                 <div class="col-12">

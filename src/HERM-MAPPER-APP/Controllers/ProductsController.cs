@@ -45,7 +45,7 @@ public sealed class ProductsController(
 
     public async Task<IActionResult> Create()
     {
-        await PopulateOwnerOptionsAsync(null);
+        await PopulateFormOptionsAsync(null, null);
         return View(new ProductCatalogItem());
     }
 
@@ -54,10 +54,11 @@ public sealed class ProductsController(
     public async Task<IActionResult> Create([Bind("Name,Vendor,Version,LifecycleStatus,Owner,Description,Notes")] ProductCatalogItem input)
     {
         input.Owner = NormalizeSelection(input.Owner);
+        input.LifecycleStatus = NormalizeSelection(input.LifecycleStatus);
 
         if (!ModelState.IsValid)
         {
-            await PopulateOwnerOptionsAsync(input.Owner);
+            await PopulateFormOptionsAsync(input.Owner, input.LifecycleStatus);
             return View(input);
         }
 
@@ -159,7 +160,7 @@ public sealed class ProductsController(
         var product = await dbContext.ProductCatalogItems.FindAsync(id);
         if (product is not null)
         {
-            await PopulateOwnerOptionsAsync(product.Owner);
+            await PopulateFormOptionsAsync(product.Owner, product.LifecycleStatus);
         }
 
         return product is null ? NotFound() : View(product);
@@ -176,11 +177,12 @@ public sealed class ProductsController(
         }
 
         input.Owner = NormalizeSelection(input.Owner);
+        input.LifecycleStatus = NormalizeSelection(input.LifecycleStatus);
 
         if (!ModelState.IsValid)
         {
             input.Id = id;
-            await PopulateOwnerOptionsAsync(input.Owner);
+            await PopulateFormOptionsAsync(input.Owner, input.LifecycleStatus);
             return View(input);
         }
 
@@ -234,11 +236,14 @@ public sealed class ProductsController(
         return RedirectToAction(nameof(Index));
     }
 
-    private async Task PopulateOwnerOptionsAsync(string? selectedValue)
+    private async Task PopulateFormOptionsAsync(string? selectedOwner, string? selectedLifecycleStatus)
     {
         ViewData["OwnerOptions"] = await configurableFieldService.GetSelectListAsync(
             ConfigurableFieldNames.Owner,
-            selectedValue);
+            selectedOwner);
+        ViewData["LifecycleStatusOptions"] = await configurableFieldService.GetSelectListAsync(
+            ConfigurableFieldNames.LifecycleStatus,
+            selectedLifecycleStatus);
     }
 
     private static string? NormalizeSelection(string? value) =>

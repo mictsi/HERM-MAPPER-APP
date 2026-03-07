@@ -16,16 +16,16 @@ public sealed class ConfigurableFieldService(AppDbContext dbContext)
         var configuredValues = await dbContext.ConfigurableFieldOptions
             .AsNoTracking()
             .Where(x => x.FieldName == fieldName)
-            .OrderBy(x => x.Value)
             .Select(x => x.Value)
             .ToListAsync(cancellationToken);
+        var orderedValues = ConfigurableFieldNames.OrderValues(fieldName, configuredValues);
 
         var items = new List<SelectListItem>
         {
             new(defaultLabel, string.Empty, string.IsNullOrWhiteSpace(selectedValue))
         };
 
-        foreach (var value in configuredValues.Distinct(StringComparer.OrdinalIgnoreCase))
+        foreach (var value in orderedValues.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             items.Add(new SelectListItem(value, value, string.Equals(value, selectedValue, StringComparison.OrdinalIgnoreCase)));
         }
@@ -41,10 +41,21 @@ public sealed class ConfigurableFieldService(AppDbContext dbContext)
 
     public async Task<IReadOnlyList<ConfigurableFieldOption>> GetOptionsAsync(
         string fieldName,
-        CancellationToken cancellationToken = default) =>
-        await dbContext.ConfigurableFieldOptions
+        CancellationToken cancellationToken = default)
+    {
+        var options = await dbContext.ConfigurableFieldOptions
             .AsNoTracking()
             .Where(x => x.FieldName == fieldName)
-            .OrderBy(x => x.Value)
             .ToListAsync(cancellationToken);
+
+        var orderedValues = ConfigurableFieldNames.OrderValues(fieldName, options.Select(x => x.Value));
+        var orderLookup = orderedValues
+            .Select((value, index) => new { value, index })
+            .ToDictionary(x => x.value, x => x.index, StringComparer.OrdinalIgnoreCase);
+
+        return options
+            .OrderBy(x => orderLookup.TryGetValue(x.Value, out var index) ? index : int.MaxValue)
+            .ThenBy(x => x.Value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 }
