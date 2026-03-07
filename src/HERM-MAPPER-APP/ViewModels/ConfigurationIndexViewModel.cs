@@ -1,10 +1,15 @@
 using System.ComponentModel.DataAnnotations;
 using HERM_MAPPER_APP.Models;
+using HERM_MAPPER_APP.Services;
 
 namespace HERM_MAPPER_APP.ViewModels;
 
 public sealed class ConfigurationIndexViewModel
 {
+    public string? StatusMessage { get; init; }
+    public string? ErrorMessage { get; init; }
+    public WorkbookImportReviewViewModel CatalogueImportReview { get; init; } = new();
+    public ProductImportReviewViewModel ProductImportReview { get; init; } = new();
     public IReadOnlyList<ConfigurationFieldGroupViewModel> Fields { get; init; } = [];
 }
 
@@ -23,4 +28,12 @@ public sealed class AddConfigurationOptionInputModel
     [Required, StringLength(120)]
     [Display(Name = "Value")]
     public string Value { get; set; } = string.Empty;
+}
+
+public sealed class ProductImportReviewViewModel
+{
+    public bool HasReview => Verification is not null;
+    public string? PendingImportToken { get; init; }
+    public string? UploadedFileName { get; init; }
+    public ProductRelationshipVerificationResult? Verification { get; init; }
 }

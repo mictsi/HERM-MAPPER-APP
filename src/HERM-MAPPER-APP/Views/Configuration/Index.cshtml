@@ -1,4 +1,5 @@
 @model ConfigurationIndexViewModel
+@using HERM_MAPPER_APP.Services
 @{
     ViewData["Title"] = "Configuration";
 }
@@ -7,16 +8,250 @@
     <div>
         <span class="eyebrow">App settings</span>
         <h1>Configuration</h1>
-        <p>Manage the allowed values for configurable product and mapping fields.</p>
+        <p>Manage import workflows and the allowed values for configurable product and mapping fields.</p>
     </div>
 </section>
 
-@if (TempData["ConfigurationError"] is string errorMessage)
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <section class="content-card">
-        <div class="alert alert-danger mb-0">@errorMessage</div>
+        <div class="alert alert-success mb-0">@Model.StatusMessage</div>
     </section>
 }
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <section class="content-card">
+        <div class="alert alert-danger mb-0">@Model.ErrorMessage</div>
+    </section>
+}
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Catalogue import</span>
+            <h2>Verify workbook before importing</h2>
+        </div>
+    </div>
+    <p class="mb-3">Upload the HERM workbook here to review the proposed domain, capability, and component changes before applying them.</p>
+    <form asp-action="VerifyCatalogueImport" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+        @Html.AntiForgeryToken()
+        <div class="col-lg-8">
+            <label class="form-label" for="workbook">Workbook</label>
+            <input class="form-control" id="workbook" name="workbook" type="file" accept=".xlsx" />
+        </div>
+        <div class="col-lg-4 d-grid">
+            <button class="btn btn-primary" type="submit">Verify workbook</button>
+        </div>
+    </form>
+
+    @if (Model.CatalogueImportReview.HasReview && Model.CatalogueImportReview.Verification is not null)
+    {
+        var verification = Model.CatalogueImportReview.Verification;
+        <div class="import-review mt-4">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Verification result</span>
+                    <h3>@(Model.CatalogueImportReview.UploadedFileName ?? "Uploaded workbook")</h3>
+                </div>
+                <span class="status-pill @(verification.IsValid ? "status-complete" : "status-outofscope")">
+                    @(verification.IsValid ? "Ready to import" : "Verification failed")
+                </span>
+            </div>
+
+            <div class="stats-grid stats-grid-compact import-stats">
+                <article class="stat-card">
+                    <span class="stat-label">Domains</span>
+                    <span class="stat-value">@verification.DomainRowCount</span>
+                    <span class="stat-meta">+@verification.DomainsToAdd new, @verification.DomainsToUpdate update</span>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">Capabilities</span>
+                    <span class="stat-value">@verification.CapabilityRowCount</span>
+                    <span class="stat-meta">+@verification.CapabilitiesToAdd new, @verification.CapabilitiesToUpdate update</span>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">Components</span>
+                    <span class="stat-value">@verification.ComponentRowCount</span>
+                    <span class="stat-meta">+@verification.ComponentsToAdd new, @verification.ComponentsToUpdate update</span>
+                </article>
+            </div>
+
+            @if (verification.Errors.Count > 0)
+            {
+                <div class="alert alert-danger mt-3 mb-0">
+                    <strong>Import is blocked.</strong>
+                    <ul class="mb-0 mt-2">
+                        @foreach (var error in verification.Errors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (verification.Warnings.Count > 0)
+            {
+                <div class="alert alert-warning mt-3 mb-0">
+                    <ul class="mb-0">
+                        @foreach (var warning in verification.Warnings)
+                        {
+                            <li>@warning</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (verification.IsValid && !string.IsNullOrWhiteSpace(Model.CatalogueImportReview.PendingImportToken))
+            {
+                <div class="d-flex gap-2 mt-3">
+                    <form asp-action="ImportVerifiedCatalogue" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="pendingImportToken" value="@Model.CatalogueImportReview.PendingImportToken" />
+                        <button class="btn btn-primary" type="submit">Import verified workbook</button>
+                    </form>
+                    <form asp-action="AbortCatalogueImport" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="pendingImportToken" value="@Model.CatalogueImportReview.PendingImportToken" />
+                        <button class="btn btn-outline-secondary" type="submit">Abort</button>
+                    </form>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Product import</span>
+            <h2>Review CSV rows before importing</h2>
+        </div>
+    </div>
+    <p class="mb-3">Upload a semicolon-separated CSV with the columns <code>LEVEL0;LEVEL1;LEVEL2;LEVEL3</code>. Each row is previewed before import so you can see whether it will add a product, create a mapping, or import the product only.</p>
+    <form asp-action="VerifyProductImport" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+        @Html.AntiForgeryToken()
+        <div class="col-lg-8">
+            <label class="form-label" for="csvFile">CSV file</label>
+            <input class="form-control" id="csvFile" name="csvFile" type="file" accept=".csv,text/csv" />
+        </div>
+        <div class="col-lg-4 d-grid">
+            <button class="btn btn-primary" type="submit">Verify product CSV</button>
+        </div>
+    </form>
+
+    @if (Model.ProductImportReview.HasReview && Model.ProductImportReview.Verification is not null)
+    {
+        var verification = Model.ProductImportReview.Verification;
+        <div class="import-review mt-4">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Verification result</span>
+                    <h3>@(Model.ProductImportReview.UploadedFileName ?? "Uploaded CSV")</h3>
+                </div>
+                <span class="status-pill @(verification.IsValid ? "status-complete" : "status-outofscope")">
+                    @(verification.IsValid ? "Ready to import" : "Verification failed")
+                </span>
+            </div>
+
+            <div class="stats-grid stats-grid-compact import-stats">
+                <article class="stat-card">
+                    <span class="stat-label">Rows read</span>
+                    <span class="stat-value">@verification.RowsRead</span>
+                    <span class="stat-meta">@verification.RowsSkipped skipped</span>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">Products</span>
+                    <span class="stat-value">+@verification.ProductsToAdd</span>
+                    <span class="stat-meta">@verification.ProductsMatched existing matched</span>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">Mappings</span>
+                    <span class="stat-value">+@verification.MappingsToAdd</span>
+                    <span class="stat-meta">@verification.MappingsSkippedAsDuplicate duplicate, @verification.ProductsOnlyRows product-only</span>
+                </article>
+            </div>
+
+            @if (verification.Errors.Count > 0)
+            {
+                <div class="alert alert-danger mt-3 mb-0">
+                    <strong>Import is blocked.</strong>
+                    <ul class="mb-0 mt-2">
+                        @foreach (var error in verification.Errors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (verification.Warnings.Count > 0)
+            {
+                <div class="alert alert-warning mt-3 mb-0">
+                    <ul class="mb-0">
+                        @foreach (var warning in verification.Warnings)
+                        {
+                            <li>@warning</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            @if (verification.Rows.Count > 0)
+            {
+                <div class="table-responsive mt-3">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Row</th>
+                                <th>Product</th>
+                                <th>LEVEL1</th>
+                                <th>LEVEL2</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var row in verification.Rows)
+                        {
+                            var statusClass = row.StatusKind switch
+                            {
+                                ProductImportStatusKind.Ready => "status-complete",
+                                ProductImportStatusKind.Warning => "status-inreview",
+                                _ => "status-outofscope"
+                            };
+                            <tr>
+                                <td>@row.RowNumber</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.ProductName) ? "-" : row.ProductName)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Level1Name) ? "-" : row.Level1Name)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.Level2Name) ? "-" : row.Level2Name)</td>
+                                <td><span class="status-pill @statusClass">@row.Status</span></td>
+                                <td>@row.Details</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (verification.IsValid && !string.IsNullOrWhiteSpace(Model.ProductImportReview.PendingImportToken))
+            {
+                <div class="d-flex gap-2 mt-3">
+                    <form asp-action="ImportVerifiedProducts" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="pendingImportToken" value="@Model.ProductImportReview.PendingImportToken" />
+                        <button class="btn btn-primary" type="submit">Import verified CSV</button>
+                    </form>
+                    <form asp-action="AbortProductImport" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="pendingImportToken" value="@Model.ProductImportReview.PendingImportToken" />
+                        <button class="btn btn-outline-secondary" type="submit">Abort</button>
+                    </form>
+                </div>
+            }
+        </div>
+    }
+</section>
 
 @foreach (var field in Model.Fields)
 {

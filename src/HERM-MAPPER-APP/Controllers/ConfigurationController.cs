@@ -10,26 +10,231 @@ namespace HERM_MAPPER_APP.Controllers;
 public sealed class ConfigurationController(
     AppDbContext dbContext,
     ConfigurableFieldService configurableFieldService,
-    AuditLogService auditLogService) : Controller
+    AuditLogService auditLogService,
+    TrmWorkbookImportService workbookImportService,
+    SampleRelationshipImportService sampleRelationshipImportService,
+    IWebHostEnvironment environment) : Controller
 {
     public async Task<IActionResult> Index()
     {
-        var fields = new List<ConfigurationFieldGroupViewModel>();
+        return View(await BuildViewModelAsync());
+    }
 
-        foreach (var field in ConfigurableFieldNames.All)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> VerifyCatalogueImport(IFormFile? workbook)
+    {
+        if (workbook is null || workbook.Length == 0)
         {
-            fields.Add(new ConfigurationFieldGroupViewModel
-            {
-                FieldName = field.Key,
-                Label = field.Value,
-                Options = await configurableFieldService.GetOptionsAsync(field.Key)
-            });
+            return View("Index", await BuildViewModelAsync(
+                catalogueImportReview: BuildCatalogueErrorReview("Choose an .xlsx workbook before verifying the import.")));
         }
 
-        return View(new ConfigurationIndexViewModel
+        if (!string.Equals(Path.GetExtension(workbook.FileName), ".xlsx", StringComparison.OrdinalIgnoreCase))
         {
-            Fields = fields
-        });
+            return View("Index", await BuildViewModelAsync(
+                catalogueImportReview: BuildCatalogueErrorReview("Only Excel .xlsx workbooks are supported.", workbook.FileName)));
+        }
+
+        var pendingImportToken = Guid.NewGuid().ToString("N");
+        var pendingPath = Path.Combine(EnsurePendingImportDirectory("catalogue"), $"{pendingImportToken}.xlsx");
+
+        await using (var stream = System.IO.File.Create(pendingPath))
+        {
+            await workbook.CopyToAsync(stream);
+        }
+
+        var verification = await workbookImportService.VerifyAsync(pendingPath);
+        if (!verification.IsValid)
+        {
+            System.IO.File.Delete(pendingPath);
+        }
+
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "VerifyCatalogueImport",
+            "TrmWorkbook",
+            null,
+            $"Verified workbook {workbook.FileName}.",
+            verification.IsValid ? "Verification passed." : string.Join(" | ", verification.Errors));
+
+        return View("Index", await BuildViewModelAsync(
+            catalogueImportReview: new WorkbookImportReviewViewModel
+            {
+                PendingImportToken = verification.IsValid ? pendingImportToken : null,
+                UploadedFileName = workbook.FileName,
+                Verification = verification
+            }));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportVerifiedCatalogue(string pendingImportToken)
+    {
+        if (string.IsNullOrWhiteSpace(pendingImportToken))
+        {
+            TempData["ConfigurationError"] = "Verify a catalogue workbook before importing it.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var pendingPath = Path.Combine(EnsurePendingImportDirectory("catalogue"), $"{pendingImportToken}.xlsx");
+        if (!System.IO.File.Exists(pendingPath))
+        {
+            TempData["ConfigurationError"] = "The verified catalogue workbook is no longer available. Upload it again.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var verification = await workbookImportService.VerifyAsync(pendingPath);
+        if (!verification.IsValid)
+        {
+            System.IO.File.Delete(pendingPath);
+            return View("Index", await BuildViewModelAsync(
+                catalogueImportReview: new WorkbookImportReviewViewModel
+                {
+                    Verification = verification
+                }));
+        }
+
+        var summary = await workbookImportService.ImportAsync(pendingPath);
+        System.IO.File.Delete(pendingPath);
+
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "ImportCatalogue",
+            "TrmWorkbook",
+            null,
+            "Imported verified catalogue workbook.",
+            $"Domains +{summary.DomainsAdded}/{summary.DomainsUpdated}, capabilities +{summary.CapabilitiesAdded}/{summary.CapabilitiesUpdated}, components +{summary.ComponentsAdded}/{summary.ComponentsUpdated}.");
+
+        TempData["ConfigurationStatusMessage"] =
+            $"Catalogue imported. Domains +{summary.DomainsAdded}/{summary.DomainsUpdated} updated, " +
+            $"capabilities +{summary.CapabilitiesAdded}/{summary.CapabilitiesUpdated} updated, " +
+            $"components +{summary.ComponentsAdded}/{summary.ComponentsUpdated} updated.";
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AbortCatalogueImport(string pendingImportToken)
+    {
+        DeletePendingImport("catalogue", pendingImportToken, ".xlsx");
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "AbortCatalogueImport",
+            "TrmWorkbook",
+            null,
+            "Aborted pending catalogue import.");
+        TempData["ConfigurationStatusMessage"] = "Catalogue import was aborted.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> VerifyProductImport(IFormFile? csvFile)
+    {
+        if (csvFile is null || csvFile.Length == 0)
+        {
+            return View("Index", await BuildViewModelAsync(
+                productImportReview: BuildProductErrorReview("Choose a CSV file before verifying the import.")));
+        }
+
+        if (!string.Equals(Path.GetExtension(csvFile.FileName), ".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            return View("Index", await BuildViewModelAsync(
+                productImportReview: BuildProductErrorReview("Only .csv files are supported for product import.", csvFile.FileName)));
+        }
+
+        var pendingImportToken = Guid.NewGuid().ToString("N");
+        var pendingPath = Path.Combine(EnsurePendingImportDirectory("products"), $"{pendingImportToken}.csv");
+
+        await using (var stream = System.IO.File.Create(pendingPath))
+        {
+            await csvFile.CopyToAsync(stream);
+        }
+
+        var verification = await sampleRelationshipImportService.VerifyAsync(pendingPath);
+        if (!verification.IsValid)
+        {
+            System.IO.File.Delete(pendingPath);
+        }
+
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "VerifyProductImport",
+            nameof(ProductCatalogItem),
+            null,
+            $"Verified product import CSV {csvFile.FileName}.",
+            verification.IsValid ? $"Rows read: {verification.RowsRead}." : string.Join(" | ", verification.Errors));
+
+        return View("Index", await BuildViewModelAsync(
+            productImportReview: new ProductImportReviewViewModel
+            {
+                PendingImportToken = verification.IsValid ? pendingImportToken : null,
+                UploadedFileName = csvFile.FileName,
+                Verification = verification
+            }));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportVerifiedProducts(string pendingImportToken)
+    {
+        if (string.IsNullOrWhiteSpace(pendingImportToken))
+        {
+            TempData["ConfigurationError"] = "Verify a product CSV before importing it.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var pendingPath = Path.Combine(EnsurePendingImportDirectory("products"), $"{pendingImportToken}.csv");
+        if (!System.IO.File.Exists(pendingPath))
+        {
+            TempData["ConfigurationError"] = "The verified product CSV is no longer available. Upload it again.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var verification = await sampleRelationshipImportService.VerifyAsync(pendingPath);
+        if (!verification.IsValid)
+        {
+            System.IO.File.Delete(pendingPath);
+            return View("Index", await BuildViewModelAsync(
+                productImportReview: new ProductImportReviewViewModel
+                {
+                    Verification = verification
+                }));
+        }
+
+        var summary = await sampleRelationshipImportService.ImportAsync(pendingPath);
+        System.IO.File.Delete(pendingPath);
+
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "ImportProducts",
+            nameof(ProductCatalogItem),
+            null,
+            "Imported verified product CSV.",
+            $"Rows read: {summary.RowsRead}; products added: {summary.ProductsAdded}; existing products matched: {summary.ProductsMatched}; mappings added: {summary.MappingsAdded}; product-only rows: {summary.ProductsOnlyRows}; duplicate mappings skipped: {summary.MappingsSkippedAsDuplicate}; rows skipped: {summary.RowsSkipped}.");
+
+        TempData["ConfigurationStatusMessage"] =
+            $"Imported {summary.ProductsAdded} new product(s), matched {summary.ProductsMatched} existing product(s), " +
+            $"created {summary.MappingsAdded} mapping(s), and left {summary.ProductsOnlyRows} row(s) as product-only because the hierarchy did not match.";
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AbortProductImport(string pendingImportToken)
+    {
+        DeletePendingImport("products", pendingImportToken, ".csv");
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "AbortProductImport",
+            nameof(ProductCatalogItem),
+            null,
+            "Aborted pending product import.");
+        TempData["ConfigurationStatusMessage"] = "Product import was aborted.";
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]
@@ -77,6 +282,7 @@ public sealed class ConfigurationController(
             option.Id,
             $"Added configuration value '{option.Value}' to {option.FieldName}.");
 
+        TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(input.FieldName)} value '{option.Value}' was added.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -99,6 +305,74 @@ public sealed class ConfigurationController(
             option.Id,
             $"Removed configuration value '{option.Value}' from {option.FieldName}.");
 
+        TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(option.FieldName)} value '{option.Value}' was removed.";
         return RedirectToAction(nameof(Index));
+    }
+
+    private async Task<ConfigurationIndexViewModel> BuildViewModelAsync(
+        WorkbookImportReviewViewModel? catalogueImportReview = null,
+        ProductImportReviewViewModel? productImportReview = null)
+    {
+        var fields = new List<ConfigurationFieldGroupViewModel>();
+
+        foreach (var field in ConfigurableFieldNames.All)
+        {
+            fields.Add(new ConfigurationFieldGroupViewModel
+            {
+                FieldName = field.Key,
+                Label = field.Value,
+                Options = await configurableFieldService.GetOptionsAsync(field.Key)
+            });
+        }
+
+        return new ConfigurationIndexViewModel
+        {
+            StatusMessage = TempData["ConfigurationStatusMessage"] as string,
+            ErrorMessage = TempData["ConfigurationError"] as string,
+            CatalogueImportReview = catalogueImportReview ?? new WorkbookImportReviewViewModel(),
+            ProductImportReview = productImportReview ?? new ProductImportReviewViewModel(),
+            Fields = fields
+        };
+    }
+
+    private WorkbookImportReviewViewModel BuildCatalogueErrorReview(string errorMessage, string? uploadedFileName = null) =>
+        new()
+        {
+            UploadedFileName = uploadedFileName,
+            Verification = new TrmWorkbookVerificationResult
+            {
+                Errors = [errorMessage]
+            }
+        };
+
+    private ProductImportReviewViewModel BuildProductErrorReview(string errorMessage, string? uploadedFileName = null) =>
+        new()
+        {
+            UploadedFileName = uploadedFileName,
+            Verification = new ProductRelationshipVerificationResult
+            {
+                Errors = [errorMessage]
+            }
+        };
+
+    private string EnsurePendingImportDirectory(string importType)
+    {
+        var directory = Path.Combine(environment.ContentRootPath, "App_Data", "PendingImports", importType);
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private void DeletePendingImport(string importType, string pendingImportToken, string extension)
+    {
+        if (string.IsNullOrWhiteSpace(pendingImportToken))
+        {
+            return;
+        }
+
+        var pendingPath = Path.Combine(EnsurePendingImportDirectory(importType), $"{pendingImportToken}{extension}");
+        if (System.IO.File.Exists(pendingPath))
+        {
+            System.IO.File.Delete(pendingPath);
+        }
     }
 }

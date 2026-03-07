@@ -10,6 +10,71 @@ namespace HERM_MAPPER_APP.Tests.Services;
 public sealed class SampleRelationshipImportServiceTests
 {
     [Fact]
+    public async Task VerifyAsync_ShowsPreviewActions_ForEachRow()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
+
+        var existingProduct = new ProductCatalogItem
+        {
+            Name = "Graylog"
+        };
+
+        fixture.DbContext.ProductCatalogItems.Add(existingProduct);
+        await fixture.DbContext.SaveChangesAsync();
+
+        var csvPath = fixture.WriteCsv(
+            """
+            LEVEL0;LEVEL1;LEVEL2;LEVEL3
+            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
+            HERM;Infrastructure;Monitoring & Alerting (TC002);Azure Log Analytics
+            """);
+
+        var service = new SampleRelationshipImportService(fixture.DbContext);
+
+        var verification = await service.VerifyAsync(csvPath);
+
+        Assert.True(verification.IsValid);
+        Assert.Equal(2, verification.RowsRead);
+        Assert.Equal(1, verification.ProductsMatched);
+        Assert.Equal(1, verification.ProductsToAdd);
+        Assert.Equal(1, verification.MappingsToAdd);
+        Assert.Equal(1, verification.ProductsOnlyRows);
+        Assert.Collection(
+            verification.Rows,
+            row =>
+            {
+                Assert.Equal("Add Mapping", row.Status);
+                Assert.True(row.WillCreateMapping);
+                Assert.False(row.WillCreateProduct);
+            },
+            row =>
+            {
+                Assert.Equal("Add Product Only", row.Status);
+                Assert.False(row.WillCreateMapping);
+                Assert.True(row.WillCreateProduct);
+            });
+    }
+
+    [Fact]
+    public async Task VerifyAsync_Fails_WhenHeaderIsInvalid()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var csvPath = fixture.WriteCsv(
+            """
+            Domain;Capability;Component;Product
+            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
+            """);
+
+        var service = new SampleRelationshipImportService(fixture.DbContext);
+
+        var verification = await service.VerifyAsync(csvPath);
+
+        Assert.False(verification.IsValid);
+        Assert.Contains("LEVEL0;LEVEL1;LEVEL2;LEVEL3", verification.Errors.Single());
+    }
+
+    [Fact]
     public async Task ImportAsync_CreatesProductAndMapping_WhenHierarchyMatches()
     {
         await using var fixture = await TestFixture.CreateAsync();
