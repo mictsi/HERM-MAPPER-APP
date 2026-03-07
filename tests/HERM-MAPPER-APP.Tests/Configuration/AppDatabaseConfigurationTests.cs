@@ -50,6 +50,56 @@ public sealed class AppDatabaseConfigurationTests
     }
 
     [Fact]
+    public void Resolve_UsesHomeDirectoryToken_ForSqlitePath()
+    {
+        using var contentRoot = new TemporaryDirectory();
+        using var homeDirectory = new TemporaryDirectory();
+        using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
+        {
+            ["HOME"] = homeDirectory.Path
+        });
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Database:SqliteFilePath"] = "|HomeDirectory|/data/herm-mapper.db"
+            })
+            .Build();
+
+        var resolved = AppDatabaseConfiguration.Resolve(configuration, contentRoot.Path);
+
+        Assert.Equal(
+            NormalizeSlashes($"Data Source={Path.Combine(homeDirectory.Path, "data", "herm-mapper.db")}"),
+            NormalizeSlashes(resolved.ConnectionString));
+        Assert.True(Directory.Exists(Path.Combine(homeDirectory.Path, "data")));
+    }
+
+    [Fact]
+    public void Resolve_ExpandsEnvironmentVariables_ForSqliteConnectionString()
+    {
+        using var contentRoot = new TemporaryDirectory();
+        using var homeDirectory = new TemporaryDirectory();
+        using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
+        {
+            ["HOME"] = homeDirectory.Path
+        });
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Sqlite"] = "Data Source=%HOME%/data/herm-mapper.db"
+            })
+            .Build();
+
+        var resolved = AppDatabaseConfiguration.Resolve(configuration, contentRoot.Path);
+
+        Assert.Equal(
+            NormalizeSlashes($"Data Source={Path.Combine(homeDirectory.Path, "data", "herm-mapper.db")}"),
+            NormalizeSlashes(resolved.ConnectionString));
+        Assert.True(Directory.Exists(Path.Combine(homeDirectory.Path, "data")));
+    }
+
+    [Fact]
     public void Resolve_Throws_WhenSqlServerHasNoConnectionString()
     {
         using var contentRoot = new TemporaryDirectory();

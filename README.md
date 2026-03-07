@@ -77,6 +77,7 @@ The web application now lives under `src/HERM-MAPPER-APP` and automated tests li
 - Database provider is selected with `Database:Provider` or `HERM_Database__Provider`
 - SQLite uses `Database:SqliteFilePath`, `ConnectionStrings:Sqlite`, or `ConnectionStrings:DefaultConnection`
 - SQL Server uses `Database:ConnectionString`, `ConnectionStrings:SqlServer`, or `ConnectionStrings:DefaultConnection`
+- SQLite paths support `|DataDirectory|` and `|HomeDirectory|` tokens; `|HomeDirectory|/data/...` is suitable for durable Azure App Service storage
 - Console logging can be controlled with `Diagnostics:Console:*` or `HERM_Diagnostics__Console__*`
 - SQL command logging can be controlled with `Diagnostics:Sql:*` or `HERM_Diagnostics__Sql__*`
 
@@ -89,16 +90,32 @@ $env:HERM_Diagnostics__Sql__LogLevel = "Information"
 ```
 
 ## Azure App Service Deploy
-Use `scripts/deploy-appservice.ps1` to publish the app, create the web app if it does not exist, create the App Service plan if it is missing, and sync settings from an appsettings JSON file into App Service application settings.
+Two deployment scripts exist under `scripts/`:
 
-Example:
+- `deploy-appservice.ps1`: original script (keeps legacy behavior).
+- `deploy-appservice-azcli.ps1`: recommended. Uses Azure CLI and is runnable from the repository root.
+
+`deploy-appservice-azcli.ps1` behavior:
+- Uses an existing App Service plan specified by `-AppPlan` (errors if not found).
+- Creates the Web App if it does not exist, using the provided plan.
+- Publishes the project under `src/HERM-MAPPER-APP`, zips the publish output and deploys via `az webapp deploy`.
+- Loads the provided appsettings JSON file, flattens nested keys using `Section__Key` naming, and applies them as App Settings (in chunks).
+
+Usage (run from the repository root):
 ```powershell
-.\scripts\deploy-appservice.ps1 -SubscriptionId $SUBID -ResourceGroupName $RG -WebAppName "HERM-MAPPER-APP" -SettingsFile $SettingsFile -AppEnvironment "Production" -appplan $appplan
+.\scripts\deploy-appservice-azcli.ps1 \
+	-SubscriptionId $SUBID \
+	-Region 'eastus' \
+	-ResourceGroupName $RG \
+	-WebAppName 'my-app' \
+	-SettingsFile '.\src\HERM-MAPPER-APP\appsettings.Production.json' \
+	-AppEnvironment 'Production' \
+	-AppPlan $appplan
 ```
 
 Notes:
-- The resource group must already exist because the script derives the location from it.
-- If the App Service plan is missing, the script creates a Linux `S1` plan by default.
+- The resource group must already exist because the script derives the region from it.
+- `deploy-appservice-azcli.ps1` requires the `az` CLI and `dotnet` SDK on PATH.
 - Settings are flattened into App Service environment variables using `Section__Key` naming.
 
 ## License

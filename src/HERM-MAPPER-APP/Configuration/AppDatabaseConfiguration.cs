@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 
 namespace HERM_MAPPER_APP.Configuration;
@@ -27,6 +28,7 @@ public static class AppDatabaseConfiguration
         ArgumentException.ThrowIfNullOrWhiteSpace(contentRootPath);
 
         var dataDirectory = Path.Combine(contentRootPath, "App_Data");
+        var homeDirectory = ResolveHomeDirectory(contentRootPath);
         Directory.CreateDirectory(dataDirectory);
 
         var settings = configuration.GetSection(AppDatabaseSettings.SectionName).Get<AppDatabaseSettings>() ?? new AppDatabaseSettings();
@@ -36,7 +38,7 @@ public static class AppDatabaseConfiguration
         {
             DatabaseProviderKind.Sqlite => new ResolvedDatabaseConfiguration(
                 provider,
-                ResolveSqliteConnectionString(configuration, settings, dataDirectory)),
+                ResolveSqliteConnectionString(configuration, settings, dataDirectory, homeDirectory)),
             DatabaseProviderKind.SqlServer => new ResolvedDatabaseConfiguration(
                 provider,
                 ResolveSqlServerConnectionString(configuration, settings)),
@@ -55,7 +57,8 @@ public static class AppDatabaseConfiguration
     private static string ResolveSqliteConnectionString(
         IConfiguration configuration,
         AppDatabaseSettings settings,
-        string dataDirectory)
+        string dataDirectory,
+        string homeDirectory)
     {
         var configuredConnectionString = FirstNonEmpty(
             settings.ConnectionString,
@@ -64,10 +67,14 @@ public static class AppDatabaseConfiguration
 
         if (!string.IsNullOrWhiteSpace(configuredConnectionString))
         {
-            return ReplaceDataDirectoryToken(configuredConnectionString, dataDirectory);
+            var resolvedConnectionString = ResolvePathTokens(configuredConnectionString, dataDirectory, homeDirectory);
+            EnsureSqliteDataDirectoryExists(resolvedConnectionString);
+            return resolvedConnectionString;
         }
 
-        return $"Data Source={ReplaceDataDirectoryToken(settings.SqliteFilePath, dataDirectory)}";
+        var sqliteFilePath = ResolvePathTokens(settings.SqliteFilePath, dataDirectory, homeDirectory);
+        EnsureSqliteDataDirectoryExists($"Data Source={sqliteFilePath}");
+        return $"Data Source={sqliteFilePath}";
     }
 
     private static string ResolveSqlServerConnectionString(
@@ -88,8 +95,52 @@ public static class AppDatabaseConfiguration
         return configuredConnectionString;
     }
 
-    private static string ReplaceDataDirectoryToken(string value, string dataDirectory) =>
-        value.Replace("|DataDirectory|", dataDirectory.Replace("\\", "/"), StringComparison.OrdinalIgnoreCase);
+    private static string ResolvePathTokens(string value, string dataDirectory, string homeDirectory)
+    {
+        var resolvedValue = value
+            .Replace("|DataDirectory|", dataDirectory.Replace("\\", "/"), StringComparison.OrdinalIgnoreCase)
+            .Replace("|HomeDirectory|", homeDirectory.Replace("\\", "/"), StringComparison.OrdinalIgnoreCase);
+
+        return ExpandEnvironmentVariables(resolvedValue);
+    }
+
+    private static string ResolveHomeDirectory(string contentRootPath) =>
+        FirstNonEmpty(
+            Environment.GetEnvironmentVariable("HOME"),
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            contentRootPath)
+        ?? contentRootPath;
+
+    private static string ExpandEnvironmentVariables(string value)
+    {
+        var expandedValue = Environment.ExpandEnvironmentVariables(value);
+
+        return System.Text.RegularExpressions.Regex.Replace(
+            expandedValue,
+            @"\$(\{(?<name>[A-Za-z_][A-Za-z0-9_]*)\}|(?<name>[A-Za-z_][A-Za-z0-9_]*))",
+            match =>
+            {
+                var variableName = match.Groups["name"].Value;
+                return Environment.GetEnvironmentVariable(variableName) ?? match.Value;
+            });
+    }
+
+    private static void EnsureSqliteDataDirectoryExists(string connectionString)
+    {
+        var builder = new SqliteConnectionStringBuilder(connectionString);
+        var dataSource = builder.DataSource;
+
+        if (string.IsNullOrWhiteSpace(dataSource) || string.Equals(dataSource, ":memory:", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var directory = Path.GetDirectoryName(dataSource);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+    }
 
     private static string? FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
