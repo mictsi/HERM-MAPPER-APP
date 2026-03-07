@@ -34,18 +34,8 @@ public sealed class CatalogueSearchTests
                 SortOrder = 1
             });
         fixture.DbContext.ProductCatalogItems.AddRange(
-            new ProductCatalogItem
-            {
-                Name = "SharePoint Online",
-                Vendor = "Microsoft",
-                Owner = "Collaboration Team",
-                LifecycleStatus = "Production"
-            },
-            new ProductCatalogItem
-            {
-                Name = "ServiceNow",
-                Vendor = "ServiceNow"
-            });
+            CreateProduct("SharePoint Online", "Microsoft", "Production", "Collaboration Team"),
+            CreateProduct("ServiceNow", "ServiceNow", null));
         await fixture.DbContext.SaveChangesAsync();
 
         var controller = fixture.CreateProductsController();
@@ -59,7 +49,7 @@ public sealed class CatalogueSearchTests
     }
 
     [Fact]
-    public async Task ProductsIndex_FiltersByOwnerAndLifecycle()
+    public async Task ProductsIndex_FiltersByMultipleOwnersAndLifecycle()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.AddRange(
@@ -88,28 +78,19 @@ public sealed class CatalogueSearchTests
                 SortOrder = 2
             });
         fixture.DbContext.ProductCatalogItems.AddRange(
-            new ProductCatalogItem
-            {
-                Name = "Payments Hub",
-                Owner = "Finance Team",
-                LifecycleStatus = "Production"
-            },
-            new ProductCatalogItem
-            {
-                Name = "Developer Portal",
-                Owner = "Platform Team",
-                LifecycleStatus = "Trial"
-            });
+            CreateProduct("Payments Hub", null, "Production", "Finance Team"),
+            CreateProduct("Platform Core", null, "Production", "Platform Team"),
+            CreateProduct("Developer Portal", null, "Trial", "Platform Team"));
         await fixture.DbContext.SaveChangesAsync();
 
         var controller = fixture.CreateProductsController();
 
-        var result = await controller.Index(null, "Finance Team", "Production");
+        var result = await controller.Index(null, ["Finance Team", "Platform Team"], "Production");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ProductsIndexViewModel>(view.Model);
-        var product = Assert.Single(model.Products);
-        Assert.Equal("Payments Hub", product.Name);
+        Assert.Equal(["Finance Team", "Platform Team"], model.SelectedOwners.OrderBy(x => x).ToArray());
+        Assert.Equal(["Payments Hub", "Platform Core"], model.Products.Select(x => x.Name).ToArray());
     }
 
     [Fact]
@@ -258,5 +239,25 @@ public sealed class CatalogueSearchTests
         public string EnvironmentName { get; set; } = "Development";
         public string ContentRootPath { get; set; } = System.IO.Path.GetTempPath();
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static ProductCatalogItem CreateProduct(string name, string? vendor, string? lifecycleStatus, params string[] owners)
+    {
+        var product = new ProductCatalogItem
+        {
+            Name = name,
+            Vendor = vendor,
+            LifecycleStatus = lifecycleStatus
+        };
+
+        foreach (var owner in owners)
+        {
+            product.Owners.Add(new ProductCatalogItemOwner
+            {
+                OwnerValue = owner
+            });
+        }
+
+        return product;
     }
 }

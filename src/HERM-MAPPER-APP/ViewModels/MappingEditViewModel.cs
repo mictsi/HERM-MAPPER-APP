@@ -14,8 +14,8 @@ public sealed class MappingEditViewModel
     public string? Description { get; init; }
     public string? LifecycleStatus { get; init; }
 
-    [Display(Name = "Owner")]
-    public string? Owner { get; set; }
+    [Display(Name = "Owners")]
+    public List<string> Owners { get; set; } = [];
 
     [Display(Name = "TRM domain")]
     public int? SelectedDomainId { get; set; }
@@ -45,4 +45,6 @@ public sealed class MappingEditViewModel
     public IEnumerable<SelectListItem> Capabilities { get; init; } = [];
     public IEnumerable<SelectListItem> Components { get; init; } = [];
     public IEnumerable<SelectListItem> OwnerOptions { get; init; } = [];
+
+    public string? OwnerSummary => Owners.Count == 0 ? null : string.Join(", ", Owners);
 }

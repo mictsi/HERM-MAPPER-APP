@@ -1,9 +1,4 @@
-@model ProductCatalogItem
-@using Microsoft.AspNetCore.Mvc.Rendering
-@{
-    var ownerOptions = ViewData["OwnerOptions"] as IEnumerable<SelectListItem> ?? [];
-    var lifecycleStatusOptions = ViewData["LifecycleStatusOptions"] as IEnumerable<SelectListItem> ?? [];
-}
+@model ProductEditViewModel
 
 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
@@ -34,13 +29,28 @@
                     <span asp-validation-for="Vendor" class="text-danger"></span>
                 </div>
                 <div class="col-md-6">
-                    <label asp-for="Owner" class="form-label"></label>
-                    <select asp-for="Owner" asp-items="ownerOptions" class="form-select"></select>
-                    <span asp-validation-for="Owner" class="text-danger"></span>
+                    <label asp-for="Owners" class="form-label"></label>
+                    <div class="product-owner-checklist product-owner-checklist-compact">
+                        @for (var index = 0; index < Model.OwnerOptions.Count; index++)
+                        {
+                            var owner = Model.OwnerOptions[index];
+                            var optionId = $"product-owner-{index}";
+                            <label class="product-owner-option" for="@optionId">
+                                <input type="checkbox"
+                                       id="@optionId"
+                                       name="Owners"
+                                       value="@owner.Value"
+                                       @(owner.Selected ? "checked" : null) />
+                                <span>@owner.Text</span>
+                            </label>
+                        }
+                    </div>
+                    <div class="small text-muted mt-2">Select one or more owners.</div>
+                    <span asp-validation-for="Owners" class="text-danger"></span>
                 </div>
                 <div class="col-md-6">
                     <label asp-for="LifecycleStatus" class="form-label"></label>
-                    <select asp-for="LifecycleStatus" asp-items="lifecycleStatusOptions" class="form-select"></select>
+                    <select asp-for="LifecycleStatus" asp-items="Model.LifecycleStatusOptions" class="form-select"></select>
                     <span asp-validation-for="LifecycleStatus" class="text-danger"></span>
                 </div>
                 <div class="col-12">

@@ -13,6 +13,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<ConfigurableFieldOption> ConfigurableFieldOptions => Set<ConfigurableFieldOption>();
     public DbSet<ProductCatalogItem> ProductCatalogItems => Set<ProductCatalogItem>();
+    public DbSet<ProductCatalogItemOwner> ProductCatalogItemOwners => Set<ProductCatalogItemOwner>();
     public DbSet<ProductMapping> ProductMappings => Set<ProductMapping>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -97,8 +98,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.Vendor).HasMaxLength(120);
             entity.Property(x => x.Version).HasMaxLength(80);
-            entity.Property(x => x.Owner).HasMaxLength(120);
             entity.Property(x => x.LifecycleStatus).HasMaxLength(80);
+        });
+
+        modelBuilder.Entity<ProductCatalogItemOwner>(entity =>
+        {
+            entity.Property(x => x.OwnerValue).HasMaxLength(120);
+            entity.HasIndex(x => x.OwnerValue);
+            entity.HasIndex(x => new { x.ProductCatalogItemId, x.OwnerValue }).IsUnique();
+            entity.HasOne(x => x.ProductCatalogItem)
+                .WithMany(x => x.Owners)
+                .HasForeignKey(x => x.ProductCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ProductMapping>(entity =>

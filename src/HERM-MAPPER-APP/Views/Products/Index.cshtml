@@ -1,6 +1,12 @@
 @model ProductsIndexViewModel
 @{
     ViewData["Title"] = "Product Catalogue";
+    var ownerFilterSummary = Model.SelectedOwners.Count switch
+    {
+        0 => "Filter by owner",
+        1 => Model.SelectedOwners[0],
+        _ => $"{Model.SelectedOwners.Count} owners selected"
+    };
 }
 
 <section class="page-header">
@@ -13,20 +19,39 @@
 </section>
 
 <section class="content-card">
-    <form method="get" class="row g-3 align-items-end">
+    <form method="get" class="row g-3 align-items-start product-filter-form">
         <div class="col-lg-5">
             <label class="form-label" for="search">Search products</label>
-            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Product, vendor, version, owner, lifecycle" />
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Product, vendor, version, owners, lifecycle" />
         </div>
-        <div class="col-lg-3">
-            <label class="form-label" for="owner">Owner</label>
-            <select class="form-select" id="owner" name="owner">
-                <option value="">All owners</option>
-                @foreach (var owner in Model.Owners)
-                {
-                    <option value="@owner.Value" selected="@(string.Equals(Model.Owner, owner.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@owner.Value</option>
-                }
-            </select>
+        <div class="col-lg-4">
+            <label class="form-label" for="ownerFilterSummary">Owners</label>
+            <details class="owner-filter-dropdown" data-owner-dropdown>
+                <summary class="form-select owner-filter-summary" id="ownerFilterSummary">
+                    <span data-owner-dropdown-label data-default-label="Filter by owner">@ownerFilterSummary</span>
+                </summary>
+                <div class="owner-filter-menu">
+                    <div class="product-owner-checklist">
+                        @foreach (var owner in Model.AvailableOwners)
+                        {
+                            var optionId = $"owner-{owner.Id}";
+                            <label class="product-owner-option" for="@optionId">
+                                <input type="checkbox"
+                                       id="@optionId"
+                                       name="owners"
+                                       value="@owner.Value"
+                                       data-owner-label="@owner.Value"
+                                       @(Model.SelectedOwners.Contains(owner.Value, StringComparer.OrdinalIgnoreCase) ? "checked" : null) />
+                                <span>@owner.Value</span>
+                            </label>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
+                        <div class="small text-muted">Choose one or more owners.</div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-owner-clear>Clear</button>
+                    </div>
+                </div>
+            </details>
         </div>
         <div class="col-lg-3">
             <label class="form-label" for="lifecycleStatus">Lifecycle</label>
@@ -38,7 +63,7 @@
                 }
             </select>
         </div>
-        <div class="col-lg-1 d-grid">
+        <div class="col-lg-12 d-flex justify-content-end">
             <button class="btn btn-primary" type="submit">Go</button>
         </div>
     </form>
@@ -66,7 +91,7 @@
                 <thead>
                     <tr>
                         <th>Product</th>
-                        <th>Owner</th>
+                        <th>Owners</th>
                         <th>Lifecycle</th>
                         <th>Mappings</th>
                         <th>Updated</th>
@@ -82,7 +107,7 @@
                             <strong>@item.Name</strong>
                             <div class="table-subline">@item.Vendor @item.Version</div>
                         </td>
-                        <td>@(string.IsNullOrWhiteSpace(item.Owner) ? "-" : item.Owner)</td>
+                        <td>@(item.OwnerDisplay ?? "-")</td>
                         <td>@(string.IsNullOrWhiteSpace(item.LifecycleStatus) ? "-" : item.LifecycleStatus)</td>
                         <td>
                             <strong>@item.Mappings.Count mapping(s)</strong>

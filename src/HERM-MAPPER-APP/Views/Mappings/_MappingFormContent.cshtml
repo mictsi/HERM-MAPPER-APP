@@ -16,8 +16,8 @@
                 <dd>@(Model.Vendor ?? "-")</dd>
                 <dt>Version</dt>
                 <dd>@(Model.Version ?? "-")</dd>
-                <dt>Owner</dt>
-                <dd>@(Model.Owner ?? "-")</dd>
+                <dt>Owners</dt>
+                <dd>@(Model.OwnerSummary ?? "-")</dd>
                 <dt>Lifecycle</dt>
                 <dd>@(Model.LifecycleStatus ?? "-")</dd>
                 <dt>Description</dt>
@@ -59,9 +59,10 @@
                     <span asp-validation-for="SelectedComponentId" class="text-danger"></span>
                 </div>
                 <div class="col-md-4">
-                    <label asp-for="Owner" class="form-label"></label>
-                    <select asp-for="Owner" asp-items="Model.OwnerOptions" class="form-select"></select>
-                    <span asp-validation-for="Owner" class="text-danger"></span>
+                    <label asp-for="Owners" class="form-label"></label>
+                    <select asp-for="Owners" asp-items="Model.OwnerOptions" class="form-select" multiple size="6"></select>
+                    <div class="form-note">Select one or more owners for this product.</div>
+                    <span asp-validation-for="Owners" class="text-danger"></span>
                 </div>
                 <div class="col-md-4">
                     <label asp-for="MappingStatus" class="form-label"></label>

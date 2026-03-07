@@ -74,7 +74,10 @@ public sealed class MappingsController(
 
     public async Task<IActionResult> Create(int productId)
     {
-        var product = await dbContext.ProductCatalogItems.AsNoTracking().FirstOrDefaultAsync(x => x.Id == productId);
+        var product = await dbContext.ProductCatalogItems
+            .AsNoTracking()
+            .Include(x => x.Owners)
+            .FirstOrDefaultAsync(x => x.Id == productId);
         if (product is null)
         {
             return NotFound();
@@ -87,11 +90,15 @@ public sealed class MappingsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(MappingEditViewModel model)
     {
-        var product = await dbContext.ProductCatalogItems.FindAsync(model.ProductId);
+        var product = await dbContext.ProductCatalogItems
+            .Include(x => x.Owners)
+            .FirstOrDefaultAsync(x => x.Id == model.ProductId);
         if (product is null)
         {
             return NotFound();
         }
+
+        model.Owners = NormalizeSelections(model.Owners);
 
         var mapping = new ProductMapping
         {
@@ -107,7 +114,7 @@ public sealed class MappingsController(
         }
 
         dbContext.ProductMappings.Add(mapping);
-        product.Owner = NormalizeInput(model.Owner);
+        SynchronizeOwners(product, model.Owners);
         product.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
         await WriteMappingAuditAsync(mapping, "Create", "Created mapping.");
@@ -121,6 +128,7 @@ public sealed class MappingsController(
         var mapping = await dbContext.ProductMappings
             .AsNoTracking()
             .Include(x => x.ProductCatalogItem)
+            .ThenInclude(x => x!.Owners)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (mapping?.ProductCatalogItem is null)
@@ -137,6 +145,7 @@ public sealed class MappingsController(
     {
         var mapping = await dbContext.ProductMappings
             .Include(x => x.ProductCatalogItem)
+            .ThenInclude(x => x!.Owners)
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (mapping?.ProductCatalogItem is null)
@@ -144,6 +153,7 @@ public sealed class MappingsController(
             return NotFound();
         }
 
+        model.Owners = NormalizeSelections(model.Owners);
         var mappingUpdate = await PopulateAndValidateMapping(model, mapping);
         if (mappingUpdate is null)
         {
@@ -151,7 +161,7 @@ public sealed class MappingsController(
         }
 
         mapping.UpdatedUtc = DateTime.UtcNow;
-        mapping.ProductCatalogItem.Owner = NormalizeInput(model.Owner);
+        SynchronizeOwners(mapping.ProductCatalogItem, model.Owners);
         mapping.ProductCatalogItem.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
         await WriteMappingAuditAsync(mapping, "Update", "Updated mapping.");
@@ -484,7 +494,7 @@ public sealed class MappingsController(
             Version = product.Version,
             Description = product.Description,
             LifecycleStatus = product.LifecycleStatus,
-            Owner = product.Owner,
+            Owners = product.OwnerValues.ToList(),
             SelectedDomainId = selectedDomainId,
             SelectedCapabilityId = selectedCapabilityId,
             SelectedComponentId = selectedComponentId,
@@ -493,7 +503,7 @@ public sealed class MappingsController(
             Domains = domains,
             Capabilities = capabilities,
             Components = components,
-            OwnerOptions = await configurableFieldService.GetSelectListAsync(ConfigurableFieldNames.Owner, product.Owner)
+            OwnerOptions = await configurableFieldService.GetMultiSelectListAsync(ConfigurableFieldNames.Owner, product.OwnerValues)
         };
     }
 
@@ -540,7 +550,7 @@ public sealed class MappingsController(
             Version = product.Version,
             Description = product.Description,
             LifecycleStatus = product.LifecycleStatus,
-            Owner = postedModel.Owner,
+            Owners = postedModel.Owners,
             SelectedDomainId = postedModel.SelectedDomainId,
             SelectedCapabilityId = postedModel.SelectedCapabilityId,
             SelectedComponentId = postedModel.SelectedComponentId,
@@ -551,7 +561,7 @@ public sealed class MappingsController(
             Domains = domains,
             Capabilities = capabilities,
             Components = components,
-            OwnerOptions = await configurableFieldService.GetSelectListAsync(ConfigurableFieldNames.Owner, postedModel.Owner)
+            OwnerOptions = await configurableFieldService.GetMultiSelectListAsync(ConfigurableFieldNames.Owner, postedModel.Owners)
         };
     }
 
@@ -627,6 +637,49 @@ public sealed class MappingsController(
 
     private static string? NormalizeInput(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void SynchronizeOwners(ProductCatalogItem product, IReadOnlyCollection<string> selectedOwners)
+    {
+        var existingOwners = product.Owners.ToList();
+
+        foreach (var owner in existingOwners.Where(owner =>
+                     selectedOwners.All(selected => !string.Equals(selected, owner.OwnerValue, StringComparison.OrdinalIgnoreCase))))
+        {
+            product.Owners.Remove(owner);
+            dbContext.ProductCatalogItemOwners.Remove(owner);
+        }
+
+        foreach (var owner in selectedOwners.Where(selected =>
+                     existingOwners.All(existing => !string.Equals(existing.OwnerValue, selected, StringComparison.OrdinalIgnoreCase))))
+        {
+            product.Owners.Add(new ProductCatalogItemOwner
+            {
+                OwnerValue = owner
+            });
+        }
+    }
+
+    private static List<string> NormalizeSelections(IEnumerable<string>? values)
+    {
+        var normalized = new List<string>();
+        if (values is null)
+        {
+            return normalized;
+        }
+
+        foreach (var value in values)
+        {
+            var trimmed = NormalizeInput(value);
+            if (trimmed is null || normalized.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            normalized.Add(trimmed);
+        }
+
+        return normalized;
+    }
 
     private async Task WriteMappingAuditAsync(ProductMapping mapping, string action, string details)
     {

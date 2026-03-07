@@ -15,6 +15,7 @@ public sealed class DatabaseInitializer(
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureConfigurableFieldOptionsTableAsync(cancellationToken);
         await NormalizeConfigurableFieldOptionSortOrdersAsync(cancellationToken);
         await EnsureDefaultConfigurableFieldOptionsAsync(cancellationToken);
@@ -221,6 +222,126 @@ public sealed class DatabaseInitializer(
         }
     }
 
+    private async Task EnsureProductOwnerTableAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "ProductCatalogItemOwners" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_ProductCatalogItemOwners" PRIMARY KEY AUTOINCREMENT,
+                    "ProductCatalogItemId" INTEGER NOT NULL,
+                    "OwnerValue" TEXT NOT NULL,
+                    CONSTRAINT "FK_ProductCatalogItemOwners_ProductCatalogItems_ProductCatalogItemId" FOREIGN KEY ("ProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_ProductCatalogItemOwners_ProductCatalogItemId_OwnerValue"
+                ON "ProductCatalogItemOwners" ("ProductCatalogItemId", "OwnerValue")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ProductCatalogItemOwners_OwnerValue"
+                ON "ProductCatalogItemOwners" ("OwnerValue")
+                """,
+                cancellationToken);
+
+            var legacyOwnerColumnExists = await SqliteColumnExistsAsync("ProductCatalogItems", "Owner", cancellationToken);
+            if (legacyOwnerColumnExists)
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    """
+                    INSERT INTO "ProductCatalogItemOwners" ("ProductCatalogItemId", "OwnerValue")
+                    SELECT p."Id", TRIM(p."Owner")
+                    FROM "ProductCatalogItems" p
+                    WHERE p."Owner" IS NOT NULL
+                      AND TRIM(p."Owner") <> ''
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM "ProductCatalogItemOwners" o
+                          WHERE o."ProductCatalogItemId" = p."Id"
+                            AND LOWER(o."OwnerValue") = LOWER(TRIM(p."Owner"))
+                      )
+                    """,
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[ProductCatalogItemOwners]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [ProductCatalogItemOwners] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ProductCatalogItemOwners] PRIMARY KEY,
+                        [ProductCatalogItemId] INT NOT NULL,
+                        [OwnerValue] NVARCHAR(120) NOT NULL,
+                        CONSTRAINT [FK_ProductCatalogItemOwners_ProductCatalogItems_ProductCatalogItemId]
+                            FOREIGN KEY ([ProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ProductCatalogItemOwners_ProductCatalogItemId_OwnerValue'
+                      AND object_id = OBJECT_ID(N'[ProductCatalogItemOwners]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_ProductCatalogItemOwners_ProductCatalogItemId_OwnerValue]
+                    ON [ProductCatalogItemOwners] ([ProductCatalogItemId], [OwnerValue]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ProductCatalogItemOwners_OwnerValue'
+                      AND object_id = OBJECT_ID(N'[ProductCatalogItemOwners]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ProductCatalogItemOwners_OwnerValue]
+                    ON [ProductCatalogItemOwners] ([OwnerValue]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ProductCatalogItems]', N'Owner') IS NOT NULL
+                BEGIN
+                    INSERT INTO [ProductCatalogItemOwners] ([ProductCatalogItemId], [OwnerValue])
+                    SELECT p.[Id], LTRIM(RTRIM(p.[Owner]))
+                    FROM [ProductCatalogItems] p
+                    WHERE p.[Owner] IS NOT NULL
+                      AND LTRIM(RTRIM(p.[Owner])) <> N''
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM [ProductCatalogItemOwners] o
+                          WHERE o.[ProductCatalogItemId] = p.[Id]
+                            AND LOWER(o.[OwnerValue]) = LOWER(LTRIM(RTRIM(p.[Owner])))
+                      );
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
     private async Task EnsureConfigurableFieldOptionsTableAsync(CancellationToken cancellationToken)
     {
         if (dbContext.Database.IsSqlite())
@@ -345,6 +466,40 @@ public sealed class DatabaseInitializer(
                     "ALTER TABLE ConfigurableFieldOptions ADD COLUMN SortOrder INTEGER NOT NULL DEFAULT 0",
                     cancellationToken);
             }
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private async Task<bool> SqliteColumnExistsAsync(string tableName, string columnName, CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        if (shouldClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA table_info('{tableName}')";
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         finally
         {

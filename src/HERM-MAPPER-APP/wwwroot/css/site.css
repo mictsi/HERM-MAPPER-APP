@@ -389,6 +389,77 @@ a {
   color: var(--muted);
 }
 
+.product-filter-form {
+  align-items: flex-start;
+}
+
+.owner-filter-dropdown {
+  position: relative;
+}
+
+.owner-filter-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.owner-filter-summary::-webkit-details-marker {
+  display: none;
+}
+
+.owner-filter-summary::after {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-right: 2px solid rgba(31, 41, 51, 0.56);
+  border-bottom: 2px solid rgba(31, 41, 51, 0.56);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.owner-filter-dropdown[open] .owner-filter-summary::after {
+  transform: rotate(-135deg);
+  margin-top: 0.35rem;
+}
+
+.owner-filter-menu {
+  margin-top: 0.5rem;
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow);
+}
+
+.product-owner-checklist {
+  display: grid;
+  gap: 0.6rem;
+  max-height: 15rem;
+  overflow-y: auto;
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.product-owner-checklist-compact {
+  max-height: 12rem;
+}
+
+.product-owner-option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--ink);
+}
+
+.product-owner-option input {
+  margin: 0;
+}
+
 .import-review {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
