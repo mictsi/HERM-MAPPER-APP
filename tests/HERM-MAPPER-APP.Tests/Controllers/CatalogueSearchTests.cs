@@ -20,12 +20,26 @@ public sealed class CatalogueSearchTests
     public async Task ProductsIndex_Search_MatchesPartialStrings_CaseInsensitively()
     {
         await using var fixture = await TestFixture.CreateAsync();
+        fixture.DbContext.ConfigurableFieldOptions.AddRange(
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Collaboration Team",
+                SortOrder = 1
+            },
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.LifecycleStatus,
+                Value = "Production",
+                SortOrder = 1
+            });
         fixture.DbContext.ProductCatalogItems.AddRange(
             new ProductCatalogItem
             {
                 Name = "SharePoint Online",
                 Vendor = "Microsoft",
-                Owner = "Collaboration Team"
+                Owner = "Collaboration Team",
+                LifecycleStatus = "Production"
             },
             new ProductCatalogItem
             {
@@ -42,6 +56,60 @@ public sealed class CatalogueSearchTests
         var model = Assert.IsType<ProductsIndexViewModel>(view.Model);
         var product = Assert.Single(model.Products);
         Assert.Equal("SharePoint Online", product.Name);
+    }
+
+    [Fact]
+    public async Task ProductsIndex_FiltersByOwnerAndLifecycle()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        fixture.DbContext.ConfigurableFieldOptions.AddRange(
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Platform Team",
+                SortOrder = 1
+            },
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Finance Team",
+                SortOrder = 2
+            },
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.LifecycleStatus,
+                Value = "Production",
+                SortOrder = 1
+            },
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.LifecycleStatus,
+                Value = "Trial",
+                SortOrder = 2
+            });
+        fixture.DbContext.ProductCatalogItems.AddRange(
+            new ProductCatalogItem
+            {
+                Name = "Payments Hub",
+                Owner = "Finance Team",
+                LifecycleStatus = "Production"
+            },
+            new ProductCatalogItem
+            {
+                Name = "Developer Portal",
+                Owner = "Platform Team",
+                LifecycleStatus = "Trial"
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var controller = fixture.CreateProductsController();
+
+        var result = await controller.Index(null, "Finance Team", "Production");
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductsIndexViewModel>(view.Model);
+        var product = Assert.Single(model.Products);
+        Assert.Equal("Payments Hub", product.Name);
     }
 
     [Fact]

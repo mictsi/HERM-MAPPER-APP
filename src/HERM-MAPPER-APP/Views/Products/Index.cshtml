@@ -14,23 +14,49 @@
 
 <section class="content-card">
     <form method="get" class="row g-3 align-items-end">
-        <div class="col-lg-9">
-            <label class="form-label" for="search">Search</label>
-            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Search by product, vendor, version, or owner" />
+        <div class="col-lg-5">
+            <label class="form-label" for="search">Search products</label>
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Product, vendor, version, owner, lifecycle" />
         </div>
-        <div class="col-lg-3 d-flex gap-2">
-            <button class="btn btn-primary flex-fill" type="submit">Filter</button>
-            <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
+        <div class="col-lg-3">
+            <label class="form-label" for="owner">Owner</label>
+            <select class="form-select" id="owner" name="owner">
+                <option value="">All owners</option>
+                @foreach (var owner in Model.Owners)
+                {
+                    <option value="@owner.Value" selected="@(string.Equals(Model.Owner, owner.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@owner.Value</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-3">
+            <label class="form-label" for="lifecycleStatus">Lifecycle</label>
+            <select class="form-select" id="lifecycleStatus" name="lifecycleStatus">
+                <option value="">All lifecycle states</option>
+                @foreach (var option in Model.LifecycleStatuses)
+                {
+                    <option value="@option.Value" selected="@(string.Equals(Model.LifecycleStatus, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Value</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-1 d-grid">
+            <button class="btn btn-primary" type="submit">Go</button>
         </div>
     </form>
 </section>
 
 <section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Products</span>
+            <h2>@Model.Products.Count result(s)</h2>
+        </div>
+    </div>
+
     @if (Model.Products.Count == 0)
     {
-        <div class="empty-state">
-            <h3>No catalogue entries found</h3>
-            <p>Add a product to start mapping it against the HERM reference model.</p>
+        <div class="empty-state compact">
+            <h3>No matching products</h3>
+            <p>Try a wider search or clear the filters.</p>
         </div>
     }
     else

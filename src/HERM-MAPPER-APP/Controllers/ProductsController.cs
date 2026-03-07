@@ -13,13 +13,16 @@ public sealed class ProductsController(
     AuditLogService auditLogService,
     ConfigurableFieldService configurableFieldService) : Controller
 {
-    public async Task<IActionResult> Index(string? search)
+    public async Task<IActionResult> Index(string? search, string? owner = null, string? lifecycleStatus = null)
     {
         var query = dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Mappings)
             .ThenInclude(x => x.TrmComponent)
             .AsQueryable();
+
+        owner = NormalizeSelection(owner);
+        lifecycleStatus = NormalizeSelection(lifecycleStatus);
 
         var likePattern = SearchPattern.CreateContainsPattern(search);
         if (likePattern is not null)
@@ -34,9 +37,23 @@ public sealed class ProductsController(
                 (x.Notes != null && EF.Functions.Like(x.Notes, likePattern)));
         }
 
+        if (owner is not null)
+        {
+            query = query.Where(x => x.Owner != null && x.Owner.ToLower() == owner.ToLower());
+        }
+
+        if (lifecycleStatus is not null)
+        {
+            query = query.Where(x => x.LifecycleStatus != null && x.LifecycleStatus.ToLower() == lifecycleStatus.ToLower());
+        }
+
         var model = new ProductsIndexViewModel
         {
             Search = search,
+            Owner = owner,
+            LifecycleStatus = lifecycleStatus,
+            Owners = await configurableFieldService.GetOptionsAsync(ConfigurableFieldNames.Owner),
+            LifecycleStatuses = await configurableFieldService.GetOptionsAsync(ConfigurableFieldNames.LifecycleStatus),
             Products = await query.OrderBy(x => x.Name).ToListAsync()
         };
 
