@@ -12,6 +12,13 @@
     <a class="btn btn-primary" asp-action="Create">Add product</a>
 </section>
 
+@if (!string.IsNullOrWhiteSpace(Model.ImportStatusMessage))
+{
+    <section class="content-card">
+        <div class="alert alert-info mb-0" role="status">@Model.ImportStatusMessage</div>
+    </section>
+}
+
 <section class="content-card">
     <form method="get" class="row g-3 align-items-end">
         <div class="col-lg-9">
@@ -21,6 +28,26 @@
         <div class="col-lg-3 d-flex gap-2">
             <button class="btn btn-primary flex-fill" type="submit">Filter</button>
             <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
+        </div>
+    </form>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Bulk import</span>
+            <h2>Import products from CSV</h2>
+        </div>
+    </div>
+    <p class="mb-3">Upload a semicolon-separated CSV with the columns <code>LEVEL0;LEVEL1;LEVEL2;LEVEL3</code>. <code>LEVEL3</code> becomes the product name. If the hierarchy does not match the TRM model, the product is still added without a mapping.</p>
+    <form asp-action="ImportCsv" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+        @Html.AntiForgeryToken()
+        <div class="col-lg-9">
+            <label class="form-label" for="csvFile">CSV file</label>
+            <input class="form-control" id="csvFile" name="csvFile" type="file" accept=".csv,text/csv" />
+        </div>
+        <div class="col-lg-3 d-grid">
+            <button class="btn btn-outline-primary" type="submit">Import CSV</button>
         </div>
     </form>
 </section>

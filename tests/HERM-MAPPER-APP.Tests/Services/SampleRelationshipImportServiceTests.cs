@@ -1,0 +1,203 @@
+using HERM_MAPPER_APP.Data;
+using HERM_MAPPER_APP.Models;
+using HERM_MAPPER_APP.Services;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Xunit;
+
+namespace HERM_MAPPER_APP.Tests.Services;
+
+public sealed class SampleRelationshipImportServiceTests
+{
+    [Fact]
+    public async Task ImportAsync_CreatesProductAndMapping_WhenHierarchyMatches()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
+        var csvPath = fixture.WriteCsv(
+            """
+            LEVEL0;LEVEL1;LEVEL2;LEVEL3
+            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
+            """);
+
+        var service = new SampleRelationshipImportService(fixture.DbContext);
+
+        var summary = await service.ImportAsync(csvPath);
+
+        var products = await fixture.DbContext.ProductCatalogItems.AsNoTracking().ToListAsync();
+        var mappings = await fixture.DbContext.ProductMappings.AsNoTracking().ToListAsync();
+
+        Assert.Equal(1, summary.ProductsAdded);
+        Assert.Equal(1, summary.MappingsAdded);
+        Assert.Single(products);
+        Assert.Equal("Graylog", products[0].Name);
+        Assert.Single(mappings);
+        Assert.NotNull(mappings[0].TrmDomainId);
+        Assert.NotNull(mappings[0].TrmCapabilityId);
+        Assert.NotNull(mappings[0].TrmComponentId);
+    }
+
+    [Fact]
+    public async Task ImportAsync_CreatesOnlyProduct_WhenHierarchyDoesNotMatch()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedHierarchyAsync("Infrastructure", "Capability A", "Monitoring & Alerting", "TC002");
+        var csvPath = fixture.WriteCsv(
+            """
+            LEVEL0;LEVEL1;LEVEL2;LEVEL3
+            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
+            """);
+
+        var service = new SampleRelationshipImportService(fixture.DbContext);
+
+        var summary = await service.ImportAsync(csvPath);
+
+        var products = await fixture.DbContext.ProductCatalogItems.AsNoTracking().ToListAsync();
+        var mappings = await fixture.DbContext.ProductMappings.AsNoTracking().ToListAsync();
+
+        Assert.Equal(1, summary.ProductsAdded);
+        Assert.Equal(1, summary.ProductsOnlyRows);
+        Assert.Equal(0, summary.MappingsAdded);
+        Assert.Single(products);
+        Assert.Equal("Graylog", products[0].Name);
+        Assert.Empty(mappings);
+    }
+
+    [Fact]
+    public async Task ImportAsync_ImportsIntoExistingCatalogue_AndSkipsDuplicateMapping()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var hierarchy = await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
+
+        var existingProduct = new ProductCatalogItem
+        {
+            Name = "Graylog"
+        };
+
+        fixture.DbContext.ProductCatalogItems.Add(existingProduct);
+        await fixture.DbContext.SaveChangesAsync();
+
+        fixture.DbContext.ProductMappings.Add(new ProductMapping
+        {
+            ProductCatalogItemId = existingProduct.Id,
+            TrmDomainId = hierarchy.Domain.Id,
+            TrmCapabilityId = hierarchy.Capability.Id,
+            TrmComponentId = hierarchy.Component.Id,
+            MappingStatus = MappingStatus.Complete
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var csvPath = fixture.WriteCsv(
+            """
+            LEVEL0;LEVEL1;LEVEL2;LEVEL3
+            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
+            HERM;Cybersecurity;Monitoring & Alerting (TC002);Azure Log Analytics
+            """);
+
+        var service = new SampleRelationshipImportService(fixture.DbContext);
+
+        var summary = await service.ImportAsync(csvPath);
+
+        var products = await fixture.DbContext.ProductCatalogItems.AsNoTracking().OrderBy(x => x.Name).ToListAsync();
+        var mappings = await fixture.DbContext.ProductMappings.AsNoTracking().ToListAsync();
+
+        Assert.Equal(1, summary.ProductsAdded);
+        Assert.Equal(1, summary.ProductsMatched);
+        Assert.Equal(1, summary.MappingsAdded);
+        Assert.Equal(1, summary.MappingsSkippedAsDuplicate);
+        Assert.Equal(2, products.Count);
+        Assert.Equal(2, mappings.Count);
+    }
+
+    private sealed class TestFixture : IAsyncDisposable
+    {
+        private readonly SqliteConnection connection;
+        private readonly TemporaryDirectory tempDirectory;
+
+        private TestFixture(SqliteConnection connection, TemporaryDirectory tempDirectory, AppDbContext dbContext)
+        {
+            this.connection = connection;
+            this.tempDirectory = tempDirectory;
+            DbContext = dbContext;
+        }
+
+        public AppDbContext DbContext { get; }
+
+        public static async Task<TestFixture> CreateAsync()
+        {
+            var connection = new SqliteConnection("Data Source=:memory:");
+            await connection.OpenAsync();
+
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite(connection)
+                .Options;
+
+            var dbContext = new AppDbContext(options);
+            await dbContext.Database.EnsureCreatedAsync();
+
+            return new TestFixture(connection, new TemporaryDirectory(), dbContext);
+        }
+
+        public async Task<(TrmDomain Domain, TrmCapability Capability, TrmComponent Component)> SeedHierarchyAsync(string domainName, string capabilityName, string componentName, string componentCode)
+        {
+            var domain = new TrmDomain
+            {
+                Code = "TD001",
+                Name = domainName
+            };
+
+            var capability = new TrmCapability
+            {
+                Code = "TCAP001",
+                Name = capabilityName,
+                ParentDomain = domain
+            };
+
+            var component = new TrmComponent
+            {
+                Code = componentCode,
+                Name = componentName,
+                ParentCapability = capability
+            };
+
+            DbContext.TrmDomains.Add(domain);
+            DbContext.TrmCapabilities.Add(capability);
+            DbContext.TrmComponents.Add(component);
+            await DbContext.SaveChangesAsync();
+            return (domain, capability, component);
+        }
+
+        public string WriteCsv(string contents)
+        {
+            var path = Path.Combine(tempDirectory.Path, $"{Guid.NewGuid():N}.csv");
+            File.WriteAllText(path, contents.ReplaceLineEndings(Environment.NewLine));
+            return path;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await DbContext.DisposeAsync();
+            await connection.DisposeAsync();
+            tempDirectory.Dispose();
+        }
+    }
+
+    private sealed class TemporaryDirectory : IDisposable
+    {
+        public TemporaryDirectory()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"herm-mapper-import-tests-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(Path);
+        }
+
+        public string Path { get; }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+            {
+                Directory.Delete(Path, recursive: true);
+            }
+        }
+    }
+}

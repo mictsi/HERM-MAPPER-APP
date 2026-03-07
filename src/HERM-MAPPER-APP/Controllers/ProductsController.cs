@@ -10,7 +10,8 @@ namespace HERM_MAPPER_APP.Controllers;
 public sealed class ProductsController(
     AppDbContext dbContext,
     AuditLogService auditLogService,
-    ConfigurableFieldService configurableFieldService) : Controller
+    ConfigurableFieldService configurableFieldService,
+    SampleRelationshipImportService sampleRelationshipImportService) : Controller
 {
     public async Task<IActionResult> Index(string? search)
     {
@@ -32,10 +33,48 @@ public sealed class ProductsController(
         var model = new ProductsIndexViewModel
         {
             Search = search,
+            ImportStatusMessage = TempData["ImportStatusMessage"] as string,
             Products = await query.OrderBy(x => x.Name).ToListAsync()
         };
 
         return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportCsv(IFormFile? csvFile)
+    {
+        if (csvFile is null || csvFile.Length == 0)
+        {
+            TempData["ImportStatusMessage"] = "Choose a CSV file before importing products.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (!string.Equals(Path.GetExtension(csvFile.FileName), ".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            TempData["ImportStatusMessage"] = "Only .csv files are supported for product import.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        ProductRelationshipImportSummary summary;
+        await using (var stream = csvFile.OpenReadStream())
+        {
+            summary = await sampleRelationshipImportService.ImportAsync(stream);
+        }
+
+        await auditLogService.WriteAsync(
+            "Product",
+            "ImportCsv",
+            nameof(ProductCatalogItem),
+            null,
+            $"Imported products from {csvFile.FileName}.",
+            $"Rows read: {summary.RowsRead}; products added: {summary.ProductsAdded}; existing products matched: {summary.ProductsMatched}; mappings added: {summary.MappingsAdded}; product-only rows: {summary.ProductsOnlyRows}; duplicates skipped: {summary.MappingsSkippedAsDuplicate}; rows skipped: {summary.RowsSkipped}.");
+
+        TempData["ImportStatusMessage"] =
+            $"Imported {summary.ProductsAdded} new product(s), matched {summary.ProductsMatched} existing product(s), " +
+            $"created {summary.MappingsAdded} mapping(s), and left {summary.ProductsOnlyRows} row(s) as product-only because the hierarchy did not match.";
+
+        return RedirectToAction(nameof(Index));
     }
 
     public async Task<IActionResult> Create()
