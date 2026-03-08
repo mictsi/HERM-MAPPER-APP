@@ -7,99 +7,136 @@ using Microsoft.Extensions.Logging;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables(prefix: "HERM_");
 
-var databaseConfiguration = AppDatabaseConfiguration.Resolve(builder.Configuration, builder.Environment.ContentRootPath);
-var consoleLoggingEnabled = builder.Configuration.GetValue<bool?>("Diagnostics:Console:Enabled") ?? true;
-var consoleLogLevel = ParseLogLevel(builder.Configuration["Diagnostics:Console:LogLevel"], LogLevel.Information);
-var sqlLoggingEnabled = builder.Configuration.GetValue<bool?>("Diagnostics:Sql:Enabled") ?? false;
-var sqlLogLevel = ParseLogLevel(builder.Configuration["Diagnostics:Sql:LogLevel"], LogLevel.Information);
-var sqlSensitiveDataLoggingEnabled = builder.Configuration.GetValue<bool?>("Diagnostics:Sql:IncludeSensitiveData") ?? false;
-var sqlDetailedErrorsEnabled = builder.Configuration.GetValue<bool?>("Diagnostics:Sql:EnableDetailedErrors") ?? false;
+var databaseConfiguration = Program.ResolveDatabaseConfiguration(builder.Configuration, builder.Environment.ContentRootPath);
+var diagnosticsOptions = Program.BuildDiagnosticsOptions(builder.Configuration);
 
-builder.Logging.ClearProviders();
-builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
-if (consoleLoggingEnabled)
-{
-    builder.Logging.AddSimpleConsole(options =>
-    {
-        options.SingleLine = true;
-        options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
-    });
-    builder.Logging.AddFilter<Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider>(null, consoleLogLevel);
-}
-
-builder.Logging.AddFilter(
-    "Microsoft.EntityFrameworkCore.Database.Command",
-    sqlLoggingEnabled ? sqlLogLevel : LogLevel.None);
-
-// Add services to the container.
-builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    switch (databaseConfiguration.Provider)
-    {
-        case DatabaseProviderKind.SqlServer:
-            options.UseSqlServer(databaseConfiguration.ConnectionString);
-            break;
-        case DatabaseProviderKind.Sqlite:
-        default:
-            options.UseSqlite(databaseConfiguration.ConnectionString);
-            break;
-    }
-
-    if (sqlLoggingEnabled)
-    {
-        if (sqlDetailedErrorsEnabled)
-        {
-            options.EnableDetailedErrors();
-        }
-
-        if (sqlSensitiveDataLoggingEnabled)
-        {
-            options.EnableSensitiveDataLogging();
-        }
-    }
-});
-builder.Services.AddSingleton(databaseConfiguration);
-builder.Services.AddScoped<TrmWorkbookImportService>();
-builder.Services.AddScoped<SampleRelationshipImportService>();
-builder.Services.AddScoped<DatabaseInitializer>();
-builder.Services.AddScoped<CsvExportService>();
-builder.Services.AddScoped<AuditLogService>();
-builder.Services.AddScoped<ConfigurableFieldService>();
-builder.Services.AddScoped<ComponentVersioningService>();
-builder.Services.AddControllersWithViews();
+Program.ConfigureLogging(builder.Logging, builder.Configuration, diagnosticsOptions);
+Program.ConfigureApplicationServices(builder.Services, builder.Configuration, databaseConfiguration, diagnosticsOptions);
 
 var app = builder.Build();
-
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-    await initializer.InitializeAsync();
-}
-
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-app.UseRouting();
-
-app.UseAuthorization();
-
-app.MapStaticAssets();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
-
-
+await Program.InitializeDatabaseAsync(app.Services);
+Program.ConfigurePipeline(app);
 app.Run();
 
-static LogLevel ParseLogLevel(string? value, LogLevel fallback) =>
-    Enum.TryParse<LogLevel>(value, ignoreCase: true, out var parsedLevel)
-        ? parsedLevel
-        : fallback;
+public sealed record StartupDiagnosticsOptions(
+    bool ConsoleLoggingEnabled,
+    LogLevel ConsoleLogLevel,
+    bool SqlLoggingEnabled,
+    LogLevel SqlLogLevel,
+    bool SqlSensitiveDataLoggingEnabled,
+    bool SqlDetailedErrorsEnabled);
+
+public partial class Program
+{
+    public static ResolvedDatabaseConfiguration ResolveDatabaseConfiguration(IConfiguration configuration, string contentRootPath) =>
+        AppDatabaseConfiguration.Resolve(configuration, contentRootPath);
+
+    public static StartupDiagnosticsOptions BuildDiagnosticsOptions(IConfiguration configuration) =>
+        new(
+            ConsoleLoggingEnabled: configuration.GetValue<bool?>("Diagnostics:Console:Enabled") ?? true,
+            ConsoleLogLevel: ParseLogLevel(configuration["Diagnostics:Console:LogLevel"], LogLevel.Information),
+            SqlLoggingEnabled: configuration.GetValue<bool?>("Diagnostics:Sql:Enabled") ?? false,
+            SqlLogLevel: ParseLogLevel(configuration["Diagnostics:Sql:LogLevel"], LogLevel.Information),
+            SqlSensitiveDataLoggingEnabled: configuration.GetValue<bool?>("Diagnostics:Sql:IncludeSensitiveData") ?? false,
+            SqlDetailedErrorsEnabled: configuration.GetValue<bool?>("Diagnostics:Sql:EnableDetailedErrors") ?? false);
+
+    public static void ConfigureLogging(
+        ILoggingBuilder logging,
+        IConfiguration configuration,
+        StartupDiagnosticsOptions diagnosticsOptions)
+    {
+        logging.ClearProviders();
+        logging.AddConfiguration(configuration.GetSection("Logging"));
+
+        if (diagnosticsOptions.ConsoleLoggingEnabled)
+        {
+            logging.AddSimpleConsole(options =>
+            {
+                options.SingleLine = true;
+                options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+            });
+            logging.AddFilter<Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider>(null, diagnosticsOptions.ConsoleLogLevel);
+        }
+
+        logging.AddFilter(
+            "Microsoft.EntityFrameworkCore.Database.Command",
+            diagnosticsOptions.SqlLoggingEnabled ? diagnosticsOptions.SqlLogLevel : LogLevel.None);
+    }
+
+    public static void ConfigureApplicationServices(
+        IServiceCollection services,
+        IConfiguration configuration,
+        ResolvedDatabaseConfiguration databaseConfiguration,
+        StartupDiagnosticsOptions diagnosticsOptions)
+    {
+        services.AddSingleton(configuration);
+        services.AddDbContext<AppDbContext>(options =>
+        {
+            switch (databaseConfiguration.Provider)
+            {
+                case DatabaseProviderKind.SqlServer:
+                    options.UseSqlServer(databaseConfiguration.ConnectionString);
+                    break;
+                case DatabaseProviderKind.Sqlite:
+                default:
+                    options.UseSqlite(databaseConfiguration.ConnectionString);
+                    break;
+            }
+
+            if (diagnosticsOptions.SqlLoggingEnabled)
+            {
+                if (diagnosticsOptions.SqlDetailedErrorsEnabled)
+                {
+                    options.EnableDetailedErrors();
+                }
+
+                if (diagnosticsOptions.SqlSensitiveDataLoggingEnabled)
+                {
+                    options.EnableSensitiveDataLogging();
+                }
+            }
+        });
+        services.AddSingleton(databaseConfiguration);
+        services.AddScoped<TrmWorkbookImportService>();
+        services.AddScoped<SampleRelationshipImportService>();
+        services.AddScoped<DatabaseInitializer>();
+        services.AddScoped<CsvExportService>();
+        services.AddScoped<AuditLogService>();
+        services.AddScoped<ConfigurableFieldService>();
+        services.AddScoped<ComponentVersioningService>();
+        services.AddControllersWithViews();
+    }
+
+    public static async Task InitializeDatabaseAsync(IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
+        await initializer.InitializeAsync();
+    }
+
+    public static void ConfigurePipeline(WebApplication app)
+    {
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/Home");
+            app.UseHsts();
+        }
+
+        app.UseHttpsRedirection();
+        app.UseRouting();
+
+        app.UseAuthorization();
+
+        app.MapStaticAssets();
+
+        app.MapControllerRoute(
+            name: "default",
+            pattern: "{controller=Home}/{action=Index}/{id?}")
+            .WithStaticAssets();
+    }
+
+    public static LogLevel ParseLogLevel(string? value, LogLevel fallback) =>
+        Enum.TryParse<LogLevel>(value, ignoreCase: true, out var parsedLevel)
+            ? parsedLevel
+            : fallback;
+}
