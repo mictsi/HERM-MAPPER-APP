@@ -1,0 +1,46 @@
+@model HERM_MAPPER_APP.ViewModels.OwnerHierarchyNodeViewModel
+@{
+    var cssType = Model.NodeType.ToLowerInvariant();
+}
+
+@if (Model.Children.Count == 0)
+{
+    <li class="owner-tree-item owner-tree-item-leaf owner-tree-@cssType">
+        <div class="owner-tree-leaf-row">
+            @if (Model.ProductId.HasValue)
+            {
+                <a class="owner-tree-label" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId.Value">@Model.Label</a>
+            }
+            else
+            {
+                <span class="owner-tree-label">@Model.Label</span>
+            }
+            <span class="owner-tree-badges">
+                <span class="owner-tree-badge">@Model.MappingCount mapping(s)</span>
+            </span>
+        </div>
+    </li>
+}
+else
+{
+    <li class="owner-tree-item owner-tree-item-branch owner-tree-@cssType">
+        <details class="owner-tree-details" @(Model.IsExpanded ? "open" : null)>
+            <summary class="owner-tree-summary">
+                <span class="owner-tree-summary-copy">
+                    <span class="owner-tree-type">@Model.NodeType</span>
+                    <span class="owner-tree-label">@Model.Label</span>
+                </span>
+                <span class="owner-tree-badges">
+                    <span class="owner-tree-badge">@Model.MappingCount mapping(s)</span>
+                    <span class="owner-tree-badge subtle">@Model.ProductCount product(s)</span>
+                </span>
+            </summary>
+            <ul class="owner-tree-list">
+                @foreach (var child in Model.Children)
+                {
+                    <partial name="_HierarchyNode" model="child" />
+                }
+            </ul>
+        </details>
+    </li>
+}

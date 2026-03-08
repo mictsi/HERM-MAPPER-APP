@@ -548,6 +548,307 @@ a {
   font-size: 1.1rem;
 }
 
+.owner-jump-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+}
+
+.owner-jump-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgba(11, 110, 79, 0.18);
+  border-radius: 999px;
+  background: rgba(11, 110, 79, 0.07);
+  color: var(--accent-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.owner-hierarchy-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.owner-hierarchy-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1.2rem;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.owner-tree-root,
+.owner-tree-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.owner-tree-list {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+  padding-left: 1rem;
+  border-left: 1px solid rgba(31, 41, 51, 0.08);
+}
+
+.owner-tree-details {
+  width: 100%;
+}
+
+.owner-tree-summary,
+.owner-tree-leaf-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.95rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.owner-tree-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.owner-tree-summary::-webkit-details-marker {
+  display: none;
+}
+
+.owner-tree-summary-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.owner-tree-type {
+  display: inline-block;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.owner-tree-label {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.owner-tree-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  justify-content: end;
+}
+
+.owner-tree-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(11, 110, 79, 0.12);
+  color: var(--accent-deep);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.owner-tree-badge.subtle {
+  background: rgba(82, 96, 109, 0.12);
+  color: #36424f;
+}
+
+.owner-tree-owner > .owner-tree-details > .owner-tree-summary,
+.owner-tree-owner.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: linear-gradient(135deg, rgba(11, 110, 79, 0.16), rgba(11, 110, 79, 0.08));
+}
+
+.owner-tree-domain > .owner-tree-details > .owner-tree-summary,
+.owner-tree-domain.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(43, 111, 119, 0.08);
+}
+
+.owner-tree-capability > .owner-tree-details > .owner-tree-summary,
+.owner-tree-capability.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(92, 124, 53, 0.08);
+}
+
+.owner-tree-component > .owner-tree-details > .owner-tree-summary,
+.owner-tree-component.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(139, 94, 52, 0.08);
+}
+
+.owner-tree-product .owner-tree-leaf-row {
+  background: rgba(123, 63, 97, 0.06);
+}
+
+.owner-sankey-shell {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.owner-sankey-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  gap: 0.9rem;
+  align-items: end;
+}
+
+.owner-sankey-filter-actions {
+  display: flex;
+  align-items: end;
+}
+
+.owner-sankey-filter-summary {
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: rgba(11, 110, 79, 0.08);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.owner-lifecycle-filter-form {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) auto;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.owner-lifecycle-filter-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.owner-lifecycle-summary {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: rgba(43, 111, 119, 0.08);
+  color: var(--ink);
+}
+
+.owner-lifecycle-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.owner-lifecycle-card {
+  display: grid;
+  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.owner-lifecycle-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.owner-lifecycle-meter {
+  height: 0.9rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(82, 96, 109, 0.12);
+}
+
+.owner-lifecycle-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2b6f77, #0b6e4f);
+}
+
+.owner-lifecycle-metrics {
+  min-width: 5rem;
+  text-align: right;
+}
+
+.owner-sankey-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.owner-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.owner-legend-chip.owner {
+  background: #0b6e4f;
+}
+
+.owner-legend-chip.domain {
+  background: #2b6f77;
+}
+
+.owner-legend-chip.capability {
+  background: #5c7c35;
+}
+
+.owner-legend-chip.component {
+  background: #8b5e34;
+}
+
+.owner-legend-chip.product {
+  background: #7b3f61;
+}
+
+.owner-sankey-frame {
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1.2rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 243, 235, 0.95));
+}
+
+.owner-sankey-svg {
+  width: 100%;
+  min-width: 1200px;
+  height: auto;
+  display: block;
+}
+
+.owner-sankey-link {
+  transition: stroke-opacity 0.15s ease;
+}
+
+.owner-sankey-link:hover {
+  stroke-opacity: 0.82;
+}
+
+.owner-sankey-label,
+.owner-sankey-value {
+  font-family: "Aptos", "Segoe UI Variable Text", "Trebuchet MS", sans-serif;
+}
+
+.owner-sankey-label {
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--ink);
+}
+
+.owner-sankey-value {
+  font-size: 10px;
+  fill: var(--muted);
+}
+
 @media (max-width: 991.98px) {
   .hero-panel,
   .stats-grid,
@@ -575,6 +876,25 @@ a {
 
   .dependency-arrow {
     display: none;
+  }
+
+  .owner-tree-summary,
+  .owner-tree-leaf-row {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .owner-sankey-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-lifecycle-filter-form,
+  .owner-lifecycle-card {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-tree-badges {
+    justify-content: start;
   }
 }
 

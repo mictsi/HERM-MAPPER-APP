@@ -1,0 +1,232 @@
+@model HERM_MAPPER_APP.ViewModels.OwnerVisualizationViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Reports";
+    var sankeyPayload = JsonSerializer.Serialize(new
+    {
+        paths = Model.Paths,
+        nodes = Model.SankeyNodes,
+        links = Model.SankeyLinks
+    });
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Reports</span>
+        <h1>Reports</h1>
+        <p>Review mapping structure, model relationship flow, and product lifecycle status from one place.</p>
+    </div>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Report navigation</span>
+            <h2>Jump to a report</h2>
+        </div>
+    </div>
+    <div class="owner-jump-list">
+        <a class="owner-jump-chip" href="#report-mapping-by-owner">Mapping by owner</a>
+        <a class="owner-jump-chip" href="#report-sankey-relationships">Sankey view of model relationships</a>
+        <a class="owner-jump-chip" href="#report-lifecycle-status">Lifecycle status report</a>
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span class="stat-label">Owners</span>
+        <span class="stat-value">@Model.OwnerCount</span>
+        <span class="stat-meta">root nodes</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Domains</span>
+        <span class="stat-value">@Model.DomainCount</span>
+        <span class="stat-meta">shared across owners</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Capabilities</span>
+        <span class="stat-value">@Model.CapabilityCount</span>
+        <span class="stat-meta">parent branches</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Components</span>
+        <span class="stat-value">@Model.ComponentCount</span>
+        <span class="stat-meta">mapped targets</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Paths</span>
+        <span class="stat-value">@Model.MappingPathCount</span>
+        <span class="stat-meta">@Model.ProductCount distinct products</span>
+    </article>
+</section>
+
+<section class="content-card" id="report-mapping-by-owner">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Hierarchy view</span>
+            <h2>Mapping by owner</h2>
+            <p>Expand an owner to follow the mapping path from domain to capability, component, and product.</p>
+        </div>
+    </div>
+
+    @if (Model.Owners.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No complete mappings available yet</h3>
+            <p>Add complete mappings with owners to populate this hierarchy view.</p>
+        </div>
+    }
+    else
+    {
+        <div class="owner-jump-list">
+            @foreach (var owner in Model.Owners)
+            {
+                <a class="owner-jump-chip" href="#@owner.Key.Replace(":", "-")">@owner.Label</a>
+            }
+        </div>
+
+        <div class="owner-hierarchy-stack">
+            @foreach (var owner in Model.Owners)
+            {
+                <article class="owner-hierarchy-card" id="@owner.Key.Replace(":", "-")">
+                    <ul class="owner-tree-list owner-tree-root">
+                        <partial name="_HierarchyNode" model="owner" />
+                    </ul>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<section class="content-card" id="report-sankey-relationships">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Sankey view</span>
+            <h2>Sankey view of model relationships</h2>
+            <p>Use the filters or click a sankey node to isolate a branch. Link width represents how many mapping paths flow through each step.</p>
+        </div>
+    </div>
+
+    @if (Model.SankeyNodes.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No sankey data available</h3>
+            <p>The sankey appears when at least one complete mapping path exists.</p>
+        </div>
+    }
+    else
+    {
+        <div class="owner-sankey-shell">
+            <div class="owner-sankey-filters">
+                <div>
+                    <label class="form-label" for="ownerFilter">Owner</label>
+                    <select class="form-select" id="ownerFilter" data-owner-filter="owner">
+                        <option value="">All owners</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="domainFilter">Domain</label>
+                    <select class="form-select" id="domainFilter" data-owner-filter="domain">
+                        <option value="">All domains</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="capabilityFilter">Capability</label>
+                    <select class="form-select" id="capabilityFilter" data-owner-filter="capability">
+                        <option value="">All capabilities</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="componentFilter">Component</label>
+                    <select class="form-select" id="componentFilter" data-owner-filter="component">
+                        <option value="">All components</option>
+                    </select>
+                </div>
+                <div class="owner-sankey-filter-actions">
+                    <button class="btn btn-outline-secondary" type="button" data-owner-filter-reset>Reset filters</button>
+                </div>
+            </div>
+            <div class="owner-sankey-filter-summary" data-owner-filter-summary></div>
+            <div class="owner-sankey-legend">
+                <span class="owner-legend-chip owner">Owner</span>
+                <span class="owner-legend-chip domain">Domain</span>
+                <span class="owner-legend-chip capability">Capability</span>
+                <span class="owner-legend-chip component">Component</span>
+                <span class="owner-legend-chip product">Product</span>
+            </div>
+            <div class="owner-sankey-frame" data-owner-sankey></div>
+            <script type="application/json" data-owner-sankey-payload>@Html.Raw(sankeyPayload)</script>
+        </div>
+    }
+</section>
+
+<section class="content-card" id="report-lifecycle-status">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Lifecycle report</span>
+            <h2>Lifecycle status report</h2>
+            <p>See how products are distributed across lifecycle states and narrow the report to a specific owner.</p>
+        </div>
+    </div>
+
+    <form method="get" class="owner-lifecycle-filter-form">
+        <div>
+            <label class="form-label" for="lifecycleOwner">Owner</label>
+            <select class="form-select" id="lifecycleOwner" name="lifecycleOwner">
+                <option value="">All owners</option>
+                @foreach (var owner in Model.AvailableOwners)
+                {
+                    <option value="@owner" selected="@(string.Equals(owner, Model.SelectedLifecycleOwner, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@owner</option>
+                }
+            </select>
+        </div>
+        <div class="owner-lifecycle-filter-actions">
+            <button class="btn btn-primary" type="submit">Apply filter</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
+        </div>
+    </form>
+
+    @if (Model.LifecycleStatuses.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No lifecycle data available</h3>
+            <p>No products matched the selected owner filter.</p>
+        </div>
+    }
+    else
+    {
+        <div class="owner-lifecycle-summary">
+            <strong>@Model.LifecycleProductCount</strong> product(s)
+            @if (!string.IsNullOrWhiteSpace(Model.SelectedLifecycleOwner))
+            {
+                <span>for owner <strong>@Model.SelectedLifecycleOwner</strong></span>
+            }
+            else
+            {
+                <span>across all owners</span>
+            }
+        </div>
+
+        <div class="owner-lifecycle-list">
+            @foreach (var status in Model.LifecycleStatuses)
+            {
+                <article class="owner-lifecycle-card">
+                    <div class="owner-lifecycle-copy">
+                        <strong>@status.Label</strong>
+                        <span class="table-subline">@status.ProductCount product(s)</span>
+                    </div>
+                    <div class="owner-lifecycle-meter" aria-hidden="true">
+                        <span style="width: @status.Percentage.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></span>
+                    </div>
+                    <div class="owner-lifecycle-metrics">
+                        <strong>@status.Percentage%</strong>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@section Scripts {
+    <script src="~/js/owner-visualization.js" asp-append-version="true"></script>
+}
