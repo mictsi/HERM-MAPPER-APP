@@ -66,7 +66,6 @@ public sealed partial class TrmWorkbookImportService(
             .ToListAsync(cancellationToken);
         var existingComponentCodes = await dbContext.TrmComponents
             .AsNoTracking()
-            .Where(x => !x.IsCustom)
             .Select(x => x.Code)
             .ToListAsync(cancellationToken);
 
@@ -195,7 +194,6 @@ public sealed partial class TrmWorkbookImportService(
             .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
         var componentsByCode = await dbContext.TrmComponents
-            .Where(x => !x.IsCustom)
             .Include(x => x.CapabilityLinks)
             .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
