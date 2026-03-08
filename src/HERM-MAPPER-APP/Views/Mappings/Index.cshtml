@@ -7,7 +7,7 @@
     <div>
         <span class="eyebrow">Mapping workspace</span>
         <h1>Review and complete HERM mappings</h1>
-        <p>Products can have multiple mappings. Export follows the uploaded sample format: <code>LEVEL0;LEVEL1;LEVEL2;LEVEL3</code>.</p>
+        <p>Products can have multiple mappings. Export follows the uploaded sample format: <code>MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT</code>.</p>
     </div>
     <a class="btn btn-primary" asp-action="ExportCsv" asp-route-search="@Model.Search" asp-route-status="@Model.Status" asp-route-domainId="@Model.DomainId" asp-route-capabilityId="@Model.CapabilityId">Export completed CSV</a>
 </section>

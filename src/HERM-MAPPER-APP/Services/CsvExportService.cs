@@ -9,19 +9,19 @@ public sealed class CsvExportService
     {
         var builder = new StringBuilder();
 
-        builder.AppendLine("LEVEL0;LEVEL1;LEVEL2;LEVEL3");
+        builder.AppendLine("MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT");
 
         foreach (var mapping in mappings)
         {
-            var componentLabel = mapping.TrmComponent is null
-                ? string.Empty
-                : $"{mapping.TrmComponent.Name} ({mapping.TrmComponent.DisplayCode})";
+            var capability = mapping.TrmComponent?.ParentCapability ?? mapping.TrmCapability;
+            var domain = mapping.TrmComponent?.ParentCapability?.ParentDomain ?? capability?.ParentDomain ?? mapping.TrmDomain;
 
             AppendRow(builder,
             [
                 "HERM",
-                mapping.TrmDomain?.Name,
-                componentLabel,
+                domain is null ? null : $"{domain.Code} {domain.Name}",
+                capability is null ? null : $"{capability.Code} {capability.Name}",
+                mapping.TrmComponent?.DisplayLabel,
                 mapping.ProductCatalogItem?.Name
             ]);
         }

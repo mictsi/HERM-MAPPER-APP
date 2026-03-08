@@ -25,9 +25,9 @@ public sealed class SampleRelationshipImportServiceTests
 
         var csvPath = fixture.WriteCsv(
             """
-            LEVEL0;LEVEL1;LEVEL2;LEVEL3
-            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
-            HERM;Infrastructure;Monitoring & Alerting (TC002);Azure Log Analytics
+            MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
+            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
+            HERM;TD999 Infrastructure;TCAP001 Capability A;TC002 Monitoring & Alerting;Azure Log Analytics
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -63,7 +63,7 @@ public sealed class SampleRelationshipImportServiceTests
         var csvPath = fixture.WriteCsv(
             """
             Domain;Capability;Component;Product
-            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
+            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -71,7 +71,7 @@ public sealed class SampleRelationshipImportServiceTests
         var verification = await service.VerifyAsync(csvPath);
 
         Assert.False(verification.IsValid);
-        Assert.Contains("LEVEL0;LEVEL1;LEVEL2;LEVEL3", verification.Errors.Single());
+        Assert.Contains("MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT", verification.Errors.Single());
     }
 
     [Fact]
@@ -81,8 +81,8 @@ public sealed class SampleRelationshipImportServiceTests
         await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
         var csvPath = fixture.WriteCsv(
             """
-            LEVEL0;LEVEL1;LEVEL2;LEVEL3
-            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
+            MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
+            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -109,8 +109,8 @@ public sealed class SampleRelationshipImportServiceTests
         await fixture.SeedHierarchyAsync("Infrastructure", "Capability A", "Monitoring & Alerting", "TC002");
         var csvPath = fixture.WriteCsv(
             """
-            LEVEL0;LEVEL1;LEVEL2;LEVEL3
-            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
+            MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
+            HERM;TD001 Cybersecurity;TCAP001 Capability B;TC002 Monitoring & Alerting;Graylog
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -125,6 +125,31 @@ public sealed class SampleRelationshipImportServiceTests
         Assert.Equal(0, summary.MappingsAdded);
         Assert.Single(products);
         Assert.Equal("Graylog", products[0].Name);
+        Assert.Empty(mappings);
+    }
+
+    [Fact]
+    public async Task ImportAsync_CreatesOnlyProduct_WhenDomainDoesNotMatchCapabilityParentDomain()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
+        var csvPath = fixture.WriteCsv(
+            """
+            MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
+            HERM;TD999 Infrastructure;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
+            """);
+
+        var service = new SampleRelationshipImportService(fixture.DbContext);
+
+        var summary = await service.ImportAsync(csvPath);
+
+        var products = await fixture.DbContext.ProductCatalogItems.AsNoTracking().ToListAsync();
+        var mappings = await fixture.DbContext.ProductMappings.AsNoTracking().ToListAsync();
+
+        Assert.Equal(1, summary.ProductsAdded);
+        Assert.Equal(1, summary.ProductsOnlyRows);
+        Assert.Equal(0, summary.MappingsAdded);
+        Assert.Single(products);
         Assert.Empty(mappings);
     }
 
@@ -154,9 +179,9 @@ public sealed class SampleRelationshipImportServiceTests
 
         var csvPath = fixture.WriteCsv(
             """
-            LEVEL0;LEVEL1;LEVEL2;LEVEL3
-            HERM;Cybersecurity;Monitoring & Alerting (TC002);Graylog
-            HERM;Cybersecurity;Monitoring & Alerting (TC002);Azure Log Analytics
+            MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
+            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
+            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Azure Log Analytics
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);

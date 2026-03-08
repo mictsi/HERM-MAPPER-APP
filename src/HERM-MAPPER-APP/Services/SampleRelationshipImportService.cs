@@ -39,17 +39,27 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
         }
 
         var headerParts = headerLine.Split(';');
-        if (headerParts.Length < 4 ||
-            !string.Equals(headerParts[0].Trim(), "LEVEL0", StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(headerParts[1].Trim(), "LEVEL1", StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(headerParts[2].Trim(), "LEVEL2", StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(headerParts[3].Trim(), "LEVEL3", StringComparison.OrdinalIgnoreCase))
+        if (headerParts.Length < 5 ||
+            !string.Equals(headerParts[0].Trim(), "MODEL", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(headerParts[1].Trim(), "DOMAIN", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(headerParts[2].Trim(), "CAPABILITY", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(headerParts[3].Trim(), "COMPONENT", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(headerParts[4].Trim(), "PRODUCT", StringComparison.OrdinalIgnoreCase))
         {
             return new ProductRelationshipVerificationResult
             {
-                Errors = ["The CSV header must be 'LEVEL0;LEVEL1;LEVEL2;LEVEL3'."]
+                Errors = ["The CSV header must be 'MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT'."]
             };
         }
+
+        var domains = await dbContext.TrmDomains
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var capabilities = await dbContext.TrmCapabilities
+            .AsNoTracking()
+            .Include(x => x.ParentDomain)
+            .ToListAsync(cancellationToken);
 
         var components = await dbContext.TrmComponents
             .AsNoTracking()
@@ -98,7 +108,7 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
             summary.RowsRead++;
 
             var parts = line.Split(';');
-            if (parts.Length < 4)
+            if (parts.Length < 5)
             {
                 summary.RowsSkipped++;
                 rows.Add(new ProductRelationshipVerificationRow
@@ -106,16 +116,17 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
                     RowNumber = rowNumber,
                     Status = "Skipped",
                     StatusKind = ProductImportStatusKind.Skipped,
-                    Details = "The row does not contain the required four columns.",
+                    Details = "The row does not contain the required five columns.",
                     WillImport = false
                 });
                 continue;
             }
 
-            var level0Name = parts[0].Trim();
-            var domainName = parts[1].Trim();
-            var componentRaw = parts[2].Trim();
-            var productName = parts[3].Trim();
+            var modelName = parts[0].Trim();
+            var domainRaw = parts[1].Trim();
+            var capabilityRaw = parts[2].Trim();
+            var componentRaw = parts[3].Trim();
+            var productName = parts[4].Trim();
 
             if (string.IsNullOrWhiteSpace(productName))
             {
@@ -123,12 +134,13 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
                 rows.Add(new ProductRelationshipVerificationRow
                 {
                     RowNumber = rowNumber,
-                    Level0Name = level0Name,
-                    Level1Name = domainName,
-                    Level2Name = componentRaw,
+                    ModelName = modelName,
+                    DomainName = domainRaw,
+                    CapabilityName = capabilityRaw,
+                    ComponentName = componentRaw,
                     Status = "Skipped",
                     StatusKind = ProductImportStatusKind.Skipped,
-                    Details = "LEVEL3 is empty, so no product can be imported.",
+                    Details = "PRODUCT is empty, so no product can be imported.",
                     WillImport = false
                 });
                 continue;
@@ -146,15 +158,25 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
                 summary.ProductsMatched++;
             }
 
-            if (!TryResolveValidatedMapping(level0Name, domainName, componentRaw, components, out var resolvedMapping, out var resolutionMessage))
+            if (!TryResolveValidatedMapping(
+                    modelName,
+                    domainRaw,
+                    capabilityRaw,
+                    componentRaw,
+                    domains,
+                    capabilities,
+                    components,
+                    out var resolvedMapping,
+                    out var resolutionMessage))
             {
                 summary.ProductsOnlyRows++;
                 rows.Add(new ProductRelationshipVerificationRow
                 {
                     RowNumber = rowNumber,
-                    Level0Name = level0Name,
-                    Level1Name = domainName,
-                    Level2Name = componentRaw,
+                    ModelName = modelName,
+                    DomainName = domainRaw,
+                    CapabilityName = capabilityRaw,
+                    ComponentName = componentRaw,
                     ProductName = productName,
                     Status = createsNewProduct ? "Add Product Only" : "Keep Product Only",
                     StatusKind = ProductImportStatusKind.Warning,
@@ -173,9 +195,10 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
                 rows.Add(new ProductRelationshipVerificationRow
                 {
                     RowNumber = rowNumber,
-                    Level0Name = level0Name,
-                    Level1Name = domainName,
-                    Level2Name = componentRaw,
+                    ModelName = modelName,
+                    DomainName = domainRaw,
+                    CapabilityName = capabilityRaw,
+                    ComponentName = componentRaw,
                     ProductName = productName,
                     Status = "Skip Duplicate Mapping",
                     StatusKind = ProductImportStatusKind.Skipped,
@@ -191,9 +214,10 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
             rows.Add(new ProductRelationshipVerificationRow
             {
                 RowNumber = rowNumber,
-                Level0Name = level0Name,
-                Level1Name = domainName,
-                Level2Name = componentRaw,
+                ModelName = modelName,
+                DomainName = domainRaw,
+                CapabilityName = capabilityRaw,
+                ComponentName = componentRaw,
                 ProductName = productName,
                 Status = createsNewProduct ? "Add Product + Mapping" : "Add Mapping",
                 StatusKind = ProductImportStatusKind.Ready,
@@ -224,6 +248,21 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
         ArgumentNullException.ThrowIfNull(csvStream);
 
         using var reader = new StreamReader(csvStream, leaveOpen: true);
+        var headerLine = await reader.ReadLineAsync();
+        if (!HasValidHeader(headerLine))
+        {
+            return ProductRelationshipImportSummary.Empty;
+        }
+
+        var domains = await dbContext.TrmDomains
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var capabilities = await dbContext.TrmCapabilities
+            .AsNoTracking()
+            .Include(x => x.ParentDomain)
+            .ToListAsync(cancellationToken);
+
         var components = await dbContext.TrmComponents
             .AsNoTracking()
             .Include(x => x.ParentCapability)
@@ -257,17 +296,10 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var summary = new ProductRelationshipImportSummary();
-        var isHeaderRow = true;
 
         while (await reader.ReadLineAsync() is { } line)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            if (isHeaderRow)
-            {
-                isHeaderRow = false;
-                continue;
-            }
 
             if (string.IsNullOrWhiteSpace(line))
             {
@@ -277,16 +309,17 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
             summary.RowsRead++;
 
             var parts = line.Split(';');
-            if (parts.Length < 4)
+            if (parts.Length < 5)
             {
                 summary.RowsSkipped++;
                 continue;
             }
 
-            var level0Name = parts[0].Trim();
-            var domainName = parts[1].Trim();
-            var componentRaw = parts[2].Trim();
-            var productName = parts[3].Trim();
+            var modelName = parts[0].Trim();
+            var domainRaw = parts[1].Trim();
+            var capabilityRaw = parts[2].Trim();
+            var componentRaw = parts[3].Trim();
+            var productName = parts[4].Trim();
 
             if (string.IsNullOrWhiteSpace(productName))
             {
@@ -316,7 +349,16 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
                 }
             }
 
-            if (!TryResolveValidatedMapping(level0Name, domainName, componentRaw, components, out var resolvedMapping, out _))
+            if (!TryResolveValidatedMapping(
+                    modelName,
+                    domainRaw,
+                    capabilityRaw,
+                    componentRaw,
+                    domains,
+                    capabilities,
+                    components,
+                    out var resolvedMapping,
+                    out _))
             {
                 summary.ProductsOnlyRows++;
                 continue;
@@ -349,9 +391,12 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
     }
 
     private static bool TryResolveValidatedMapping(
-        string level0Name,
-        string domainName,
+        string modelName,
+        string domainRaw,
+        string capabilityRaw,
         string componentRaw,
+        IReadOnlyCollection<TrmDomain> domains,
+        IReadOnlyCollection<TrmCapability> capabilities,
         IReadOnlyCollection<TrmComponent> components,
         [NotNullWhen(true)] out ResolvedRelationshipMapping? resolvedMapping,
         out string resolutionMessage)
@@ -359,33 +404,31 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
         resolvedMapping = default;
         resolutionMessage = string.Empty;
 
-        if (!string.IsNullOrWhiteSpace(level0Name) &&
-            !string.Equals(level0Name, "HERM", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(modelName) &&
+            !string.Equals(modelName, "HERM", StringComparison.OrdinalIgnoreCase))
         {
-            resolutionMessage = $"LEVEL0 '{level0Name}' is not supported. Expected 'HERM'.";
+            resolutionMessage = $"MODEL '{modelName}' is not supported. Expected 'HERM'.";
             return false;
         }
 
-        var component = ResolveComponent(componentRaw, components);
+        var domain = ResolveDomain(domainRaw, domains);
+        if (domain is null)
+        {
+            resolutionMessage = $"DOMAIN '{domainRaw}' could not be matched to a unique TRM domain.";
+            return false;
+        }
+
+        var capability = ResolveCapability(capabilityRaw, domain.Id, capabilities);
+        if (capability is null)
+        {
+            resolutionMessage = $"CAPABILITY '{capabilityRaw}' could not be matched under domain '{domain.Code} {domain.Name}'.";
+            return false;
+        }
+
+        var component = ResolveComponent(componentRaw, capability.Id, components);
         if (component is null)
         {
-            resolutionMessage = $"LEVEL2 '{componentRaw}' could not be matched to a unique TRM component.";
-            return false;
-        }
-
-        var capability = component.ParentCapability;
-        var domain = capability?.ParentDomain;
-
-        if (capability is null || domain is null)
-        {
-            resolutionMessage = $"LEVEL2 '{componentRaw}' matched a component, but its parent capability/domain is incomplete in the catalogue.";
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(domainName) ||
-            !string.Equals(domain.Name, domainName, StringComparison.OrdinalIgnoreCase))
-        {
-            resolutionMessage = $"LEVEL1 '{domainName}' does not match the resolved domain '{domain.Name}' for {component.DisplayLabel}.";
+            resolutionMessage = $"COMPONENT '{componentRaw}' could not be matched under capability '{capability.Code} {capability.Name}'.";
             return false;
         }
 
@@ -394,28 +437,114 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
         return true;
     }
 
-    private static TrmComponent? ResolveComponent(string rawValue, IReadOnlyCollection<TrmComponent> components)
+    private static bool HasValidHeader(string? headerLine)
     {
-        var componentCode = ExtractComponentCode(rawValue);
-        var componentName = ExtractComponentName(rawValue);
-        var normalizedCode = NormalizeCode(componentCode);
-
-        if (!string.IsNullOrWhiteSpace(normalizedCode))
+        if (string.IsNullOrWhiteSpace(headerLine))
         {
-            var codeMatch = components.FirstOrDefault(x =>
-                string.Equals(x.Code, normalizedCode, StringComparison.OrdinalIgnoreCase));
-
-            if (codeMatch is not null)
-            {
-                return codeMatch;
-            }
+            return false;
         }
 
-        var nameMatches = components
-            .Where(x => string.Equals(x.Name, componentName, StringComparison.OrdinalIgnoreCase))
+        var headerParts = headerLine.Split(';');
+        return headerParts.Length >= 5 &&
+               string.Equals(headerParts[0].Trim(), "MODEL", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(headerParts[1].Trim(), "DOMAIN", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(headerParts[2].Trim(), "CAPABILITY", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(headerParts[3].Trim(), "COMPONENT", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(headerParts[4].Trim(), "PRODUCT", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static TrmDomain? ResolveDomain(string rawValue, IReadOnlyCollection<TrmDomain> domains) =>
+        ResolveByCodeNameOrTitle(rawValue, domains, x => x.Code, x => x.Name, x => x.SourceTitle);
+
+    private static TrmCapability? ResolveCapability(string rawValue, int domainId, IReadOnlyCollection<TrmCapability> capabilities) =>
+        ResolveByCodeNameOrTitle(
+            rawValue,
+            capabilities.Where(x => x.ParentDomainId == domainId).ToList(),
+            x => x.Code,
+            x => x.Name,
+            x => x.SourceTitle);
+
+    private static TrmComponent? ResolveComponent(string rawValue, int capabilityId, IReadOnlyCollection<TrmComponent> components) =>
+        ResolveByCodeNameOrTitle(
+            rawValue,
+            components.Where(x => x.ParentCapabilityId == capabilityId).ToList(),
+            x => x.Code,
+            x => x.Name,
+            x => x.SourceTitle);
+
+    private static T? ResolveByCodeNameOrTitle<T>(
+        string rawValue,
+        IReadOnlyCollection<T> items,
+        Func<T, string?> codeSelector,
+        Func<T, string?> nameSelector,
+        Func<T, string?> titleSelector)
+        where T : class
+    {
+        var parsedValue = ParseLookupValue(rawValue);
+        if (string.IsNullOrWhiteSpace(parsedValue.Code) && string.IsNullOrWhiteSpace(parsedValue.Label))
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(parsedValue.Code))
+        {
+            var codeMatch = items.FirstOrDefault(x =>
+                string.Equals(NormalizeCode(codeSelector(x)), parsedValue.Code, StringComparison.OrdinalIgnoreCase));
+
+            if (codeMatch is null)
+            {
+                return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(parsedValue.Label) && !MatchesLabel(parsedValue.Label, nameSelector(codeMatch), titleSelector(codeMatch)))
+            {
+                return null;
+            }
+
+            return codeMatch;
+        }
+
+        var labelMatches = items
+            .Where(x => MatchesLabel(parsedValue.Label, nameSelector(x), titleSelector(x)))
             .ToList();
 
-        return nameMatches.Count == 1 ? nameMatches[0] : null;
+        return labelMatches.Count == 1 ? labelMatches[0] : null;
+    }
+
+    private static bool MatchesLabel(string? expectedLabel, string? name, string? sourceTitle)
+    {
+        if (string.IsNullOrWhiteSpace(expectedLabel))
+        {
+            return false;
+        }
+
+        return string.Equals(name, expectedLabel, StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(sourceTitle, expectedLabel, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static LookupValue ParseLookupValue(string rawValue)
+    {
+        var trimmedValue = rawValue.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedValue))
+        {
+            return new LookupValue(null, string.Empty);
+        }
+
+        var legacyCode = ExtractComponentCode(trimmedValue);
+        if (!string.IsNullOrWhiteSpace(legacyCode))
+        {
+            return new LookupValue(NormalizeCode(legacyCode), ExtractComponentName(trimmedValue));
+        }
+
+        var leadingCodeMatch = LeadingCodeAndNameRegex().Match(trimmedValue);
+        if (leadingCodeMatch.Success)
+        {
+            return new LookupValue(
+                NormalizeCode(leadingCodeMatch.Groups["code"].Value),
+                leadingCodeMatch.Groups["name"].Value.Trim());
+        }
+
+        return new LookupValue(null, trimmedValue);
     }
 
     private static string BuildMappingKey(string productName, int? domainId, int? capabilityId, int? componentId) =>
@@ -454,10 +583,14 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
     [GeneratedRegex(@"\((?<code>TC\d+)\)", RegexOptions.CultureInvariant)]
     private static partial Regex ComponentCodeRegex();
 
+    [GeneratedRegex(@"^(?<code>[A-Z]+\d+)\s+(?<name>.+)$", RegexOptions.CultureInvariant)]
+    private static partial Regex LeadingCodeAndNameRegex();
+
     [GeneratedRegex(@"^(?<prefix>[A-Z]+)(?<number>\d+)$", RegexOptions.CultureInvariant)]
     private static partial Regex GenericCodeRegex();
 
     private sealed record ResolvedRelationshipMapping(TrmDomain Domain, TrmCapability Capability, TrmComponent Component);
+    private sealed record LookupValue(string? Code, string Label);
 }
 
 public sealed class ProductRelationshipImportSummary
@@ -491,9 +624,10 @@ public sealed class ProductRelationshipVerificationResult
 public sealed class ProductRelationshipVerificationRow
 {
     public int RowNumber { get; init; }
-    public string? Level0Name { get; init; }
-    public string? Level1Name { get; init; }
-    public string? Level2Name { get; init; }
+    public string? ModelName { get; init; }
+    public string? DomainName { get; init; }
+    public string? CapabilityName { get; init; }
+    public string? ComponentName { get; init; }
     public string? ProductName { get; init; }
     public string Status { get; init; } = string.Empty;
     public ProductImportStatusKind StatusKind { get; init; }

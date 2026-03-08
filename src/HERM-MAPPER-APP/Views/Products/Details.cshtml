@@ -59,15 +59,17 @@
         <div class="mapping-flow-list mb-4">
             @foreach (var mapping in Model.Mappings.OrderBy(x => x.TrmDomain?.Name ?? string.Empty).ThenBy(x => x.TrmComponent?.Name ?? string.Empty))
             {
+                var capability = mapping.TrmComponent?.ParentCapability ?? mapping.TrmCapability;
+                var domain = mapping.TrmComponent?.ParentCapability?.ParentDomain ?? capability?.ParentDomain ?? mapping.TrmDomain;
                 <article class="mapping-flow-card">
                     <div class="mapping-node">
                         <span class="eyebrow text-dark">Domain</span>
-                        <strong>@(mapping.TrmDomain is null ? "-" : $"{mapping.TrmDomain.Code} {mapping.TrmDomain.Name}")</strong>
+                        <strong>@(domain is null ? "-" : $"{domain.Code} {domain.Name}")</strong>
                     </div>
                     <div class="mapping-flow-arrow">→</div>
                     <div class="mapping-node">
                         <span class="eyebrow text-dark">Capability</span>
-                        <strong>@(mapping.TrmCapability is null ? "-" : $"{mapping.TrmCapability.Code} {mapping.TrmCapability.Name}")</strong>
+                        <strong>@(capability is null ? "-" : $"{capability.Code} {capability.Name}")</strong>
                     </div>
                     <div class="mapping-flow-arrow">→</div>
                     <div class="mapping-node">
@@ -97,10 +99,12 @@
                 <tbody>
                 @foreach (var mapping in Model.Mappings.OrderBy(x => x.TrmDomain?.Name ?? string.Empty).ThenBy(x => x.TrmComponent?.Name ?? string.Empty))
                 {
+                    var capability = mapping.TrmComponent?.ParentCapability ?? mapping.TrmCapability;
+                    var domain = mapping.TrmComponent?.ParentCapability?.ParentDomain ?? capability?.ParentDomain ?? mapping.TrmDomain;
                     <tr>
                         <td><span class="status-pill status-@mapping.MappingStatus.ToString().ToLowerInvariant()">@mapping.MappingStatus</span></td>
-                        <td>@(mapping.TrmDomain is null ? "-" : $"{mapping.TrmDomain.Code} {mapping.TrmDomain.Name}")</td>
-                        <td>@(mapping.TrmCapability is null ? "-" : $"{mapping.TrmCapability.Code} {mapping.TrmCapability.Name}")</td>
+                        <td>@(domain is null ? "-" : $"{domain.Code} {domain.Name}")</td>
+                        <td>@(capability is null ? "-" : $"{capability.Code} {capability.Name}")</td>
                         <td>@(mapping.TrmComponent is null ? "-" : mapping.TrmComponent.DisplayLabel)</td>
                         <td class="text-end">
                             <div class="btn-group btn-group-sm">

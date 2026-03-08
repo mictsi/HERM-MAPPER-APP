@@ -235,7 +235,7 @@ public sealed class MappingsController(
         var query = dbContext.TrmComponents.AsNoTracking().AsQueryable();
         if (capabilityId.HasValue)
         {
-            query = query.Where(x => !x.IsDeleted && x.CapabilityLinks.Any(link => link.TrmCapabilityId == capabilityId));
+            query = query.Where(x => !x.IsDeleted && x.ParentCapabilityId == capabilityId);
         }
         else
         {
@@ -272,7 +272,10 @@ public sealed class MappingsController(
             .Include(x => x.ProductCatalogItem)
             .Include(x => x.TrmDomain)
             .Include(x => x.TrmCapability)
+            .ThenInclude(x => x!.ParentDomain)
             .Include(x => x.TrmComponent)
+            .ThenInclude(x => x!.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
             .AsQueryable();
 
         if (!includeUnfinished)
@@ -362,8 +365,7 @@ public sealed class MappingsController(
         else if (model.SelectedComponentId.HasValue)
         {
             component = await dbContext.TrmComponents
-                .Include(x => x.CapabilityLinks)
-                .ThenInclude(x => x.TrmCapability)
+                .Include(x => x.ParentCapability)
                 .ThenInclude(x => x!.ParentDomain)
                 .FirstOrDefaultAsync(x => x.Id == model.SelectedComponentId.Value && !x.IsDeleted);
 
@@ -373,21 +375,18 @@ public sealed class MappingsController(
             }
             else
             {
-                capability = model.SelectedCapabilityId.HasValue
-                    ? component.CapabilityLinks
-                        .Where(x => x.TrmCapabilityId == model.SelectedCapabilityId.Value)
-                        .Select(x => x.TrmCapability)
-                        .FirstOrDefault()
-                    : component.CapabilityLinks
-                        .Select(x => x.TrmCapability)
-                        .FirstOrDefault();
+                capability = component.ParentCapability;
+                domain = capability?.ParentDomain;
 
-                if (model.SelectedCapabilityId.HasValue && capability is null)
+                if (model.SelectedCapabilityId.HasValue && component.ParentCapabilityId != model.SelectedCapabilityId.Value)
                 {
-                    ModelState.AddModelError(nameof(model.SelectedCapabilityId), "The selected component is not linked to that TRM capability.");
+                    ModelState.AddModelError(nameof(model.SelectedCapabilityId), "The selected component does not belong to that TRM capability.");
                 }
 
-                domain = capability?.ParentDomain;
+                if (component.ParentCapabilityId is null || capability is null || domain is null)
+                {
+                    ModelState.AddModelError(nameof(model.SelectedComponentId), "The selected component does not have a complete parent capability/domain hierarchy.");
+                }
             }
         }
         else if (model.SelectedCapabilityId.HasValue)
@@ -417,6 +416,20 @@ public sealed class MappingsController(
         if (model.MappingStatus == MappingStatus.Complete && component is null)
         {
             ModelState.AddModelError(nameof(model.SelectedComponentId), "A completed mapping must select a HERM TRM component.");
+        }
+
+        if (capability is not null &&
+            model.SelectedDomainId.HasValue &&
+            capability.ParentDomainId != model.SelectedDomainId.Value)
+        {
+            ModelState.AddModelError(nameof(model.SelectedDomainId), "The selected capability does not belong to that TRM domain.");
+        }
+
+        if (domain is not null &&
+            model.SelectedDomainId.HasValue &&
+            domain.Id != model.SelectedDomainId.Value)
+        {
+            ModelState.AddModelError(nameof(model.SelectedDomainId), "The selected component hierarchy does not belong to that TRM domain.");
         }
 
         if (!ModelState.IsValid)
@@ -476,7 +489,7 @@ public sealed class MappingsController(
             .AsQueryable();
         if (selectedCapabilityId.HasValue)
         {
-            componentsQuery = componentsQuery.Where(x => x.CapabilityLinks.Any(link => link.TrmCapabilityId == selectedCapabilityId));
+            componentsQuery = componentsQuery.Where(x => x.ParentCapabilityId == selectedCapabilityId);
         }
 
         var components = await componentsQuery
@@ -532,7 +545,7 @@ public sealed class MappingsController(
             .AsQueryable();
         if (postedModel.SelectedCapabilityId.HasValue)
         {
-            componentsQuery = componentsQuery.Where(x => x.CapabilityLinks.Any(link => link.TrmCapabilityId == postedModel.SelectedCapabilityId));
+            componentsQuery = componentsQuery.Where(x => x.ParentCapabilityId == postedModel.SelectedCapabilityId);
         }
 
         var components = await componentsQuery

@@ -118,8 +118,11 @@ public sealed class ProductsController(
             .ThenInclude(x => x.TrmDomain)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.TrmCapability)
+            .ThenInclude(x => x!.ParentDomain)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.TrmComponent)
+            .ThenInclude(x => x!.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
             .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id);
 
@@ -134,10 +137,10 @@ public sealed class ProductsController(
             .ThenInclude(x => x.TrmDomain)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.TrmCapability)
+            .ThenInclude(x => x!.ParentDomain)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.TrmComponent)
-            .ThenInclude(x => x!.CapabilityLinks)
-            .ThenInclude(x => x.TrmCapability)
+            .ThenInclude(x => x!.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
             .FirstOrDefaultAsync(x => x.Id == id);
 
@@ -147,34 +150,18 @@ public sealed class ProductsController(
         }
 
         var paths = product.Mappings
-            .SelectMany(mapping =>
+            .Select(mapping =>
             {
-                var capabilityLinks = mapping.TrmComponent?.CapabilityLinks
-                    .Where(x => x.TrmCapability is not null)
-                    .ToList();
+                var capability = mapping.TrmComponent?.ParentCapability ?? mapping.TrmCapability;
+                var domain = mapping.TrmComponent?.ParentCapability?.ParentDomain ?? capability?.ParentDomain ?? mapping.TrmDomain;
 
-                if (capabilityLinks is null || capabilityLinks.Count == 0)
+                return new ProductDependencyPathViewModel
                 {
-                    return
-                    [
-                        new ProductDependencyPathViewModel
-                        {
-                            Status = mapping.MappingStatus.ToString(),
-                            DomainLabel = mapping.TrmDomain is null ? "-" : $"{mapping.TrmDomain.Code} {mapping.TrmDomain.Name}",
-                            CapabilityLabel = mapping.TrmCapability is null ? "-" : $"{mapping.TrmCapability.Code} {mapping.TrmCapability.Name}",
-                            ComponentLabel = mapping.TrmComponent is null ? "-" : mapping.TrmComponent.DisplayLabel
-                        }
-                    ];
-                }
-
-                return capabilityLinks
-                    .Select(link => new ProductDependencyPathViewModel
-                    {
-                        Status = mapping.MappingStatus.ToString(),
-                        DomainLabel = link.TrmCapability?.ParentDomain is null ? "-" : $"{link.TrmCapability.ParentDomain.Code} {link.TrmCapability.ParentDomain.Name}",
-                        CapabilityLabel = link.TrmCapability is null ? "-" : $"{link.TrmCapability.Code} {link.TrmCapability.Name}",
-                        ComponentLabel = mapping.TrmComponent?.DisplayLabel ?? "-"
-                    });
+                    Status = mapping.MappingStatus.ToString(),
+                    DomainLabel = domain is null ? "-" : $"{domain.Code} {domain.Name}",
+                    CapabilityLabel = capability is null ? "-" : $"{capability.Code} {capability.Name}",
+                    ComponentLabel = mapping.TrmComponent?.DisplayLabel ?? "-"
+                };
             })
             .DistinctBy(x => new { x.DomainLabel, x.CapabilityLabel, x.ComponentLabel, x.Status })
             .OrderBy(x => x.DomainLabel)

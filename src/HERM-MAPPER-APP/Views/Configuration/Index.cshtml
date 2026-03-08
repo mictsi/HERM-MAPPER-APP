@@ -128,7 +128,7 @@
             <h2>Review CSV rows before importing</h2>
         </div>
     </div>
-    <p class="mb-3">Upload a semicolon-separated CSV with the columns <code>LEVEL0;LEVEL1;LEVEL2;LEVEL3</code>. Each row is previewed before import so you can see whether it will add a product, create a mapping, or import the product only.</p>
+    <p class="mb-3">Upload a semicolon-separated CSV with the columns <code>MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT</code>. Each row is previewed before import so you can see whether it will add a product, create a mapping, or import the product only.</p>
     <form asp-action="VerifyProductImport" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
         @Html.AntiForgeryToken()
         <div class="col-lg-8">
@@ -205,8 +205,10 @@
                             <tr>
                                 <th>Row</th>
                                 <th>Product</th>
-                                <th>LEVEL1</th>
-                                <th>LEVEL2</th>
+                                <th>MODEL</th>
+                                <th>DOMAIN</th>
+                                <th>CAPABILITY</th>
+                                <th>COMPONENT</th>
                                 <th>Action</th>
                                 <th>Details</th>
                             </tr>
@@ -219,12 +221,14 @@
                                 ProductImportStatusKind.Ready => "status-complete",
                                 ProductImportStatusKind.Warning => "status-inreview",
                                 _ => "status-outofscope"
-                            };
+                                };
                             <tr>
                                 <td>@row.RowNumber</td>
                                 <td>@(string.IsNullOrWhiteSpace(row.ProductName) ? "-" : row.ProductName)</td>
-                                <td>@(string.IsNullOrWhiteSpace(row.Level1Name) ? "-" : row.Level1Name)</td>
-                                <td>@(string.IsNullOrWhiteSpace(row.Level2Name) ? "-" : row.Level2Name)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.ModelName) ? "-" : row.ModelName)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.DomainName) ? "-" : row.DomainName)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.CapabilityName) ? "-" : row.CapabilityName)</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.ComponentName) ? "-" : row.ComponentName)</td>
                                 <td><span class="status-pill @statusClass">@row.Status</span></td>
                                 <td>@row.Details</td>
                             </tr>
