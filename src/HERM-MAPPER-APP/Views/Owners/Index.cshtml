@@ -210,18 +210,34 @@
         <div class="owner-lifecycle-list">
             @foreach (var status in Model.LifecycleStatuses)
             {
-                <article class="owner-lifecycle-card">
-                    <div class="owner-lifecycle-copy">
-                        <strong>@status.Label</strong>
-                        <span class="table-subline">@status.ProductCount product(s)</span>
+                <details class="owner-lifecycle-details">
+                    <summary class="owner-lifecycle-card">
+                        <div class="owner-lifecycle-copy">
+                            <strong>@status.Label</strong>
+                            <span class="table-subline">@status.ProductCount product(s)</span>
+                        </div>
+                        <div class="owner-lifecycle-meter" aria-hidden="true">
+                            <span style="width: @status.Percentage.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></span>
+                        </div>
+                        <div class="owner-lifecycle-metrics">
+                            <strong>@status.Percentage%</strong>
+                        </div>
+                    </summary>
+                    <div class="owner-lifecycle-products">
+                        @foreach (var product in status.Products)
+                        {
+                            <article class="owner-lifecycle-product">
+                                <div class="owner-lifecycle-product-copy">
+                                    <a class="owner-tree-label" asp-controller="Products" asp-action="Details" asp-route-id="@product.ProductId">@product.Name</a>
+                                    <span class="table-subline">@(string.IsNullOrWhiteSpace(product.Vendor) && string.IsNullOrWhiteSpace(product.Version) ? "-" : $"{product.Vendor} {product.Version}".Trim())</span>
+                                </div>
+                                <div class="owner-lifecycle-product-meta">
+                                    <span class="table-subline">Owners: @(product.OwnersLabel ?? "-")</span>
+                                </div>
+                            </article>
+                        }
                     </div>
-                    <div class="owner-lifecycle-meter" aria-hidden="true">
-                        <span style="width: @status.Percentage.ToString(System.Globalization.CultureInfo.InvariantCulture)%"></span>
-                    </div>
-                    <div class="owner-lifecycle-metrics">
-                        <strong>@status.Percentage%</strong>
-                    </div>
-                </article>
+                </details>
             }
         </div>
     }

@@ -23,6 +23,16 @@ public sealed class LifecycleStatusReportRowViewModel
     public string Label { get; init; } = string.Empty;
     public int ProductCount { get; init; }
     public decimal Percentage { get; init; }
+    public IReadOnlyList<LifecycleStatusProductViewModel> Products { get; init; } = [];
+}
+
+public sealed class LifecycleStatusProductViewModel
+{
+    public int ProductId { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string? Vendor { get; init; }
+    public string? Version { get; init; }
+    public string? OwnersLabel { get; init; }
 }
 
 public sealed class OwnerPathViewModel

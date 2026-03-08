@@ -738,15 +738,26 @@ a {
   gap: 0.8rem;
 }
 
+.owner-lifecycle-details {
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+}
+
 .owner-lifecycle-card {
   display: grid;
   grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) auto;
   gap: 1rem;
   align-items: center;
   padding: 0.95rem 1rem;
-  border: 1px solid rgba(31, 41, 51, 0.08);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  list-style: none;
+}
+
+.owner-lifecycle-card::-webkit-details-marker,
+.owner-lifecycle-card::marker {
+  display: none;
+  content: "";
 }
 
 .owner-lifecycle-copy {
@@ -771,6 +782,28 @@ a {
 .owner-lifecycle-metrics {
   min-width: 5rem;
   text-align: right;
+}
+
+.owner-lifecycle-products {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+}
+
+.owner-lifecycle-product {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.9rem;
+  background: rgba(243, 239, 230, 0.72);
+}
+
+.owner-lifecycle-product-copy,
+.owner-lifecycle-product-meta {
+  display: grid;
+  gap: 0.15rem;
 }
 
 .owner-sankey-legend {
@@ -891,6 +924,11 @@ a {
   .owner-lifecycle-filter-form,
   .owner-lifecycle-card {
     grid-template-columns: 1fr;
+  }
+
+  .owner-lifecycle-product {
+    align-items: start;
+    flex-direction: column;
   }
 
   .owner-tree-badges {

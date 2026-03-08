@@ -109,7 +109,18 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             {
                 Label = group.Key,
                 ProductCount = group.Count(),
-                Percentage = Math.Round((decimal)group.Count() / products.Count * 100m, 1, MidpointRounding.AwayFromZero)
+                Percentage = Math.Round((decimal)group.Count() / products.Count * 100m, 1, MidpointRounding.AwayFromZero),
+                Products = group
+                    .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(x => new LifecycleStatusProductViewModel
+                    {
+                        ProductId = x.Id,
+                        Name = x.Name,
+                        Vendor = x.Vendor,
+                        Version = x.Version,
+                        OwnersLabel = x.OwnerDisplay
+                    })
+                    .ToList()
             })
             .ToList();
     }
