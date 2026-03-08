@@ -1,4 +1,4 @@
-@model HERM_MAPPER_APP.ViewModels.OwnerHierarchyNodeViewModel
+@model HERM_MAPPER_APP.ViewModels.ReportsHierarchyNodeViewModel
 @{
     var cssType = Model.NodeType.ToLowerInvariant();
 }
@@ -30,9 +30,12 @@ else
                     <span class="owner-tree-type">@Model.NodeType</span>
                     <span class="owner-tree-label">@Model.Label</span>
                 </span>
-                <span class="owner-tree-badges">
-                    <span class="owner-tree-badge">@Model.MappingCount mapping(s)</span>
-                    <span class="owner-tree-badge subtle">@Model.ProductCount product(s)</span>
+                <span class="owner-tree-summary-actions">
+                    <span class="owner-tree-badges">
+                        <span class="owner-tree-badge">@Model.MappingCount mapping(s)</span>
+                        <span class="owner-tree-badge subtle">@Model.ProductCount product(s)</span>
+                    </span>
+                    <span class="owner-tree-toggle" aria-hidden="true"></span>
                 </span>
             </summary>
             <ul class="owner-tree-list">

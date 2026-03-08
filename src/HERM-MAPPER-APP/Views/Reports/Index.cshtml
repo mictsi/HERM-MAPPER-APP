@@ -1,4 +1,4 @@
-@model HERM_MAPPER_APP.ViewModels.OwnerVisualizationViewModel
+@model HERM_MAPPER_APP.ViewModels.ReportsViewModel
 @using System.Text.Json
 @{
     ViewData["Title"] = "Reports";
@@ -10,7 +10,7 @@
     });
 }
 
-<section class="page-header">
+<section class="page-header" id="report-top">
     <div>
         <span class="eyebrow">Reports</span>
         <h1>Reports</h1>
@@ -67,6 +67,7 @@
             <h2>Mapping by owner</h2>
             <p>Expand an owner to follow the mapping path from domain to capability, component, and product.</p>
         </div>
+        <a class="btn btn-outline-secondary btn-sm" href="#report-top">Back to top</a>
     </div>
 
     @if (Model.Owners.Count == 0)
@@ -105,6 +106,7 @@
             <h2>Sankey view of model relationships</h2>
             <p>Use the filters or click a sankey node to isolate a branch. Link width represents how many mapping paths flow through each step.</p>
         </div>
+        <a class="btn btn-outline-secondary btn-sm" href="#report-top">Back to top</a>
     </div>
 
     @if (Model.SankeyNodes.Count == 0)
@@ -167,6 +169,7 @@
             <h2>Lifecycle status report</h2>
             <p>See how products are distributed across lifecycle states and narrow the report to a specific owner.</p>
         </div>
+        <a class="btn btn-outline-secondary btn-sm" href="#report-top">Back to top</a>
     </div>
 
     <form method="get" class="owner-lifecycle-filter-form">
@@ -222,6 +225,7 @@
                         <div class="owner-lifecycle-metrics">
                             <strong>@status.Percentage%</strong>
                         </div>
+                        <span class="owner-lifecycle-toggle" aria-hidden="true"></span>
                     </summary>
                     <div class="owner-lifecycle-products">
                         @foreach (var product in status.Products)

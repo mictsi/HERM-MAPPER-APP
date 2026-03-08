@@ -622,6 +622,33 @@ a {
 .owner-tree-summary-copy {
   display: grid;
   gap: 0.15rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.owner-tree-summary-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.8rem;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.owner-tree-toggle,
+.owner-lifecycle-toggle {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-right: 2px solid rgba(31, 41, 51, 0.6);
+  border-bottom: 2px solid rgba(31, 41, 51, 0.6);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  flex: 0 0 auto;
+}
+
+.owner-tree-details[open] > .owner-tree-summary .owner-tree-toggle,
+.owner-lifecycle-details[open] > .owner-lifecycle-card .owner-lifecycle-toggle {
+  transform: rotate(-135deg);
 }
 
 .owner-tree-type {
@@ -746,7 +773,7 @@ a {
 
 .owner-lifecycle-card {
   display: grid;
-  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 18rem) minmax(0, 1fr) auto auto;
   gap: 1rem;
   align-items: center;
   padding: 0.95rem 1rem;
@@ -917,6 +944,12 @@ a {
     flex-direction: column;
   }
 
+  .owner-tree-summary-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .owner-sankey-filters {
     grid-template-columns: 1fr;
   }
@@ -924,6 +957,11 @@ a {
   .owner-lifecycle-filter-form,
   .owner-lifecycle-card {
     grid-template-columns: 1fr;
+  }
+
+  .owner-tree-toggle,
+  .owner-lifecycle-toggle {
+    margin-top: 0.2rem;
   }
 
   .owner-lifecycle-product {

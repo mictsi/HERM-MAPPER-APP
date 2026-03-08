@@ -1,6 +1,6 @@
 namespace HERM_MAPPER_APP.ViewModels;
 
-public sealed class OwnerVisualizationViewModel
+public sealed class ReportsViewModel
 {
     public int OwnerCount { get; init; }
     public int DomainCount { get; init; }
@@ -12,10 +12,10 @@ public sealed class OwnerVisualizationViewModel
     public int LifecycleProductCount { get; init; }
     public IReadOnlyList<string> AvailableOwners { get; init; } = [];
     public IReadOnlyList<LifecycleStatusReportRowViewModel> LifecycleStatuses { get; init; } = [];
-    public IReadOnlyList<OwnerHierarchyNodeViewModel> Owners { get; init; } = [];
-    public IReadOnlyList<OwnerPathViewModel> Paths { get; init; } = [];
-    public IReadOnlyList<OwnerSankeyNodeViewModel> SankeyNodes { get; init; } = [];
-    public IReadOnlyList<OwnerSankeyLinkViewModel> SankeyLinks { get; init; } = [];
+    public IReadOnlyList<ReportsHierarchyNodeViewModel> Owners { get; init; } = [];
+    public IReadOnlyList<ReportsPathViewModel> Paths { get; init; } = [];
+    public IReadOnlyList<ReportsSankeyNodeViewModel> SankeyNodes { get; init; } = [];
+    public IReadOnlyList<ReportsSankeyLinkViewModel> SankeyLinks { get; init; } = [];
 }
 
 public sealed class LifecycleStatusReportRowViewModel
@@ -35,7 +35,7 @@ public sealed class LifecycleStatusProductViewModel
     public string? OwnersLabel { get; init; }
 }
 
-public sealed class OwnerPathViewModel
+public sealed class ReportsPathViewModel
 {
     public int MappingId { get; init; }
     public string OwnerName { get; init; } = string.Empty;
@@ -49,7 +49,7 @@ public sealed class OwnerPathViewModel
     public string ProductName { get; init; } = string.Empty;
 }
 
-public sealed class OwnerHierarchyNodeViewModel
+public sealed class ReportsHierarchyNodeViewModel
 {
     public string Key { get; init; } = string.Empty;
     public string NodeType { get; init; } = string.Empty;
@@ -58,10 +58,10 @@ public sealed class OwnerHierarchyNodeViewModel
     public int ProductCount { get; init; }
     public int? ProductId { get; init; }
     public bool IsExpanded { get; init; }
-    public IReadOnlyList<OwnerHierarchyNodeViewModel> Children { get; init; } = [];
+    public IReadOnlyList<ReportsHierarchyNodeViewModel> Children { get; init; } = [];
 }
 
-public sealed class OwnerSankeyNodeViewModel
+public sealed class ReportsSankeyNodeViewModel
 {
     public string Id { get; init; } = string.Empty;
     public string NodeType { get; init; } = string.Empty;
@@ -70,7 +70,7 @@ public sealed class OwnerSankeyNodeViewModel
     public int Value { get; init; }
 }
 
-public sealed class OwnerSankeyLinkViewModel
+public sealed class ReportsSankeyLinkViewModel
 {
     public string SourceId { get; init; } = string.Empty;
     public string TargetId { get; init; } = string.Empty;

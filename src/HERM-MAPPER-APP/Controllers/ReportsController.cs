@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
-public sealed class OwnersController(AppDbContext dbContext) : Controller
+public sealed class ReportsController(AppDbContext dbContext) : Controller
 {
     public async Task<IActionResult> Index(string? lifecycleOwner = null)
     {
@@ -54,7 +54,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
 
         var lifecycleProducts = FilterProductsByOwner(products, lifecycleOwner).ToList();
 
-        var model = new OwnerVisualizationViewModel
+        var model = new ReportsViewModel
         {
             OwnerCount = paths.Select(x => x.OwnerName).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
             DomainCount = paths.Select(x => x.DomainId).Distinct().Count(),
@@ -66,10 +66,10 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             LifecycleProductCount = lifecycleProducts.Count,
             AvailableOwners = availableOwners,
             LifecycleStatuses = BuildLifecycleStatuses(lifecycleProducts),
-            Owners = BuildOwnerHierarchy(paths),
+            Owners = BuildReportsHierarchy(paths),
             Paths = paths,
-            SankeyNodes = BuildSankeyNodes(paths),
-            SankeyLinks = BuildSankeyLinks(paths)
+            SankeyNodes = BuildReportsSankeyNodes(paths),
+            SankeyLinks = BuildReportsSankeyLinks(paths)
         };
 
         return View(model);
@@ -125,7 +125,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             .ToList();
     }
 
-    private static IEnumerable<OwnerPathViewModel> BuildPathsForMapping(Models.ProductMapping mapping)
+    private static IEnumerable<ReportsPathViewModel> BuildPathsForMapping(Models.ProductMapping mapping)
     {
         var product = mapping.ProductCatalogItem;
         var component = mapping.TrmComponent;
@@ -141,7 +141,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             ? ["Unassigned owner"]
             : product.OwnerValues;
 
-        return owners.Select(owner => new OwnerPathViewModel
+        return owners.Select(owner => new ReportsPathViewModel
         {
             MappingId = mapping.Id,
             OwnerName = owner,
@@ -156,7 +156,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
         });
     }
 
-    private static IReadOnlyList<OwnerHierarchyNodeViewModel> BuildOwnerHierarchy(IReadOnlyList<OwnerPathViewModel> paths)
+    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildReportsHierarchy(IReadOnlyList<ReportsPathViewModel> paths)
     {
         var ownerGroups = paths
             .GroupBy(x => x.OwnerName, StringComparer.OrdinalIgnoreCase)
@@ -165,7 +165,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             .ToList();
 
         return ownerGroups
-            .Select(group => new OwnerHierarchyNodeViewModel
+            .Select(group => new ReportsHierarchyNodeViewModel
             {
                 Key = $"owner:{group.Key}",
                 NodeType = "owner",
@@ -178,11 +178,11 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             .ToList();
     }
 
-    private static IReadOnlyList<OwnerHierarchyNodeViewModel> BuildDomainNodes(IReadOnlyList<OwnerPathViewModel> paths) =>
+    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildDomainNodes(IReadOnlyList<ReportsPathViewModel> paths) =>
         paths.GroupBy(x => new { x.DomainId, x.DomainLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.DomainLabel, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerHierarchyNodeViewModel
+            .Select(group => new ReportsHierarchyNodeViewModel
             {
                 Key = $"domain:{group.Key.DomainId}",
                 NodeType = "domain",
@@ -193,11 +193,11 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             })
             .ToList();
 
-    private static IReadOnlyList<OwnerHierarchyNodeViewModel> BuildCapabilityNodes(IReadOnlyList<OwnerPathViewModel> paths) =>
+    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildCapabilityNodes(IReadOnlyList<ReportsPathViewModel> paths) =>
         paths.GroupBy(x => new { x.CapabilityId, x.CapabilityLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.CapabilityLabel, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerHierarchyNodeViewModel
+            .Select(group => new ReportsHierarchyNodeViewModel
             {
                 Key = $"capability:{group.Key.CapabilityId}",
                 NodeType = "capability",
@@ -208,11 +208,11 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             })
             .ToList();
 
-    private static IReadOnlyList<OwnerHierarchyNodeViewModel> BuildComponentNodes(IReadOnlyList<OwnerPathViewModel> paths) =>
+    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildComponentNodes(IReadOnlyList<ReportsPathViewModel> paths) =>
         paths.GroupBy(x => new { x.ComponentId, x.ComponentLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.ComponentLabel, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerHierarchyNodeViewModel
+            .Select(group => new ReportsHierarchyNodeViewModel
             {
                 Key = $"component:{group.Key.ComponentId}",
                 NodeType = "component",
@@ -223,11 +223,11 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             })
             .ToList();
 
-    private static IReadOnlyList<OwnerHierarchyNodeViewModel> BuildProductNodes(IReadOnlyList<OwnerPathViewModel> paths) =>
+    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildProductNodes(IReadOnlyList<ReportsPathViewModel> paths) =>
         paths.GroupBy(x => new { x.ProductId, x.ProductName })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.ProductName, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerHierarchyNodeViewModel
+            .Select(group => new ReportsHierarchyNodeViewModel
             {
                 Key = $"product:{group.Key.ProductId}",
                 NodeType = "product",
@@ -238,15 +238,15 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             })
             .ToList();
 
-    private static IReadOnlyList<OwnerSankeyNodeViewModel> BuildSankeyNodes(IReadOnlyList<OwnerPathViewModel> paths)
+    private static IReadOnlyList<ReportsSankeyNodeViewModel> BuildReportsSankeyNodes(IReadOnlyList<ReportsPathViewModel> paths)
     {
-        var nodes = new List<OwnerSankeyNodeViewModel>();
+        var nodes = new List<ReportsSankeyNodeViewModel>();
 
         nodes.AddRange(paths
             .GroupBy(x => x.OwnerName, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerSankeyNodeViewModel
+            .Select(group => new ReportsSankeyNodeViewModel
             {
                 Id = BuildSankeyNodeId("owner", group.Key),
                 NodeType = "owner",
@@ -259,7 +259,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             .GroupBy(x => new { x.DomainId, x.DomainLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.DomainLabel, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerSankeyNodeViewModel
+            .Select(group => new ReportsSankeyNodeViewModel
             {
                 Id = BuildSankeyNodeId("domain", group.Key.DomainId),
                 NodeType = "domain",
@@ -272,7 +272,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             .GroupBy(x => new { x.CapabilityId, x.CapabilityLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.CapabilityLabel, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerSankeyNodeViewModel
+            .Select(group => new ReportsSankeyNodeViewModel
             {
                 Id = BuildSankeyNodeId("capability", group.Key.CapabilityId),
                 NodeType = "capability",
@@ -285,7 +285,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             .GroupBy(x => new { x.ComponentId, x.ComponentLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.ComponentLabel, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerSankeyNodeViewModel
+            .Select(group => new ReportsSankeyNodeViewModel
             {
                 Id = BuildSankeyNodeId("component", group.Key.ComponentId),
                 NodeType = "component",
@@ -298,7 +298,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
             .GroupBy(x => new { x.ProductId, x.ProductName })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.ProductName, StringComparer.OrdinalIgnoreCase)
-            .Select(group => new OwnerSankeyNodeViewModel
+            .Select(group => new ReportsSankeyNodeViewModel
             {
                 Id = BuildSankeyNodeId("product", group.Key.ProductId),
                 NodeType = "product",
@@ -310,13 +310,13 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
         return nodes;
     }
 
-    private static IReadOnlyList<OwnerSankeyLinkViewModel> BuildSankeyLinks(IReadOnlyList<OwnerPathViewModel> paths)
+    private static IReadOnlyList<ReportsSankeyLinkViewModel> BuildReportsSankeyLinks(IReadOnlyList<ReportsPathViewModel> paths)
     {
-        var links = new List<OwnerSankeyLinkViewModel>();
+        var links = new List<ReportsSankeyLinkViewModel>();
 
         links.AddRange(paths
             .GroupBy(x => new { x.OwnerName, x.DomainId })
-            .Select(group => new OwnerSankeyLinkViewModel
+            .Select(group => new ReportsSankeyLinkViewModel
             {
                 SourceId = BuildSankeyNodeId("owner", group.Key.OwnerName),
                 TargetId = BuildSankeyNodeId("domain", group.Key.DomainId),
@@ -326,7 +326,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
 
         links.AddRange(paths
             .GroupBy(x => new { x.DomainId, x.CapabilityId })
-            .Select(group => new OwnerSankeyLinkViewModel
+            .Select(group => new ReportsSankeyLinkViewModel
             {
                 SourceId = BuildSankeyNodeId("domain", group.Key.DomainId),
                 TargetId = BuildSankeyNodeId("capability", group.Key.CapabilityId),
@@ -336,7 +336,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
 
         links.AddRange(paths
             .GroupBy(x => new { x.CapabilityId, x.ComponentId })
-            .Select(group => new OwnerSankeyLinkViewModel
+            .Select(group => new ReportsSankeyLinkViewModel
             {
                 SourceId = BuildSankeyNodeId("capability", group.Key.CapabilityId),
                 TargetId = BuildSankeyNodeId("component", group.Key.ComponentId),
@@ -346,7 +346,7 @@ public sealed class OwnersController(AppDbContext dbContext) : Controller
 
         links.AddRange(paths
             .GroupBy(x => new { x.ComponentId, x.ProductId })
-            .Select(group => new OwnerSankeyLinkViewModel
+            .Select(group => new ReportsSankeyLinkViewModel
             {
                 SourceId = BuildSankeyNodeId("component", group.Key.ComponentId),
                 TargetId = BuildSankeyNodeId("product", group.Key.ProductId),
