@@ -1,5 +1,7 @@
 # Todo
 
+- Add a configuration entry to specify timezone. All entries should be save in UTC but displayed inte specified timezone
+
 - import domain/capability description
 
 - openid support for login
