@@ -15,6 +15,7 @@ public sealed class DatabaseInitializer(
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureServiceTablesAsync(cancellationToken);
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureConfigurableFieldOptionsTableAsync(cancellationToken);
         await NormalizeConfigurableFieldOptionSortOrdersAsync(cancellationToken);
@@ -336,6 +337,169 @@ public sealed class DatabaseInitializer(
                           WHERE o.[ProductCatalogItemId] = p.[Id]
                             AND LOWER(o.[OwnerValue]) = LOWER(LTRIM(RTRIM(p.[Owner])))
                       );
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureServiceTablesAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "ServiceCatalogItems" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_ServiceCatalogItems" PRIMARY KEY AUTOINCREMENT,
+                    "Name" TEXT NOT NULL,
+                    "Description" TEXT NULL,
+                    "Owner" TEXT NOT NULL,
+                    "LifecycleStatus" TEXT NOT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "ServiceCatalogItemProducts" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_ServiceCatalogItemProducts" PRIMARY KEY AUTOINCREMENT,
+                    "ServiceCatalogItemId" INTEGER NOT NULL,
+                    "ProductCatalogItemId" INTEGER NOT NULL,
+                    "SortOrder" INTEGER NOT NULL,
+                    CONSTRAINT "FK_ServiceCatalogItemProducts_ServiceCatalogItems_ServiceCatalogItemId"
+                        FOREIGN KEY ("ServiceCatalogItemId") REFERENCES "ServiceCatalogItems" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_ServiceCatalogItemProducts_ProductCatalogItems_ProductCatalogItemId"
+                        FOREIGN KEY ("ProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_ServiceCatalogItemProducts_ServiceCatalogItemId_SortOrder"
+                ON "ServiceCatalogItemProducts" ("ServiceCatalogItemId", "SortOrder")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ServiceCatalogItemProducts_ProductCatalogItemId"
+                ON "ServiceCatalogItemProducts" ("ProductCatalogItemId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ServiceCatalogItems_Owner"
+                ON "ServiceCatalogItems" ("Owner")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ServiceCatalogItems_LifecycleStatus"
+                ON "ServiceCatalogItems" ("LifecycleStatus")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[ServiceCatalogItems]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [ServiceCatalogItems] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ServiceCatalogItems] PRIMARY KEY,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [Description] NVARCHAR(2000) NULL,
+                        [Owner] NVARCHAR(120) NOT NULL,
+                        [LifecycleStatus] NVARCHAR(80) NOT NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[ServiceCatalogItemProducts]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [ServiceCatalogItemProducts] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ServiceCatalogItemProducts] PRIMARY KEY,
+                        [ServiceCatalogItemId] INT NOT NULL,
+                        [ProductCatalogItemId] INT NOT NULL,
+                        [SortOrder] INT NOT NULL,
+                        CONSTRAINT [FK_ServiceCatalogItemProducts_ServiceCatalogItems_ServiceCatalogItemId]
+                            FOREIGN KEY ([ServiceCatalogItemId]) REFERENCES [ServiceCatalogItems] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_ServiceCatalogItemProducts_ProductCatalogItems_ProductCatalogItemId]
+                            FOREIGN KEY ([ProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ServiceCatalogItemProducts_ServiceCatalogItemId_SortOrder'
+                      AND object_id = OBJECT_ID(N'[ServiceCatalogItemProducts]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_ServiceCatalogItemProducts_ServiceCatalogItemId_SortOrder]
+                    ON [ServiceCatalogItemProducts] ([ServiceCatalogItemId], [SortOrder]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ServiceCatalogItemProducts_ProductCatalogItemId'
+                      AND object_id = OBJECT_ID(N'[ServiceCatalogItemProducts]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ServiceCatalogItemProducts_ProductCatalogItemId]
+                    ON [ServiceCatalogItemProducts] ([ProductCatalogItemId]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ServiceCatalogItems_Owner'
+                      AND object_id = OBJECT_ID(N'[ServiceCatalogItems]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ServiceCatalogItems_Owner]
+                    ON [ServiceCatalogItems] ([Owner]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ServiceCatalogItems_LifecycleStatus'
+                      AND object_id = OBJECT_ID(N'[ServiceCatalogItems]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ServiceCatalogItems_LifecycleStatus]
+                    ON [ServiceCatalogItems] ([LifecycleStatus]);
                 END
                 """,
                 cancellationToken);

@@ -1,0 +1,20 @@
+@model ServiceEditViewModel
+@{
+    ViewData["Title"] = "Add Service";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Service design</span>
+        <h1>Add a service</h1>
+        <p>Define the service metadata first, then arrange products in order to create its connection flow.</p>
+    </div>
+</section>
+
+<form asp-action="Create" method="post">
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

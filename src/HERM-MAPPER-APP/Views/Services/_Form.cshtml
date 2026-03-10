@@ -1,0 +1,128 @@
+@model ServiceEditViewModel
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+<div class="service-editor" data-service-editor>
+    <section class="content-card">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Part 1</span>
+                <h2>Service information</h2>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" data-service-name />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+            <div class="col-lg-3">
+                <label asp-for="Owner" class="form-label"></label>
+                <select asp-for="Owner" asp-items="Model.OwnerOptions" class="form-select"></select>
+                <span asp-validation-for="Owner" class="text-danger"></span>
+            </div>
+            <div class="col-lg-3">
+                <label asp-for="LifecycleStatus" class="form-label"></label>
+                <select asp-for="LifecycleStatus" asp-items="Model.LifecycleStatusOptions" class="form-select"></select>
+                <span asp-validation-for="LifecycleStatus" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control" rows="4"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+        </div>
+    </section>
+
+    <section class="content-card">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Part 2</span>
+                <h2>Connected products</h2>
+                <p>Adjacent products define the saved service connections. Add, remove, or reorder rows to change the flow.</p>
+            </div>
+        </div>
+
+        @if (Model.ProductOptions.Count <= 1)
+        {
+            <div class="form-note mb-3">
+                Add products in the product catalogue first. Once products exist, you can connect them here into a service flow.
+            </div>
+        }
+
+        <div class="service-product-stack" data-service-rows>
+            @for (var index = 0; index < Model.ProductRows.Count; index++)
+            {
+                var row = Model.ProductRows[index];
+                <div class="service-product-row" data-service-row>
+                    <div class="service-product-order" data-service-order>@(index + 1)</div>
+                    <div class="service-product-field">
+                        <label class="form-label" for="ProductRows_@(index)__ProductId">Product</label>
+                        <select class="form-select"
+                                id="ProductRows_@(index)__ProductId"
+                                name="ProductRows[@index].ProductId"
+                                data-service-product-select>
+                            @foreach (var option in Model.ProductOptions)
+                            {
+                                <option value="@option.Value" selected="@(row.ProductId?.ToString() == option.Value ? "selected" : null)">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="service-product-actions">
+                        <button type="button" class="btn btn-outline-secondary service-action-button" data-service-add-row aria-label="Add product below">+</button>
+                        <button type="button" class="btn btn-outline-secondary service-action-button" data-service-move-up aria-label="Move product up">Up</button>
+                        <button type="button" class="btn btn-outline-secondary service-action-button" data-service-move-down aria-label="Move product down">Down</button>
+                        <button type="button" class="btn btn-outline-danger" data-service-remove-row>Remove</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center gap-2 mt-3 flex-wrap">
+            <div class="small text-muted">Use the plus button on any row to insert a new product and create a new connection point.</div>
+            <button type="button" class="btn btn-outline-secondary" data-service-add-tail>+ Add product</button>
+        </div>
+
+        <template data-service-row-template>
+            <div class="service-product-row" data-service-row>
+                <div class="service-product-order" data-service-order>1</div>
+                <div class="service-product-field">
+                    <label class="form-label" for="ProductRows___index___ProductId">Product</label>
+                    <select class="form-select"
+                            id="ProductRows___index___ProductId"
+                            name="ProductRows[__index__].ProductId"
+                            data-service-product-select>
+                        @foreach (var option in Model.ProductOptions)
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    </select>
+                </div>
+                <div class="service-product-actions">
+                    <button type="button" class="btn btn-outline-secondary service-action-button" data-service-add-row aria-label="Add product below">+</button>
+                    <button type="button" class="btn btn-outline-secondary service-action-button" data-service-move-up aria-label="Move product up">Up</button>
+                    <button type="button" class="btn btn-outline-secondary service-action-button" data-service-move-down aria-label="Move product down">Down</button>
+                    <button type="button" class="btn btn-outline-danger" data-service-remove-row>Remove</button>
+                </div>
+            </div>
+        </template>
+    </section>
+
+    <section class="content-card">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Part 3</span>
+                <h2>Connection visualization</h2>
+                <p>The preview updates every time you add, remove, or reorder products.</p>
+            </div>
+        </div>
+
+        <div class="service-preview" data-service-preview></div>
+
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-primary">Save service</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+        </div>
+    </section>
+</div>

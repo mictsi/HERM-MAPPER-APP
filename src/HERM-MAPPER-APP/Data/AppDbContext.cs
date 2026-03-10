@@ -15,6 +15,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ProductCatalogItem> ProductCatalogItems => Set<ProductCatalogItem>();
     public DbSet<ProductCatalogItemOwner> ProductCatalogItemOwners => Set<ProductCatalogItemOwner>();
     public DbSet<ProductMapping> ProductMappings => Set<ProductMapping>();
+    public DbSet<ServiceCatalogItem> ServiceCatalogItems => Set<ServiceCatalogItem>();
+    public DbSet<ServiceCatalogItemProduct> ServiceCatalogItemProducts => Set<ServiceCatalogItemProduct>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -133,6 +135,30 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.TrmComponentId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ServiceCatalogItem>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.Owner).HasMaxLength(120);
+            entity.Property(x => x.LifecycleStatus).HasMaxLength(80);
+        });
+
+        modelBuilder.Entity<ServiceCatalogItemProduct>(entity =>
+        {
+            entity.HasIndex(x => new { x.ServiceCatalogItemId, x.SortOrder }).IsUnique();
+            entity.HasIndex(x => x.ProductCatalogItemId);
+
+            entity.HasOne(x => x.ServiceCatalogItem)
+                .WithMany(x => x.ProductLinks)
+                .HasForeignKey(x => x.ServiceCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ProductCatalogItem)
+                .WithMany()
+                .HasForeignKey(x => x.ProductCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

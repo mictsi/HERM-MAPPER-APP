@@ -1,0 +1,129 @@
+@model ServicesIndexViewModel
+@{
+    ViewData["Title"] = "Services";
+    var statusMessage = TempData["ServicesStatusMessage"] as string;
+    var errorMessage = TempData["ServicesErrorMessage"] as string;
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Service catalogue</span>
+        <h1>Services</h1>
+        <p>Define connected product chains as named services, then review, filter, and visualize them from one workspace.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">Add service</a>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+
+<section class="content-card">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-lg-4">
+            <label class="form-label" for="search">Search services</label>
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Service, owner, status, or connected product" />
+        </div>
+        <div class="col-lg-2">
+            <label class="form-label" for="owner">Owner</label>
+            <select class="form-select" id="owner" name="owner">
+                <option value="">All owners</option>
+                @foreach (var option in Model.AvailableOwners)
+                {
+                    <option value="@option.Value" selected="@(string.Equals(Model.Owner, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Value</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-2">
+            <label class="form-label" for="lifecycleStatus">Lifecycle</label>
+            <select class="form-select" id="lifecycleStatus" name="lifecycleStatus">
+                <option value="">All lifecycle states</option>
+                @foreach (var option in Model.LifecycleStatuses)
+                {
+                    <option value="@option.Value" selected="@(string.Equals(Model.LifecycleStatus, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Value</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-4">
+            <label class="form-label" for="sort">Sort</label>
+            <select class="form-select" id="sort" name="sort">
+                <option value="@ServiceSortOptions.UpdatedDesc" selected="@(Model.Sort == ServiceSortOptions.UpdatedDesc ? "selected" : null)">Last updated, newest first</option>
+                <option value="@ServiceSortOptions.UpdatedAsc" selected="@(Model.Sort == ServiceSortOptions.UpdatedAsc ? "selected" : null)">Last updated, oldest first</option>
+                <option value="@ServiceSortOptions.Name" selected="@(Model.Sort == ServiceSortOptions.Name ? "selected" : null)">Name, A-Z</option>
+                <option value="@ServiceSortOptions.NameDesc" selected="@(Model.Sort == ServiceSortOptions.NameDesc ? "selected" : null)">Name, Z-A</option>
+                <option value="@ServiceSortOptions.Owner" selected="@(Model.Sort == ServiceSortOptions.Owner ? "selected" : null)">Owner, A-Z</option>
+                <option value="@ServiceSortOptions.Lifecycle" selected="@(Model.Sort == ServiceSortOptions.Lifecycle ? "selected" : null)">Lifecycle, A-Z</option>
+                <option value="@ServiceSortOptions.ProductCountDesc" selected="@(Model.Sort == ServiceSortOptions.ProductCountDesc ? "selected" : null)">Most connected products first</option>
+            </select>
+        </div>
+        <div class="col-12 d-flex gap-2 justify-content-end">
+            <button class="btn btn-primary" type="submit">Apply</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
+        </div>
+    </form>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Services</span>
+            <h2>@Model.Services.Count result(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.Services.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No matching services</h3>
+            <p>Try a wider search, clear the filters, or create the first service.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Owner</th>
+                        <th>Status</th>
+                        <th>Connected products</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var service in Model.Services)
+                {
+                    <tr>
+                        <td>
+                            <strong>@service.Name</strong>
+                            <div class="table-subline">@(string.IsNullOrWhiteSpace(service.Description) ? "No description provided." : service.Description)</div>
+                        </td>
+                        <td>@service.Owner</td>
+                        <td>@service.LifecycleStatus</td>
+                        <td>
+                            <strong>@service.ConnectionCount connection(s)</strong>
+                            <div class="table-subline">@service.ProductPreview</div>
+                        </td>
+                        <td>@service.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@service.Id">Visualize</a>
+                                <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@service.Id">Edit</a>
+                                <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@service.Id">Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

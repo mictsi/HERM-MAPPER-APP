@@ -576,6 +576,97 @@ a {
   gap: 0.9rem;
 }
 
+.service-editor {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.service-product-stack,
+.service-sequence-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.service-chain,
+.service-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.service-chain {
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.service-chain-node {
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  background: rgba(11, 110, 79, 0.08);
+  font-weight: 700;
+}
+
+.service-chain-arrow {
+  color: var(--muted);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.service-product-row,
+.service-sequence-item {
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.service-product-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.service-product-order,
+.service-sequence-index {
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--accent-deep);
+  background: rgba(11, 110, 79, 0.12);
+}
+
+.service-product-order {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
+}
+
+.service-sequence-index {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.service-product-field {
+  min-width: 0;
+}
+
+.service-product-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.5rem;
+}
+
+.service-action-button {
+  min-width: 3.25rem;
+}
+
 .dependency-path-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 1.2rem minmax(0, 1fr) 1.2rem minmax(0, 1fr) 1.2rem minmax(0, 1fr);
@@ -980,6 +1071,15 @@ a {
 
   .mapping-flow-card {
     grid-template-columns: 1fr;
+  }
+
+  .service-product-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .service-product-actions {
+    justify-content: start;
   }
 
   .dependency-path-card {

@@ -1,0 +1,46 @@
+@model ServiceCatalogItem
+@{
+    ViewData["Title"] = "Delete Service";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Service design</span>
+        <h1>Delete @Model.Name?</h1>
+        <p>This removes the service and its saved product connection order.</p>
+    </div>
+</section>
+
+<section class="content-card">
+    <dl class="detail-grid mb-4">
+        <dt>Service</dt>
+        <dd>@Model.Name</dd>
+        <dt>Owner</dt>
+        <dd>@Model.Owner</dd>
+        <dt>Lifecycle</dt>
+        <dd>@Model.LifecycleStatus</dd>
+        <dt>Products</dt>
+        <dd>@Model.ProductLinks.Count</dd>
+        <dt>Connections</dt>
+        <dd>@Model.ConnectionCount</dd>
+    </dl>
+
+    @if (Model.ProductLinks.Count != 0)
+    {
+        <div class="stack-list mb-4">
+            @foreach (var link in Model.OrderedProductLinks)
+            {
+                <article class="stack-item">
+                    <div class="stack-title">@link.ProductCatalogItem.Name</div>
+                    <div class="table-subline">Step @link.SortOrder</div>
+                </article>
+            }
+        </div>
+    }
+
+    <form asp-action="Delete" method="post" class="d-flex gap-2">
+        <input type="hidden" asp-for="Id" />
+        <button type="submit" class="btn btn-danger">Delete</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </form>
+</section>

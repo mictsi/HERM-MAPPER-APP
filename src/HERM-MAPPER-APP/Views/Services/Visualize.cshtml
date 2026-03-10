@@ -1,0 +1,46 @@
+@model ServiceVisualizationViewModel
+@{
+    ViewData["Title"] = "Visualize Service Connections";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Connection view</span>
+        <h1>@Model.Service.Name</h1>
+        <p>Review the product flow for this service.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index">Back to services</a>
+        <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Service.Id">Edit connections</a>
+    </div>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Service sequence</span>
+            <h2>Visualization</h2>
+        </div>
+    </div>
+
+    @if (Model.ProductNames.Count < 2)
+    {
+        <div class="empty-state compact">
+            <h3>No complete flow yet</h3>
+            <p>Add at least two products to visualize the service connections.</p>
+        </div>
+    }
+    else
+    {
+        <div class="service-chain" aria-label="Service product flow">
+            @for (var index = 0; index < Model.ProductNames.Count; index++)
+            {
+                <div class="service-chain-node">@Model.ProductNames[index]</div>
+                @if (index < Model.ProductNames.Count - 1)
+                {
+                    <div class="service-chain-arrow" aria-hidden="true">&rarr;</div>
+                }
+            }
+        </div>
+    }
+</section>

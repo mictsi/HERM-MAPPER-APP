@@ -1,0 +1,21 @@
+@model ServiceEditViewModel
+@{
+    ViewData["Title"] = "Edit Service";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Service design</span>
+        <h1>Edit @Model.Name</h1>
+        <p>Update the service metadata or change the ordered product chain to redefine its connections.</p>
+    </div>
+    <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.Id">Visualize</a>
+</section>
+
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
