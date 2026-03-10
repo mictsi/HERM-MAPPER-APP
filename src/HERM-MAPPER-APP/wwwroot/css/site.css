@@ -393,6 +393,22 @@ a {
   align-items: flex-start;
 }
 
+.bulk-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.bulk-selection-summary {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bulk-selection-column {
+  width: 3rem;
+  text-align: center;
+}
+
 .owner-filter-dropdown {
   position: relative;
 }
@@ -458,6 +474,42 @@ a {
 
 .product-owner-option input {
   margin: 0;
+}
+
+.bulk-edit-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.bulk-edit-field {
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.6);
+  transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.bulk-edit-field:has(.form-check-input:checked) {
+  border-color: rgba(11, 110, 79, 0.22);
+  background: rgba(11, 110, 79, 0.06);
+}
+
+.bulk-edit-field.is-inactive {
+  opacity: 0.72;
+}
+
+.bulk-edit-selection-list {
+  display: grid;
+  gap: 0.8rem;
+  max-height: 28rem;
+  overflow-y: auto;
+}
+
+.bulk-edit-selection-item {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .import-review {
@@ -954,6 +1006,12 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .bulk-selection-actions {
+    width: 100%;
+    align-items: start;
+    flex-direction: column;
+  }
+
   .owner-lifecycle-filter-form,
   .owner-lifecycle-card {
     grid-template-columns: 1fr;
@@ -975,6 +1033,10 @@ a {
 }
 
 @media (min-width: 992px) {
+  .bulk-edit-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .mapping-flow-card {
     grid-template-columns: minmax(0, 1fr) 1.5rem minmax(0, 1fr) 1.5rem minmax(0, 1fr) 1.5rem minmax(0, 1fr);
   }

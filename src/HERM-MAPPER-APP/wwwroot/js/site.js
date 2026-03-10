@@ -45,4 +45,77 @@ document.addEventListener("DOMContentLoaded", () => {
 
     syncLabel();
   });
+
+  document.querySelectorAll("[data-bulk-selection-form]").forEach((form) => {
+    const checkboxes = form.querySelectorAll("input[type='checkbox'][data-bulk-select-item]");
+    const selectAll = form.querySelector("[data-bulk-select-all]");
+    const submitButtons = form.querySelectorAll("[data-bulk-submit]");
+    const summary = form.querySelector("[data-bulk-selection-summary]");
+
+    if (checkboxes.length === 0) {
+      return;
+    }
+
+    const syncSelection = () => {
+      const checkedCount = Array.from(checkboxes)
+        .filter((checkbox) => checkbox instanceof HTMLInputElement && checkbox.checked)
+        .length;
+
+      submitButtons.forEach((button) => {
+        if (button instanceof HTMLButtonElement) {
+          button.disabled = checkedCount === 0;
+        }
+      });
+
+      if (selectAll instanceof HTMLInputElement) {
+        selectAll.checked = checkedCount === checkboxes.length;
+        selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+      }
+
+      if (summary !== null) {
+        summary.textContent = checkedCount === 0
+          ? "Select products to bulk update."
+          : `${checkedCount} product(s) selected for bulk edit.`;
+      }
+    };
+
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener("change", syncSelection);
+    });
+
+    if (selectAll instanceof HTMLInputElement) {
+      selectAll.addEventListener("change", () => {
+        checkboxes.forEach((checkbox) => {
+          if (checkbox instanceof HTMLInputElement) {
+            checkbox.checked = selectAll.checked;
+          }
+        });
+
+        syncSelection();
+      });
+    }
+
+    syncSelection();
+  });
+
+  document.querySelectorAll("[data-bulk-edit-section]").forEach((section) => {
+    const toggle = section.querySelector("[data-bulk-edit-toggle]");
+    const controls = section.querySelectorAll("[data-bulk-edit-control]");
+
+    if (!(toggle instanceof HTMLInputElement) || controls.length === 0) {
+      return;
+    }
+
+    const syncSection = () => {
+      section.classList.toggle("is-inactive", !toggle.checked);
+      controls.forEach((control) => {
+        if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement) {
+          control.disabled = !toggle.checked;
+        }
+      });
+    };
+
+    toggle.addEventListener("change", syncSection);
+    syncSection();
+  });
 });

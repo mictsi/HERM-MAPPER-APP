@@ -192,6 +192,36 @@ public sealed class ProductsController(
         return View(model);
     }
 
+    public async Task<IActionResult> BulkEdit(int[]? selectedIds, string? returnSearch = null, string[]? returnOwners = null, string? returnLifecycleStatus = null)
+    {
+        var normalizedProductIds = NormalizeIds(selectedIds);
+        var normalizedReturnOwners = NormalizeSelections(returnOwners);
+        var normalizedReturnLifecycleStatus = NormalizeSelection(returnLifecycleStatus);
+
+        if (normalizedProductIds.Count == 0)
+        {
+            TempData["ProductsErrorMessage"] = "Select one or more products before opening bulk edit.";
+            return Redirect(BuildIndexUrl(returnSearch, normalizedReturnOwners, normalizedReturnLifecycleStatus));
+        }
+
+        var model = new ProductBulkEditViewModel
+        {
+            SelectedProductIds = normalizedProductIds,
+            ReturnSearch = returnSearch,
+            ReturnOwners = normalizedReturnOwners,
+            ReturnLifecycleStatus = normalizedReturnLifecycleStatus
+        };
+
+        await PopulateBulkEditModelAsync(model);
+        if (model.SelectedProducts.Count == 0)
+        {
+            TempData["ProductsErrorMessage"] = "The selected products could not be found.";
+            return Redirect(BuildIndexUrl(model.ReturnSearch, model.ReturnOwners, model.ReturnLifecycleStatus));
+        }
+
+        return View(model);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, ProductEditViewModel input)
@@ -231,6 +261,94 @@ public sealed class ProductsController(
             product.Id,
             $"Updated product {product.Name}.");
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BulkEdit(ProductBulkEditViewModel input)
+    {
+        input.SelectedProductIds = NormalizeIds(input.SelectedProductIds);
+        input.ReturnOwners = NormalizeSelections(input.ReturnOwners);
+        input.Owners = NormalizeSelections(input.Owners);
+        input.OwnerUpdateMode = NormalizeOwnerUpdateMode(input.OwnerUpdateMode);
+        input.Vendor = NormalizeSelection(input.Vendor);
+        input.ReturnLifecycleStatus = NormalizeSelection(input.ReturnLifecycleStatus);
+        input.LifecycleStatus = NormalizeSelection(input.LifecycleStatus);
+
+        var products = await dbContext.ProductCatalogItems
+            .Include(x => x.Owners)
+            .Where(x => input.SelectedProductIds.Contains(x.Id))
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+
+        input.SelectedProductIds = products.Select(x => x.Id).ToList();
+        input.SelectedProducts = products
+            .Select(BuildBulkEditSelection)
+            .ToList();
+
+        if (products.Count == 0)
+        {
+            TempData["ProductsErrorMessage"] = "The selected products could not be found.";
+            return Redirect(BuildIndexUrl(input.ReturnSearch, input.ReturnOwners, input.ReturnLifecycleStatus));
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateBulkEditOptionsAsync(input);
+            return View(input);
+        }
+
+        var appliedFields = BuildAppliedFieldList(input);
+        var updatedCount = 0;
+        var updateTimestamp = DateTime.UtcNow;
+
+        foreach (var productToUpdate in products)
+        {
+            var changed = false;
+
+            if (input.ApplyVendor && !string.Equals(productToUpdate.Vendor, input.Vendor, StringComparison.Ordinal))
+            {
+                productToUpdate.Vendor = input.Vendor;
+                changed = true;
+            }
+
+            if (input.ApplyLifecycleStatus &&
+                !string.Equals(productToUpdate.LifecycleStatus, input.LifecycleStatus, StringComparison.Ordinal))
+            {
+                productToUpdate.LifecycleStatus = input.LifecycleStatus;
+                changed = true;
+            }
+
+            if (input.ApplyOwners)
+            {
+                var targetOwners = ResolveBulkOwnerSelection(productToUpdate, input);
+                if (!OwnerSelectionsMatch(productToUpdate, targetOwners))
+                {
+                    SynchronizeOwners(productToUpdate, targetOwners);
+                    changed = true;
+                }
+            }
+
+            if (!changed)
+            {
+                continue;
+            }
+
+            productToUpdate.UpdatedUtc = updateTimestamp;
+            updatedCount++;
+        }
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Product",
+            "BulkUpdate",
+            nameof(ProductCatalogItem),
+            null,
+            $"Bulk updated {updatedCount} of {products.Count} selected product(s).",
+            $"Fields: {string.Join(", ", appliedFields)}. Products: {string.Join(", ", products.Select(x => x.Name))}.");
+
+        TempData["ProductsStatusMessage"] = $"Updated {updatedCount} of {products.Count} selected product(s).";
+        return Redirect(BuildIndexUrl(input.ReturnSearch, input.ReturnOwners, input.ReturnLifecycleStatus));
     }
 
     public async Task<IActionResult> Delete(int id)
@@ -276,8 +394,89 @@ public sealed class ProductsController(
             model.LifecycleStatus);
     }
 
+    private async Task PopulateBulkEditModelAsync(ProductBulkEditViewModel model)
+    {
+        var products = await dbContext.ProductCatalogItems
+            .AsNoTracking()
+            .Include(x => x.Owners)
+            .Where(x => model.SelectedProductIds.Contains(x.Id))
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+
+        model.SelectedProductIds = products.Select(x => x.Id).ToList();
+        model.SelectedProducts = products
+            .Select(BuildBulkEditSelection)
+            .ToList();
+
+        await PopulateBulkEditOptionsAsync(model);
+    }
+
+    private async Task PopulateBulkEditOptionsAsync(ProductBulkEditViewModel model)
+    {
+        model.OwnerOptions = await configurableFieldService.GetMultiSelectListAsync(
+            ConfigurableFieldNames.Owner,
+            model.Owners);
+        model.LifecycleStatusOptions = await configurableFieldService.GetSelectListAsync(
+            ConfigurableFieldNames.LifecycleStatus,
+            model.LifecycleStatus,
+            "Clear lifecycle status");
+    }
+
     private static string? NormalizeSelection(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string NormalizeOwnerUpdateMode(string? value) =>
+        string.Equals(value, ProductBulkOwnerUpdateModes.Append, StringComparison.OrdinalIgnoreCase)
+            ? ProductBulkOwnerUpdateModes.Append
+            : ProductBulkOwnerUpdateModes.Replace;
+
+    private static string BuildIndexUrl(string? search, IReadOnlyCollection<string>? owners, string? lifecycleStatus)
+    {
+        var parameters = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            parameters.Add($"search={Uri.EscapeDataString(search)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(lifecycleStatus))
+        {
+            parameters.Add($"lifecycleStatus={Uri.EscapeDataString(lifecycleStatus)}");
+        }
+
+        if (owners is not null)
+        {
+            foreach (var owner in owners.Where(x => !string.IsNullOrWhiteSpace(x)))
+            {
+                parameters.Add($"owners={Uri.EscapeDataString(owner)}");
+            }
+        }
+
+        return parameters.Count == 0
+            ? "/Products"
+            : $"/Products?{string.Join("&", parameters)}";
+    }
+
+    private static List<int> NormalizeIds(IEnumerable<int>? ids)
+    {
+        var normalized = new List<int>();
+        if (ids is null)
+        {
+            return normalized;
+        }
+
+        foreach (var id in ids)
+        {
+            if (id <= 0 || normalized.Contains(id))
+            {
+                continue;
+            }
+
+            normalized.Add(id);
+        }
+
+        return normalized;
+    }
 
     private void SynchronizeOwners(ProductCatalogItem product, IReadOnlyCollection<string> selectedOwners)
     {
@@ -298,6 +497,71 @@ public sealed class ProductsController(
                 OwnerValue = owner
             });
         }
+    }
+
+    private static ProductBulkEditSelectionViewModel BuildBulkEditSelection(ProductCatalogItem product) =>
+        new()
+        {
+            Id = product.Id,
+            Name = product.Name,
+            Vendor = product.Vendor,
+            LifecycleStatus = product.LifecycleStatus,
+            Owners = product.OwnerValues
+        };
+
+    private static IReadOnlyList<string> BuildAppliedFieldList(ProductBulkEditViewModel input)
+    {
+        var appliedFields = new List<string>();
+        if (input.ApplyVendor)
+        {
+            appliedFields.Add("Vendor");
+        }
+
+        if (input.ApplyOwners)
+        {
+            appliedFields.Add(input.OwnerUpdateMode == ProductBulkOwnerUpdateModes.Append
+                ? "Owners (append)"
+                : "Owners (replace)");
+        }
+
+        if (input.ApplyLifecycleStatus)
+        {
+            appliedFields.Add("Lifecycle status");
+        }
+
+        return appliedFields;
+    }
+
+    private static bool OwnerSelectionsMatch(ProductCatalogItem product, IReadOnlyCollection<string> selectedOwners)
+    {
+        if (product.Owners.Count != selectedOwners.Count)
+        {
+            return false;
+        }
+
+        return product.Owners.All(owner =>
+            selectedOwners.Any(selected => string.Equals(selected, owner.OwnerValue, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static IReadOnlyList<string> ResolveBulkOwnerSelection(ProductCatalogItem product, ProductBulkEditViewModel input)
+    {
+        if (input.OwnerUpdateMode != ProductBulkOwnerUpdateModes.Append)
+        {
+            return input.Owners;
+        }
+
+        var mergedOwners = product.OwnerValues.ToList();
+        foreach (var owner in input.Owners)
+        {
+            if (mergedOwners.Contains(owner, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            mergedOwners.Add(owner);
+        }
+
+        return mergedOwners;
     }
 
     private static List<string> NormalizeSelections(IEnumerable<string>? values)

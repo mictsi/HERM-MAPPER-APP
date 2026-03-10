@@ -1,0 +1,167 @@
+@model ProductBulkEditViewModel
+@{
+    ViewData["Title"] = "Bulk Edit Products";
+    var backUrlParameters = new List<string>();
+    if (!string.IsNullOrWhiteSpace(Model.ReturnSearch))
+    {
+        backUrlParameters.Add($"search={Uri.EscapeDataString(Model.ReturnSearch)}");
+    }
+
+    if (!string.IsNullOrWhiteSpace(Model.ReturnLifecycleStatus))
+    {
+        backUrlParameters.Add($"lifecycleStatus={Uri.EscapeDataString(Model.ReturnLifecycleStatus)}");
+    }
+
+    foreach (var owner in Model.ReturnOwners.Where(x => !string.IsNullOrWhiteSpace(x)))
+    {
+        backUrlParameters.Add($"owners={Uri.EscapeDataString(owner)}");
+    }
+
+    var backUrl = backUrlParameters.Count == 0
+        ? "/Products"
+        : $"/Products?{string.Join("&", backUrlParameters)}";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Catalogue bulk update</span>
+        <h1>Bulk edit @Model.SelectedProducts.Count product(s)</h1>
+        <p>Apply the same vendor, owners, or lifecycle status across the selected products in one step.</p>
+    </div>
+</section>
+
+<form asp-action="BulkEdit" method="post">
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+    @for (var index = 0; index < Model.SelectedProductIds.Count; index++)
+    {
+        <input type="hidden" asp-for="SelectedProductIds[index]" />
+    }
+
+    <input type="hidden" asp-for="ReturnSearch" />
+    <input type="hidden" asp-for="ReturnLifecycleStatus" />
+    @for (var index = 0; index < Model.ReturnOwners.Count; index++)
+    {
+        <input type="hidden" asp-for="ReturnOwners[index]" />
+    }
+
+    <div class="row g-4">
+        <div class="col-xl-8">
+            <div class="content-card">
+                <div class="section-heading">
+                    <div>
+                        <span class="eyebrow">Update fields</span>
+                        <h2>Choose what to apply</h2>
+                    </div>
+                </div>
+
+                <div class="bulk-edit-grid">
+                    <section class="bulk-edit-field" data-bulk-edit-section>
+                        <div class="form-check form-switch mb-3">
+                            <input asp-for="ApplyVendor" class="form-check-input" data-bulk-edit-toggle />
+                            <label asp-for="ApplyVendor" class="form-check-label"></label>
+                        </div>
+                        <label asp-for="Vendor" class="form-label"></label>
+                        <input asp-for="Vendor" class="form-control" data-bulk-edit-control />
+                        <div class="small text-muted mt-2">Leave blank to clear the vendor for every selected product.</div>
+                        <span asp-validation-for="Vendor" class="text-danger"></span>
+                    </section>
+
+                    <section class="bulk-edit-field" data-bulk-edit-section>
+                        <div class="form-check form-switch mb-3">
+                            <input asp-for="ApplyOwners" class="form-check-input" data-bulk-edit-toggle />
+                            <label asp-for="ApplyOwners" class="form-check-label"></label>
+                        </div>
+                        <div class="d-flex flex-wrap gap-3 mb-3">
+                            <div class="form-check">
+                                <input asp-for="OwnerUpdateMode"
+                                       class="form-check-input"
+                                       type="radio"
+                                       value="@ProductBulkOwnerUpdateModes.Replace"
+                                       data-bulk-edit-control />
+                                <label class="form-check-label" asp-for="OwnerUpdateMode">Replace owners</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input"
+                                       type="radio"
+                                       name="OwnerUpdateMode"
+                                       id="OwnerUpdateModeAppend"
+                                       value="@ProductBulkOwnerUpdateModes.Append"
+                                       @(Model.OwnerUpdateMode == ProductBulkOwnerUpdateModes.Append ? "checked" : null)
+                                       data-bulk-edit-control />
+                                <label class="form-check-label" for="OwnerUpdateModeAppend">Append owners</label>
+                            </div>
+                        </div>
+                        <label asp-for="Owners" class="form-label"></label>
+                        <div class="product-owner-checklist product-owner-checklist-compact">
+                            @for (var index = 0; index < Model.OwnerOptions.Count; index++)
+                            {
+                                var owner = Model.OwnerOptions[index];
+                                var optionId = $"bulk-owner-{index}";
+                                <label class="product-owner-option" for="@optionId">
+                                    <input type="checkbox"
+                                           id="@optionId"
+                                           name="Owners"
+                                           value="@owner.Value"
+                                           data-bulk-edit-control
+                                           @(owner.Selected ? "checked" : null) />
+                                    <span>@owner.Text</span>
+                                </label>
+                            }
+                        </div>
+                        <div class="small text-muted mt-2">Replace sets the full owner list. Append keeps existing owners and adds the selected ones.</div>
+                        <span asp-validation-for="Owners" class="text-danger"></span>
+                    </section>
+
+                    <section class="bulk-edit-field" data-bulk-edit-section>
+                        <div class="form-check form-switch mb-3">
+                            <input asp-for="ApplyLifecycleStatus" class="form-check-input" data-bulk-edit-toggle />
+                            <label asp-for="ApplyLifecycleStatus" class="form-check-label"></label>
+                        </div>
+                        <label asp-for="LifecycleStatus" class="form-label"></label>
+                        <select asp-for="LifecycleStatus"
+                                asp-items="Model.LifecycleStatusOptions"
+                                class="form-select"
+                                data-bulk-edit-control></select>
+                        <div class="small text-muted mt-2">Choose "Clear lifecycle status" to remove it from each selected product.</div>
+                        <span asp-validation-for="LifecycleStatus" class="text-danger"></span>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <aside class="content-card h-100">
+                <div class="section-heading">
+                    <div>
+                        <span class="eyebrow">Selected products</span>
+                        <h2>@Model.SelectedProducts.Count ready</h2>
+                    </div>
+                </div>
+
+                <p class="mb-3">Review the products below, then apply the shared values.</p>
+
+                <div class="bulk-edit-selection-list">
+                    @foreach (var product in Model.SelectedProducts)
+                    {
+                        <article class="bulk-edit-selection-item">
+                            <strong>@product.Name</strong>
+                            <div class="table-subline">Vendor: @(string.IsNullOrWhiteSpace(product.Vendor) ? "-" : product.Vendor)</div>
+                            <div class="table-subline">Owners: @product.OwnerDisplay</div>
+                            <div class="table-subline">Lifecycle: @(string.IsNullOrWhiteSpace(product.LifecycleStatus) ? "-" : product.LifecycleStatus)</div>
+                        </article>
+                    }
+                </div>
+
+                <div class="d-grid gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary">Apply bulk update</button>
+                    <a class="btn btn-outline-secondary" href="@backUrl">Back to products</a>
+                </div>
+            </aside>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
