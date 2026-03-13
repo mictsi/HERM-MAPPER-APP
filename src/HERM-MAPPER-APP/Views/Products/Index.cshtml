@@ -1,6 +1,8 @@
+@using HERM_MAPPER_APP.Models
 @model ProductsIndexViewModel
 @{
     ViewData["Title"] = "Product Catalogue";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
     var statusMessage = TempData["ProductsStatusMessage"] as string;
     var errorMessage = TempData["ProductsErrorMessage"] as string;
     var ownerFilterSummary = Model.SelectedOwners.Count switch
@@ -17,7 +19,10 @@
         <h1>Products to classify</h1>
         <p>Track what needs to be mapped and keep ownership, versioning, and notes in one place. Bulk imports are managed from Configuration, and shared product fields can be updated here.</p>
     </div>
-    <a class="btn btn-primary" asp-action="Create">Add product</a>
+    @if (canManageProductsAndServices)
+    {
+        <a class="btn btn-primary" asp-action="Create">Add product</a>
+    }
 </section>
 
 @if (!string.IsNullOrWhiteSpace(statusMessage))
@@ -95,7 +100,7 @@
                 <span class="eyebrow">Products</span>
                 <h2>@Model.Products.Count result(s)</h2>
             </div>
-            @if (Model.Products.Count != 0)
+            @if (canManageProductsAndServices && Model.Products.Count != 0)
             {
                 <div class="bulk-selection-actions">
                     <span class="bulk-selection-summary" data-bulk-selection-summary>Select products to bulk update.</span>
@@ -117,12 +122,15 @@
                 <table class="table align-middle">
                     <thead>
                         <tr>
+                            @if (canManageProductsAndServices)
+                            {
                             <th class="bulk-selection-column">
                                 <input type="checkbox"
                                        class="form-check-input"
                                        data-bulk-select-all
                                        aria-label="Select all products on this page" />
                             </th>
+                            }
                             <th>Product</th>
                             <th>Owners</th>
                             <th>Lifecycle</th>
@@ -136,6 +144,8 @@
                     {
                         var latestMapping = item.Mappings.OrderByDescending(x => x.UpdatedUtc).FirstOrDefault();
                         <tr>
+                            @if (canManageProductsAndServices)
+                            {
                             <td class="bulk-selection-column">
                                 <input type="checkbox"
                                        class="form-check-input"
@@ -144,6 +154,7 @@
                                        data-bulk-select-item
                                        aria-label="Select @item.Name for bulk edit" />
                             </td>
+                            }
                             <td>
                                 <strong>@item.Name</strong>
                                 <div class="table-subline">@item.Vendor @item.Version</div>
@@ -161,8 +172,11 @@
                                 <div class="btn-group btn-group-sm">
                                     <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@item.Id">Show details</a>
                                     <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@item.Id">Visualize</a>
+                                    @if (canManageProductsAndServices)
+                                    {
                                     <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@item.Id">Edit</a>
                                     <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+                                    }
                                 </div>
                             </td>
                         </tr>

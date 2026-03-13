@@ -3,12 +3,14 @@ using HERM_MAPPER_APP.Infrastructure;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
+[Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class ServicesController(
     AppDbContext dbContext,
     AuditLogService auditLogService,
@@ -68,6 +70,7 @@ public sealed class ServicesController(
         });
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Create()
     {
         var model = new ServiceEditViewModel();
@@ -76,6 +79,7 @@ public sealed class ServicesController(
         return View(model);
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(ServiceEditViewModel input)
@@ -116,6 +120,7 @@ public sealed class ServicesController(
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
         var service = await LoadServiceAsync(id, asNoTracking: true);
@@ -130,6 +135,7 @@ public sealed class ServicesController(
         return View(model);
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, ServiceEditViewModel input)
@@ -192,12 +198,14 @@ public sealed class ServicesController(
         });
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Delete(int id)
     {
         var service = await LoadServiceAsync(id, asNoTracking: true);
         return service is null ? NotFound() : View(service);
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost, ActionName(nameof(Delete))]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

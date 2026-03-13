@@ -3,11 +3,13 @@ using HERM_MAPPER_APP.Infrastructure;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
+[Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class ProductsController(
     AppDbContext dbContext,
     AuditLogService auditLogService,
@@ -63,6 +65,7 @@ public sealed class ProductsController(
         return View(model);
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Create()
     {
         var model = new ProductEditViewModel();
@@ -70,6 +73,7 @@ public sealed class ProductsController(
         return View(model);
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(ProductEditViewModel input)
@@ -176,6 +180,7 @@ public sealed class ProductsController(
         });
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
         var product = await dbContext.ProductCatalogItems
@@ -192,6 +197,7 @@ public sealed class ProductsController(
         return View(model);
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> BulkEdit(int[]? selectedIds, string? returnSearch = null, string[]? returnOwners = null, string? returnLifecycleStatus = null)
     {
         var normalizedProductIds = NormalizeIds(selectedIds);
@@ -222,6 +228,7 @@ public sealed class ProductsController(
         return View(model);
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, ProductEditViewModel input)
@@ -263,6 +270,7 @@ public sealed class ProductsController(
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> BulkEdit(ProductBulkEditViewModel input)
@@ -351,6 +359,7 @@ public sealed class ProductsController(
         return Redirect(BuildIndexUrl(input.ReturnSearch, input.ReturnOwners, input.ReturnLifecycleStatus));
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Delete(int id)
     {
         var product = await dbContext.ProductCatalogItems
@@ -363,6 +372,7 @@ public sealed class ProductsController(
         return product is null ? NotFound() : View(product);
     }
 
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost, ActionName(nameof(Delete))]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)

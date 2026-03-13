@@ -1,6 +1,8 @@
+@using HERM_MAPPER_APP.Models
 @model ServiceVisualizationViewModel
 @{
     ViewData["Title"] = "Visualize Service Connections";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
 }
 
 <section class="page-header">
@@ -11,7 +13,10 @@
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary" asp-action="Index">Back to services</a>
+        @if (canManageProductsAndServices)
+        {
         <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Service.Id">Edit connections</a>
+        }
     </div>
 </section>
 

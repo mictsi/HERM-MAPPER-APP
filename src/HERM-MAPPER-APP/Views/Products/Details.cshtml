@@ -1,6 +1,9 @@
+@using HERM_MAPPER_APP.Models
 @model ProductCatalogItem
 @{
     ViewData["Title"] = "Product Details";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var isAdministrator = AppRoles.IsAdministrator(User);
 }
 
 <section class="page-header">
@@ -10,9 +13,15 @@
         <p>@Model.Vendor @Model.Version</p>
     </div>
     <div class="d-flex gap-2">
+        @if (isAdministrator)
+        {
         <a class="btn btn-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@Model.Id">Add mapping</a>
+        }
         <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.Id">Visualize</a>
+        @if (canManageProductsAndServices)
+        {
         <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">Edit product</a>
+        }
     </div>
 </section>
 
@@ -107,10 +116,13 @@
                         <td>@(capability is null ? "-" : $"{capability.Code} {capability.Name}")</td>
                         <td>@(mapping.TrmComponent is null ? "-" : mapping.TrmComponent.DisplayLabel)</td>
                         <td class="text-end">
+                            @if (isAdministrator)
+                            {
                             <div class="btn-group btn-group-sm">
                                 <a class="btn btn-outline-secondary" asp-controller="Mappings" asp-action="Edit" asp-route-id="@mapping.Id">Modify mapping</a>
                                 <a class="btn btn-outline-danger" asp-controller="Mappings" asp-action="Delete" asp-route-id="@mapping.Id">Delete</a>
                             </div>
+                            }
                         </td>
                     </tr>
                 }

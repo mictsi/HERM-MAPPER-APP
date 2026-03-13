@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+@using HERM_MAPPER_APP.Models
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -25,7 +26,13 @@
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <div class="collapse navbar-collapse justify-content-end" id="mainNav">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                        var canReadCatalogue = AppRoles.CanReadCatalogue(User);
+                        var isAdministrator = AppRoles.IsAdministrator(User);
                         <ul class="navbar-nav gap-lg-2">
+                            @if (canReadCatalogue)
+                            {
                             <li class="nav-item">
                                 <a class="nav-link" asp-controller="Home" asp-action="Index">Dashboard</a>
                             </li>
@@ -39,19 +46,39 @@
                                 <a class="nav-link" asp-controller="Reference" asp-action="Index">HERM TRM Catalogue</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="Mappings" asp-action="Index">Mapping Board</a>
-                            </li>
-                            <li class="nav-item">
                                 <a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a>
+                            </li>
+                            }
+                            @if (isAdministrator)
+                            {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Mappings" asp-action="Index">Mapping Board</a>
                             </li>
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
                                 <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" asp-controller="Users" asp-action="Index">Users</a></li>
                                     <li><a class="dropdown-item" asp-controller="Configuration" asp-action="Index">Configuration</a></li>
                                     <li><a class="dropdown-item" asp-controller="ChangeLog" asp-action="Index">Change Log</a></li>
                                 </ul>
                             </li>
+                            }
+                            <li class="nav-item">
+                                <a class="nav-link nav-icon-link" asp-controller="Account" asp-action="Profile" aria-label="Profile">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M20 21a8 8 0 0 0-16 0"/>
+                                        <circle cx="12" cy="7" r="4"/>
+                                    </svg>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button class="btn btn-outline-secondary navbar-action" type="submit">Logout</button>
+                                </form>
+                            </li>
                         </ul>
+                        }
                     </div>
                 </nav>
             </div>

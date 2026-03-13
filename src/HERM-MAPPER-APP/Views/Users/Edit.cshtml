@@ -1,0 +1,58 @@
+@model UserUpdateViewModel
+@{
+    ViewData["Title"] = "Edit user";
+    ViewData["AdminNav"] = "Users";
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Administration</span>
+                <h1>Edit user</h1>
+            </div>
+        </section>
+
+        <section class="content-card">
+            <form asp-action="Edit" method="post" class="row g-4">
+                @Html.AntiForgeryToken()
+                <input asp-for="Id" type="hidden" />
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="col-lg-6">
+                    <label asp-for="GivenName" class="form-label"></label>
+                    <input asp-for="GivenName" class="form-control" />
+                    <span asp-validation-for="GivenName" class="text-danger small"></span>
+                </div>
+                <div class="col-lg-6">
+                    <label asp-for="LastName" class="form-label"></label>
+                    <input asp-for="LastName" class="form-control" />
+                    <span asp-validation-for="LastName" class="text-danger small"></span>
+                </div>
+                <div class="col-lg-6">
+                    <label asp-for="Email" class="form-label"></label>
+                    <input asp-for="Email" class="form-control" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+                <div class="col-lg-6">
+                    <label asp-for="UserName" class="form-label"></label>
+                    <input asp-for="UserName" class="form-control" />
+                    <span asp-validation-for="UserName" class="text-danger small"></span>
+                </div>
+                <div class="col-lg-6">
+                    <label asp-for="RoleName" class="form-label"></label>
+                    <select asp-for="RoleName" asp-items="Model.RoleOptions" class="form-select"></select>
+                    <span asp-validation-for="RoleName" class="text-danger small"></span>
+                </div>
+                <div class="col-12 d-flex justify-content-end gap-2">
+                    <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+                    <button class="btn btn-primary" type="submit">Save user</button>
+                </div>
+            </form>
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

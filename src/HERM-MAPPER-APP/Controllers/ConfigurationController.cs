@@ -2,12 +2,14 @@ using HERM_MAPPER_APP.Data;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
+[Authorize(Policy = AppPolicies.AdminOnly)]
 public sealed class ConfigurationController(
     AppDbContext dbContext,
     AppSettingsService appSettingsService,

@@ -1,0 +1,79 @@
+@model UsersIndexViewModel
+@{
+    ViewData["Title"] = "Users";
+    ViewData["AdminNav"] = "Users";
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Administration</span>
+                <h1>Users</h1>
+                <p>Create, update, delete, and reset passwords for local application users.</p>
+            </div>
+            <a class="btn btn-primary" asp-action="Create">Create user</a>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-success mb-0">@Model.StatusMessage</div>
+            </section>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-danger mb-0">@Model.ErrorMessage</div>
+            </section>
+        }
+
+        <section class="content-card">
+            @if (Model.Users.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <h3>No users</h3>
+                    <p>Create the first user account.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Password changed</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var user in Model.Users)
+                        {
+                            <tr>
+                                <td>@user.DisplayName</td>
+                                <td>@user.Email</td>
+                                <td>@user.UserName</td>
+                                <td>@user.RoleName</td>
+                                <td>@await TimeZoneDisplay.FormatUtcAsync(user.PasswordChangedUtc)</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@user.Id">Edit</a>
+                                        <a class="btn btn-outline-secondary" asp-action="ResetPassword" asp-route-id="@user.Id">Reset password</a>
+                                        <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@user.Id">Delete</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

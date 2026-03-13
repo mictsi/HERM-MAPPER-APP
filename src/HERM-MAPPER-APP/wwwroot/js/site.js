@@ -151,6 +151,67 @@ document.addEventListener("DOMContentLoaded", () => {
       return host.firstElementChild;
     };
 
+
+  document.querySelectorAll("[data-password-strength-root]").forEach((root) => {
+    const input = root.querySelector("[data-password-input]");
+    const bar = root.querySelector("[data-password-strength-bar]");
+    const label = root.querySelector("[data-password-strength-label]");
+
+    if (!(input instanceof HTMLInputElement) || !(bar instanceof HTMLElement) || !(label instanceof HTMLElement)) {
+      return;
+    }
+
+    const calculateScore = (value) => {
+      let score = 0;
+
+      if (value.length >= 12) {
+        score += 35;
+      }
+
+      if (value.length >= 16) {
+        score += 10;
+      }
+
+      if (/[a-z]/.test(value)) {
+        score += 15;
+      }
+
+      if (/[A-Z]/.test(value)) {
+        score += 15;
+      }
+
+      if (/\d/.test(value)) {
+        score += 15;
+      }
+
+      if (/[^A-Za-z0-9]/.test(value)) {
+        score += 10;
+      }
+
+      return Math.max(0, Math.min(100, score));
+    };
+
+    const syncStrength = () => {
+      const score = calculateScore(input.value);
+      let tone = "weak";
+      let text = "Weak";
+
+      if (score >= 80) {
+        tone = "strong";
+        text = "Strong";
+      } else if (score >= 55) {
+        tone = "medium";
+        text = "Medium";
+      }
+
+      bar.style.width = `${score}%`;
+      bar.setAttribute("data-strength-tone", tone);
+      label.textContent = text;
+    };
+
+    input.addEventListener("input", syncStrength);
+    syncStrength();
+  });
     const ensureMinimumRows = () => {
       while (getRows().length < 2) {
         const row = createRow();

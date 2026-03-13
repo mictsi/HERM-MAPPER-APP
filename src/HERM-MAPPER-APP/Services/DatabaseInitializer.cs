@@ -9,6 +9,7 @@ public sealed class DatabaseInitializer(
     AppDbContext dbContext,
     TrmWorkbookImportService workbookImportService,
     SampleRelationshipImportService sampleRelationshipImportService,
+    PasswordHashService passwordHashService,
     IConfiguration configuration,
     ILogger<DatabaseInitializer> logger)
 {
@@ -18,8 +19,11 @@ public sealed class DatabaseInitializer(
         await EnsureServiceTablesAsync(cancellationToken);
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureAppSettingsTableAsync(cancellationToken);
+        await EnsureUsersTableAsync(cancellationToken);
+        await EnsureRoleNormalizationAsync(cancellationToken);
         await EnsureConfigurableFieldOptionsTableAsync(cancellationToken);
         await EnsureDefaultAppSettingsAsync(cancellationToken);
+        await EnsureBootstrapAdminUserAsync(cancellationToken);
         await NormalizeConfigurableFieldOptionSortOrdersAsync(cancellationToken);
         await EnsureDefaultConfigurableFieldOptionsAsync(cancellationToken);
 
@@ -632,6 +636,224 @@ public sealed class DatabaseInitializer(
                 END
                 """,
                 cancellationToken);
+        }
+    }
+
+    private async Task EnsureUsersTableAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "AppUsers" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_AppUsers" PRIMARY KEY AUTOINCREMENT,
+                    "GivenName" TEXT NOT NULL,
+                    "LastName" TEXT NOT NULL,
+                    "Email" TEXT NOT NULL,
+                    "UserName" TEXT NOT NULL,
+                    "PasswordHash" TEXT NOT NULL,
+                    "RoleName" TEXT NOT NULL,
+                    "FailedLoginCount" INTEGER NOT NULL DEFAULT 0,
+                    "LockoutEndUtc" TEXT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL,
+                    "PasswordChangedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await EnsureSqliteUserColumnsAsync(cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_AppUsers_Email"
+                ON "AppUsers" ("Email")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_AppUsers_UserName"
+                ON "AppUsers" ("UserName")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[AppUsers]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [AppUsers] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_AppUsers] PRIMARY KEY,
+                        [GivenName] NVARCHAR(100) NOT NULL,
+                        [LastName] NVARCHAR(100) NOT NULL,
+                        [Email] NVARCHAR(200) NOT NULL,
+                        [UserName] NVARCHAR(100) NOT NULL,
+                        [PasswordHash] NVARCHAR(400) NOT NULL,
+                        [RoleName] NVARCHAR(40) NOT NULL,
+                        [FailedLoginCount] INT NOT NULL CONSTRAINT [DF_AppUsers_FailedLoginCount] DEFAULT 0,
+                        [LockoutEndUtc] DATETIME2 NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL,
+                        [PasswordChangedUtc] DATETIME2 NOT NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[AppUsers]', N'FailedLoginCount') IS NULL
+                BEGIN
+                    ALTER TABLE [AppUsers]
+                    ADD [FailedLoginCount] INT NOT NULL CONSTRAINT [DF_AppUsers_FailedLoginCount] DEFAULT 0;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[AppUsers]', N'LockoutEndUtc') IS NULL
+                BEGIN
+                    ALTER TABLE [AppUsers]
+                    ADD [LockoutEndUtc] DATETIME2 NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_AppUsers_Email'
+                      AND object_id = OBJECT_ID(N'[AppUsers]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_AppUsers_Email]
+                    ON [AppUsers] ([Email]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_AppUsers_UserName'
+                      AND object_id = OBJECT_ID(N'[AppUsers]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_AppUsers_UserName]
+                    ON [AppUsers] ([UserName]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureBootstrapAdminUserAsync(CancellationToken cancellationToken)
+    {
+        if (await dbContext.AppUsers.AnyAsync(cancellationToken))
+        {
+            return;
+        }
+
+        var userName = configuration["Security:BootstrapAdmin:UserName"] ?? "admin";
+        var email = configuration["Security:BootstrapAdmin:Email"] ?? "admin@local";
+        var givenName = configuration["Security:BootstrapAdmin:GivenName"] ?? "System";
+        var lastName = configuration["Security:BootstrapAdmin:LastName"] ?? "Administrator";
+        var password = configuration["Security:BootstrapAdmin:Password"] ?? "ChangeMeNow!123";
+        var nowUtc = DateTime.UtcNow;
+
+        dbContext.AppUsers.Add(new AppUser
+        {
+            GivenName = givenName,
+            LastName = lastName,
+            Email = email,
+            UserName = userName,
+            PasswordHash = passwordHashService.HashPassword(password),
+            RoleName = AppRoles.Admin,
+            FailedLoginCount = 0,
+            LockoutEndUtc = null,
+            CreatedUtc = nowUtc,
+            UpdatedUtc = nowUtc,
+            PasswordChangedUtc = nowUtc
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureSqliteUserColumnsAsync(CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        if (shouldClose)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA table_info('AppUsers')";
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                columns.Add(reader.GetString(1));
+            }
+
+            if (!columns.Contains("FailedLoginCount"))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AppUsers ADD COLUMN FailedLoginCount INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+
+            if (!columns.Contains("LockoutEndUtc"))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AppUsers ADD COLUMN LockoutEndUtc TEXT NULL",
+                    cancellationToken);
+            }
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private async Task EnsureRoleNormalizationAsync(CancellationToken cancellationToken)
+    {
+        var users = await dbContext.AppUsers.ToListAsync(cancellationToken);
+        var updated = false;
+
+        foreach (var user in users)
+        {
+            var normalizedRole = AppRoles.Normalize(user.RoleName);
+            if (string.IsNullOrWhiteSpace(normalizedRole) || string.Equals(user.RoleName, normalizedRole, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            user.RoleName = normalizedRole;
+            user.UpdatedUtc = DateTime.UtcNow;
+            updated = true;
+        }
+
+        if (updated)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
 

@@ -3,11 +3,13 @@ using HERM_MAPPER_APP.Infrastructure;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
+[Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class ReferenceController(
     AppDbContext dbContext,
     TrmWorkbookImportService workbookImportService,
@@ -20,6 +22,7 @@ public sealed class ReferenceController(
         return View(await BuildViewModelAsync(search, domainId, capabilityId, null, TempData["ImportStatusMessage"] as string));
     }
 
+    [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> VerifyImport(IFormFile? workbook)
@@ -93,6 +96,7 @@ public sealed class ReferenceController(
             null));
     }
 
+    [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ImportVerified(string pendingImportToken)
@@ -136,6 +140,7 @@ public sealed class ReferenceController(
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteComponent(int id)
@@ -164,6 +169,7 @@ public sealed class ReferenceController(
         return RedirectToAction(nameof(Index));
     }
 
+    [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RestoreComponent(int id)

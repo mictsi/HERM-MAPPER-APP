@@ -1052,7 +1052,160 @@ a {
   fill: var(--muted);
 }
 
+.nav-icon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.nav-icon-link svg {
+  display: block;
+}
+
+.navbar-action {
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+}
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.admin-sidebar {
+  align-self: start;
+  position: sticky;
+  top: 6rem;
+}
+
+.admin-content {
+  min-width: 0;
+}
+
+.admin-nav {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.admin-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 1rem;
+  text-decoration: none;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.admin-nav-link:hover,
+.admin-nav-link:focus,
+.admin-nav-link.is-active {
+  background: rgba(11, 110, 79, 0.1);
+}
+
+.admin-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+}
+
+.login-shell {
+  width: min(100%, 30rem);
+  padding: 1.5rem;
+}
+
+.login-card {
+  padding: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 1.8rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.login-card h1 {
+  margin: 1.25rem 0 1.5rem;
+  text-align: center;
+}
+
+.login-placeholder {
+  display: grid;
+  place-items: center;
+}
+
+.login-placeholder svg {
+  width: 100%;
+  height: auto;
+}
+
+.login-logo {
+  width: min(100%, 14rem);
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.login-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.password-strength {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.password-strength-track {
+  width: 100%;
+  height: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(82, 96, 109, 0.16);
+}
+
+.password-strength-bar {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: #b24343;
+  transition: width 0.18s ease, background 0.18s ease;
+}
+
+.password-strength-bar[data-strength-tone="medium"] {
+  background: #b98a26;
+}
+
+.password-strength-bar[data-strength-tone="strong"] {
+  background: var(--accent);
+}
+
+.password-strength-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 @media (max-width: 991.98px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: static;
+  }
+
   .hero-panel,
   .stats-grid,
   .stats-grid-compact {

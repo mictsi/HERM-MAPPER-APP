@@ -1,6 +1,8 @@
+@using HERM_MAPPER_APP.Models
 @model ReferenceCatalogueViewModel
 @{
     ViewData["Title"] = "HERM Catalogue";
+    var isAdministrator = AppRoles.IsAdministrator(User);
 }
 
 <section class="page-header">
@@ -158,10 +160,13 @@
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
                                         <a class="btn btn-outline-secondary" asp-action="History" asp-route-id="@component.Id">History</a>
+                                        @if (isAdministrator)
+                                        {
                                         <form asp-action="DeleteComponent" method="post" class="d-inline">
                                             <input type="hidden" name="id" value="@component.Id" />
                                             <button class="btn btn-outline-danger" type="submit">Trash</button>
                                         </form>
+                                        }
                                     </div>
                                 </td>
                             </tr>
@@ -211,10 +216,13 @@
                         <td class="text-end">
                             <div class="btn-group btn-group-sm">
                                 <a class="btn btn-outline-secondary" asp-action="History" asp-route-id="@component.Id">History</a>
+                                @if (isAdministrator)
+                                {
                                 <form asp-action="RestoreComponent" method="post" class="d-inline">
                                     <input type="hidden" name="id" value="@component.Id" />
                                     <button class="btn btn-outline-primary" type="submit">Restore</button>
                                 </form>
+                                }
                             </div>
                         </td>
                     </tr>

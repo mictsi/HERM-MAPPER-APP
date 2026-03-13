@@ -1,6 +1,8 @@
+@using HERM_MAPPER_APP.Models
 @model ServicesIndexViewModel
 @{
     ViewData["Title"] = "Services";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
     var statusMessage = TempData["ServicesStatusMessage"] as string;
     var errorMessage = TempData["ServicesErrorMessage"] as string;
 }
@@ -11,7 +13,10 @@
         <h1>Services</h1>
         <p>Define connected product chains as named services, then review, filter, and visualize them from one workspace.</p>
     </div>
-    <a class="btn btn-primary" asp-action="Create">Add service</a>
+    @if (canManageProductsAndServices)
+    {
+        <a class="btn btn-primary" asp-action="Create">Add service</a>
+    }
 </section>
 
 @if (!string.IsNullOrWhiteSpace(statusMessage))
@@ -116,8 +121,11 @@
                         <td class="text-end">
                             <div class="btn-group btn-group-sm">
                                 <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@service.Id">Visualize</a>
+                                @if (canManageProductsAndServices)
+                                {
                                 <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@service.Id">Edit</a>
                                 <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@service.Id">Delete</a>
+                                }
                             </div>
                         </td>
                     </tr>

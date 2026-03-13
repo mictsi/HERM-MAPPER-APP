@@ -2,8 +2,12 @@
 @using HERM_MAPPER_APP.Services
 @{
     ViewData["Title"] = "Configuration";
+    ViewData["AdminNav"] = "Configuration";
 }
 
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
 <section class="page-header">
     <div>
         <span class="eyebrow">App settings</span>
@@ -18,6 +22,9 @@
         <div class="alert alert-success mb-0">@Model.StatusMessage</div>
     </section>
 }
+
+    </div>
+</div>
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {

@@ -2,11 +2,14 @@ using HERM_MAPPER_APP.Configuration;
 using HERM_MAPPER_APP.Data;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 using Xunit;
 
 namespace HERM_MAPPER_APP.Tests;
@@ -36,6 +39,49 @@ public sealed class ProgramStartupTests
         Assert.Equal(LogLevel.Debug, options.SqlLogLevel);
         Assert.True(options.SqlSensitiveDataLoggingEnabled);
         Assert.True(options.SqlDetailedErrorsEnabled);
+    }
+
+    [Fact]
+    public void BuildAuthenticationSecurityOptions_UsesConfiguredValues()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:Authentication:SessionTimeoutMinutes"] = "60",
+                ["Security:Authentication:MaxFailedLoginAttempts"] = "15",
+                ["Security:Authentication:LockoutMinutes"] = "1"
+            })
+            .Build();
+
+        var options = Program.BuildAuthenticationSecurityOptions(configuration);
+
+        Assert.Equal(60, options.SessionTimeoutMinutes);
+        Assert.Equal(15, options.MaxFailedLoginAttempts);
+        Assert.Equal(1, options.LockoutMinutes);
+        Assert.Equal(TimeSpan.FromMinutes(60), options.SessionTimeout);
+    }
+
+    [Fact]
+    public void BuildCookieSecurePolicy_UsesEnvironmentDefault_AndAllowsOverride()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        var overrideConfiguration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:Authentication:RequireHttpsCookies"] = "true"
+            })
+            .Build();
+
+        Assert.Equal(CookieSecurePolicy.SameAsRequest, Program.BuildCookieSecurePolicy(configuration, "Development"));
+        Assert.Equal(CookieSecurePolicy.Always, Program.BuildCookieSecurePolicy(configuration, "Production"));
+        Assert.Equal(CookieSecurePolicy.Always, Program.BuildCookieSecurePolicy(overrideConfiguration, "Development"));
+    }
+
+    [Fact]
+    public void BuildCookieName_UsesHostPrefix_OnlyWhenCookiesRequireHttps()
+    {
+        Assert.Equal("HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.SameAsRequest));
+        Assert.Equal("__Host-HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.Always));
     }
 
     [Fact]
@@ -72,7 +118,7 @@ public sealed class ProgramStartupTests
         var services = new ServiceCollection();
         services.AddLogging();
 
-        Program.ConfigureApplicationServices(services, configuration, databaseConfiguration, diagnosticsOptions);
+        Program.ConfigureApplicationServices(services, configuration, "Development", databaseConfiguration, diagnosticsOptions);
 
         await using var provider = services.BuildServiceProvider();
         await Program.InitializeDatabaseAsync(provider);
@@ -84,6 +130,9 @@ public sealed class ProgramStartupTests
         Assert.Equal("Microsoft.EntityFrameworkCore.Sqlite", dbContext.Database.ProviderName);
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AuditLogService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AppSettingsService>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<PasswordPolicyService>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<PasswordHashService>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<AppAuthenticationService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ComponentVersioningService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ConfiguredTimeZoneService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<DatabaseInitializer>());
@@ -97,7 +146,60 @@ public sealed class ProgramStartupTests
             .AsNoTracking()
             .SingleAsync(x => x.Key == AppSettingKeys.DisplayTimeZone);
 
+        var bootstrapAdmin = await dbContext.AppUsers
+            .AsNoTracking()
+            .SingleAsync();
+
         Assert.Equal(AppSettingDefaults.DisplayTimeZone, displayTimeZone.Value);
+        Assert.Equal("admin", bootstrapAdmin.UserName);
+        Assert.Equal(AppRoles.Administrator, bootstrapAdmin.RoleName);
+    }
+
+    [Fact]
+    public async Task ConfigureApplicationServices_RegistersRolePolicies_ForRequestedAccessMatrix()
+    {
+        using var contentRoot = new TemporaryDirectory();
+        Directory.CreateDirectory(Path.Combine(contentRoot.Path, "App_Data"));
+        var configuration = new ConfigurationBuilder().Build();
+        var databaseConfiguration = new ResolvedDatabaseConfiguration(
+            DatabaseProviderKind.Sqlite,
+            $"Data Source={Path.Combine(contentRoot.Path, "App_Data", "auth-tests.db")}");
+        var diagnosticsOptions = new StartupDiagnosticsOptions(
+            ConsoleLoggingEnabled: false,
+            ConsoleLogLevel: LogLevel.Information,
+            SqlLoggingEnabled: false,
+            SqlLogLevel: LogLevel.Information,
+            SqlSensitiveDataLoggingEnabled: false,
+            SqlDetailedErrorsEnabled: false);
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        Program.ConfigureApplicationServices(services, configuration, "Development", databaseConfiguration, diagnosticsOptions);
+
+        await using var provider = services.BuildServiceProvider();
+        var authorizationService = provider.GetRequiredService<IAuthorizationService>();
+
+        var viewer = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.Name, "viewer"),
+            new Claim(ClaimTypes.Role, AppRoles.Viewer)
+        ], "test"));
+        var contributor = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.Name, "contributor"),
+            new Claim(ClaimTypes.Role, AppRoles.Contributor)
+        ], "test"));
+        var legacyAdmin = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.Name, "admin"),
+            new Claim(ClaimTypes.Role, "Admin")
+        ], "test"));
+
+        Assert.True((await authorizationService.AuthorizeAsync(viewer, null, AppPolicies.CatalogueRead)).Succeeded);
+        Assert.False((await authorizationService.AuthorizeAsync(viewer, null, AppPolicies.ProductsAndServicesWrite)).Succeeded);
+        Assert.True((await authorizationService.AuthorizeAsync(contributor, null, AppPolicies.ProductsAndServicesWrite)).Succeeded);
+        Assert.True((await authorizationService.AuthorizeAsync(legacyAdmin, null, AppPolicies.AdminOnly)).Succeeded);
     }
 
 

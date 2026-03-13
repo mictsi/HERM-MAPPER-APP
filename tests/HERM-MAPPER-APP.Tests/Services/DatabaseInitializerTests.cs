@@ -88,6 +88,44 @@ public sealed class DatabaseInitializerTests
         Assert.Equal(["Team A", "Team B"], ownerOptions.Select(x => x.Value).ToArray());
     }
 
+    [Fact]
+    public async Task InitializeAsync_NormalizesLegacyUserRoles()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        fixture.DbContext.AppUsers.AddRange(
+            new AppUser
+            {
+                GivenName = "Legacy",
+                LastName = "Admin",
+                Email = "legacy-admin@example.com",
+                UserName = "legacy-admin",
+                PasswordHash = "hash",
+                RoleName = "Admin"
+            },
+            new AppUser
+            {
+                GivenName = "Legacy",
+                LastName = "Viewer",
+                Email = "legacy-user@example.com",
+                UserName = "legacy-user",
+                PasswordHash = "hash",
+                RoleName = "User"
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var initializer = fixture.CreateInitializer();
+
+        await initializer.InitializeAsync();
+
+        var roles = await fixture.DbContext.AppUsers
+            .AsNoTracking()
+            .OrderBy(x => x.UserName)
+            .Select(x => x.RoleName)
+            .ToListAsync();
+
+        Assert.Equal([AppRoles.Administrator, AppRoles.Viewer], roles);
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
@@ -125,6 +163,7 @@ public sealed class DatabaseInitializerTests
                 DbContext,
                 new TrmWorkbookImportService(DbContext, new ComponentVersioningService(DbContext), new AuditLogService(DbContext)),
                 new SampleRelationshipImportService(DbContext),
+                new PasswordHashService(),
                 configuration,
                 NullLogger<DatabaseInitializer>.Instance);
         }

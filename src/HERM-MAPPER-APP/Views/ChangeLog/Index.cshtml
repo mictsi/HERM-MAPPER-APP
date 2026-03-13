@@ -1,8 +1,12 @@
 @model ChangeLogIndexViewModel
 @{
     ViewData["Title"] = "Change Log";
+    ViewData["AdminNav"] = "ChangeLog";
 }
 
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
 <section class="page-header">
     <div>
         <span class="eyebrow">Operations audit</span>
@@ -66,3 +70,6 @@
         </div>
     }
 </section>
+
+        </div>
+    </div>

@@ -12,6 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<TrmComponentVersion> TrmComponentVersions => Set<TrmComponentVersion>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<ConfigurableFieldOption> ConfigurableFieldOptions => Set<ConfigurableFieldOption>();
     public DbSet<ProductCatalogItem> ProductCatalogItems => Set<ProductCatalogItem>();
     public DbSet<ProductCatalogItemOwner> ProductCatalogItemOwners => Set<ProductCatalogItemOwner>();
@@ -93,6 +94,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(x => x.Key).IsUnique();
             entity.Property(x => x.Key).HasMaxLength(100);
             entity.Property(x => x.Value).HasMaxLength(400);
+        });
+
+        modelBuilder.Entity<AppUser>(entity =>
+        {
+            entity.HasIndex(x => x.Email).IsUnique();
+            entity.HasIndex(x => x.UserName).IsUnique();
+            entity.Property(x => x.GivenName).HasMaxLength(100);
+            entity.Property(x => x.LastName).HasMaxLength(100);
+            entity.Property(x => x.Email).HasMaxLength(200);
+            entity.Property(x => x.UserName).HasMaxLength(100);
+            entity.Property(x => x.PasswordHash).HasMaxLength(400);
+            entity.Property(x => x.RoleName).HasMaxLength(40);
+            entity.Property(x => x.FailedLoginCount).HasDefaultValue(0);
         });
 
         modelBuilder.Entity<ConfigurableFieldOption>(entity =>

@@ -1,0 +1,15 @@
+@using HERM_MAPPER_APP.Models
+@{
+    var activeItem = ViewData["AdminNav"] as string ?? string.Empty;
+}
+
+<aside class="admin-sidebar content-card">
+    <nav class="admin-nav">
+        @if (AppRoles.IsAdministrator(User))
+        {
+            <a class="admin-nav-link @(activeItem == "Users" ? "is-active" : string.Empty)" asp-controller="Users" asp-action="Index">Users</a>
+            <a class="admin-nav-link @(activeItem == "Configuration" ? "is-active" : string.Empty)" asp-controller="Configuration" asp-action="Index">Configuration</a>
+            <a class="admin-nav-link @(activeItem == "ChangeLog" ? "is-active" : string.Empty)" asp-controller="ChangeLog" asp-action="Index">Change Log</a>
+        }
+    </nav>
+</aside>
