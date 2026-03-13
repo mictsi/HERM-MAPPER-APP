@@ -62,6 +62,44 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
+    public void BuildLocalAuthenticationOptions_UsesConfiguredValue()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:Authentication:Local:Enabled"] = "false"
+            })
+            .Build();
+
+        var options = Program.BuildLocalAuthenticationOptions(configuration);
+
+        Assert.False(options.Enabled);
+    }
+
+    [Fact]
+    public void BuildOpenIdConnectAuthenticationOptions_UsesConfiguredRoleMappings()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:Authentication:OpenIdConnect:Enabled"] = "true",
+                ["Security:Authentication:OpenIdConnect:Authority"] = "https://login.example.com",
+                ["Security:Authentication:OpenIdConnect:ClientId"] = "client-id",
+                ["Security:Authentication:OpenIdConnect:RoleGroupMappings:Administrator:0"] = "11111111-1111-1111-1111-111111111111",
+                ["Security:Authentication:OpenIdConnect:RoleGroupMappings:Contributor:0"] = "22222222-2222-2222-2222-222222222222"
+            })
+            .Build();
+
+        var options = Program.BuildOpenIdConnectAuthenticationOptions(configuration);
+
+        Assert.True(options.Enabled);
+        Assert.Equal("https://login.example.com", options.Authority);
+        Assert.Equal("client-id", options.ClientId);
+        Assert.Equal("11111111-1111-1111-1111-111111111111", options.RoleGroupMappings[AppRoles.Administrator].Single());
+        Assert.Equal("22222222-2222-2222-2222-222222222222", options.RoleGroupMappings[AppRoles.Contributor].Single());
+    }
+
+    [Fact]
     public void BuildCookieSecurePolicy_UsesEnvironmentDefault_AndAllowsOverride()
     {
         var configuration = new ConfigurationBuilder().Build();

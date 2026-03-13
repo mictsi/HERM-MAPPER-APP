@@ -18,22 +18,40 @@
                 <img src="~/images/logo.png" asp-append-version="true" alt="" class="login-logo" />
             </div>
             <h1>HERM-MAPPER</h1>
-            <form asp-controller="Account" asp-action="Login" method="post" class="login-form">
-                @Html.AntiForgeryToken()
-                <input asp-for="ReturnUrl" type="hidden" />
-                <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
-                <div>
-                    <label asp-for="UserName" class="form-label"></label>
-                    <input asp-for="UserName" class="form-control" autocomplete="username" />
-                    <span asp-validation-for="UserName" class="text-danger small"></span>
-                </div>
-                <div>
-                    <label asp-for="Password" class="form-label"></label>
-                    <input asp-for="Password" class="form-control" autocomplete="current-password" />
-                    <span asp-validation-for="Password" class="text-danger small"></span>
-                </div>
-                <button class="btn btn-primary btn-lg w-100" type="submit">Login</button>
-            </form>
+            <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+            @if (Model.LocalLoginEnabled)
+            {
+                <form asp-controller="Account" asp-action="Login" method="post" class="login-form">
+                    @Html.AntiForgeryToken()
+                    <input asp-for="ReturnUrl" type="hidden" />
+                    <div>
+                        <label asp-for="UserName" class="form-label"></label>
+                        <input asp-for="UserName" class="form-control" autocomplete="username" />
+                        <span asp-validation-for="UserName" class="text-danger small"></span>
+                    </div>
+                    <div>
+                        <label asp-for="Password" class="form-label"></label>
+                        <input asp-for="Password" class="form-control" autocomplete="current-password" />
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+                    <button class="btn btn-primary btn-lg w-100" type="submit">Login</button>
+                </form>
+            }
+
+            @if (Model.LocalLoginEnabled && Model.OpenIdConnectEnabled)
+            {
+                <div class="text-center small text-muted my-3">or</div>
+            }
+
+            @if (Model.OpenIdConnectEnabled)
+            {
+                <form asp-controller="Account" asp-action="ExternalLogin" method="post" class="login-form">
+                    @Html.AntiForgeryToken()
+                    <input asp-for="ReturnUrl" type="hidden" />
+                    <button class="btn btn-outline-secondary btn-lg w-100" type="submit">Continue with @Model.OpenIdConnectDisplayName</button>
+                </form>
+            }
         </section>
     </main>
 

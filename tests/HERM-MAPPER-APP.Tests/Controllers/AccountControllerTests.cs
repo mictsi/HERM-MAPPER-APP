@@ -1,4 +1,5 @@
 using HERM_MAPPER_APP.Controllers;
+using HERM_MAPPER_APP.Configuration;
 using HERM_MAPPER_APP.Data;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
@@ -77,6 +78,22 @@ public sealed class AccountControllerTests
         Assert.Contains(controller.ModelState[string.Empty]!.Errors, error => error.ErrorMessage.Contains("temporarily locked", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task Login_WhenLocalLoginIsDisabled_ShowsConfigurationMessage()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var controller = fixture.CreateController(localAuthenticationEnabled: false);
+        var result = await controller.Login(new LoginViewModel
+        {
+            UserName = "ada",
+            Password = "ComplexPass!123"
+        });
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Contains(controller.ModelState[string.Empty]!.Errors, error => error.ErrorMessage.Contains("Local login is disabled", StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
@@ -107,7 +124,7 @@ public sealed class AccountControllerTests
             return new TestFixture(connection, dbContext, new PasswordHashService());
         }
 
-        public AccountController CreateController()
+        public AccountController CreateController(bool localAuthenticationEnabled = true, bool openIdConnectEnabled = false)
         {
             var services = new ServiceCollection();
             services.AddSingleton<IAuthenticationService, StubAuthenticationService>();
@@ -123,7 +140,17 @@ public sealed class AccountControllerTests
                 new PasswordPolicyService(),
                 new AppAuthenticationService(new AuthenticationSecurityOptions(60, 3, 1)),
                 new AuditLogService(DbContext),
-                new AuthenticationSecurityOptions(60, 3, 1))
+                new AuthenticationSecurityOptions(60, 3, 1),
+                new LocalAuthenticationOptions
+                {
+                    Enabled = localAuthenticationEnabled
+                },
+                new OpenIdConnectAuthenticationOptions
+                {
+                    Enabled = openIdConnectEnabled,
+                    Authority = openIdConnectEnabled ? "https://login.example.com" : string.Empty,
+                    ClientId = openIdConnectEnabled ? "client-id" : string.Empty
+                })
             {
                 ControllerContext = new ControllerContext { HttpContext = httpContext },
                 TempData = new TempDataDictionary(httpContext, new TestTempDataProvider())

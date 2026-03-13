@@ -15,6 +15,12 @@ public sealed class LoginViewModel
     public string Password { get; set; } = string.Empty;
 
     public string? ReturnUrl { get; set; }
+
+    public bool LocalLoginEnabled { get; init; } = true;
+
+    public bool OpenIdConnectEnabled { get; init; }
+
+    public string OpenIdConnectDisplayName { get; init; } = "OpenID Connect";
 }
 
 public sealed class PasswordSelfServiceViewModel

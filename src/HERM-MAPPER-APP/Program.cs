@@ -1,12 +1,17 @@
+using System.Security.Claims;
 using HERM_MAPPER_APP.Configuration;
 using HERM_MAPPER_APP.Data;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables(prefix: "HERM_");
@@ -63,6 +68,78 @@ public partial class Program
             MaxFailedLoginAttempts: Math.Max(1, configuration.GetValue<int?>("Security:Authentication:MaxFailedLoginAttempts") ?? 15),
             LockoutMinutes: Math.Max(1, configuration.GetValue<int?>("Security:Authentication:LockoutMinutes") ?? 1));
 
+    public static LocalAuthenticationOptions BuildLocalAuthenticationOptions(IConfiguration configuration) =>
+        new()
+        {
+            Enabled = configuration.GetValue<bool?>("Security:Authentication:Local:Enabled") ?? true
+        };
+
+    public static OpenIdConnectAuthenticationOptions BuildOpenIdConnectAuthenticationOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection("Security:Authentication:OpenIdConnect");
+        var roleGroupMappings = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+
+        foreach (var childSection in section.GetSection("RoleGroupMappings").GetChildren())
+        {
+            var normalizedRole = AppRoles.Normalize(childSection.Key);
+            if (!AppRoles.IsSupported(normalizedRole))
+            {
+                throw new InvalidOperationException($"Security:Authentication:OpenIdConnect:RoleGroupMappings contains unsupported role '{childSection.Key}'.");
+            }
+
+            var groups = (childSection.Get<string[]>() ?? [])
+                .Where(groupId => !string.IsNullOrWhiteSpace(groupId))
+                .Select(groupId => groupId.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            roleGroupMappings[normalizedRole] = groups;
+        }
+
+        var options = new OpenIdConnectAuthenticationOptions
+        {
+            Enabled = section.GetValue<bool?>("Enabled") ?? false,
+            DisplayName = section["DisplayName"] ?? "OpenID Connect",
+            Authority = section["Authority"] ?? string.Empty,
+            MetadataAddress = section["MetadataAddress"] ?? string.Empty,
+            ClientId = section["ClientId"] ?? string.Empty,
+            ClientSecret = section["ClientSecret"] ?? string.Empty,
+            CallbackPath = section["CallbackPath"] ?? "/signin-oidc",
+            SignedOutCallbackPath = section["SignedOutCallbackPath"] ?? "/signout-callback-oidc",
+            RequireHttpsMetadata = section.GetValue<bool?>("RequireHttpsMetadata") ?? true,
+            GetClaimsFromUserInfoEndpoint = section.GetValue<bool?>("GetClaimsFromUserInfoEndpoint") ?? false,
+            NameClaimType = section["NameClaimType"] ?? "name",
+            EmailClaimType = section["EmailClaimType"] ?? "email",
+            GivenNameClaimType = section["GivenNameClaimType"] ?? "given_name",
+            SurnameClaimType = section["SurnameClaimType"] ?? "family_name",
+            GroupClaimType = section["GroupClaimType"] ?? "groups",
+            SubjectClaimType = section["SubjectClaimType"] ?? "sub",
+            Scopes = (section.GetSection("Scopes").Get<string[]>() ?? ["openid", "profile", "email"])
+                .Where(scope => !string.IsNullOrWhiteSpace(scope))
+                .Select(scope => scope.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray(),
+            RoleGroupMappings = roleGroupMappings
+        };
+
+        if (!options.Enabled)
+        {
+            return options;
+        }
+
+        if (string.IsNullOrWhiteSpace(options.ClientId))
+        {
+            throw new InvalidOperationException("Security:Authentication:OpenIdConnect:ClientId must be configured when OpenID Connect is enabled.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.Authority) && string.IsNullOrWhiteSpace(options.MetadataAddress))
+        {
+            throw new InvalidOperationException("Security:Authentication:OpenIdConnect requires either Authority or MetadataAddress when enabled.");
+        }
+
+        return options;
+    }
+
     public static CookieSecurePolicy BuildCookieSecurePolicy(IConfiguration configuration, string environmentName)
     {
         var requireHttpsCookies = configuration.GetValue<bool?>("Security:Authentication:RequireHttpsCookies");
@@ -113,10 +190,20 @@ public partial class Program
     {
         services.AddSingleton(configuration);
         var authenticationSecurityOptions = BuildAuthenticationSecurityOptions(configuration);
+        var localAuthenticationOptions = BuildLocalAuthenticationOptions(configuration);
+        var openIdConnectAuthenticationOptions = BuildOpenIdConnectAuthenticationOptions(configuration);
         var cookieSecurePolicy = BuildCookieSecurePolicy(configuration, environmentName);
         var antiforgeryCookieName = BuildCookieName(AntiforgeryCookieName, cookieSecurePolicy);
         var authenticationCookieName = BuildCookieName(AuthenticationCookieName, cookieSecurePolicy);
+
+        if (!localAuthenticationOptions.Enabled && !openIdConnectAuthenticationOptions.Enabled)
+        {
+            throw new InvalidOperationException("At least one authentication method must be enabled. Configure local login or OpenID Connect.");
+        }
+
         services.AddSingleton(authenticationSecurityOptions);
+        services.AddSingleton(localAuthenticationOptions);
+        services.AddSingleton(openIdConnectAuthenticationOptions);
         services.AddHttpContextAccessor();
         services.AddAntiforgery(options =>
         {
@@ -165,20 +252,108 @@ public partial class Program
         services.AddScoped<ConfigurableFieldService>();
         services.AddScoped<ComponentVersioningService>();
         services.AddScoped<ConfiguredTimeZoneService>();
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie(options =>
+        var authenticationBuilder = services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme);
+        authenticationBuilder.AddCookie(options =>
+        {
+            options.LoginPath = "/Account/Login";
+            options.AccessDeniedPath = "/Account/Login";
+            options.Cookie.Name = authenticationCookieName;
+            options.Cookie.HttpOnly = true;
+            options.Cookie.Path = "/";
+            options.Cookie.SecurePolicy = cookieSecurePolicy;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.IsEssential = true;
+            options.SlidingExpiration = true;
+            options.ExpireTimeSpan = authenticationSecurityOptions.SessionTimeout;
+        });
+
+        if (openIdConnectAuthenticationOptions.Enabled)
+        {
+            authenticationBuilder.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
             {
-                options.LoginPath = "/Account/Login";
-                options.AccessDeniedPath = "/Account/Login";
-                options.Cookie.Name = authenticationCookieName;
-                options.Cookie.HttpOnly = true;
-                options.Cookie.Path = "/";
-                options.Cookie.SecurePolicy = cookieSecurePolicy;
-                options.Cookie.SameSite = SameSiteMode.Strict;
-                options.Cookie.IsEssential = true;
-                options.SlidingExpiration = true;
-                options.ExpireTimeSpan = authenticationSecurityOptions.SessionTimeout;
+                options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.RequireHttpsMetadata = openIdConnectAuthenticationOptions.RequireHttpsMetadata;
+                options.ClientId = openIdConnectAuthenticationOptions.ClientId;
+                options.ClientSecret = string.IsNullOrWhiteSpace(openIdConnectAuthenticationOptions.ClientSecret)
+                    ? null
+                    : openIdConnectAuthenticationOptions.ClientSecret;
+                options.CallbackPath = openIdConnectAuthenticationOptions.CallbackPath;
+                options.SignedOutCallbackPath = openIdConnectAuthenticationOptions.SignedOutCallbackPath;
+                options.GetClaimsFromUserInfoEndpoint = openIdConnectAuthenticationOptions.GetClaimsFromUserInfoEndpoint;
+                options.ResponseType = OpenIdConnectResponseType.Code;
+                options.UsePkce = true;
+                options.MapInboundClaims = false;
+                options.SaveTokens = true;
+
+                if (!string.IsNullOrWhiteSpace(openIdConnectAuthenticationOptions.Authority))
+                {
+                    options.Authority = openIdConnectAuthenticationOptions.Authority;
+                }
+
+                if (!string.IsNullOrWhiteSpace(openIdConnectAuthenticationOptions.MetadataAddress))
+                {
+                    options.MetadataAddress = openIdConnectAuthenticationOptions.MetadataAddress;
+                }
+
+                options.Scope.Clear();
+                foreach (var scope in openIdConnectAuthenticationOptions.Scopes)
+                {
+                    options.Scope.Add(scope);
+                }
+
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    NameClaimType = ClaimTypes.Name,
+                    RoleClaimType = ClaimTypes.Role
+                };
+
+                options.Events = new OpenIdConnectEvents
+                {
+                    OnTokenValidated = context =>
+                    {
+                        var authenticationService = context.HttpContext.RequestServices.GetRequiredService<AppAuthenticationService>();
+
+                        try
+                        {
+                            context.Principal = authenticationService.CreateExternalPrincipal(
+                                context.Principal,
+                                openIdConnectAuthenticationOptions,
+                                OpenIdConnectDefaults.AuthenticationScheme);
+                        }
+                        catch (InvalidOperationException exception)
+                        {
+                            context.HandleResponse();
+                            context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, exception.Message));
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                    OnAuthenticationFailed = context =>
+                    {
+                        context.HandleResponse();
+                        context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, "OpenID Connect sign-in failed."));
+                        return Task.CompletedTask;
+                    },
+                    OnRemoteFailure = context =>
+                    {
+                        context.HandleResponse();
+                        context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, "OpenID Connect sign-in failed."));
+                        return Task.CompletedTask;
+                    },
+                    OnRedirectToIdentityProviderForSignOut = async context =>
+                    {
+                        var idToken = context.Properties?.GetTokenValue("id_token")
+                            ?? await context.HttpContext.GetTokenAsync("id_token");
+
+                        if (!string.IsNullOrWhiteSpace(idToken))
+                        {
+                            context.ProtocolMessage.IdTokenHint = idToken;
+                        }
+                    }
+                };
             });
+        }
+
         services.AddAuthorization(options =>
         {
             options.AddPolicy(AppPolicies.AdminOnly, policy =>
@@ -227,4 +402,19 @@ public partial class Program
         Enum.TryParse<LogLevel>(value, ignoreCase: true, out var parsedLevel)
             ? parsedLevel
             : fallback;
+
+    public static string BuildAuthenticationFailureRedirectUri(string? returnUrl, string errorMessage)
+    {
+        var querySegments = new List<string>
+        {
+            $"error={Uri.EscapeDataString(errorMessage)}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Uri.TryCreate(returnUrl, UriKind.Relative, out _))
+        {
+            querySegments.Add($"returnUrl={Uri.EscapeDataString(returnUrl)}");
+        }
+
+        return $"/Account/Login?{string.Join("&", querySegments)}";
+    }
 }

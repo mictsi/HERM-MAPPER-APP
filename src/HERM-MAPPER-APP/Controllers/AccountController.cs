@@ -1,8 +1,11 @@
 using HERM_MAPPER_APP.Data;
+using HERM_MAPPER_APP.Configuration;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,20 +18,24 @@ public sealed class AccountController(
     PasswordPolicyService passwordPolicyService,
     AppAuthenticationService appAuthenticationService,
     AuditLogService auditLogService,
-    AuthenticationSecurityOptions authenticationSecurityOptions) : Controller
+    AuthenticationSecurityOptions authenticationSecurityOptions,
+    LocalAuthenticationOptions localAuthenticationOptions,
+    OpenIdConnectAuthenticationOptions openIdConnectAuthenticationOptions) : Controller
 {
     [AllowAnonymous]
-    public IActionResult Login(string? returnUrl = null)
+    public IActionResult Login(string? returnUrl = null, string? error = null)
     {
         if (User.Identity?.IsAuthenticated == true)
         {
             return RedirectToAction("Index", "Home");
         }
 
-        return View(new LoginViewModel
+        if (!string.IsNullOrWhiteSpace(error))
         {
-            ReturnUrl = returnUrl
-        });
+            ModelState.AddModelError(string.Empty, error);
+        }
+
+        return View(BuildLoginViewModel(returnUrl));
     }
 
     [HttpPost]
@@ -38,6 +45,13 @@ public sealed class AccountController(
     {
         input.UserName = input.UserName?.Trim() ?? string.Empty;
         var normalizedUserName = input.UserName.ToUpperInvariant();
+        input = BuildLoginViewModel(input.ReturnUrl, input);
+
+        if (!localAuthenticationOptions.Enabled)
+        {
+            ModelState.AddModelError(string.Empty, "Local login is disabled.");
+            return View(input);
+        }
 
         if (!ModelState.IsValid)
         {
@@ -130,12 +144,34 @@ public sealed class AccountController(
     }
 
     [HttpPost]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    public IActionResult ExternalLogin(string? returnUrl = null)
+    {
+        if (!openIdConnectAuthenticationOptions.Enabled)
+        {
+            return NotFound();
+        }
+
+        var redirectUrl = string.IsNullOrWhiteSpace(returnUrl) || !Url.IsLocalUrl(returnUrl)
+            ? Url.Action("Index", "Home")
+            : returnUrl;
+
+        return Challenge(
+            new AuthenticationProperties
+            {
+                RedirectUri = redirectUrl
+            },
+            OpenIdConnectDefaults.AuthenticationScheme);
+    }
+
+    [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
         var user = await GetCurrentUserAsync();
-
-        await HttpContext.SignOutAsync();
+        var externalUserName = User.Identity?.Name;
+        var isOpenIdConnectUser = AppAuthenticationService.IsOpenIdConnectUser(User);
 
         if (user is not null)
         {
@@ -146,12 +182,39 @@ public sealed class AccountController(
                 user.Id,
                 $"User '{user.UserName}' signed out.");
         }
+        else if (isOpenIdConnectUser && !string.IsNullOrWhiteSpace(externalUserName))
+        {
+            await auditLogService.WriteAsync(
+                "Authentication",
+                "Logout",
+                "ExternalUser",
+                null,
+                $"OpenID Connect user '{externalUserName}' signed out.");
+        }
 
+        if (isOpenIdConnectUser && openIdConnectAuthenticationOptions.Enabled)
+        {
+            return SignOut(
+                new AuthenticationProperties
+                {
+                    RedirectUri = Url.Action(nameof(Login))
+                },
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                OpenIdConnectDefaults.AuthenticationScheme);
+        }
+
+        await HttpContext.SignOutAsync();
         return RedirectToAction(nameof(Login));
     }
 
     public async Task<IActionResult> Profile()
     {
+        if (!AppAuthenticationService.IsLocalUser(User))
+        {
+            TempData["ProfileErrorMessage"] = "Password changes are managed by your identity provider.";
+            return RedirectToAction("Index", "Home");
+        }
+
         var user = await GetRequiredCurrentUserAsync();
         if (user is null)
         {
@@ -165,6 +228,12 @@ public sealed class AccountController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Profile(PasswordSelfServiceViewModel input)
     {
+        if (!AppAuthenticationService.IsLocalUser(User))
+        {
+            TempData["ProfileErrorMessage"] = "Password changes are managed by your identity provider.";
+            return RedirectToAction("Index", "Home");
+        }
+
         var user = await GetRequiredCurrentUserAsync();
         if (user is null)
         {
@@ -211,6 +280,11 @@ public sealed class AccountController(
 
     private async Task<AppUser?> GetCurrentUserAsync()
     {
+        if (!AppAuthenticationService.IsLocalUser(User))
+        {
+            return null;
+        }
+
         var userName = User.Identity?.Name;
         if (string.IsNullOrWhiteSpace(userName))
         {
@@ -245,5 +319,15 @@ public sealed class AccountController(
         CurrentPassword = postedModel?.CurrentPassword ?? string.Empty,
         NewPassword = postedModel?.NewPassword ?? string.Empty,
         ConfirmPassword = postedModel?.ConfirmPassword ?? string.Empty
+    };
+
+    private LoginViewModel BuildLoginViewModel(string? returnUrl, LoginViewModel? postedModel = null) => new()
+    {
+        UserName = postedModel?.UserName ?? string.Empty,
+        Password = postedModel?.Password ?? string.Empty,
+        ReturnUrl = returnUrl ?? postedModel?.ReturnUrl,
+        LocalLoginEnabled = localAuthenticationOptions.Enabled,
+        OpenIdConnectEnabled = openIdConnectAuthenticationOptions.Enabled,
+        OpenIdConnectDisplayName = openIdConnectAuthenticationOptions.DisplayName
     };
 }
