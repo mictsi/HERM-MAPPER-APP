@@ -25,6 +25,12 @@ public sealed class DatabaseInitializerTests
         Assert.Equal(
             ConfigurableFieldNames.GetDefaultValues(ConfigurableFieldNames.LifecycleStatus),
             lifecycleStatuses.Select(x => x.Value).ToList());
+
+        var displayTimeZone = await fixture.DbContext.AppSettings
+            .AsNoTracking()
+            .SingleAsync(x => x.Key == AppSettingKeys.DisplayTimeZone);
+
+        Assert.Equal(AppSettingDefaults.DisplayTimeZone, displayTimeZone.Value);
     }
 
     [Fact]

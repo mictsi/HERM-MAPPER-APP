@@ -1,20 +1,38 @@
 # Todo
 
-- Add a configuration entry to specify timezone. All entries should be save in UTC but displayed inte specified timezone
+1. create a new menu item "Admin"
+-- move configuration and changelog as a submenu to admin
+
+2. All entries should be save in UTC but displayed inte specified timezone
+- Add a configuration entry to specify timezone.
+
+
+
+
+
+
 
 - import domain/capability description
 
-- openid support for login
+
+- Implement openid support for login
 -- support for groups in token to map to roles
+
+
+
 
 - display domain and capability description to visualisation when on going over the domain/capability visualisation on mouseover
 
 - user management
+-- add the ability to crud
 -- Admin can disable users
 --- user and api keys should be disabled
 -- Admin can disable api keys/remove keys from a user
 
 - Roles
+-- implement the following roles
+-- Administrator
+--- Has access to all features
 -- View Role
 -- Admin Role
 -- Add/Modify Product role
@@ -29,6 +47,10 @@
 -- All Create/Update/Delete operations should be logged in the common log
 -- all operations should include who made the operations
 
+
+# Version history
+Implement version history
+
 - Products
 -- Add version history for all changes include who made the 
 
@@ -36,8 +58,5 @@
 -- Add version history for all changes include who made the 
 
 - Services
--- Add version history for all changes include who made the 
-
-
-# Longterm
-- Check if document database is a better fit for the application
+-- Add version history for all changes include who made them
+-- Ability to restore the a service to previous version

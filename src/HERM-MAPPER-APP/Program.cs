@@ -102,8 +102,10 @@ public partial class Program
         services.AddScoped<DatabaseInitializer>();
         services.AddScoped<CsvExportService>();
         services.AddScoped<AuditLogService>();
+        services.AddScoped<AppSettingsService>();
         services.AddScoped<ConfigurableFieldService>();
         services.AddScoped<ComponentVersioningService>();
+        services.AddScoped<ConfiguredTimeZoneService>();
         services.AddControllersWithViews();
     }
 

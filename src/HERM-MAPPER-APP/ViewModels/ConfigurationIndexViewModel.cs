@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace HERM_MAPPER_APP.ViewModels;
 
@@ -8,6 +9,8 @@ public sealed class ConfigurationIndexViewModel
 {
     public string? StatusMessage { get; init; }
     public string? ErrorMessage { get; init; }
+    public string DisplayTimeZoneId { get; init; } = AppSettingDefaults.DisplayTimeZone;
+    public IReadOnlyList<SelectListItem> AvailableTimeZones { get; init; } = [];
     public WorkbookImportReviewViewModel CatalogueImportReview { get; init; } = new();
     public ProductImportReviewViewModel ProductImportReview { get; init; } = new();
     public IReadOnlyList<ConfigurationFieldGroupViewModel> Fields { get; init; } = [];
@@ -38,6 +41,13 @@ public sealed class UpdateConfigurationOptionOrderInputModel
     [Range(1, int.MaxValue)]
     [Display(Name = "Order")]
     public int SortOrder { get; set; }
+}
+
+public sealed class UpdateDisplayTimeZoneInputModel
+{
+    [Required]
+    [Display(Name = "Time zone")]
+    public string TimeZoneId { get; set; } = AppSettingDefaults.DisplayTimeZone;
 }
 
 public sealed class ProductImportReviewViewModel

@@ -112,7 +112,7 @@
                             <strong>@service.ConnectionCount connection(s)</strong>
                             <div class="table-subline">@service.ProductPreview</div>
                         </td>
-                        <td>@service.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(service.UpdatedUtc)</td>
                         <td class="text-end">
                             <div class="btn-group btn-group-sm">
                                 <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@service.Id">Visualize</a>

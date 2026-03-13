@@ -3,12 +3,14 @@ using HERM_MAPPER_APP.Models;
 using HERM_MAPPER_APP.Services;
 using HERM_MAPPER_APP.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace HERM_MAPPER_APP.Controllers;
 
 public sealed class ConfigurationController(
     AppDbContext dbContext,
+    AppSettingsService appSettingsService,
     ConfigurableFieldService configurableFieldService,
     AuditLogService auditLogService,
     TrmWorkbookImportService workbookImportService,
@@ -351,6 +353,45 @@ public sealed class ConfigurationController(
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateDisplayTimeZone(UpdateDisplayTimeZoneInputModel input)
+    {
+        input.TimeZoneId = input.TimeZoneId?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(input.TimeZoneId))
+        {
+            TempData["ConfigurationError"] = "Choose a time zone before saving.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(input.TimeZoneId);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            TempData["ConfigurationError"] = $"The time zone '{input.TimeZoneId}' is not available on this server.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidTimeZoneException)
+        {
+            TempData["ConfigurationError"] = $"The time zone '{input.TimeZoneId}' is invalid on this server.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        await appSettingsService.SetValueAsync(AppSettingKeys.DisplayTimeZone, input.TimeZoneId);
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "UpdateDisplayTimeZone",
+            nameof(AppSetting),
+            null,
+            $"Updated display time zone to '{input.TimeZoneId}'.");
+
+        TempData["ConfigurationStatusMessage"] = $"Display time zone updated to '{input.TimeZoneId}'.";
+        return RedirectToAction(nameof(Index));
+    }
+
     private async Task<int> GetNextSortOrderAsync(string fieldName)
     {
         var maxSortOrder = await dbContext.ConfigurableFieldOptions
@@ -394,6 +435,9 @@ public sealed class ConfigurationController(
         ProductImportReviewViewModel? productImportReview = null)
     {
         var fields = new List<ConfigurationFieldGroupViewModel>();
+        var displayTimeZoneId = await appSettingsService.GetValueAsync(
+            AppSettingKeys.DisplayTimeZone,
+            AppSettingDefaults.DisplayTimeZone);
 
         foreach (var field in ConfigurableFieldNames.All)
         {
@@ -409,10 +453,31 @@ public sealed class ConfigurationController(
         {
             StatusMessage = TempData["ConfigurationStatusMessage"] as string,
             ErrorMessage = TempData["ConfigurationError"] as string,
+            DisplayTimeZoneId = displayTimeZoneId,
+            AvailableTimeZones = BuildTimeZoneOptions(displayTimeZoneId),
             CatalogueImportReview = catalogueImportReview ?? new WorkbookImportReviewViewModel(),
             ProductImportReview = productImportReview ?? new ProductImportReviewViewModel(),
             Fields = fields
         };
+    }
+
+    private static IReadOnlyList<SelectListItem> BuildTimeZoneOptions(string selectedTimeZoneId) =>
+        TimeZoneInfo.GetSystemTimeZones()
+            .OrderBy(x => x.BaseUtcOffset)
+            .ThenBy(x => x.DisplayName)
+            .Select(x => new SelectListItem
+            {
+                Value = x.Id,
+                Text = $"(UTC{FormatOffset(x.BaseUtcOffset)}) {x.Id}",
+                Selected = string.Equals(x.Id, selectedTimeZoneId, StringComparison.Ordinal)
+            })
+            .ToList();
+
+    private static string FormatOffset(TimeSpan offset)
+    {
+        var sign = offset < TimeSpan.Zero ? "-" : "+";
+        var absoluteOffset = offset.Duration();
+        return $"{sign}{absoluteOffset:hh\\:mm}";
     }
 
     private WorkbookImportReviewViewModel BuildCatalogueErrorReview(string errorMessage, string? uploadedFileName = null) =>

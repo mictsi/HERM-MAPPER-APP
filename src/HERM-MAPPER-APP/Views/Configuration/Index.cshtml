@@ -29,6 +29,27 @@
 <section class="content-card">
     <div class="section-heading">
         <div>
+            <span class="eyebrow">Regional display</span>
+            <h2>Display time zone</h2>
+        </div>
+    </div>
+    <p class="mb-3">All timestamps are stored in UTC. Choose the time zone used when dates are shown in the application.</p>
+    <form asp-action="UpdateDisplayTimeZone" method="post" class="row g-3 align-items-end">
+        @Html.AntiForgeryToken()
+        <div class="col-lg-8">
+            <label class="form-label" for="TimeZoneId">Time zone</label>
+            <select class="form-select" id="TimeZoneId" name="TimeZoneId" asp-items="Model.AvailableTimeZones"></select>
+        </div>
+        <div class="col-lg-4 d-grid">
+            <button class="btn btn-primary" type="submit">Save time zone</button>
+        </div>
+    </form>
+    <p class="text-muted mt-3 mb-0">Current display time zone: <strong>@Model.DisplayTimeZoneId</strong></p>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
             <span class="eyebrow">Catalogue import</span>
             <h2>Verify workbook before importing</h2>
         </div>
@@ -301,7 +322,7 @@
                                         </form>
                                     </td>
                                     <td><strong>@option.Value</strong></td>
-                                    <td>@option.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td>@await TimeZoneDisplay.FormatUtcAsync(option.CreatedUtc)</td>
                                     <td class="text-end">
                                         <form asp-action="DeleteOption" method="post" class="d-inline">
                                             @Html.AntiForgeryToken()

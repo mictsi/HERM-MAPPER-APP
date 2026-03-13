@@ -125,7 +125,7 @@
                                 <div class="table-subline">@(latestMapping.TrmComponent is null ? "No component selected" : latestMapping.TrmComponent.DisplayLabel)</div>
                             }
                         </td>
-                        <td>@product.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(product.UpdatedUtc)</td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary" asp-controller="Products" asp-action="Details" asp-route-id="@product.Id">Show details</a>
                         </td>

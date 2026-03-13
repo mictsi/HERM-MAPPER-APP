@@ -210,6 +210,45 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
+    public async Task UpdateDisplayTimeZone_PersistsSetting_AndWritesAuditLog()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var controller = fixture.CreateConfigurationController();
+
+        var result = await controller.UpdateDisplayTimeZone(new UpdateDisplayTimeZoneInputModel
+        {
+            TimeZoneId = "UTC"
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+
+        var setting = await fixture.DbContext.AppSettings.SingleAsync(x => x.Key == AppSettingKeys.DisplayTimeZone);
+        var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
+
+        Assert.Equal("UTC", setting.Value);
+        Assert.Equal("Display time zone updated to 'UTC'.", controller.TempData["ConfigurationStatusMessage"]);
+        Assert.Equal("UpdateDisplayTimeZone", audit.Action);
+        Assert.Equal(nameof(AppSetting), audit.EntityType);
+    }
+
+    [Fact]
+    public async Task UpdateDisplayTimeZone_RejectsUnknownTimeZone()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var controller = fixture.CreateConfigurationController();
+
+        var result = await controller.UpdateDisplayTimeZone(new UpdateDisplayTimeZoneInputModel
+        {
+            TimeZoneId = "Not/AZone"
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("The time zone 'Not/AZone' is not available on this server.", controller.TempData["ConfigurationError"]);
+    }
+
+    [Fact]
     public async Task VerifyProductImport_ReturnsErrorReview_WhenFileExtensionIsInvalid()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -281,6 +320,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         {
             var controller = new ConfigurationController(
                 DbContext,
+                new AppSettingsService(DbContext),
                 new ConfigurableFieldService(DbContext),
                 new AuditLogService(DbContext),
                 new TrmWorkbookImportService(DbContext, new ComponentVersioningService(DbContext), new AuditLogService(DbContext)),

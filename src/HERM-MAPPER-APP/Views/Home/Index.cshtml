@@ -105,7 +105,7 @@
                             }
                         </td>
                         <td>@(latestMapping?.TrmComponent is null ? $"{product.Mappings.Count} mapping(s)" : latestMapping.TrmComponent.DisplayLabel)</td>
-                        <td>@product.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(product.UpdatedUtc)</td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary" asp-controller="Products" asp-action="Details" asp-route-id="@product.Id">Show details</a>
                         </td>

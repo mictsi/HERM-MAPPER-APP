@@ -206,7 +206,7 @@
                 {
                     <tr>
                         <td>@component.DisplayLabel</td>
-                        <td>@component.DeletedUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(component.DeletedUtc)</td>
                         <td>@(component.DeletedReason ?? "-")</td>
                         <td class="text-end">
                             <div class="btn-group btn-group-sm">

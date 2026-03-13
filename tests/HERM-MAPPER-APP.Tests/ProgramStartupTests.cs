@@ -83,14 +83,23 @@ public sealed class ProgramStartupTests
 
         Assert.Equal("Microsoft.EntityFrameworkCore.Sqlite", dbContext.Database.ProviderName);
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AuditLogService>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<AppSettingsService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ComponentVersioningService>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<ConfiguredTimeZoneService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<DatabaseInitializer>());
 
         var lifecycleStatuses = await configurableFieldService.GetOptionsAsync(ConfigurableFieldNames.LifecycleStatus);
         Assert.Equal(
             ConfigurableFieldNames.GetDefaultValues(ConfigurableFieldNames.LifecycleStatus),
             lifecycleStatuses.Select(x => x.Value).ToList());
+
+        var displayTimeZone = await dbContext.AppSettings
+            .AsNoTracking()
+            .SingleAsync(x => x.Key == AppSettingKeys.DisplayTimeZone);
+
+        Assert.Equal(AppSettingDefaults.DisplayTimeZone, displayTimeZone.Value);
     }
+
 
     private sealed class TemporaryDirectory : IDisposable
     {

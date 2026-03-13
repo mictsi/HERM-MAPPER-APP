@@ -17,7 +17,9 @@ public sealed class DatabaseInitializer(
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureServiceTablesAsync(cancellationToken);
         await EnsureProductOwnerTableAsync(cancellationToken);
+        await EnsureAppSettingsTableAsync(cancellationToken);
         await EnsureConfigurableFieldOptionsTableAsync(cancellationToken);
+        await EnsureDefaultAppSettingsAsync(cancellationToken);
         await NormalizeConfigurableFieldOptionSortOrdersAsync(cancellationToken);
         await EnsureDefaultConfigurableFieldOptionsAsync(cancellationToken);
 
@@ -573,6 +575,85 @@ public sealed class DatabaseInitializer(
                 """,
                 cancellationToken);
         }
+    }
+
+    private async Task EnsureAppSettingsTableAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "AppSettings" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_AppSettings" PRIMARY KEY AUTOINCREMENT,
+                    "Key" TEXT NOT NULL,
+                    "Value" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_AppSettings_Key"
+                ON "AppSettings" ("Key")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[AppSettings]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [AppSettings] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_AppSettings] PRIMARY KEY,
+                        [Key] NVARCHAR(100) NOT NULL,
+                        [Value] NVARCHAR(400) NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_AppSettings_Key'
+                      AND object_id = OBJECT_ID(N'[AppSettings]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_AppSettings_Key]
+                    ON [AppSettings] ([Key]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureDefaultAppSettingsAsync(CancellationToken cancellationToken)
+    {
+        var hasDisplayTimeZone = await dbContext.AppSettings
+            .AsNoTracking()
+            .AnyAsync(x => x.Key == AppSettingKeys.DisplayTimeZone, cancellationToken);
+
+        if (hasDisplayTimeZone)
+        {
+            return;
+        }
+
+        dbContext.AppSettings.Add(new AppSetting
+        {
+            Key = AppSettingKeys.DisplayTimeZone,
+            Value = AppSettingDefaults.DisplayTimeZone,
+            UpdatedUtc = DateTime.UtcNow
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task EnsureDefaultConfigurableFieldOptionsAsync(CancellationToken cancellationToken)

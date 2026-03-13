@@ -42,7 +42,7 @@
                         <td>@version.ChangeType</td>
                         <td>@(string.IsNullOrWhiteSpace(version.CapabilityCodes) ? "-" : version.CapabilityCodes)</td>
                         <td>@(version.IsDeleted ? "Deleted" : "Active")</td>
-                        <td>@version.ChangedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(version.ChangedUtc)</td>
                         <td>@(version.Details ?? "-")</td>
                     </tr>
                 }

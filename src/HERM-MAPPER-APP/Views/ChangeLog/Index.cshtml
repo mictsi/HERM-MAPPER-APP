@@ -48,7 +48,7 @@
                 @foreach (var entry in Model.Entries)
                 {
                     <tr>
-                        <td>@entry.OccurredUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(entry.OccurredUtc)</td>
                         <td>@entry.Category</td>
                         <td>@entry.Action</td>
                         <td>@(entry.EntityType is null ? "-" : $"{entry.EntityType} #{entry.EntityId}")</td>

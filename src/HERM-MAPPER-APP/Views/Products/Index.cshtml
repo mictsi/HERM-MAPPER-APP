@@ -156,7 +156,7 @@
                                     @(latestMapping?.TrmComponent is null ? "No mapped component yet" : latestMapping.TrmComponent.DisplayLabel)
                                 </div>
                             </td>
-                            <td>@item.UpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@await TimeZoneDisplay.FormatUtcAsync(item.UpdatedUtc)</td>
                             <td class="text-end">
                                 <div class="btn-group btn-group-sm">
                                     <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@item.Id">Show details</a>
