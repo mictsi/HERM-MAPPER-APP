@@ -1,8 +1,8 @@
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -10,17 +10,17 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class UsersControllerTests
 {
     [Fact]
-    public async Task Create_PersistsUserWithRole_AndHashedPassword()
+    public async Task CreatePersistsUserWithRoleAndHashedPassword()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var controller = fixture.CreateController();
+        using var controller = fixture.CreateController();
 
-        var result = await controller.Create(new UserEditViewModel
+        var result = await controller.CreateAsync(new UserEditViewModel
         {
             GivenName = "Ada",
             LastName = "Lovelace",
@@ -32,7 +32,7 @@ public sealed class UsersControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(UsersController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
         var user = await fixture.DbContext.AppUsers.SingleAsync();
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
@@ -40,12 +40,12 @@ public sealed class UsersControllerTests
         Assert.Equal("ada@example.com", user.Email);
         Assert.Equal(AppRoles.User, user.RoleName);
         Assert.NotEqual("ComplexPass!123", user.PasswordHash);
-        Assert.True(fixture.PasswordHashService.VerifyPassword("ComplexPass!123", user.PasswordHash));
+        Assert.True(PasswordHashService.VerifyPassword("ComplexPass!123", user.PasswordHash));
         Assert.Equal("Create", audit.Action);
     }
 
     [Fact]
-    public async Task ResetPassword_UpdatesStoredHash()
+    public async Task ResetPasswordUpdatesStoredHash()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -55,14 +55,14 @@ public sealed class UsersControllerTests
             Email = "grace@example.com",
             UserName = "grace",
             RoleName = AppRoles.Admin,
-            PasswordHash = fixture.PasswordHashService.HashPassword("InitialPass!123")
+            PasswordHash = PasswordHashService.HashPassword("InitialPass!123")
         });
         await fixture.DbContext.SaveChangesAsync();
 
         var user = await fixture.DbContext.AppUsers.SingleAsync();
-        var controller = fixture.CreateController();
+        using var controller = fixture.CreateController();
 
-        var result = await controller.ResetPassword(new UserResetPasswordViewModel
+        var result = await controller.ResetPasswordAsync(new UserResetPasswordViewModel
         {
             Id = user.Id,
             Password = "UpdatedPass!123",
@@ -70,26 +70,23 @@ public sealed class UsersControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(UsersController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
         var updatedUser = await fixture.DbContext.AppUsers.SingleAsync();
-        Assert.True(fixture.PasswordHashService.VerifyPassword("UpdatedPass!123", updatedUser.PasswordHash));
+        Assert.True(PasswordHashService.VerifyPassword("UpdatedPass!123", updatedUser.PasswordHash));
     }
 
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
 
-        private TestFixture(SqliteConnection connection, AppDbContext dbContext, PasswordHashService passwordHashService)
+        private TestFixture(SqliteConnection connection, AppDbContext dbContext)
         {
             this.connection = connection;
             DbContext = dbContext;
-            PasswordHashService = passwordHashService;
         }
 
         public AppDbContext DbContext { get; }
-
-        public PasswordHashService PasswordHashService { get; }
 
         public static async Task<TestFixture> CreateAsync()
         {
@@ -103,15 +100,13 @@ public sealed class UsersControllerTests
             var dbContext = new AppDbContext(options);
             await dbContext.Database.EnsureCreatedAsync();
 
-            return new TestFixture(connection, dbContext, new PasswordHashService());
+            return new TestFixture(connection, dbContext);
         }
 
         public UsersController CreateController()
         {
             var controller = new UsersController(
                 DbContext,
-                PasswordHashService,
-                new PasswordPolicyService(),
                 new AuditLogService(DbContext));
 
             controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider());

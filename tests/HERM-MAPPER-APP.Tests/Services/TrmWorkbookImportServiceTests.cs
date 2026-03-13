@@ -1,18 +1,18 @@
 using System.IO.Compression;
 using System.Xml.Linq;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Services;
+namespace HERMMapperApp.Tests.Services;
 
 public sealed class TrmWorkbookImportServiceTests
 {
     [Fact]
-    public async Task VerifyAsync_ReturnsError_WhenRequiredSheetIsMissing()
+    public async Task VerifyAsyncReturnsErrorWhenRequiredSheetIsMissing()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var workbookPath = fixture.WriteWorkbook(
@@ -36,7 +36,7 @@ public sealed class TrmWorkbookImportServiceTests
     }
 
     [Fact]
-    public async Task VerifyAsync_ReturnsCountsAndFirstImportWarning_WhenDatabaseIsEmpty()
+    public async Task VerifyAsyncReturnsCountsAndFirstImportWarningWhenDatabaseIsEmpty()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var workbookPath = fixture.WriteWorkbook(
@@ -72,7 +72,7 @@ public sealed class TrmWorkbookImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsync_UpdatesExistingRecords_AddsNewOnes_AndRecordsVersions()
+    public async Task ImportAsyncUpdatesExistingRecordsAddsNewOnesAndRecordsVersions()
     {
         await using var fixture = await TestFixture.CreateAsync();
 

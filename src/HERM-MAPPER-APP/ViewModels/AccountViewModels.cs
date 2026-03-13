@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Models;
 
-namespace HERM_MAPPER_APP.ViewModels;
+namespace HERMMapperApp.ViewModels;
 
 public sealed class LoginViewModel
 {

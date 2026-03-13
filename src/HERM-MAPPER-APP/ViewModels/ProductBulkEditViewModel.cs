@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace HERM_MAPPER_APP.ViewModels;
+namespace HERMMapperApp.ViewModels;
 
 public sealed class ProductBulkEditViewModel : IValidatableObject
 {

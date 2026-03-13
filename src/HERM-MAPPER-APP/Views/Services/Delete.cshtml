@@ -28,7 +28,7 @@
     @if (Model.ProductLinks.Count != 0)
     {
         <div class="stack-list mb-4">
-            @foreach (var link in Model.OrderedProductLinks)
+            @foreach (var link in Model.GetOrderedProductLinks())
             {
                 <article class="stack-item">
                     <div class="stack-title">@link.ProductCatalogItem.Name</div>

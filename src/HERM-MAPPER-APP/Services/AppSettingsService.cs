@@ -1,8 +1,8 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
 public sealed class AppSettingsService(AppDbContext dbContext)
 {

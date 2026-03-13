@@ -1,5 +1,9 @@
-@model HERM_MAPPER_APP.ViewModels.ReportsViewModel
+@model HERMMapperApp.ViewModels.ReportsViewModel
 @using System.Text.Json
+@using HERMMapperApp
+@using HERMMapperApp.Models
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
 @{
     ViewData["Title"] = "Reports";
     var sankeyPayload = JsonSerializer.Serialize(new

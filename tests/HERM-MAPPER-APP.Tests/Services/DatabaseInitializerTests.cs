@@ -1,18 +1,18 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Services;
+namespace HERMMapperApp.Tests.Services;
 
 public sealed class DatabaseInitializerTests
 {
     [Fact]
-    public async Task InitializeAsync_SeedsDefaultLifecycleStatuses()
+    public async Task InitializeAsyncSeedsDefaultLifecycleStatuses()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var initializer = fixture.CreateInitializer();
@@ -34,7 +34,7 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
-    public async Task InitializeAsync_DoesNotDuplicateDefaultLifecycleStatuses()
+    public async Task InitializeAsyncDoesNotDuplicateDefaultLifecycleStatuses()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.Add(new ConfigurableFieldOption
@@ -57,7 +57,7 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
-    public async Task InitializeAsync_BackfillsAndNormalizesSortOrder_ForExistingOptions()
+    public async Task InitializeAsyncBackfillsAndNormalizesSortOrderForExistingOptions()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.AddRange(
@@ -89,7 +89,7 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
-    public async Task InitializeAsync_NormalizesLegacyUserRoles()
+    public async Task InitializeAsyncNormalizesLegacyUserRoles()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.AddRange(
@@ -163,7 +163,6 @@ public sealed class DatabaseInitializerTests
                 DbContext,
                 new TrmWorkbookImportService(DbContext, new ComponentVersioningService(DbContext), new AuditLogService(DbContext)),
                 new SampleRelationshipImportService(DbContext),
-                new PasswordHashService(),
                 configuration,
                 NullLogger<DatabaseInitializer>.Instance);
         }

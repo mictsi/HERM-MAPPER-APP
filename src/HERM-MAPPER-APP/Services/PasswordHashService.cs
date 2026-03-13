@@ -1,15 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
-public sealed class PasswordHashService
+public static class PasswordHashService
 {
     private const int SaltSize = 16;
     private const int KeySize = 32;
     private const int IterationCount = 210_000;
 
-    public string HashPassword(string password)
+    public static string HashPassword(string password)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
         var hash = Rfc2898DeriveBytes.Pbkdf2(
@@ -22,7 +22,7 @@ public sealed class PasswordHashService
         return $"pbkdf2-sha512${IterationCount}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
     }
 
-    public bool VerifyPassword(string password, string passwordHash)
+    public static bool VerifyPassword(string password, string passwordHash)
     {
         if (string.IsNullOrWhiteSpace(passwordHash))
         {

@@ -1,8 +1,8 @@
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
-public sealed class PasswordPolicyService
+public static class PasswordPolicyService
 {
-    public PasswordPolicyValidationResult Validate(string? password)
+    public static PasswordPolicyValidationResult Validate(string? password)
     {
         var errors = new List<string>();
         var candidate = password ?? string.Empty;
@@ -35,7 +35,7 @@ public sealed class PasswordPolicyService
         return new PasswordPolicyValidationResult(errors.Count == 0, errors, CalculateStrength(candidate));
     }
 
-    public int CalculateStrength(string? password)
+    public static int CalculateStrength(string? password)
     {
         var candidate = password ?? string.Empty;
         var score = 0;

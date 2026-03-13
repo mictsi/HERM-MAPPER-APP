@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Models;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace HERM_MAPPER_APP.ViewModels;
+namespace HERMMapperApp.ViewModels;
 
 public sealed class UsersIndexViewModel
 {

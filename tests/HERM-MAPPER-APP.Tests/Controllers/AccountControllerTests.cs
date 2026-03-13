@@ -1,9 +1,9 @@
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Configuration;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Configuration;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,12 +13,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class AccountControllerTests
 {
     [Fact]
-    public async Task Login_InvalidPassword_LocksUserAfterConfiguredFailures()
+    public async Task LoginInvalidPasswordLocksUserAfterConfiguredFailures()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -27,15 +27,15 @@ public sealed class AccountControllerTests
             LastName = "Lovelace",
             Email = "ada@example.com",
             UserName = "ada",
-            PasswordHash = fixture.PasswordHashService.HashPassword("ComplexPass!123"),
+            PasswordHash = PasswordHashService.HashPassword("ComplexPass!123"),
             RoleName = AppRoles.Viewer
         });
         await fixture.DbContext.SaveChangesAsync();
 
         for (var attempt = 1; attempt <= 3; attempt++)
         {
-            var controller = fixture.CreateController();
-            var result = await controller.Login(new LoginViewModel
+            using var controller = fixture.CreateController();
+            var result = await controller.LoginAsync(new LoginViewModel
             {
                 UserName = "ada",
                 Password = "wrong-password"
@@ -52,7 +52,7 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task Login_LockedUser_ShowsLockoutMessage()
+    public async Task LoginLockedUserShowsLockoutMessage()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -61,14 +61,14 @@ public sealed class AccountControllerTests
             LastName = "Hopper",
             Email = "grace@example.com",
             UserName = "grace",
-            PasswordHash = fixture.PasswordHashService.HashPassword("ComplexPass!123"),
+            PasswordHash = PasswordHashService.HashPassword("ComplexPass!123"),
             RoleName = AppRoles.Viewer,
             LockoutEndUtc = DateTime.UtcNow.AddMinutes(1)
         });
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateController();
-        var result = await controller.Login(new LoginViewModel
+        using var controller = fixture.CreateController();
+        var result = await controller.LoginAsync(new LoginViewModel
         {
             UserName = "grace",
             Password = "ComplexPass!123"
@@ -79,12 +79,12 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task Login_WhenLocalLoginIsDisabled_ShowsConfigurationMessage()
+    public async Task LoginWhenLocalLoginIsDisabledShowsConfigurationMessage()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
-        var controller = fixture.CreateController(localAuthenticationEnabled: false);
-        var result = await controller.Login(new LoginViewModel
+        using var controller = fixture.CreateController(localAuthenticationEnabled: false);
+        var result = await controller.LoginAsync(new LoginViewModel
         {
             UserName = "ada",
             Password = "ComplexPass!123"
@@ -98,16 +98,13 @@ public sealed class AccountControllerTests
     {
         private readonly SqliteConnection connection;
 
-        private TestFixture(SqliteConnection connection, AppDbContext dbContext, PasswordHashService passwordHashService)
+        private TestFixture(SqliteConnection connection, AppDbContext dbContext)
         {
             this.connection = connection;
             DbContext = dbContext;
-            PasswordHashService = passwordHashService;
         }
 
         public AppDbContext DbContext { get; }
-
-        public PasswordHashService PasswordHashService { get; }
 
         public static async Task<TestFixture> CreateAsync()
         {
@@ -121,7 +118,7 @@ public sealed class AccountControllerTests
             var dbContext = new AppDbContext(options);
             await dbContext.Database.EnsureCreatedAsync();
 
-            return new TestFixture(connection, dbContext, new PasswordHashService());
+            return new TestFixture(connection, dbContext);
         }
 
         public AccountController CreateController(bool localAuthenticationEnabled = true, bool openIdConnectEnabled = false)
@@ -136,8 +133,6 @@ public sealed class AccountControllerTests
 
             var controller = new AccountController(
                 DbContext,
-                PasswordHashService,
-                new PasswordPolicyService(),
                 new AppAuthenticationService(new AuthenticationSecurityOptions(60, 3, 1)),
                 new AuditLogService(DbContext),
                 new AuthenticationSecurityOptions(60, 3, 1),

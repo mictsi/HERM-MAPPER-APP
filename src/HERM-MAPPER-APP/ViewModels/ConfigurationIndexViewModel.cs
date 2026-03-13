@@ -1,9 +1,9 @@
 using System.ComponentModel.DataAnnotations;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace HERM_MAPPER_APP.ViewModels;
+namespace HERMMapperApp.ViewModels;
 
 public sealed class ConfigurationIndexViewModel
 {

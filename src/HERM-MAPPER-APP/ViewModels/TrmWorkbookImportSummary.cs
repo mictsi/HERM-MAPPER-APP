@@ -1,4 +1,4 @@
-namespace HERM_MAPPER_APP.ViewModels;
+namespace HERMMapperApp.ViewModels;
 
 public sealed class TrmWorkbookImportSummary
 {

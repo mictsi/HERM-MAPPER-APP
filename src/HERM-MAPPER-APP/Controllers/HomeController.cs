@@ -1,17 +1,22 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class HomeController(AppDbContext dbContext) : Controller
 {
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> IndexAsync()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var model = new HomeDashboardViewModel
         {
             ProductCount = await dbContext.ProductCatalogItems.CountAsync(),

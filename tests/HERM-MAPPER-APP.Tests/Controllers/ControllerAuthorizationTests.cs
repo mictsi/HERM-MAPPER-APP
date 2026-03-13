@@ -1,15 +1,15 @@
 using System.Reflection;
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Models;
 using Microsoft.AspNetCore.Authorization;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class ControllerAuthorizationTests
 {
     [Fact]
-    public void CatalogueControllers_UseCatalogueReadPolicy()
+    public void CatalogueControllersUseCatalogueReadPolicy()
     {
         AssertClassPolicy<HomeController>(AppPolicies.CatalogueRead);
         AssertClassPolicy<ProductsController>(AppPolicies.CatalogueRead);
@@ -19,7 +19,7 @@ public sealed class ControllerAuthorizationTests
     }
 
     [Fact]
-    public void AdminControllers_UseAdminOnlyPolicy()
+    public void AdminControllersUseAdminOnlyPolicy()
     {
         AssertClassPolicy<MappingsController>(AppPolicies.AdminOnly);
         AssertClassPolicy<UsersController>(AppPolicies.AdminOnly);
@@ -28,7 +28,7 @@ public sealed class ControllerAuthorizationTests
     }
 
     [Fact]
-    public void ProductWriteActions_RequireProductsAndServicesWritePolicy()
+    public void ProductWriteActionsRequireProductsAndServicesWritePolicy()
     {
         AssertMethodPolicy<ProductsController>(nameof(ProductsController.Create), AppPolicies.ProductsAndServicesWrite, 0);
         AssertMethodPolicy<ProductsController>(nameof(ProductsController.Create), AppPolicies.ProductsAndServicesWrite, 1);
@@ -41,7 +41,7 @@ public sealed class ControllerAuthorizationTests
     }
 
     [Fact]
-    public void ServiceWriteActions_RequireProductsAndServicesWritePolicy()
+    public void ServiceWriteActionsRequireProductsAndServicesWritePolicy()
     {
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Create), AppPolicies.ProductsAndServicesWrite, 0);
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Create), AppPolicies.ProductsAndServicesWrite, 1);
@@ -52,12 +52,12 @@ public sealed class ControllerAuthorizationTests
     }
 
     [Fact]
-    public void ReferenceWriteActions_RequireAdminOnlyPolicy()
+    public void ReferenceWriteActionsRequireAdminOnlyPolicy()
     {
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.VerifyImport), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.ImportVerified), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponent), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponent), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.VerifyImportAsync), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.ImportVerifiedAsync), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponentAsync), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponentAsync), AppPolicies.AdminOnly, 1);
     }
 
     private static void AssertClassPolicy<TController>(string expectedPolicy)

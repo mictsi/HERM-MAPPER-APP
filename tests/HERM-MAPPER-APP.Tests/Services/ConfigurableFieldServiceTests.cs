@@ -1,16 +1,16 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Services;
+namespace HERMMapperApp.Tests.Services;
 
 public sealed class ConfigurableFieldServiceTests
 {
     [Fact]
-    public async Task GetMultiSelectListAsync_IncludesUnknownSelectedValues_OnlyOnce()
+    public async Task GetMultiSelectListAsyncIncludesUnknownSelectedValuesOnlyOnce()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.AddRange(
@@ -39,7 +39,7 @@ public sealed class ConfigurableFieldServiceTests
     }
 
     [Fact]
-    public async Task GetSelectListAsync_AddsUnknownSelection_AfterConfiguredOptions()
+    public async Task GetSelectListAsyncAddsUnknownSelectionAfterConfiguredOptions()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.AddRange(

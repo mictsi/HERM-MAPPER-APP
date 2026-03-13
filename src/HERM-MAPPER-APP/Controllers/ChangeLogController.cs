@@ -1,17 +1,22 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.AdminOnly)]
 public sealed class ChangeLogController(AppDbContext dbContext) : Controller
 {
-    public async Task<IActionResult> Index(string? search)
+    public async Task<IActionResult> IndexAsync(string? search)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var query = dbContext.AuditLogEntries
             .AsNoTracking()
             .AsQueryable();

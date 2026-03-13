@@ -1,8 +1,10 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Configuration;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using System.Globalization;
+using HERMMapperApp.Infrastructure;
+using HERMMapperApp.Data;
+using HERMMapperApp.Configuration;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -10,12 +12,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 public sealed class AccountController(
     AppDbContext dbContext,
-    PasswordHashService passwordHashService,
-    PasswordPolicyService passwordPolicyService,
     AppAuthenticationService appAuthenticationService,
     AuditLogService auditLogService,
     AuthenticationSecurityOptions authenticationSecurityOptions,
@@ -41,10 +41,10 @@ public sealed class AccountController(
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login(LoginViewModel input)
+    public async Task<IActionResult> LoginAsync(LoginViewModel input)
     {
         input.UserName = input.UserName?.Trim() ?? string.Empty;
-        var normalizedUserName = input.UserName.ToUpperInvariant();
+        var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
         input = BuildLoginViewModel(input.ReturnUrl, input);
 
         if (!localAuthenticationOptions.Enabled)
@@ -59,7 +59,7 @@ public sealed class AccountController(
         }
 
         var user = await dbContext.AppUsers
-            .SingleOrDefaultAsync(x => x.UserName == input.UserName || x.UserName.ToUpper() == normalizedUserName);
+            .SingleOrDefaultAsync(x => EF.Functions.Collate(x.UserName, caseInsensitiveCollation) == input.UserName);
 
         var nowUtc = DateTime.UtcNow;
 
@@ -78,7 +78,7 @@ public sealed class AccountController(
             return View(input);
         }
 
-        if (user is null || !passwordHashService.VerifyPassword(input.Password, user.PasswordHash))
+        if (user is null || !PasswordHashService.VerifyPassword(input.Password, user.PasswordHash))
         {
             if (user is not null)
             {
@@ -92,7 +92,7 @@ public sealed class AccountController(
                     user.FailedLoginCount = 0;
                     user.LockoutEndUtc = nowUtc.Add(authenticationSecurityOptions.LockoutDuration);
                     userWasLockedOut = true;
-                    lockoutEndUtc = user.LockoutEndUtc?.ToString("O");
+                    lockoutEndUtc = user.LockoutEndUtc?.ToString("O", CultureInfo.InvariantCulture);
                 }
 
                 await dbContext.SaveChangesAsync();
@@ -125,7 +125,7 @@ public sealed class AccountController(
         }
 
         await HttpContext.SignInAsync(
-            appAuthenticationService.CreatePrincipal(user),
+            AppAuthenticationService.CreatePrincipal(user),
             appAuthenticationService.CreateProperties());
 
         await auditLogService.WriteAsync(
@@ -167,8 +167,13 @@ public sealed class AccountController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> LogoutAsync()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var user = await GetCurrentUserAsync();
         var externalUserName = User.Identity?.Name;
         var isOpenIdConnectUser = AppAuthenticationService.IsOpenIdConnectUser(User);
@@ -207,8 +212,13 @@ public sealed class AccountController(
         return RedirectToAction(nameof(Login));
     }
 
-    public async Task<IActionResult> Profile()
+    public async Task<IActionResult> ProfileAsync()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         if (!AppAuthenticationService.IsLocalUser(User))
         {
             TempData["ProfileErrorMessage"] = "Password changes are managed by your identity provider.";
@@ -226,7 +236,7 @@ public sealed class AccountController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Profile(PasswordSelfServiceViewModel input)
+    public async Task<IActionResult> ProfileAsync(PasswordSelfServiceViewModel input)
     {
         if (!AppAuthenticationService.IsLocalUser(User))
         {
@@ -245,13 +255,13 @@ public sealed class AccountController(
             return View("PasswordReset", BuildPasswordSelfServiceViewModel(user, input));
         }
 
-        if (!passwordHashService.VerifyPassword(input.CurrentPassword, user.PasswordHash))
+        if (!PasswordHashService.VerifyPassword(input.CurrentPassword, user.PasswordHash))
         {
             ModelState.AddModelError(nameof(PasswordSelfServiceViewModel.CurrentPassword), "Current password is incorrect.");
             return View("PasswordReset", BuildPasswordSelfServiceViewModel(user, input));
         }
 
-        var passwordValidation = passwordPolicyService.Validate(input.NewPassword);
+        var passwordValidation = PasswordPolicyService.Validate(input.NewPassword);
         if (!passwordValidation.IsValid)
         {
             foreach (var error in passwordValidation.Errors)
@@ -262,7 +272,7 @@ public sealed class AccountController(
             return View("PasswordReset", BuildPasswordSelfServiceViewModel(user, input));
         }
 
-        user.PasswordHash = passwordHashService.HashPassword(input.NewPassword);
+        user.PasswordHash = PasswordHashService.HashPassword(input.NewPassword);
         user.PasswordChangedUtc = DateTime.UtcNow;
         user.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
@@ -275,7 +285,7 @@ public sealed class AccountController(
             $"User '{user.UserName}' changed their password.");
 
         TempData["ProfileStatusMessage"] = "Password updated.";
-        return RedirectToAction(nameof(Profile));
+        return RedirectToAction("Profile");
     }
 
     private async Task<AppUser?> GetCurrentUserAsync()

@@ -1,7 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 
-namespace HERM_MAPPER_APP.Configuration;
+namespace HERMMapperApp.Configuration;
 
 public enum DatabaseProviderKind
 {
@@ -143,5 +143,5 @@ public static class AppDatabaseConfiguration
     }
 
     private static string? FirstNonEmpty(params string?[] values) =>
-        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        Array.Find(values, value => !string.IsNullOrWhiteSpace(value));
 }

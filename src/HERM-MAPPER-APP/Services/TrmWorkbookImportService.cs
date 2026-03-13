@@ -2,12 +2,12 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.ViewModels;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
 public sealed partial class TrmWorkbookImportService(
     AppDbContext dbContext,
@@ -22,7 +22,7 @@ public sealed partial class TrmWorkbookImportService(
     {
         try
         {
-            using var archive = ZipFile.OpenRead(workbookPath);
+            await using var archive = await ZipFile.OpenReadAsync(workbookPath, cancellationToken);
             var snapshot = LoadSnapshot(archive);
             return await BuildVerificationResultAsync(snapshot, cancellationToken);
         }
@@ -37,7 +37,7 @@ public sealed partial class TrmWorkbookImportService(
 
     public async Task<TrmWorkbookImportSummary> ImportAsync(string workbookPath, CancellationToken cancellationToken = default)
     {
-        using var archive = ZipFile.OpenRead(workbookPath);
+        await using var archive = await ZipFile.OpenReadAsync(workbookPath, cancellationToken);
         var snapshot = LoadSnapshot(archive);
         var verification = await BuildVerificationResultAsync(snapshot, cancellationToken);
 
@@ -88,7 +88,7 @@ public sealed partial class TrmWorkbookImportService(
             errors.Add("The workbook does not contain any TRM component rows.");
         }
 
-        if (!errors.Any() && !existingDomainCodes.Any() && !existingCapabilityCodes.Any() && !existingComponentCodes.Any())
+        if (errors.Count == 0 && existingDomainCodes.Count == 0 && existingCapabilityCodes.Count == 0 && existingComponentCodes.Count == 0)
         {
             warnings.Add("This import will create the first TRM model in the database.");
         }
@@ -113,8 +113,6 @@ public sealed partial class TrmWorkbookImportService(
         TrmWorkbookSnapshot snapshot,
         CancellationToken cancellationToken)
     {
-        var summary = new TrmWorkbookImportSummary();
-
         var domainsByCode = await dbContext.TrmDomains
             .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
@@ -208,15 +206,18 @@ public sealed partial class TrmWorkbookImportService(
                 .Select(code => trackedCapabilitiesByCode[code].Id)
                 .Distinct()
                 .ToList();
-            var primaryCapability = capabilityIds.Count > 0
-                ? trackedCapabilitiesByCode[row.ParentCapabilityCodes[0]]
+            var primaryCapabilityCode = row.ParentCapabilityCodes.Count > 0
+                ? row.ParentCapabilityCodes[0]
+                : null;
+            var primaryCapability = primaryCapabilityCode is not null
+                ? trackedCapabilitiesByCode[primaryCapabilityCode]
                 : null;
 
             if (componentsByCode.TryGetValue(row.Code, out var existingComponent))
             {
                 var changed = existingComponent.SourceTitle != row.SourceTitle ||
                               existingComponent.Name != row.Name ||
-                              existingComponent.ParentCapabilityCode != (row.ParentCapabilityCodes.FirstOrDefault() ?? string.Empty) ||
+                              existingComponent.ParentCapabilityCode != (primaryCapabilityCode ?? string.Empty) ||
                               existingComponent.ParentCapabilityId != primaryCapability?.Id ||
                               existingComponent.Description != row.Description ||
                               existingComponent.Comments != row.Comments ||
@@ -226,7 +227,7 @@ public sealed partial class TrmWorkbookImportService(
 
                 existingComponent.SourceTitle = row.SourceTitle;
                 existingComponent.Name = row.Name;
-                existingComponent.ParentCapabilityCode = row.ParentCapabilityCodes.FirstOrDefault() ?? string.Empty;
+                existingComponent.ParentCapabilityCode = primaryCapabilityCode ?? string.Empty;
                 existingComponent.ParentCapabilityId = primaryCapability?.Id;
                 existingComponent.Description = row.Description;
                 existingComponent.Comments = row.Comments;
@@ -249,7 +250,7 @@ public sealed partial class TrmWorkbookImportService(
                 SourceTitle = row.SourceTitle,
                 Code = row.Code,
                 Name = row.Name,
-                ParentCapabilityCode = row.ParentCapabilityCodes.FirstOrDefault() ?? string.Empty,
+                ParentCapabilityCode = primaryCapabilityCode ?? string.Empty,
                 ParentCapabilityId = primaryCapability?.Id,
                 Description = row.Description,
                 Comments = row.Comments,
@@ -416,7 +417,7 @@ public sealed partial class TrmWorkbookImportService(
         }
     }
 
-    private static string GetRequiredSheetPath(IReadOnlyDictionary<string, string> sheetLookup, string sheetName)
+    private static string GetRequiredSheetPath(Dictionary<string, string> sheetLookup, string sheetName)
     {
         if (!sheetLookup.TryGetValue(sheetName, out var worksheetPath))
         {
@@ -475,7 +476,7 @@ public sealed partial class TrmWorkbookImportService(
             ?? [];
     }
 
-    private static IEnumerable<Dictionary<string, string>> ReadRows(
+    private static List<Dictionary<string, string>> ReadRows(
         ZipArchive archive,
         string worksheetPath,
         IReadOnlyList<string> sharedStrings)
@@ -516,7 +517,7 @@ public sealed partial class TrmWorkbookImportService(
         return rawValue;
     }
 
-    private static string GetValue(IReadOnlyDictionary<string, string> row, string columnName) =>
+    private static string GetValue(Dictionary<string, string> row, string columnName) =>
         row.TryGetValue(columnName, out var value) ? value.Trim() : string.Empty;
 
     private static string GetColumnReference(string? cellReference)
@@ -540,7 +541,7 @@ public sealed partial class TrmWorkbookImportService(
         return match.Success ? match.Value : rawValue.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
     }
 
-    private static IReadOnlyList<string> ExtractCodes(string? rawValue)
+    private static List<string> ExtractCodes(string? rawValue)
     {
         if (string.IsNullOrWhiteSpace(rawValue))
         {

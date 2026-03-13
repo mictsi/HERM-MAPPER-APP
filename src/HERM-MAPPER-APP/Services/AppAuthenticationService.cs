@@ -1,11 +1,12 @@
+using System.Globalization;
 using System.Text.Json;
-using HERM_MAPPER_APP.Configuration;
+using HERMMapperApp.Configuration;
 using System.Security.Claims;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
 public sealed class AppAuthenticationService(AuthenticationSecurityOptions authenticationSecurityOptions)
 {
@@ -14,12 +15,12 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
     public const string AuthenticationSourceOpenIdConnect = "oidc";
     public const string IdentityProviderClaimType = "herm:identity_provider";
 
-    public ClaimsPrincipal CreatePrincipal(AppUser user)
+    public static ClaimsPrincipal CreatePrincipal(AppUser user)
     {
         var normalizedRole = AppRoles.Normalize(user.RoleName);
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
             new(ClaimTypes.Name, user.UserName),
             new(ClaimTypes.GivenName, user.GivenName),
             new(ClaimTypes.Surname, user.LastName),
@@ -36,7 +37,7 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
             ClaimTypes.Role));
     }
 
-    public ClaimsPrincipal CreateExternalPrincipal(
+    public static ClaimsPrincipal CreateExternalPrincipal(
         ClaimsPrincipal? externalPrincipal,
         OpenIdConnectAuthenticationOptions options,
         string authenticationScheme)
@@ -51,7 +52,7 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
         var groupIds = ExtractGroupIds(sourceClaims, options.EffectiveGroupClaimType);
         var roles = ResolveExternalRoles(groupIds, options);
 
-        if (roles.Count == 0)
+        if (roles.Length == 0)
         {
             throw new InvalidOperationException("Your account does not map to any configured application role.");
         }
@@ -113,7 +114,7 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
     public static bool IsOpenIdConnectUser(ClaimsPrincipal principal) =>
         principal.HasClaim(AuthenticationSourceClaimType, AuthenticationSourceOpenIdConnect);
 
-    private static IReadOnlyList<string> ResolveExternalRoles(
+    private static string[] ResolveExternalRoles(
         IReadOnlyCollection<string> groupIds,
         OpenIdConnectAuthenticationOptions options)
     {
@@ -134,7 +135,7 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
             .ToArray();
     }
 
-    private static IReadOnlyCollection<string> ExtractGroupIds(IEnumerable<Claim> claims, string groupClaimType)
+    private static string[] ExtractGroupIds(IEnumerable<Claim> claims, string groupClaimType)
     {
         var groupIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -152,7 +153,7 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
         return groupIds.ToArray();
     }
 
-    private static IReadOnlyList<string> ParseClaimValues(string? value)
+    private static string[] ParseClaimValues(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -160,7 +161,7 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
         }
 
         var trimmedValue = value.Trim();
-        if (trimmedValue.StartsWith("[", StringComparison.Ordinal))
+        if (trimmedValue.StartsWith('['))
         {
             try
             {
@@ -174,6 +175,7 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
             }
             catch (JsonException)
             {
+                return [];
             }
         }
 
@@ -197,7 +199,7 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
         return string.Empty;
     }
 
-    private static void AddClaimIfPresent(ICollection<Claim> claims, string claimType, string? value)
+    private static void AddClaimIfPresent(List<Claim> claims, string claimType, string? value)
     {
         if (!string.IsNullOrWhiteSpace(value))
         {

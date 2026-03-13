@@ -1,16 +1,16 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Services;
+namespace HERMMapperApp.Tests.Services;
 
 public sealed class ConfiguredTimeZoneServiceTests
 {
     [Fact]
-    public async Task FormatUtcAsync_TreatsUnspecifiedValuesAsUtc_AndUsesConfiguredZone()
+    public async Task FormatUtcAsyncTreatsUnspecifiedValuesAsUtcAndUsesConfiguredZone()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting
@@ -28,7 +28,7 @@ public sealed class ConfiguredTimeZoneServiceTests
     }
 
     [Fact]
-    public async Task GetTimeZoneAsync_FallsBackToUtc_WhenConfiguredZoneIsInvalid()
+    public async Task GetTimeZoneAsyncFallsBackToUtcWhenConfiguredZoneIsInvalid()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting

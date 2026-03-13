@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Models;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace HERM_MAPPER_APP.ViewModels;
+namespace HERMMapperApp.ViewModels;
 
 public sealed class ServiceEditViewModel : IValidatableObject
 {
@@ -58,7 +58,7 @@ public sealed class ServiceEditViewModel : IValidatableObject
             Description = service.Description,
             Owner = service.Owner,
             LifecycleStatus = service.LifecycleStatus,
-            ProductRows = service.OrderedProductLinks
+            ProductRows = service.GetOrderedProductLinks()
                 .Select(x => new ServiceProductRowViewModel
                 {
                     ProductId = x.ProductCatalogItemId

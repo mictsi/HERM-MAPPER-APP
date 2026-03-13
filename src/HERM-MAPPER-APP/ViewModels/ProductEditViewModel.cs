@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Models;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace HERM_MAPPER_APP.ViewModels;
+namespace HERMMapperApp.ViewModels;
 
 public sealed class ProductEditViewModel
 {
@@ -42,7 +42,7 @@ public sealed class ProductEditViewModel
             Vendor = product.Vendor,
             Version = product.Version,
             LifecycleStatus = product.LifecycleStatus,
-            Owners = product.OwnerValues.ToList(),
+            Owners = product.GetOwnerValues().ToList(),
             Description = product.Description,
             Notes = product.Notes
         };

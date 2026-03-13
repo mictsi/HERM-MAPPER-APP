@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace HERM_MAPPER_APP.Models;
+namespace HERMMapperApp.Models;
 
 public sealed class ServiceCatalogItem
 {
@@ -26,11 +26,10 @@ public sealed class ServiceCatalogItem
 
     public ICollection<ServiceCatalogItemProduct> ProductLinks { get; set; } = new List<ServiceCatalogItemProduct>();
 
-    [NotMapped]
-    public IReadOnlyList<ServiceCatalogItemProduct> OrderedProductLinks => ProductLinks
+    public List<ServiceCatalogItemProduct> GetOrderedProductLinks() => ProductLinks
         .OrderBy(x => x.SortOrder)
         .ThenBy(x => x.Id)
-        .ToArray();
+        .ToList();
 
     [NotMapped]
     public int ConnectionCount => Math.Max(0, ProductLinks.Count - 1);

@@ -1,8 +1,8 @@
 using System.Security.Claims;
-using HERM_MAPPER_APP.Configuration;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Configuration;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables(prefix: "HERM_");
@@ -25,30 +26,16 @@ Program.ConfigureApplicationServices(builder.Services, builder.Configuration, bu
 var app = builder.Build();
 await Program.InitializeDatabaseAsync(app.Services);
 Program.ConfigurePipeline(app);
-app.Run();
-
-public sealed record StartupDiagnosticsOptions(
-    bool ConsoleLoggingEnabled,
-    LogLevel ConsoleLogLevel,
-    bool SqlLoggingEnabled,
-    LogLevel SqlLogLevel,
-    bool SqlSensitiveDataLoggingEnabled,
-    bool SqlDetailedErrorsEnabled);
-
-public sealed record AuthenticationSecurityOptions(
-    int SessionTimeoutMinutes,
-    int MaxFailedLoginAttempts,
-    int LockoutMinutes)
-{
-    public TimeSpan SessionTimeout => TimeSpan.FromMinutes(SessionTimeoutMinutes);
-
-    public TimeSpan LockoutDuration => TimeSpan.FromMinutes(LockoutMinutes);
-}
+await app.RunAsync();
 
 public partial class Program
 {
     private const string AntiforgeryCookieName = "HERM.Mapper.Antiforgery";
     private const string AuthenticationCookieName = "HERM.Mapper.Auth";
+
+    private Program()
+    {
+    }
 
     public static ResolvedDatabaseConfiguration ResolveDatabaseConfiguration(IConfiguration configuration, string contentRootPath) =>
         AppDatabaseConfiguration.Resolve(configuration, contentRootPath);
@@ -99,6 +86,7 @@ public partial class Program
         var options = new OpenIdConnectAuthenticationOptions
         {
             Enabled = section.GetValue<bool?>("Enabled") ?? false,
+            EmitTokensAndClaimsToConsole = section.GetValue<bool?>("EmitTokensAndClaimsToConsole") ?? false,
             DisplayName = section["DisplayName"] ?? "OpenID Connect",
             Authority = section["Authority"] ?? string.Empty,
             MetadataAddress = section["MetadataAddress"] ?? string.Empty,
@@ -220,7 +208,6 @@ public partial class Program
                 case DatabaseProviderKind.SqlServer:
                     options.UseSqlServer(databaseConfiguration.ConnectionString);
                     break;
-                case DatabaseProviderKind.Sqlite:
                 default:
                     options.UseSqlite(databaseConfiguration.ConnectionString);
                     break;
@@ -243,11 +230,8 @@ public partial class Program
         services.AddScoped<TrmWorkbookImportService>();
         services.AddScoped<SampleRelationshipImportService>();
         services.AddScoped<DatabaseInitializer>();
-        services.AddScoped<CsvExportService>();
         services.AddScoped<AuditLogService>();
         services.AddScoped<AppSettingsService>();
-        services.AddScoped<PasswordPolicyService>();
-        services.AddScoped<PasswordHashService>();
         services.AddScoped<AppAuthenticationService>();
         services.AddScoped<ConfigurableFieldService>();
         services.AddScoped<ComponentVersioningService>();
@@ -311,11 +295,11 @@ public partial class Program
                 {
                     OnTokenValidated = context =>
                     {
-                        var authenticationService = context.HttpContext.RequestServices.GetRequiredService<AppAuthenticationService>();
+                        LogOpenIdConnectDebugDetails(context, openIdConnectAuthenticationOptions);
 
                         try
                         {
-                            context.Principal = authenticationService.CreateExternalPrincipal(
+                            context.Principal = AppAuthenticationService.CreateExternalPrincipal(
                                 context.Principal,
                                 openIdConnectAuthenticationOptions,
                                 OpenIdConnectDefaults.AuthenticationScheme);
@@ -416,5 +400,60 @@ public partial class Program
         }
 
         return $"/Account/Login?{string.Join("&", querySegments)}";
+    }
+
+    public static void LogOpenIdConnectDebugDetails(TokenValidatedContext context, OpenIdConnectAuthenticationOptions options)
+    {
+        if (!options.EmitTokensAndClaimsToConsole)
+        {
+            return;
+        }
+
+        var loggerFactory = context.HttpContext.RequestServices.GetService<ILoggerFactory>();
+        var logger = loggerFactory?.CreateLogger("HERMMapperApp.OpenIdConnectDebug");
+        if (logger is null)
+        {
+            return;
+        }
+
+        var message = new StringBuilder();
+        message.AppendLine("OpenID Connect token validation debug output");
+        message.AppendLine("Claims:");
+
+        var claims = context.Principal?.Claims
+            .Select(claim => $"  {claim.Type} = {claim.Value}")
+            .ToArray()
+            ?? [];
+
+        if (claims.Length == 0)
+        {
+            message.AppendLine("  <none>");
+        }
+        else
+        {
+            foreach (var claim in claims)
+            {
+                message.AppendLine(claim);
+            }
+        }
+
+        message.AppendLine("Tokens:");
+        var tokens = context.Properties?.GetTokens()?.ToArray() ?? [];
+        if (tokens.Length == 0)
+        {
+            message.AppendLine("  <none>");
+        }
+        else
+        {
+            foreach (var token in tokens)
+            {
+                message.Append("  ");
+                message.Append(token.Name);
+                message.Append(" = ");
+                message.AppendLine(token.Value ?? string.Empty);
+            }
+        }
+
+        logger.LogInformation("{OpenIdConnectDebugDetails}", message.ToString());
     }
 }

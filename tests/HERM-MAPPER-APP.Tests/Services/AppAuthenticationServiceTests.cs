@@ -1,14 +1,14 @@
 using System.Security.Claims;
-using HERM_MAPPER_APP.Configuration;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Configuration;
+using HERMMapperApp.Services;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Services;
+namespace HERMMapperApp.Tests.Services;
 
 public sealed class AppAuthenticationServiceTests
 {
     [Fact]
-    public void CreateProperties_UsesConfiguredSessionTimeout()
+    public void CreatePropertiesUsesConfiguredSessionTimeout()
     {
         var options = new AuthenticationSecurityOptions(
             SessionTimeoutMinutes: 60,
@@ -27,12 +27,8 @@ public sealed class AppAuthenticationServiceTests
     }
 
     [Fact]
-    public void CreateExternalPrincipal_MapsRoleClaims_FromConfiguredGroups()
+    public void CreateExternalPrincipalMapsRoleClaimsFromConfiguredGroups()
     {
-        var securityOptions = new AuthenticationSecurityOptions(
-            SessionTimeoutMinutes: 60,
-            MaxFailedLoginAttempts: 15,
-            LockoutMinutes: 1);
         var oidcOptions = new OpenIdConnectAuthenticationOptions
         {
             Enabled = true,
@@ -40,8 +36,8 @@ public sealed class AppAuthenticationServiceTests
             ClientId = "client-id",
             RoleGroupMappings = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
             {
-                [HERM_MAPPER_APP.Models.AppRoles.Administrator] = ["group-admin"],
-                [HERM_MAPPER_APP.Models.AppRoles.Viewer] = ["group-viewer"]
+                [HERMMapperApp.Models.AppRoles.Administrator] = ["group-admin"],
+                [HERMMapperApp.Models.AppRoles.Viewer] = ["group-viewer"]
             }
         };
         var externalPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
@@ -51,13 +47,11 @@ public sealed class AppAuthenticationServiceTests
             new Claim("email", "ada@example.com"),
             new Claim("groups", "[\"group-admin\",\"group-viewer\"]")
         ], "oidc"));
-        var service = new AppAuthenticationService(securityOptions);
-
-        var principal = service.CreateExternalPrincipal(externalPrincipal, oidcOptions, "oidc");
+        var principal = AppAuthenticationService.CreateExternalPrincipal(externalPrincipal, oidcOptions, "oidc");
 
         Assert.Equal("Ada Lovelace", principal.Identity?.Name);
-        Assert.True(principal.IsInRole(HERM_MAPPER_APP.Models.AppRoles.Administrator));
-        Assert.True(principal.IsInRole(HERM_MAPPER_APP.Models.AppRoles.Viewer));
+        Assert.True(principal.IsInRole(HERMMapperApp.Models.AppRoles.Administrator));
+        Assert.True(principal.IsInRole(HERMMapperApp.Models.AppRoles.Viewer));
         Assert.True(AppAuthenticationService.IsOpenIdConnectUser(principal));
     }
 }

@@ -1,16 +1,14 @@
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Services;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Services;
+namespace HERMMapperApp.Tests.Services;
 
 public sealed class PasswordSecurityServiceTests
 {
     [Fact]
-    public void PasswordPolicy_RejectsWeakPassword()
+    public void PasswordPolicyRejectsWeakPassword()
     {
-        var service = new PasswordPolicyService();
-
-        var result = service.Validate("short");
+        var result = PasswordPolicyService.Validate("short");
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error => error.Contains("12 characters", StringComparison.Ordinal));
@@ -19,12 +17,11 @@ public sealed class PasswordSecurityServiceTests
     }
 
     [Fact]
-    public void PasswordHash_RoundTripsPassword()
+    public void PasswordHashRoundTripsPassword()
     {
-        var service = new PasswordHashService();
-        var hash = service.HashPassword("ChangeMeNow!123");
+        var hash = PasswordHashService.HashPassword("ChangeMeNow!123");
 
-        Assert.True(service.VerifyPassword("ChangeMeNow!123", hash));
-        Assert.False(service.VerifyPassword("WrongPassword!123", hash));
+        Assert.True(PasswordHashService.VerifyPassword("ChangeMeNow!123", hash));
+        Assert.False(PasswordHashService.VerifyPassword("WrongPassword!123", hash));
     }
 }

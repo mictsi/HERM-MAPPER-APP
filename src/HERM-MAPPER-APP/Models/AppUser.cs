@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
-namespace HERM_MAPPER_APP.Models;
+namespace HERMMapperApp.Models;
 
 public sealed class AppUser
 {

@@ -1,19 +1,19 @@
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class MappingsControllerTests
 {
     [Fact]
-    public async Task Capabilities_ReturnsFilteredCapabilities()
+    public async Task CapabilitiesReturnsFilteredCapabilities()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domainA = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -33,7 +33,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task Components_ExcludesDeletedComponents_AndOrdersModelBeforeCustom()
+    public async Task ComponentsExcludesDeletedComponentsAndOrdersModelBeforeCustom()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -69,7 +69,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task Create_Post_WithCustomComponent_CreatesMappingComponentHistoryAndAudit()
+    public async Task CreatePostWithCustomComponentCreatesMappingComponentHistoryAndAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -111,14 +111,14 @@ public sealed class MappingsControllerTests
         Assert.Single(component.CapabilityLinks);
         Assert.Single(versions);
         Assert.Equal("Created", versions[0].ChangeType);
-        Assert.Equal(["Team Blue"], persistedProduct.OwnerValues);
+        Assert.Equal(["Team Blue"], persistedProduct.GetOwnerValues());
         Assert.Equal(2, audits.Count);
         Assert.Contains(audits, entry => entry.Category == "Mapping" && entry.Action == "Create");
         Assert.Contains(audits, entry => entry.Category == "Component" && entry.Action == "Create");
     }
 
     [Fact]
-    public async Task ExportCsv_ReturnsOnlyCompletedMappings_WhenIncludeUnfinishedIsFalse()
+    public async Task ExportCsvReturnsOnlyCompletedMappingsWhenIncludeUnfinishedIsFalse()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -197,7 +197,6 @@ public sealed class MappingsControllerTests
         public MappingsController CreateController() =>
             new(
                 DbContext,
-                new CsvExportService(),
                 new AuditLogService(DbContext),
                 new ComponentVersioningService(DbContext),
                 new ConfigurableFieldService(DbContext));

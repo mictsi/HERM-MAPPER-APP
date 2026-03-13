@@ -1,11 +1,11 @@
 using System.Text;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Models;
 
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
-public sealed class CsvExportService
+public static class CsvExportService
 {
-    public string BuildProductMappingExport(IEnumerable<ProductMapping> mappings)
+    public static string BuildProductMappingExport(IEnumerable<ProductMapping> mappings)
     {
         var builder = new StringBuilder();
 

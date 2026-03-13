@@ -1,7 +1,7 @@
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Data;
+namespace HERMMapperApp.Data;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {

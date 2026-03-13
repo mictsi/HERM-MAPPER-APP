@@ -1,13 +1,13 @@
-using HERM_MAPPER_APP.Configuration;
+using HERMMapperApp.Configuration;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Configuration;
+namespace HERMMapperApp.Tests.Configuration;
 
 public sealed class AppDatabaseConfigurationTests
 {
     [Fact]
-    public void Resolve_UsesSqliteDefaults_WhenNoOverridesExist()
+    public void ResolveUsesSqliteDefaultsWhenNoOverridesExist()
     {
         using var contentRoot = new TemporaryDirectory();
         var configuration = new ConfigurationBuilder()
@@ -23,7 +23,7 @@ public sealed class AppDatabaseConfigurationTests
     }
 
     [Fact]
-    public void Resolve_UsesPrefixedEnvironmentVariables_ForSqlServer()
+    public void ResolveUsesPrefixedEnvironmentVariablesForSqlServer()
     {
         using var contentRoot = new TemporaryDirectory();
         using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
@@ -50,7 +50,7 @@ public sealed class AppDatabaseConfigurationTests
     }
 
     [Fact]
-    public void Resolve_UsesHomeDirectoryToken_ForSqlitePath()
+    public void ResolveUsesHomeDirectoryTokenForSqlitePath()
     {
         using var contentRoot = new TemporaryDirectory();
         using var homeDirectory = new TemporaryDirectory();
@@ -75,7 +75,7 @@ public sealed class AppDatabaseConfigurationTests
     }
 
     [Fact]
-    public void Resolve_ExpandsEnvironmentVariables_ForSqliteConnectionString()
+    public void ResolveExpandsEnvironmentVariablesForSqliteConnectionString()
     {
         using var contentRoot = new TemporaryDirectory();
         using var homeDirectory = new TemporaryDirectory();
@@ -100,7 +100,7 @@ public sealed class AppDatabaseConfigurationTests
     }
 
     [Fact]
-    public void Resolve_Throws_WhenSqlServerHasNoConnectionString()
+    public void ResolveThrowsWhenSqlServerHasNoConnectionString()
     {
         using var contentRoot = new TemporaryDirectory();
         var configuration = new ConfigurationBuilder()
@@ -139,8 +139,8 @@ public sealed class AppDatabaseConfigurationTests
 
     private sealed class EnvironmentVariableScope : IDisposable
     {
-        private readonly IReadOnlyDictionary<string, string?> originalValues;
-        private readonly IReadOnlyDictionary<string, string?> newValues;
+        private readonly Dictionary<string, string?> originalValues;
+        private readonly Dictionary<string, string?> newValues;
 
         public EnvironmentVariableScope(IReadOnlyDictionary<string, string?> newValues)
         {

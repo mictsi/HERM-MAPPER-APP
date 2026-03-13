@@ -1,8 +1,8 @@
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,12 +12,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class ConfigurationAndChangeLogControllerTests
 {
     [Fact]
-    public async Task ChangeLogIndex_FiltersBySearch_AndOrdersNewestFirst()
+    public async Task ChangeLogIndexFiltersBySearchAndOrdersNewestFirst()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AuditLogEntries.AddRange(
@@ -49,7 +49,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateChangeLogController().Index("Product");
+        var result = await fixture.CreateChangeLogController().IndexAsync("Product");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ChangeLogIndexViewModel>(view.Model);
@@ -61,10 +61,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AddOption_CreatesOption_AndWritesAuditLog()
+    public async Task AddOptionCreatesOptionAndWritesAuditLog()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var controller = fixture.CreateConfigurationController();
+        using var controller = fixture.CreateConfigurationController();
 
         var result = await controller.AddOption(new AddConfigurationOptionInputModel
         {
@@ -87,7 +87,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AddOption_RejectsDuplicateValue_IgnoringCase()
+    public async Task AddOptionRejectsDuplicateValueIgnoringCase()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.Add(new ConfigurableFieldOption
@@ -98,7 +98,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         });
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateConfigurationController();
+        using var controller = fixture.CreateConfigurationController();
 
         var result = await controller.AddOption(new AddConfigurationOptionInputModel
         {
@@ -113,7 +113,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task UpdateOptionOrder_ReordersOptions_AndRenumbersSequentially()
+    public async Task UpdateOptionOrderReordersOptionsAndRenumbersSequentially()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.AddRange(
@@ -141,7 +141,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         var optionToMove = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync(x => x.Value == "Team C");
-        var controller = fixture.CreateConfigurationController();
+        using var controller = fixture.CreateConfigurationController();
 
         var result = await controller.UpdateOptionOrder(new UpdateConfigurationOptionOrderInputModel
         {
@@ -165,7 +165,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task DeleteOption_RemovesOption_NormalizesSortOrder_AndWritesAuditLog()
+    public async Task DeleteOptionRemovesOptionNormalizesSortOrderAndWritesAuditLog()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.AddRange(
@@ -190,7 +190,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         var option = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync(x => x.Value == "Team B");
-        var controller = fixture.CreateConfigurationController();
+        using var controller = fixture.CreateConfigurationController();
 
         var result = await controller.DeleteOption(option.Id);
 
@@ -210,10 +210,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task UpdateDisplayTimeZone_PersistsSetting_AndWritesAuditLog()
+    public async Task UpdateDisplayTimeZonePersistsSettingAndWritesAuditLog()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var controller = fixture.CreateConfigurationController();
+        using var controller = fixture.CreateConfigurationController();
 
         var result = await controller.UpdateDisplayTimeZone(new UpdateDisplayTimeZoneInputModel
         {
@@ -233,10 +233,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task UpdateDisplayTimeZone_RejectsUnknownTimeZone()
+    public async Task UpdateDisplayTimeZoneRejectsUnknownTimeZone()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var controller = fixture.CreateConfigurationController();
+        using var controller = fixture.CreateConfigurationController();
 
         var result = await controller.UpdateDisplayTimeZone(new UpdateDisplayTimeZoneInputModel
         {
@@ -249,11 +249,13 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task VerifyProductImport_ReturnsErrorReview_WhenFileExtensionIsInvalid()
+    public async Task VerifyProductImportReturnsErrorReviewWhenFileExtensionIsInvalid()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var controller = fixture.CreateConfigurationController();
-        var file = CreateFormFile("relationships.txt", "not-a-csv");
+        using var controller = fixture.CreateConfigurationController();
+        var bytes = System.Text.Encoding.UTF8.GetBytes("not-a-csv");
+        await using var stream = new MemoryStream(bytes);
+        var file = new FormFile(stream, 0, bytes.Length, "file", "relationships.txt");
 
         var result = await controller.VerifyProductImport(file);
 
@@ -266,23 +268,16 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task ImportVerifiedProducts_WithMissingToken_RedirectsWithError()
+    public async Task ImportVerifiedProductsWithMissingTokenRedirectsWithError()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        var controller = fixture.CreateConfigurationController();
+        using var controller = fixture.CreateConfigurationController();
 
         var result = await controller.ImportVerifiedProducts("");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
         Assert.Equal("Verify a product CSV before importing it.", controller.TempData["ConfigurationError"]);
-    }
-
-    private static IFormFile CreateFormFile(string fileName, string content)
-    {
-        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-        var stream = new MemoryStream(bytes);
-        return new FormFile(stream, 0, bytes.Length, "file", fileName);
     }
 
     private sealed class TestFixture : IAsyncDisposable

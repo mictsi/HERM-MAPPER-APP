@@ -1,8 +1,8 @@
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -10,18 +10,18 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class ServicesControllerTests
 {
     [Fact]
-    public async Task Create_Post_PersistsService_NormalizesSelections_AndWritesAudit()
+    public async Task CreatePostPersistsServiceNormalizesSelectionsAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
 
         var products = await fixture.SeedProductsAsync("Sentinel", "Purview");
-        var controller = fixture.CreateController();
+        using var controller = fixture.CreateController();
 
         var result = await controller.Create(new ServiceEditViewModel
         {
@@ -48,12 +48,12 @@ public sealed class ServicesControllerTests
         Assert.Equal("Security Operations", service.Name);
         Assert.Equal("Team Blue", service.Owner);
         Assert.Equal("Production", service.LifecycleStatus);
-        Assert.Equal(["Sentinel", "Purview"], service.OrderedProductLinks.Select(x => x.ProductCatalogItem.Name).ToArray());
+        Assert.Equal(["Sentinel", "Purview"], service.GetOrderedProductLinks().Select(x => x.ProductCatalogItem.Name).ToArray());
         Assert.Equal("Create", audit.Action);
     }
 
     [Fact]
-    public async Task Edit_Post_RebuildsOrderedProductLinks_AndWritesAudit()
+    public async Task EditPostRebuildsOrderedProductLinksAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -75,7 +75,7 @@ public sealed class ServicesControllerTests
         fixture.DbContext.ServiceCatalogItems.Add(service);
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateController();
+        using var controller = fixture.CreateController();
         var result = await controller.Edit(service.Id, new ServiceEditViewModel
         {
             Name = "Payments Revised",
@@ -102,12 +102,12 @@ public sealed class ServicesControllerTests
         Assert.Equal("Payments Revised", updatedService.Name);
         Assert.Equal("Team Green", updatedService.Owner);
         Assert.Equal("Production", updatedService.LifecycleStatus);
-        Assert.Equal(["Core", "Atlas", "Broker"], updatedService.OrderedProductLinks.Select(x => x.ProductCatalogItem.Name).ToArray());
+        Assert.Equal(["Core", "Atlas", "Broker"], updatedService.GetOrderedProductLinks().Select(x => x.ProductCatalogItem.Name).ToArray());
         Assert.Equal("Update", audit.Action);
     }
 
     [Fact]
-    public async Task Index_FiltersBySearchOwnerAndLifecycleStatus()
+    public async Task IndexFiltersBySearchOwnerAndLifecycleStatus()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -151,7 +151,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task Visualize_ReturnsConnectionsInSavedOrder()
+    public async Task VisualizeReturnsConnectionsInSavedOrder()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -186,7 +186,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task DeleteConfirmed_RemovesService_AndWritesAudit()
+    public async Task DeleteConfirmedRemovesServiceAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
 

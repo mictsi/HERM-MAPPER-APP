@@ -1,4 +1,4 @@
-namespace HERM_MAPPER_APP.Models;
+namespace HERMMapperApp.Models;
 
 public class ErrorViewModel
 {

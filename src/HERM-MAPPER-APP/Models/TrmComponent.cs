@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace HERM_MAPPER_APP.Models;
+namespace HERMMapperApp.Models;
 
 public sealed class TrmComponent
 {

@@ -1,13 +1,13 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Infrastructure;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class ProductsController(
@@ -27,7 +27,7 @@ public sealed class ProductsController(
 
         var selectedOwners = NormalizeSelections(owners);
         lifecycleStatus = NormalizeSelection(lifecycleStatus);
-        var selectedOwnersLower = selectedOwners.Select(x => x.ToLowerInvariant()).ToList();
+    var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
 
         var likePattern = SearchPattern.CreateContainsPattern(search);
         if (likePattern is not null)
@@ -42,14 +42,14 @@ public sealed class ProductsController(
                 (x.Notes != null && EF.Functions.Like(x.Notes, likePattern)));
         }
 
-        if (selectedOwnersLower.Count != 0)
+        if (selectedOwners.Count != 0)
         {
-            query = query.Where(x => x.Owners.Any(owner => selectedOwnersLower.Contains(owner.OwnerValue.ToLower())));
+            query = query.Where(x => x.Owners.Any(owner => selectedOwners.Contains(EF.Functions.Collate(owner.OwnerValue, caseInsensitiveCollation))));
         }
 
         if (lifecycleStatus is not null)
         {
-            query = query.Where(x => x.LifecycleStatus != null && x.LifecycleStatus.ToLower() == lifecycleStatus.ToLower());
+            query = query.Where(x => x.LifecycleStatus != null && EF.Functions.Collate(x.LifecycleStatus, caseInsensitiveCollation) == lifecycleStatus);
         }
 
         var model = new ProductsIndexViewModel
@@ -516,10 +516,10 @@ public sealed class ProductsController(
             Name = product.Name,
             Vendor = product.Vendor,
             LifecycleStatus = product.LifecycleStatus,
-            Owners = product.OwnerValues
+            Owners = product.GetOwnerValues()
         };
 
-    private static IReadOnlyList<string> BuildAppliedFieldList(ProductBulkEditViewModel input)
+    private static List<string> BuildAppliedFieldList(ProductBulkEditViewModel input)
     {
         var appliedFields = new List<string>();
         if (input.ApplyVendor)
@@ -542,25 +542,25 @@ public sealed class ProductsController(
         return appliedFields;
     }
 
-    private static bool OwnerSelectionsMatch(ProductCatalogItem product, IReadOnlyCollection<string> selectedOwners)
+    private static bool OwnerSelectionsMatch(ProductCatalogItem product, List<string> selectedOwners)
     {
         if (product.Owners.Count != selectedOwners.Count)
         {
             return false;
         }
 
-        return product.Owners.All(owner =>
-            selectedOwners.Any(selected => string.Equals(selected, owner.OwnerValue, StringComparison.OrdinalIgnoreCase)));
+        return product.Owners.ToList().TrueForAll(owner =>
+            selectedOwners.Exists(selected => string.Equals(selected, owner.OwnerValue, StringComparison.OrdinalIgnoreCase)));
     }
 
-    private static IReadOnlyList<string> ResolveBulkOwnerSelection(ProductCatalogItem product, ProductBulkEditViewModel input)
+    private static List<string> ResolveBulkOwnerSelection(ProductCatalogItem product, ProductBulkEditViewModel input)
     {
         if (input.OwnerUpdateMode != ProductBulkOwnerUpdateModes.Append)
         {
-            return input.Owners;
+            return input.Owners.ToList();
         }
 
-        var mergedOwners = product.OwnerValues.ToList();
+        var mergedOwners = product.GetOwnerValues().ToList();
         foreach (var owner in input.Owners)
         {
             if (mergedOwners.Contains(owner, StringComparer.OrdinalIgnoreCase))

@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace HERM_MAPPER_APP.Configuration;
+namespace HERMMapperApp.Configuration;
 
 public sealed class LocalAuthenticationOptions
 {
@@ -10,6 +10,8 @@ public sealed class LocalAuthenticationOptions
 public sealed class OpenIdConnectAuthenticationOptions
 {
     public bool Enabled { get; init; }
+
+    public bool EmitTokensAndClaimsToConsole { get; init; }
 
     public string DisplayName { get; init; } = "OpenID Connect";
 

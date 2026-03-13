@@ -1,8 +1,8 @@
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -10,16 +10,16 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class ProductsControllerCrudTests
 {
     [Fact]
-    public async Task Create_Post_PersistsProduct_NormalizesSelections_AndWritesAudit()
+    public async Task CreatePostPersistsProductNormalizesSelectionsAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
-        var controller = fixture.CreateController();
+        using var controller = fixture.CreateController();
 
         var result = await controller.Create(new ProductEditViewModel
         {
@@ -40,12 +40,12 @@ public sealed class ProductsControllerCrudTests
 
         Assert.Equal(" Sentinel ", product.Name);
         Assert.Equal("Production", product.LifecycleStatus);
-        Assert.Equal(["Team Blue", "Team Red"], product.OwnerValues);
+        Assert.Equal(["Team Blue", "Team Red"], product.GetOwnerValues());
         Assert.Equal("Create", audit.Action);
     }
 
     [Fact]
-    public async Task Edit_Post_UpdatesProductAndSynchronizesOwners()
+    public async Task EditPostUpdatesProductAndSynchronizesOwners()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -64,7 +64,7 @@ public sealed class ProductsControllerCrudTests
         fixture.DbContext.ProductCatalogItems.Add(product);
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateController();
+        using var controller = fixture.CreateController();
         var result = await controller.Edit(product.Id, new ProductEditViewModel
         {
             Name = "Sentinel X",
@@ -85,12 +85,12 @@ public sealed class ProductsControllerCrudTests
         Assert.Equal("Sentinel X", updatedProduct.Name);
         Assert.Equal("Contoso", updatedProduct.Vendor);
         Assert.Equal("Production", updatedProduct.LifecycleStatus);
-        Assert.Equal(["Team Blue", "Team Green"], updatedProduct.OwnerValues);
+        Assert.Equal(["Team Blue", "Team Green"], updatedProduct.GetOwnerValues());
         Assert.Equal("Update", audit.Action);
     }
 
     [Fact]
-    public async Task BulkEdit_Get_ReturnsSelectedProductsAndPreservesReturnFilters()
+    public async Task BulkEditGetReturnsSelectedProductsAndPreservesReturnFilters()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -131,7 +131,7 @@ public sealed class ProductsControllerCrudTests
     }
 
     [Fact]
-    public async Task BulkEdit_Post_UpdatesSelectedProducts_AndWritesAudit()
+    public async Task BulkEditPostUpdatesSelectedProductsAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -161,7 +161,7 @@ public sealed class ProductsControllerCrudTests
         fixture.DbContext.ProductCatalogItems.AddRange(sentinel, atlas, draft);
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateController();
+        using var controller = fixture.CreateController();
         var result = await controller.BulkEdit(new ProductBulkEditViewModel
         {
             SelectedProductIds = [sentinel.Id, atlas.Id],
@@ -189,15 +189,15 @@ public sealed class ProductsControllerCrudTests
 
         Assert.Equal("Contoso", updatedProducts[0].Vendor);
         Assert.Equal("Production", updatedProducts[0].LifecycleStatus);
-        Assert.Equal(["Team Green"], updatedProducts[0].OwnerValues);
+        Assert.Equal(["Team Green"], updatedProducts[0].GetOwnerValues());
 
         Assert.Equal("Contoso", updatedProducts[2].Vendor);
         Assert.Equal("Production", updatedProducts[2].LifecycleStatus);
-        Assert.Equal(["Team Green"], updatedProducts[2].OwnerValues);
+        Assert.Equal(["Team Green"], updatedProducts[2].GetOwnerValues());
 
         Assert.Equal("Legacy", updatedProducts[1].Vendor);
         Assert.Equal("Pilot", updatedProducts[1].LifecycleStatus);
-        Assert.Equal(["Team Red"], updatedProducts[1].OwnerValues);
+        Assert.Equal(["Team Red"], updatedProducts[1].GetOwnerValues());
 
         Assert.Equal("BulkUpdate", audit.Action);
         Assert.Contains("Vendor", audit.Details);
@@ -206,7 +206,7 @@ public sealed class ProductsControllerCrudTests
     }
 
     [Fact]
-    public async Task BulkEdit_Post_AppendsOwners_WhenAppendModeIsSelected()
+    public async Task BulkEditPostAppendsOwnersWhenAppendModeIsSelected()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -229,7 +229,7 @@ public sealed class ProductsControllerCrudTests
         fixture.DbContext.ProductCatalogItems.AddRange(sentinel, atlas);
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateController();
+        using var controller = fixture.CreateController();
         var result = await controller.BulkEdit(new ProductBulkEditViewModel
         {
             SelectedProductIds = [sentinel.Id, atlas.Id],
@@ -247,13 +247,13 @@ public sealed class ProductsControllerCrudTests
             .ToListAsync();
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
 
-        Assert.Equal(["Team Green", "Team Red"], updatedProducts[0].OwnerValues);
-        Assert.Equal(["Team Blue", "Team Green", "Team Red"], updatedProducts[1].OwnerValues);
+        Assert.Equal(["Team Green", "Team Red"], updatedProducts[0].GetOwnerValues());
+        Assert.Equal(["Team Blue", "Team Green", "Team Red"], updatedProducts[1].GetOwnerValues());
         Assert.Contains("Owners (append)", audit.Details);
     }
 
     [Fact]
-    public async Task Visualize_ReturnsDistinctPaths_UsingFallbackHierarchy()
+    public async Task VisualizeReturnsDistinctPathsUsingFallbackHierarchy()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -302,7 +302,7 @@ public sealed class ProductsControllerCrudTests
     }
 
     [Fact]
-    public async Task DeleteConfirmed_RemovesProduct_AndWritesAudit()
+    public async Task DeleteConfirmedRemovesProductAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var product = new ProductCatalogItem { Name = "Sentinel" };

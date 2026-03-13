@@ -1,16 +1,16 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Services;
+namespace HERMMapperApp.Tests.Services;
 
 public sealed class SampleRelationshipImportServiceTests
 {
     [Fact]
-    public async Task VerifyAsync_ShowsPreviewActions_ForEachRow()
+    public async Task VerifyAsyncShowsPreviewActionsForEachRow()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
@@ -57,7 +57,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task VerifyAsync_Fails_WhenHeaderIsInvalid()
+    public async Task VerifyAsyncFailsWhenHeaderIsInvalid()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var csvPath = fixture.WriteCsv(
@@ -75,7 +75,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsync_CreatesProductAndMapping_WhenHierarchyMatches()
+    public async Task ImportAsyncCreatesProductAndMappingWhenHierarchyMatches()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
@@ -103,7 +103,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsync_CreatesOnlyProduct_WhenHierarchyDoesNotMatch()
+    public async Task ImportAsyncCreatesOnlyProductWhenHierarchyDoesNotMatch()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHierarchyAsync("Infrastructure", "Capability A", "Monitoring & Alerting", "TC002");
@@ -129,7 +129,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsync_CreatesOnlyProduct_WhenDomainDoesNotMatchCapabilityParentDomain()
+    public async Task ImportAsyncCreatesOnlyProductWhenDomainDoesNotMatchCapabilityParentDomain()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
@@ -154,7 +154,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsync_ImportsIntoExistingCatalogue_AndSkipsDuplicateMapping()
+    public async Task ImportAsyncImportsIntoExistingCatalogueAndSkipsDuplicateMapping()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var hierarchy = await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");

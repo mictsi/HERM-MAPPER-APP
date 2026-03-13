@@ -1,7 +1,7 @@
-using HERM_MAPPER_APP.Configuration;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Configuration;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
@@ -12,12 +12,12 @@ using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests;
+namespace HERMMapperApp.Tests;
 
 public sealed class ProgramStartupTests
 {
     [Fact]
-    public void BuildDiagnosticsOptions_UsesConfiguredValues_AndParsesLogLevels()
+    public void BuildDiagnosticsOptionsUsesConfiguredValuesAndParsesLogLevels()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -42,7 +42,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public void BuildAuthenticationSecurityOptions_UsesConfiguredValues()
+    public void BuildAuthenticationSecurityOptionsUsesConfiguredValues()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -62,7 +62,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public void BuildLocalAuthenticationOptions_UsesConfiguredValue()
+    public void BuildLocalAuthenticationOptionsUsesConfiguredValue()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -77,12 +77,13 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public void BuildOpenIdConnectAuthenticationOptions_UsesConfiguredRoleMappings()
+    public void BuildOpenIdConnectAuthenticationOptionsUsesConfiguredRoleMappings()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Security:Authentication:OpenIdConnect:Enabled"] = "true",
+                ["Security:Authentication:OpenIdConnect:EmitTokensAndClaimsToConsole"] = "true",
                 ["Security:Authentication:OpenIdConnect:Authority"] = "https://login.example.com",
                 ["Security:Authentication:OpenIdConnect:ClientId"] = "client-id",
                 ["Security:Authentication:OpenIdConnect:RoleGroupMappings:Administrator:0"] = "11111111-1111-1111-1111-111111111111",
@@ -93,6 +94,7 @@ public sealed class ProgramStartupTests
         var options = Program.BuildOpenIdConnectAuthenticationOptions(configuration);
 
         Assert.True(options.Enabled);
+    Assert.True(options.EmitTokensAndClaimsToConsole);
         Assert.Equal("https://login.example.com", options.Authority);
         Assert.Equal("client-id", options.ClientId);
         Assert.Equal("11111111-1111-1111-1111-111111111111", options.RoleGroupMappings[AppRoles.Administrator].Single());
@@ -100,7 +102,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public void BuildCookieSecurePolicy_UsesEnvironmentDefault_AndAllowsOverride()
+    public void BuildCookieSecurePolicyUsesEnvironmentDefaultAndAllowsOverride()
     {
         var configuration = new ConfigurationBuilder().Build();
         var overrideConfiguration = new ConfigurationBuilder()
@@ -116,14 +118,14 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public void BuildCookieName_UsesHostPrefix_OnlyWhenCookiesRequireHttps()
+    public void BuildCookieNameUsesHostPrefixOnlyWhenCookiesRequireHttps()
     {
         Assert.Equal("HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.SameAsRequest));
         Assert.Equal("__Host-HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.Always));
     }
 
     [Fact]
-    public void ParseLogLevel_ReturnsFallback_WhenValueIsInvalid()
+    public void ParseLogLevelReturnsFallbackWhenValueIsInvalid()
     {
         var parsed = Program.ParseLogLevel("not-a-level", LogLevel.Error);
 
@@ -131,7 +133,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public async Task ConfigureApplicationServices_RegistersSqliteServices_AndInitializeDatabaseAsyncSeedsDefaults()
+    public async Task ConfigureApplicationServicesRegistersSqliteServicesAndInitializeDatabaseAsyncSeedsDefaults()
     {
         using var contentRoot = new TemporaryDirectory();
         Directory.CreateDirectory(Path.Combine(contentRoot.Path, "App_Data"));
@@ -168,8 +170,6 @@ public sealed class ProgramStartupTests
         Assert.Equal("Microsoft.EntityFrameworkCore.Sqlite", dbContext.Database.ProviderName);
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AuditLogService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AppSettingsService>());
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<PasswordPolicyService>());
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<PasswordHashService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AppAuthenticationService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ComponentVersioningService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ConfiguredTimeZoneService>());
@@ -194,7 +194,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public async Task ConfigureApplicationServices_RegistersRolePolicies_ForRequestedAccessMatrix()
+    public async Task ConfigureApplicationServicesRegistersRolePoliciesForRequestedAccessMatrix()
     {
         using var contentRoot = new TemporaryDirectory();
         Directory.CreateDirectory(Path.Combine(contentRoot.Path, "App_Data"));

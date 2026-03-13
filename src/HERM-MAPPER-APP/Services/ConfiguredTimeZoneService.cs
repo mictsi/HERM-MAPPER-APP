@@ -1,6 +1,7 @@
-using HERM_MAPPER_APP.Models;
+using System.Globalization;
+using HERMMapperApp.Models;
 
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
 public sealed class ConfiguredTimeZoneService(AppSettingsService appSettingsService)
 {
@@ -39,7 +40,7 @@ public sealed class ConfiguredTimeZoneService(AppSettingsService appSettingsServ
     {
         var timeZone = await GetTimeZoneAsync(cancellationToken);
         var utcValue = EnsureUtc(value);
-        return TimeZoneInfo.ConvertTimeFromUtc(utcValue, timeZone).ToString(format);
+        return TimeZoneInfo.ConvertTimeFromUtc(utcValue, timeZone).ToString(format, CultureInfo.InvariantCulture);
     }
 
     public async Task<string?> FormatUtcAsync(DateTime? value, string format = "yyyy-MM-dd HH:mm", CancellationToken cancellationToken = default)

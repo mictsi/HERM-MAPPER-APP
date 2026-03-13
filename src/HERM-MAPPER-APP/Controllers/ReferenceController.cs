@@ -1,13 +1,13 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Infrastructure;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class ReferenceController(
@@ -17,16 +17,26 @@ public sealed class ReferenceController(
     AuditLogService auditLogService,
     IWebHostEnvironment environment) : Controller
 {
-    public async Task<IActionResult> Index(string? search, int? domainId, int? capabilityId)
+    public async Task<IActionResult> IndexAsync(string? search, int? domainId, int? capabilityId)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         return View(await BuildViewModelAsync(search, domainId, capabilityId, null, TempData["ImportStatusMessage"] as string));
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerifyImport(IFormFile? workbook)
+    public async Task<IActionResult> VerifyImportAsync(IFormFile? workbook)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         if (workbook is null || workbook.Length == 0)
         {
             return View("Index", await BuildViewModelAsync(
@@ -99,19 +109,24 @@ public sealed class ReferenceController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ImportVerified(string pendingImportToken)
+    public async Task<IActionResult> ImportVerifiedAsync(string pendingImportToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         if (string.IsNullOrWhiteSpace(pendingImportToken))
         {
             TempData["ImportStatusMessage"] = "Verify a workbook before importing it.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         var pendingPath = Path.Combine(EnsurePendingImportDirectory(), $"{pendingImportToken}.xlsx");
         if (!System.IO.File.Exists(pendingPath))
         {
             TempData["ImportStatusMessage"] = "The verified workbook is no longer available. Upload it again.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         var verification = await workbookImportService.VerifyAsync(pendingPath);
@@ -137,14 +152,19 @@ public sealed class ReferenceController(
             $"capabilities +{summary.CapabilitiesAdded}/{summary.CapabilitiesUpdated} updated, " +
             $"components +{summary.ComponentsAdded}/{summary.ComponentsUpdated} updated.";
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteComponent(int id)
+    public async Task<IActionResult> DeleteComponentAsync(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id);
         if (component is null)
         {
@@ -166,14 +186,19 @@ public sealed class ReferenceController(
             component.DeletedReason);
 
         TempData["ImportStatusMessage"] = $"Moved component {component.DisplayLabel} to trash.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RestoreComponent(int id)
+    public async Task<IActionResult> RestoreComponentAsync(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id);
         if (component is null)
         {
@@ -194,11 +219,16 @@ public sealed class ReferenceController(
             $"Restored component {component.DisplayLabel} from trash.");
 
         TempData["ImportStatusMessage"] = $"Restored component {component.DisplayLabel}.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> History(int id)
+    public async Task<IActionResult> HistoryAsync(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var component = await dbContext.TrmComponents
             .AsNoTracking()
             .Include(x => x.CapabilityLinks)

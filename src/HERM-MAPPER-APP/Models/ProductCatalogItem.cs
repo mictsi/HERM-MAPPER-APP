@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace HERM_MAPPER_APP.Models;
+namespace HERMMapperApp.Models;
 
 public sealed class ProductCatalogItem
 {
@@ -33,12 +33,18 @@ public sealed class ProductCatalogItem
     public ICollection<ProductCatalogItemOwner> Owners { get; set; } = new List<ProductCatalogItemOwner>();
     public ICollection<ProductMapping> Mappings { get; set; } = new List<ProductMapping>();
 
-    [NotMapped]
-    public IReadOnlyList<string> OwnerValues => Owners
+    public List<string> GetOwnerValues() => Owners
         .Select(x => x.OwnerValue)
         .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-        .ToArray();
+        .ToList();
 
     [NotMapped]
-    public string? OwnerDisplay => OwnerValues.Count == 0 ? null : string.Join(", ", OwnerValues);
+    public string? OwnerDisplay
+    {
+        get
+        {
+            var ownerValues = GetOwnerValues();
+            return ownerValues.Count == 0 ? null : string.Join(", ", ownerValues);
+        }
+    }
 }

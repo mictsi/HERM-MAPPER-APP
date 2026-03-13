@@ -1,15 +1,15 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
-public sealed class DatabaseInitializer(
+public sealed partial class DatabaseInitializer(
     AppDbContext dbContext,
     TrmWorkbookImportService workbookImportService,
     SampleRelationshipImportService sampleRelationshipImportService,
-    PasswordHashService passwordHashService,
     IConfiguration configuration,
     ILogger<DatabaseInitializer> logger)
 {
@@ -39,18 +39,18 @@ public sealed class DatabaseInitializer(
 
             if (!autoImport || string.IsNullOrWhiteSpace(workbookPath))
             {
-                logger.LogInformation("Skipping HERM workbook import because configuration is disabled or missing.");
+                LogSkippingWorkbookImport(logger);
                 return;
             }
 
             if (!File.Exists(workbookPath))
             {
-                logger.LogWarning("Configured HERM workbook path was not found.");
+                LogMissingWorkbookPath(logger);
                 return;
             }
 
             await workbookImportService.ImportAsync(workbookPath, cancellationToken);
-            logger.LogInformation("Imported HERM TRM workbook from configured startup settings.");
+            LogImportedWorkbook(logger);
         }
 
         if (await dbContext.ProductCatalogItems.AnyAsync(cancellationToken))
@@ -68,13 +68,28 @@ public sealed class DatabaseInitializer(
 
         if (!File.Exists(sampleCsvPath))
         {
-            logger.LogWarning("Configured sample relationship CSV was not found: {SampleCsvPath}", sampleCsvPath);
+            LogMissingSampleRelationshipCsv(logger, sampleCsvPath);
             return;
         }
 
         await sampleRelationshipImportService.ImportAsync(sampleCsvPath, cancellationToken);
-        logger.LogInformation("Imported sample relationships from {SampleCsvPath}", sampleCsvPath);
+        LogImportedSampleRelationships(logger, sampleCsvPath);
     }
+
+    [LoggerMessage(EventId = 1000, Level = LogLevel.Information, Message = "Skipping HERM workbook import because configuration is disabled or missing.")]
+    private static partial void LogSkippingWorkbookImport(ILogger logger);
+
+    [LoggerMessage(EventId = 1001, Level = LogLevel.Warning, Message = "Configured HERM workbook path was not found.")]
+    private static partial void LogMissingWorkbookPath(ILogger logger);
+
+    [LoggerMessage(EventId = 1002, Level = LogLevel.Information, Message = "Imported HERM TRM workbook from configured startup settings.")]
+    private static partial void LogImportedWorkbook(ILogger logger);
+
+    [LoggerMessage(EventId = 1003, Level = LogLevel.Warning, Message = "Configured sample relationship CSV was not found: {sampleCsvPath}")]
+    private static partial void LogMissingSampleRelationshipCsv(ILogger logger, string sampleCsvPath);
+
+    [LoggerMessage(EventId = 1004, Level = LogLevel.Information, Message = "Imported sample relationships from {sampleCsvPath}")]
+    private static partial void LogImportedSampleRelationships(ILogger logger, string sampleCsvPath);
 
     private async Task EnsureSqliteSchemaUpToDateAsync(CancellationToken cancellationToken)
     {
@@ -777,7 +792,7 @@ public sealed class DatabaseInitializer(
             LastName = lastName,
             Email = email,
             UserName = userName,
-            PasswordHash = passwordHashService.HashPassword(password),
+            PasswordHash = PasswordHashService.HashPassword(password),
             RoleName = AppRoles.Admin,
             FailedLoginCount = 0,
             LockoutEndUtc = null,
@@ -887,7 +902,7 @@ public sealed class DatabaseInitializer(
             .ToListAsync(cancellationToken);
 
         var missingLifecycleStatuses = ConfigurableFieldNames.GetDefaultValues(ConfigurableFieldNames.LifecycleStatus)
-            .Where(value => existingLifecycleStatuses.All(existing => !string.Equals(existing, value, StringComparison.OrdinalIgnoreCase)))
+            .Where(value => existingLifecycleStatuses.TrueForAll(existing => !string.Equals(existing, value, StringComparison.OrdinalIgnoreCase)))
             .Select((value, index) => new ConfigurableFieldOption
             {
                 FieldName = ConfigurableFieldNames.LifecycleStatus,

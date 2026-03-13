@@ -1,18 +1,18 @@
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class ReportsAndDashboardControllerTests
 {
     [Fact]
-    public async Task ReportsIndex_BuildsHierarchySankeyAndLifecycleData()
+    public async Task ReportsIndexBuildsHierarchySankeyAndLifecycleData()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -69,7 +69,7 @@ public sealed class ReportsAndDashboardControllerTests
         });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateReportsController().Index("Unassigned owner");
+        var result = await fixture.CreateReportsController().IndexAsync("Unassigned owner");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ReportsViewModel>(view.Model);
@@ -103,7 +103,7 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
-    public async Task HomeIndex_ReturnsDashboardCountsAndRecentProducts()
+    public async Task HomeIndexReturnsDashboardCountsAndRecentProducts()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -166,7 +166,7 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateHomeController().Index();
+        var result = await fixture.CreateHomeController().IndexAsync();
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<HomeDashboardViewModel>(view.Model);

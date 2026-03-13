@@ -1,23 +1,27 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.AdminOnly)]
 public sealed class UsersController(
     AppDbContext dbContext,
-    PasswordHashService passwordHashService,
-    PasswordPolicyService passwordPolicyService,
     AuditLogService auditLogService) : Controller
 {
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> IndexAsync()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         return View(new UsersIndexViewModel
         {
             StatusMessage = TempData["UsersStatusMessage"] as string,
@@ -37,7 +41,7 @@ public sealed class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(UserEditViewModel input)
+    public async Task<IActionResult> CreateAsync(UserEditViewModel input)
     {
         Normalize(input);
 
@@ -50,7 +54,7 @@ public sealed class UsersController(
         await ValidateUserUniquenessAsync(input.UserName, input.Email, null);
         ValidateRole(input.RoleName);
 
-        var passwordValidation = passwordPolicyService.Validate(input.Password);
+        var passwordValidation = PasswordPolicyService.Validate(input.Password);
         foreach (var error in passwordValidation.Errors)
         {
             ModelState.AddModelError(nameof(UserEditViewModel.Password), error);
@@ -70,7 +74,7 @@ public sealed class UsersController(
             Email = input.Email,
             UserName = input.UserName,
             RoleName = AppRoles.Normalize(input.RoleName),
-            PasswordHash = passwordHashService.HashPassword(input.Password),
+            PasswordHash = PasswordHashService.HashPassword(input.Password),
             CreatedUtc = nowUtc,
             UpdatedUtc = nowUtc,
             PasswordChangedUtc = nowUtc
@@ -88,15 +92,20 @@ public sealed class UsersController(
             $"Role: {user.RoleName}.");
 
         TempData["UsersStatusMessage"] = $"User '{user.UserName}' created.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> Edit(int id)
+    public async Task<IActionResult> EditAsync(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var user = await dbContext.AppUsers.FindAsync(id);
         if (user is null)
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         return View(new UserUpdateViewModel
@@ -113,20 +122,20 @@ public sealed class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(UserUpdateViewModel input)
+    public async Task<IActionResult> EditAsync(UserUpdateViewModel input)
     {
         Normalize(input);
-
-        var user = await dbContext.AppUsers.FindAsync(input.Id);
-        if (user is null)
-        {
-            return RedirectToAction(nameof(Index));
-        }
 
         if (!ModelState.IsValid)
         {
             input.RoleOptions = BuildRoleOptions(input.RoleName);
             return View(input);
+        }
+
+        var user = await dbContext.AppUsers.FindAsync(input.Id);
+        if (user is null)
+        {
+            return RedirectToAction("Index");
         }
 
         await ValidateUserUniquenessAsync(input.UserName, input.Email, input.Id);
@@ -156,15 +165,20 @@ public sealed class UsersController(
             $"Role: {user.RoleName}.");
 
         TempData["UsersStatusMessage"] = $"User '{user.UserName}' updated.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteAsync(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var user = await dbContext.AppUsers.FindAsync(id);
         if (user is null)
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         return View(new UserDeleteViewModel
@@ -180,18 +194,23 @@ public sealed class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var user = await dbContext.AppUsers.FindAsync(id);
         if (user is null)
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         if (string.Equals(User.Identity?.Name, user.UserName, StringComparison.OrdinalIgnoreCase))
         {
             TempData["UsersErrorMessage"] = "You cannot delete the account you are signed in with.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         dbContext.AppUsers.Remove(user);
@@ -205,15 +224,20 @@ public sealed class UsersController(
             $"Deleted user '{user.UserName}'.");
 
         TempData["UsersStatusMessage"] = $"User '{user.UserName}' deleted.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> ResetPassword(int id)
+    public async Task<IActionResult> ResetPasswordAsync(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var user = await dbContext.AppUsers.FindAsync(id);
         if (user is null)
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         return View(new UserResetPasswordViewModel
@@ -226,27 +250,20 @@ public sealed class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ResetPassword(UserResetPasswordViewModel input)
+    public async Task<IActionResult> ResetPasswordAsync(UserResetPasswordViewModel input)
     {
+        if (!ModelState.IsValid)
+        {
+            return View(input);
+        }
+
         var user = await dbContext.AppUsers.FindAsync(input.Id);
         if (user is null)
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
-        if (!ModelState.IsValid)
-        {
-            return View(new UserResetPasswordViewModel
-            {
-                Id = input.Id,
-                DisplayName = user.DisplayName,
-                UserName = user.UserName,
-                Password = input.Password,
-                ConfirmPassword = input.ConfirmPassword
-            });
-        }
-
-        var passwordValidation = passwordPolicyService.Validate(input.Password);
+        var passwordValidation = PasswordPolicyService.Validate(input.Password);
         foreach (var error in passwordValidation.Errors)
         {
             ModelState.AddModelError(nameof(UserResetPasswordViewModel.Password), error);
@@ -264,7 +281,7 @@ public sealed class UsersController(
             });
         }
 
-        user.PasswordHash = passwordHashService.HashPassword(input.Password);
+        user.PasswordHash = PasswordHashService.HashPassword(input.Password);
         user.PasswordChangedUtc = DateTime.UtcNow;
         user.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
@@ -277,17 +294,19 @@ public sealed class UsersController(
             $"Reset password for user '{user.UserName}'.");
 
         TempData["UsersStatusMessage"] = $"Password reset for '{user.UserName}'.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     private async Task ValidateUserUniquenessAsync(string userName, string email, int? currentUserId)
     {
-        if (await dbContext.AppUsers.AnyAsync(x => x.UserName.ToLower() == userName.ToLower() && x.Id != currentUserId))
+        var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
+
+        if (await dbContext.AppUsers.AnyAsync(x => EF.Functions.Collate(x.UserName, caseInsensitiveCollation) == userName && x.Id != currentUserId))
         {
             ModelState.AddModelError(nameof(UserEditViewModel.UserName), "Username already exists.");
         }
 
-        if (await dbContext.AppUsers.AnyAsync(x => x.Email.ToLower() == email.ToLower() && x.Id != currentUserId))
+        if (await dbContext.AppUsers.AnyAsync(x => EF.Functions.Collate(x.Email, caseInsensitiveCollation) == email && x.Id != currentUserId))
         {
             ModelState.AddModelError(nameof(UserEditViewModel.Email), "Email already exists.");
         }
@@ -301,7 +320,7 @@ public sealed class UsersController(
         }
     }
 
-    private static IReadOnlyList<SelectListItem> BuildRoleOptions(string selectedRole) =>
+    private static List<SelectListItem> BuildRoleOptions(string selectedRole) =>
         AppRoles.All
             .Select(role => new SelectListItem(role, role, string.Equals(role, selectedRole, StringComparison.Ordinal)))
             .ToList();

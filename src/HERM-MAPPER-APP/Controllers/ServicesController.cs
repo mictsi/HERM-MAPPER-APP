@@ -1,14 +1,15 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Infrastructure;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using System.Globalization;
+using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class ServicesController(
@@ -25,6 +26,7 @@ public sealed class ServicesController(
         owner = NormalizeSelection(owner);
         lifecycleStatus = NormalizeSelection(lifecycleStatus);
         sort = NormalizeSort(sort);
+        var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
 
         var query = dbContext.ServiceCatalogItems
             .AsNoTracking()
@@ -46,12 +48,12 @@ public sealed class ServicesController(
 
         if (owner is not null)
         {
-            query = query.Where(x => x.Owner.ToLower() == owner.ToLower());
+            query = query.Where(x => EF.Functions.Collate(x.Owner, caseInsensitiveCollation) == owner);
         }
 
         if (lifecycleStatus is not null)
         {
-            query = query.Where(x => x.LifecycleStatus.ToLower() == lifecycleStatus.ToLower());
+            query = query.Where(x => EF.Functions.Collate(x.LifecycleStatus, caseInsensitiveCollation) == lifecycleStatus);
         }
 
         query = ApplySort(query, sort);
@@ -186,7 +188,7 @@ public sealed class ServicesController(
             return NotFound();
         }
 
-        var orderedProductNames = service.OrderedProductLinks
+        var orderedProductNames = service.GetOrderedProductLinks()
             .Select(x => x.ProductCatalogItem.Name)
             .ToList();
 
@@ -239,10 +241,10 @@ public sealed class ServicesController(
             ConfigurableFieldNames.LifecycleStatus,
             model.LifecycleStatus,
             "Choose status");
-        model.ProductOptions = await BuildProductOptionsAsync(model.ProductRows);
+        model.ProductOptions = await BuildProductOptionsAsync();
     }
 
-    private async Task<IReadOnlyList<SelectListItem>> BuildProductOptionsAsync(IReadOnlyList<ServiceProductRowViewModel> rows)
+    private async Task<List<SelectListItem>> BuildProductOptionsAsync()
     {
         var products = await dbContext.ProductCatalogItems
             .AsNoTracking()
@@ -259,7 +261,7 @@ public sealed class ServicesController(
         items.AddRange(products.Select(product =>
             new SelectListItem(
                 BuildProductLabel(product),
-                product.Id.ToString(),
+                product.Id.ToString(CultureInfo.InvariantCulture),
                 selected: false)));
 
         return items;
@@ -293,7 +295,7 @@ public sealed class ServicesController(
 
     private static ServiceIndexRowViewModel BuildIndexRow(ServiceCatalogItem service)
     {
-        var productNames = service.OrderedProductLinks
+        var productNames = service.GetOrderedProductLinks()
             .Select(x => x.ProductCatalogItem.Name)
             .ToList();
 
@@ -334,7 +336,7 @@ public sealed class ServicesController(
         }
     }
 
-    private void SynchronizeProductLinks(ServiceCatalogItem service, IReadOnlyList<ServiceProductRowViewModel> rows)
+    private void SynchronizeProductLinks(ServiceCatalogItem service, List<ServiceProductRowViewModel> rows)
     {
         var existingLinks = service.ProductLinks
             .OrderBy(x => x.SortOrder)
@@ -371,7 +373,7 @@ public sealed class ServicesController(
         }
     }
 
-    private static IReadOnlyList<ServiceConnectionViewModel> BuildConnections(string serviceName, IReadOnlyList<string> productNames)
+    private static List<ServiceConnectionViewModel> BuildConnections(string serviceName, List<string> productNames)
     {
         var connections = new List<ServiceConnectionViewModel>();
 

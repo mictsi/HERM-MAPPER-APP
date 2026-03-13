@@ -1,4 +1,4 @@
-namespace HERM_MAPPER_APP.Infrastructure;
+namespace HERMMapperApp.Infrastructure;
 
 internal static class SearchPattern
 {

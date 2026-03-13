@@ -1,11 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Services;
+namespace HERMMapperApp.Services;
 
 public sealed partial class SampleRelationshipImportService(AppDbContext dbContext)
 {
@@ -29,7 +29,7 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
 
         using var reader = new StreamReader(csvStream, leaveOpen: true);
 
-        var headerLine = await reader.ReadLineAsync();
+        var headerLine = await reader.ReadLineAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(headerLine))
         {
             return new ProductRelationshipVerificationResult
@@ -95,7 +95,7 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
         var rows = new List<ProductRelationshipVerificationRow>();
         var rowNumber = 1;
 
-        while (await reader.ReadLineAsync() is { } line)
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
         {
             cancellationToken.ThrowIfCancellationRequested();
             rowNumber++;
@@ -248,7 +248,7 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
         ArgumentNullException.ThrowIfNull(csvStream);
 
         using var reader = new StreamReader(csvStream, leaveOpen: true);
-        var headerLine = await reader.ReadLineAsync();
+        var headerLine = await reader.ReadLineAsync(cancellationToken);
         if (!HasValidHeader(headerLine))
         {
             return ProductRelationshipImportSummary.Empty;
@@ -297,7 +297,7 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
 
         var summary = new ProductRelationshipImportSummary();
 
-        while (await reader.ReadLineAsync() is { } line)
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -548,7 +548,7 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
     }
 
     private static string BuildMappingKey(string productName, int? domainId, int? capabilityId, int? componentId) =>
-        $"{productName.Trim()}|{domainId?.ToString() ?? "-"}|{capabilityId?.ToString() ?? "-"}|{componentId?.ToString() ?? "-"}";
+        $"{productName.Trim()}|{domainId?.ToString(CultureInfo.InvariantCulture) ?? "-"}|{capabilityId?.ToString(CultureInfo.InvariantCulture) ?? "-"}|{componentId?.ToString(CultureInfo.InvariantCulture) ?? "-"}";
 
     private static string ExtractComponentName(string rawValue)
     {

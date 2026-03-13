@@ -1,8 +1,8 @@
-using HERM_MAPPER_APP.Controllers;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Controllers;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -12,12 +12,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Controllers;
+namespace HERMMapperApp.Tests.Controllers;
 
 public sealed class CatalogueSearchTests
 {
     [Fact]
-    public async Task ProductsIndex_Search_MatchesPartialStrings_CaseInsensitively()
+    public async Task ProductsIndexSearchMatchesPartialStringsCaseInsensitively()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.AddRange(
@@ -38,7 +38,7 @@ public sealed class CatalogueSearchTests
             CreateProduct("ServiceNow", "ServiceNow", null));
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateProductsController();
+        using var controller = fixture.CreateProductsController();
 
         var result = await controller.Index("point");
 
@@ -49,7 +49,7 @@ public sealed class CatalogueSearchTests
     }
 
     [Fact]
-    public async Task ProductsIndex_FiltersByMultipleOwnersAndLifecycle()
+    public async Task ProductsIndexFiltersByMultipleOwnersAndLifecycle()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.AddRange(
@@ -83,7 +83,7 @@ public sealed class CatalogueSearchTests
             CreateProduct("Developer Portal", null, "Trial", "Platform Team"));
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateProductsController();
+        using var controller = fixture.CreateProductsController();
 
         var result = await controller.Index(null, ["Finance Team", "Platform Team"], "Production");
 
@@ -94,7 +94,7 @@ public sealed class CatalogueSearchTests
     }
 
     [Fact]
-    public async Task ReferenceIndex_Search_MatchesPartialStrings_ForTypeCapabilityAndDomain()
+    public async Task ReferenceIndexSearchMatchesPartialStringsForTypeCapabilityAndDomain()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -154,17 +154,17 @@ public sealed class CatalogueSearchTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var controller = fixture.CreateReferenceController();
+        using var controller = fixture.CreateReferenceController();
 
-        var typeResult = await controller.Index("cust", null, null);
+        var typeResult = await controller.IndexAsync("cust", null, null);
         var typeModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(typeResult).Model);
         Assert.Collection(typeModel.Components, component => Assert.Equal("Ledger Hub", component.Name));
 
-        var capabilityResult = await controller.Index("pay", null, null);
+        var capabilityResult = await controller.IndexAsync("pay", null, null);
         var capabilityModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(capabilityResult).Model);
         Assert.Collection(capabilityModel.Components, component => Assert.Equal("Ledger Hub", component.Name));
 
-        var domainResult = await controller.Index("fin", null, null);
+        var domainResult = await controller.IndexAsync("fin", null, null);
         var domainModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(domainResult).Model);
         Assert.Collection(domainModel.Components, component => Assert.Equal("Ledger Hub", component.Name));
     }

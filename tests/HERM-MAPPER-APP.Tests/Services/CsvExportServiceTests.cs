@@ -1,15 +1,14 @@
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using Xunit;
 
-namespace HERM_MAPPER_APP.Tests.Services;
+namespace HERMMapperApp.Tests.Services;
 
 public sealed class CsvExportServiceTests
 {
     [Fact]
-    public void BuildProductMappingExport_UsesFiveColumnHierarchyFormat()
+    public void BuildProductMappingExportUsesFiveColumnHierarchyFormat()
     {
-        var service = new CsvExportService();
         var domain = new TrmDomain
         {
             Code = "TD006",
@@ -36,7 +35,7 @@ public sealed class CsvExportServiceTests
             TrmComponent = component
         };
 
-        var csv = service.BuildProductMappingExport([mapping]);
+        var csv = CsvExportService.BuildProductMappingExport([mapping]);
 
         Assert.Equal(
             "MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT" + Environment.NewLine +

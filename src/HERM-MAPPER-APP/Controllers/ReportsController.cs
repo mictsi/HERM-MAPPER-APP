@@ -1,17 +1,22 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Models;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class ReportsController(AppDbContext dbContext) : Controller
 {
-    public async Task<IActionResult> Index(string? lifecycleOwner = null)
+    public async Task<IActionResult> IndexAsync(string? lifecycleOwner = null)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var mappings = await dbContext.ProductMappings
             .AsNoTracking()
             .Where(x => x.MappingStatus == Models.MappingStatus.Complete && x.TrmComponentId != null)
@@ -42,11 +47,11 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
             .ToListAsync();
 
         var availableOwners = products
-            .SelectMany(x => x.OwnerValues)
+            .SelectMany(x => x.GetOwnerValues())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        if (products.Any(x => x.OwnerValues.Count == 0))
+        if (products.Exists(x => x.GetOwnerValues().Count == 0))
         {
             availableOwners.Insert(0, "Unassigned owner");
         }
@@ -89,15 +94,15 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
 
         if (string.Equals(lifecycleOwner, "Unassigned owner", StringComparison.OrdinalIgnoreCase))
         {
-            return products.Where(x => x.OwnerValues.Count == 0);
+            return products.Where(x => x.GetOwnerValues().Count == 0);
         }
 
         return products.Where(product =>
-            product.OwnerValues.Any(owner => string.Equals(owner, lifecycleOwner, StringComparison.OrdinalIgnoreCase)));
+            product.GetOwnerValues().Exists(owner => string.Equals(owner, lifecycleOwner, StringComparison.OrdinalIgnoreCase)));
     }
 
-    private static IReadOnlyList<LifecycleStatusReportRowViewModel> BuildLifecycleStatuses(
-        IReadOnlyCollection<Models.ProductCatalogItem> products)
+    private static List<LifecycleStatusReportRowViewModel> BuildLifecycleStatuses(
+        List<Models.ProductCatalogItem> products)
     {
         if (products.Count == 0)
         {
@@ -140,9 +145,10 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
             return [];
         }
 
-        IEnumerable<string> owners = product.OwnerValues.Count == 0
+        var ownerValues = product.GetOwnerValues();
+        IEnumerable<string> owners = ownerValues.Count == 0
             ? ["Unassigned owner"]
-            : product.OwnerValues;
+            : ownerValues;
 
         return owners.Select(owner => new ReportsPathViewModel
         {
@@ -159,7 +165,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
         });
     }
 
-    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildReportsHierarchy(IReadOnlyList<ReportsPathViewModel> paths)
+    private static List<ReportsHierarchyNodeViewModel> BuildReportsHierarchy(List<ReportsPathViewModel> paths)
     {
         var ownerGroups = paths
             .GroupBy(x => x.OwnerName, StringComparer.OrdinalIgnoreCase)
@@ -181,7 +187,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
             .ToList();
     }
 
-    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildDomainNodes(IReadOnlyList<ReportsPathViewModel> paths) =>
+    private static List<ReportsHierarchyNodeViewModel> BuildDomainNodes(List<ReportsPathViewModel> paths) =>
         paths.GroupBy(x => new { x.DomainId, x.DomainLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.DomainLabel, StringComparer.OrdinalIgnoreCase)
@@ -196,7 +202,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
             })
             .ToList();
 
-    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildCapabilityNodes(IReadOnlyList<ReportsPathViewModel> paths) =>
+    private static List<ReportsHierarchyNodeViewModel> BuildCapabilityNodes(List<ReportsPathViewModel> paths) =>
         paths.GroupBy(x => new { x.CapabilityId, x.CapabilityLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.CapabilityLabel, StringComparer.OrdinalIgnoreCase)
@@ -211,7 +217,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
             })
             .ToList();
 
-    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildComponentNodes(IReadOnlyList<ReportsPathViewModel> paths) =>
+    private static List<ReportsHierarchyNodeViewModel> BuildComponentNodes(List<ReportsPathViewModel> paths) =>
         paths.GroupBy(x => new { x.ComponentId, x.ComponentLabel })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.ComponentLabel, StringComparer.OrdinalIgnoreCase)
@@ -226,7 +232,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
             })
             .ToList();
 
-    private static IReadOnlyList<ReportsHierarchyNodeViewModel> BuildProductNodes(IReadOnlyList<ReportsPathViewModel> paths) =>
+    private static List<ReportsHierarchyNodeViewModel> BuildProductNodes(List<ReportsPathViewModel> paths) =>
         paths.GroupBy(x => new { x.ProductId, x.ProductName })
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key.ProductName, StringComparer.OrdinalIgnoreCase)
@@ -241,7 +247,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
             })
             .ToList();
 
-    private static IReadOnlyList<ReportsSankeyNodeViewModel> BuildReportsSankeyNodes(IReadOnlyList<ReportsPathViewModel> paths)
+    private static List<ReportsSankeyNodeViewModel> BuildReportsSankeyNodes(List<ReportsPathViewModel> paths)
     {
         var nodes = new List<ReportsSankeyNodeViewModel>();
 
@@ -313,7 +319,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
         return nodes;
     }
 
-    private static IReadOnlyList<ReportsSankeyLinkViewModel> BuildReportsSankeyLinks(IReadOnlyList<ReportsPathViewModel> paths)
+    private static List<ReportsSankeyLinkViewModel> BuildReportsSankeyLinks(List<ReportsPathViewModel> paths)
     {
         var links = new List<ReportsSankeyLinkViewModel>();
 

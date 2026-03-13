@@ -1,13 +1,14 @@
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.AdminOnly)]
 public sealed class ConfigurationController(
@@ -260,9 +261,11 @@ public sealed class ConfigurationController(
             return RedirectToAction(nameof(Index));
         }
 
+        var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
+
         var exists = await dbContext.ConfigurableFieldOptions.AnyAsync(x =>
             x.FieldName == input.FieldName &&
-            x.Value.ToLower() == input.Value.ToLower());
+            EF.Functions.Collate(x.Value, caseInsensitiveCollation) == input.Value);
 
         if (exists)
         {
@@ -463,7 +466,7 @@ public sealed class ConfigurationController(
         };
     }
 
-    private static IReadOnlyList<SelectListItem> BuildTimeZoneOptions(string selectedTimeZoneId) =>
+    private static List<SelectListItem> BuildTimeZoneOptions(string selectedTimeZoneId) =>
         TimeZoneInfo.GetSystemTimeZones()
             .OrderBy(x => x.BaseUtcOffset)
             .ThenBy(x => x.DisplayName)
@@ -482,7 +485,7 @@ public sealed class ConfigurationController(
         return $"{sign}{absoluteOffset:hh\\:mm}";
     }
 
-    private WorkbookImportReviewViewModel BuildCatalogueErrorReview(string errorMessage, string? uploadedFileName = null) =>
+    private static WorkbookImportReviewViewModel BuildCatalogueErrorReview(string errorMessage, string? uploadedFileName = null) =>
         new()
         {
             UploadedFileName = uploadedFileName,
@@ -492,7 +495,7 @@ public sealed class ConfigurationController(
             }
         };
 
-    private ProductImportReviewViewModel BuildProductErrorReview(string errorMessage, string? uploadedFileName = null) =>
+    private static ProductImportReviewViewModel BuildProductErrorReview(string errorMessage, string? uploadedFileName = null) =>
         new()
         {
             UploadedFileName = uploadedFileName,

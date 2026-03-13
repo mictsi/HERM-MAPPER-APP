@@ -1,19 +1,20 @@
+using System.Globalization;
 using System.Text;
-using HERM_MAPPER_APP.Data;
-using HERM_MAPPER_APP.Models;
-using HERM_MAPPER_APP.Services;
-using HERM_MAPPER_APP.ViewModels;
+using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
+using HERMMapperApp.Models;
+using HERMMapperApp.Services;
+using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
-namespace HERM_MAPPER_APP.Controllers;
+namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.AdminOnly)]
 public sealed class MappingsController(
     AppDbContext dbContext,
-    CsvExportService csvExportService,
     AuditLogService auditLogService,
     ComponentVersioningService componentVersioningService,
     ConfigurableFieldService configurableFieldService) : Controller
@@ -262,7 +263,7 @@ public sealed class MappingsController(
             .ThenBy(x => x.ProductCatalogItem != null ? x.ProductCatalogItem.Name : string.Empty)
             .ToListAsync();
 
-        var csv = csvExportService.BuildProductMappingExport(mappings);
+        var csv = CsvExportService.BuildProductMappingExport(mappings);
         var fileName = $"herm-mappings-{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
         return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
     }
@@ -471,7 +472,7 @@ public sealed class MappingsController(
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
             .OrderBy(x => x.Code)
-            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString()))
+            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         var capabilitiesQuery = dbContext.TrmCapabilities.AsNoTracking().OrderBy(x => x.Code).AsQueryable();
@@ -481,7 +482,7 @@ public sealed class MappingsController(
         }
 
         var capabilities = await capabilitiesQuery
-            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString()))
+            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         var componentsQuery = dbContext.TrmComponents
@@ -497,7 +498,7 @@ public sealed class MappingsController(
         var components = await componentsQuery
             .OrderBy(x => x.IsCustom)
             .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
-            .Select(x => new SelectListItem((x.IsCustom ? (x.TechnologyComponentCode ?? x.Code) : x.Code) + " " + x.Name, x.Id.ToString()))
+            .Select(x => new SelectListItem((x.IsCustom ? (x.TechnologyComponentCode ?? x.Code) : x.Code) + " " + x.Name, x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         return new MappingEditViewModel
@@ -509,7 +510,7 @@ public sealed class MappingsController(
             Version = product.Version,
             Description = product.Description,
             LifecycleStatus = product.LifecycleStatus,
-            Owners = product.OwnerValues.ToList(),
+            Owners = product.GetOwnerValues().ToList(),
             SelectedDomainId = selectedDomainId,
             SelectedCapabilityId = selectedCapabilityId,
             SelectedComponentId = selectedComponentId,
@@ -518,7 +519,7 @@ public sealed class MappingsController(
             Domains = domains,
             Capabilities = capabilities,
             Components = components,
-            OwnerOptions = await configurableFieldService.GetMultiSelectListAsync(ConfigurableFieldNames.Owner, product.OwnerValues)
+            OwnerOptions = await configurableFieldService.GetMultiSelectListAsync(ConfigurableFieldNames.Owner, product.GetOwnerValues())
         };
     }
 
@@ -527,7 +528,7 @@ public sealed class MappingsController(
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
             .OrderBy(x => x.Code)
-            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString()))
+            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         var capabilitiesQuery = dbContext.TrmCapabilities.AsNoTracking().OrderBy(x => x.Code).AsQueryable();
@@ -537,7 +538,7 @@ public sealed class MappingsController(
         }
 
         var capabilities = await capabilitiesQuery
-            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString()))
+            .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         var componentsQuery = dbContext.TrmComponents
@@ -553,7 +554,7 @@ public sealed class MappingsController(
         var components = await componentsQuery
             .OrderBy(x => x.IsCustom)
             .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
-            .Select(x => new SelectListItem((x.IsCustom ? (x.TechnologyComponentCode ?? x.Code) : x.Code) + " " + x.Name, x.Id.ToString()))
+            .Select(x => new SelectListItem((x.IsCustom ? (x.TechnologyComponentCode ?? x.Code) : x.Code) + " " + x.Name, x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         return new MappingEditViewModel
@@ -585,8 +586,10 @@ public sealed class MappingsController(
         string technologyComponentCode,
         string componentName)
     {
+        var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
+
         var modelCodeExists = await dbContext.TrmComponents.AnyAsync(x =>
-            !x.IsCustom && x.Code.ToLower() == technologyComponentCode.ToLower());
+            !x.IsCustom && EF.Functions.Collate(x.Code, caseInsensitiveCollation) == technologyComponentCode);
 
         if (modelCodeExists)
         {
@@ -599,7 +602,7 @@ public sealed class MappingsController(
                 x.IsCustom &&
                 !x.IsDeleted &&
                 x.TechnologyComponentCode != null &&
-                x.TechnologyComponentCode.ToLower() == technologyComponentCode.ToLower());
+                EF.Functions.Collate(x.TechnologyComponentCode, caseInsensitiveCollation) == technologyComponentCode);
 
         if (existingCustomComponent is not null)
         {
@@ -657,8 +660,10 @@ public sealed class MappingsController(
     {
         var existingOwners = product.Owners.ToList();
 
+        var selectedOwnerList = selectedOwners.ToList();
+
         foreach (var owner in existingOwners.Where(owner =>
-                     selectedOwners.All(selected => !string.Equals(selected, owner.OwnerValue, StringComparison.OrdinalIgnoreCase))))
+                     selectedOwnerList.TrueForAll(selected => !string.Equals(selected, owner.OwnerValue, StringComparison.OrdinalIgnoreCase))))
         {
             product.Owners.Remove(owner);
             dbContext.ProductCatalogItemOwners.Remove(owner);

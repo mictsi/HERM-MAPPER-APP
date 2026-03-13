@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace HERM_MAPPER_APP.Models;
+namespace HERMMapperApp.Models;
 
 public sealed class ConfigurableFieldOption
 {
@@ -32,7 +32,7 @@ public static class ConfigurableFieldNames
         "Sunset"
     ];
 
-    private static readonly IReadOnlyDictionary<string, string> SupportedFields =
+    private static readonly Dictionary<string, string> SupportedFields =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             [Owner] = "Owner",
