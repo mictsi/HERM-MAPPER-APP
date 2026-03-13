@@ -51,18 +51,27 @@
             </div>
         }
 
+        <div class="service-product-header" aria-hidden="true">
+            <div class="service-product-header-label">Order</div>
+            <div class="service-product-header-label">Products</div>
+            <div class="service-product-header-label service-product-header-actions">Actions</div>
+        </div>
+
         <div class="service-product-stack" data-service-rows>
             @for (var index = 0; index < Model.ProductRows.Count; index++)
             {
                 var row = Model.ProductRows[index];
-                <div class="service-product-row" data-service-row>
-                    <div class="service-product-order" data-service-order>@(index + 1)</div>
+                <div class="service-product-row" data-service-row draggable="true">
+                    <div class="service-product-order-cell">
+                        <span class="service-product-order" data-service-order>@(index + 1)</span>
+                        <span class="service-drag-handle" data-service-drag-handle title="Drag to reorder" aria-hidden="true">&#9776;</span>
+                    </div>
                     <div class="service-product-field">
-                        <label class="form-label" for="ProductRows_@(index)__ProductId">Product</label>
                         <select class="form-select"
                                 id="ProductRows_@(index)__ProductId"
                                 name="ProductRows[@index].ProductId"
-                                data-service-product-select>
+                                data-service-product-select
+                                aria-label="Product">
                             @foreach (var option in Model.ProductOptions)
                             {
                                 <option value="@option.Value" selected="@(row.ProductId?.ToString() == option.Value ? "selected" : null)">@option.Text</option>
@@ -71,8 +80,6 @@
                     </div>
                     <div class="service-product-actions">
                         <button type="button" class="btn btn-outline-secondary service-action-button" data-service-add-row aria-label="Add product below">+</button>
-                        <button type="button" class="btn btn-outline-secondary service-action-button" data-service-move-up aria-label="Move product up">Up</button>
-                        <button type="button" class="btn btn-outline-secondary service-action-button" data-service-move-down aria-label="Move product down">Down</button>
                         <button type="button" class="btn btn-outline-danger" data-service-remove-row>Remove</button>
                     </div>
                 </div>
@@ -85,14 +92,17 @@
         </div>
 
         <template data-service-row-template>
-            <div class="service-product-row" data-service-row>
-                <div class="service-product-order" data-service-order>1</div>
+            <div class="service-product-row" data-service-row draggable="true">
+                <div class="service-product-order-cell">
+                    <span class="service-product-order" data-service-order>1</span>
+                    <span class="service-drag-handle" data-service-drag-handle title="Drag to reorder" aria-hidden="true">&#9776;</span>
+                </div>
                 <div class="service-product-field">
-                    <label class="form-label" for="ProductRows___index___ProductId">Product</label>
                     <select class="form-select"
                             id="ProductRows___index___ProductId"
                             name="ProductRows[__index__].ProductId"
-                            data-service-product-select>
+                            data-service-product-select
+                            aria-label="Product">
                         @foreach (var option in Model.ProductOptions)
                         {
                             <option value="@option.Value">@option.Text</option>
@@ -101,8 +111,6 @@
                 </div>
                 <div class="service-product-actions">
                     <button type="button" class="btn btn-outline-secondary service-action-button" data-service-add-row aria-label="Add product below">+</button>
-                    <button type="button" class="btn btn-outline-secondary service-action-button" data-service-move-up aria-label="Move product up">Up</button>
-                    <button type="button" class="btn btn-outline-secondary service-action-button" data-service-move-down aria-label="Move product down">Down</button>
                     <button type="button" class="btn btn-outline-danger" data-service-remove-row>Remove</button>
                 </div>
             </div>

@@ -124,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const rowTemplate = editor.querySelector("[data-service-row-template]");
     const preview = editor.querySelector("[data-service-preview]");
     const addTailButton = editor.querySelector("[data-service-add-tail]");
+    let draggedRow = null;
 
     if (
       !(rowsContainer instanceof HTMLElement) ||
@@ -138,7 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
+        .replaceAll("\"", "&quot;")
         .replaceAll("'", "&#39;");
 
     const getRows = () =>
@@ -148,9 +149,206 @@ document.addEventListener("DOMContentLoaded", () => {
     const createRow = () => {
       const host = document.createElement("div");
       host.innerHTML = rowTemplate.innerHTML.trim();
-      return host.firstElementChild;
+      const row = host.firstElementChild;
+      return row instanceof HTMLElement ? row : null;
     };
 
+    const clearDragState = () => {
+      getRows().forEach((row) => {
+        row.classList.remove("is-dragging", "drag-over-top", "drag-over-bottom");
+      });
+    };
+
+    const ensureMinimumRows = () => {
+      while (getRows().length < 2) {
+        const row = createRow();
+        if (row === null) {
+          break;
+        }
+
+        rowsContainer.appendChild(row);
+      }
+    };
+
+    const reindexRows = () => {
+      const rows = getRows();
+      rows.forEach((row, index) => {
+        const order = row.querySelector("[data-service-order]");
+        const select = row.querySelector("[data-service-product-select]");
+
+        row.draggable = true;
+
+        if (order instanceof HTMLElement) {
+          order.textContent = String(index + 1);
+        }
+
+        if (select instanceof HTMLSelectElement) {
+          select.id = `ProductRows_${index}__ProductId`;
+          select.name = `ProductRows[${index}].ProductId`;
+        }
+      });
+    };
+
+    const getSelectedProducts = () =>
+      getRows()
+        .map((row) => row.querySelector("[data-service-product-select]"))
+        .filter((select) => select instanceof HTMLSelectElement && select.value !== "")
+        .map((select) => ({
+          id: select.value,
+          name: select.options[select.selectedIndex]?.text ?? select.value
+        }));
+
+    const renderPreview = () => {
+      const products = getSelectedProducts();
+
+      if (products.length < 2) {
+        preview.innerHTML = `
+          <div class="empty-state compact">
+            <h3>No complete flow yet</h3>
+            <p>Choose at least two products to build the service flow.</p>
+          </div>`;
+        return;
+      }
+
+      preview.innerHTML = `
+        <div class="service-chain" aria-label="Service product flow">
+          ${products.map((product, index) => `
+            <div class="service-chain-node">${escapeHtml(product.name)}</div>
+            ${index < products.length - 1 ? "<div class=\"service-chain-arrow\" aria-hidden=\"true\">&rarr;</div>" : ""}
+          `).join("")}
+        </div>`;
+    };
+
+    rowsContainer.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const button = target.closest("button");
+      const row = target.closest("[data-service-row]");
+
+      if (!(button instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) {
+        return;
+      }
+
+      if (button.hasAttribute("data-service-add-row")) {
+        const newRow = createRow();
+        if (newRow !== null) {
+          row.insertAdjacentElement("afterend", newRow);
+        }
+      } else if (button.hasAttribute("data-service-remove-row")) {
+        row.remove();
+        ensureMinimumRows();
+      } else {
+        return;
+      }
+
+      reindexRows();
+      renderPreview();
+    });
+
+    rowsContainer.addEventListener("change", (event) => {
+      const target = event.target;
+      if (target instanceof HTMLSelectElement && target.hasAttribute("data-service-product-select")) {
+        renderPreview();
+      }
+    });
+
+    rowsContainer.addEventListener("dragstart", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const row = target.closest("[data-service-row]");
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      draggedRow = row;
+      clearDragState();
+      row.classList.add("is-dragging");
+
+      if (event.dataTransfer !== null) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", row.querySelector("[data-service-order]")?.textContent ?? "");
+      }
+    });
+
+    rowsContainer.addEventListener("dragover", (event) => {
+      if (!(draggedRow instanceof HTMLElement)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const row = target.closest("[data-service-row]");
+      clearDragState();
+      draggedRow.classList.add("is-dragging");
+
+      if (!(row instanceof HTMLElement) || row === draggedRow) {
+        rowsContainer.appendChild(draggedRow);
+        reindexRows();
+        return;
+      }
+
+      const bounds = row.getBoundingClientRect();
+      const insertBefore = event.clientY < bounds.top + (bounds.height / 2);
+
+      row.classList.add(insertBefore ? "drag-over-top" : "drag-over-bottom");
+
+      if (insertBefore) {
+        rowsContainer.insertBefore(draggedRow, row);
+      } else {
+        rowsContainer.insertBefore(draggedRow, row.nextElementSibling);
+      }
+
+      reindexRows();
+    });
+
+    rowsContainer.addEventListener("drop", (event) => {
+      if (draggedRow instanceof HTMLElement) {
+        event.preventDefault();
+        reindexRows();
+        renderPreview();
+      }
+    });
+
+    rowsContainer.addEventListener("dragend", () => {
+      clearDragState();
+      draggedRow = null;
+      reindexRows();
+      renderPreview();
+    });
+
+    rowsContainer.addEventListener("dragleave", (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target === rowsContainer) {
+        clearDragState();
+      }
+    });
+
+    if (addTailButton instanceof HTMLButtonElement) {
+      addTailButton.addEventListener("click", () => {
+        const row = createRow();
+        if (row !== null) {
+          rowsContainer.appendChild(row);
+          reindexRows();
+          renderPreview();
+        }
+      });
+    }
+
+    ensureMinimumRows();
+    reindexRows();
+    renderPreview();
+  });
 
   document.querySelectorAll("[data-password-strength-root]").forEach((root) => {
     const input = root.querySelector("[data-password-input]");
@@ -211,140 +409,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
     input.addEventListener("input", syncStrength);
     syncStrength();
-  });
-    const ensureMinimumRows = () => {
-      while (getRows().length < 2) {
-        const row = createRow();
-        if (row instanceof HTMLElement) {
-          rowsContainer.appendChild(row);
-        } else {
-          break;
-        }
-      }
-    };
-
-    const reindexRows = () => {
-      const rows = getRows();
-      rows.forEach((row, index) => {
-        const order = row.querySelector("[data-service-order]");
-        const select = row.querySelector("[data-service-product-select]");
-        const label = row.querySelector("label");
-        const moveUpButton = row.querySelector("[data-service-move-up]");
-        const moveDownButton = row.querySelector("[data-service-move-down]");
-
-        if (order instanceof HTMLElement) {
-          order.textContent = String(index + 1);
-        }
-
-        if (select instanceof HTMLSelectElement) {
-          const selectId = `ProductRows_${index}__ProductId`;
-          select.id = selectId;
-          select.name = `ProductRows[${index}].ProductId`;
-
-          if (label instanceof HTMLLabelElement) {
-            label.htmlFor = selectId;
-          }
-        }
-
-        if (moveUpButton instanceof HTMLButtonElement) {
-          moveUpButton.disabled = index === 0;
-        }
-
-        if (moveDownButton instanceof HTMLButtonElement) {
-          moveDownButton.disabled = index === rows.length - 1;
-        }
-      });
-    };
-
-    const getSelectedProducts = () =>
-      getRows()
-        .map((row) => row.querySelector("[data-service-product-select]"))
-        .filter((select) => select instanceof HTMLSelectElement && select.value !== "")
-        .map((select) => ({
-          id: select.value,
-          name: select.options[select.selectedIndex]?.text ?? select.value
-        }));
-
-    const renderPreview = () => {
-      const products = getSelectedProducts();
-
-      if (products.length < 2) {
-        preview.innerHTML = `
-          <div class="empty-state compact">
-            <h3>No complete flow yet</h3>
-            <p>Choose at least two products to build the service flow.</p>
-          </div>`;
-        return;
-      }
-
-      preview.innerHTML = `
-        <div class="service-chain" aria-label="Service product flow">
-          ${products.map((product, index) => `
-            <div class="service-chain-node">${escapeHtml(product.name)}</div>
-            ${index < products.length - 1 ? '<div class="service-chain-arrow" aria-hidden="true">&rarr;</div>' : ""}
-          `).join("")}
-        </div>`;
-    };
-
-    rowsContainer.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) {
-        return;
-      }
-
-      const button = target.closest("button");
-      const row = target.closest("[data-service-row]");
-
-      if (!(button instanceof HTMLButtonElement) || !(row instanceof HTMLElement)) {
-        return;
-      }
-
-      if (button.hasAttribute("data-service-add-row")) {
-        const newRow = createRow();
-        if (newRow instanceof HTMLElement) {
-          row.insertAdjacentElement("afterend", newRow);
-        }
-      } else if (button.hasAttribute("data-service-move-up")) {
-        const previousRow = row.previousElementSibling;
-        if (previousRow instanceof HTMLElement) {
-          rowsContainer.insertBefore(row, previousRow);
-        }
-      } else if (button.hasAttribute("data-service-move-down")) {
-        const nextRow = row.nextElementSibling;
-        if (nextRow instanceof HTMLElement) {
-          rowsContainer.insertBefore(nextRow, row);
-        }
-      } else if (button.hasAttribute("data-service-remove-row")) {
-        row.remove();
-        ensureMinimumRows();
-      } else {
-        return;
-      }
-
-      reindexRows();
-      renderPreview();
-    });
-
-    rowsContainer.addEventListener("change", (event) => {
-      const target = event.target;
-      if (target instanceof HTMLSelectElement && target.hasAttribute("data-service-product-select")) {
-        renderPreview();
-      }
-    });
-
-    if (addTailButton instanceof HTMLButtonElement) {
-      addTailButton.addEventListener("click", () => {
-        const row = createRow();
-        if (row instanceof HTMLElement) {
-          rowsContainer.appendChild(row);
-          reindexRows();
-          renderPreview();
-        }
-      });
-    }
-
-    ensureMinimumRows();
-    reindexRows();
-    renderPreview();
   });
 });
