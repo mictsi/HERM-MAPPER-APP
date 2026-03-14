@@ -56,7 +56,7 @@
             <div>
                 <span class="eyebrow">Connected products</span>
                 <h2>Connect products</h2>
-                <p>Create explicit <code>from</code> and <code>to</code> links instead of reordering a single chain. Use <strong>Organize branches</strong> to group related paths together.</p>
+                <p>Create explicit <code>from</code> and <code>to</code> links instead of reordering a single chain. Use <strong>Organize connections</strong> to group related edges together.</p>
             </div>
         </div>
 
@@ -118,7 +118,7 @@
         <div class="d-flex justify-content-between align-items-center gap-2 mt-3 flex-wrap">
             <div class="small text-muted">Add as many edges as you need to create branches, merges, or parallel paths.</div>
             <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn btn-outline-secondary" data-service-connection-organize>Organize branches</button>
+                <button type="button" class="btn btn-outline-secondary" data-service-connection-organize>Organize connections</button>
                 <button type="button" class="btn btn-outline-secondary" data-service-connection-add-tail>+ Add connection</button>
             </div>
         </div>
@@ -182,21 +182,6 @@
             </div>
         </section>
 
-        <section class="content-card">
-            <div class="section-heading">
-                <div>
-                    <span class="eyebrow">Routes</span>
-                    <h2>Distinct routes</h2>
-                    <p>Each complete path is listed separately so branches and merges are easier to review.</p>
-                </div>
-            </div>
-
-            <div data-service-graph-routes
-                 data-empty-title="No routes yet"
-                 data-empty-body="Add connected products to build distinct routes."
-                 data-unavailable-title="Routes unavailable"
-                 data-unavailable-body="Distinct routes are only shown when the flow can be rendered without loops."></div>
-        </section>
     </div>
 </form>
 

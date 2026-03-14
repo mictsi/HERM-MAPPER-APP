@@ -480,47 +480,6 @@ document.addEventListener("DOMContentLoaded", () => {
       : Array.from(firstAppearance.keys())
         .sort((left, right) => (firstAppearance.get(left) ?? 0) - (firstAppearance.get(right) ?? 0));
     const roots = orderedNodeIds.filter((id) => (incoming.get(id)?.size ?? 0) === 0);
-    const rootSets = new Map();
-
-    if (supportsGraphLayout) {
-      orderedIds.forEach((id) => {
-        const parentIds = sortByFirstAppearance(incoming.get(id), firstAppearance);
-        if (parentIds.length === 0) {
-          rootSets.set(id, new Set([id]));
-          return;
-        }
-
-        const rootIds = new Set();
-        parentIds.forEach((parentId) => {
-          const parentRoots = rootSets.get(parentId);
-          if (parentRoots instanceof Set && parentRoots.size !== 0) {
-            parentRoots.forEach((rootId) => rootIds.add(rootId));
-          } else {
-            rootIds.add(parentId);
-          }
-        });
-
-        if (rootIds.size === 0) {
-          rootIds.add(id);
-        }
-
-        rootSets.set(id, rootIds);
-      });
-    }
-
-    const primaryRootById = new Map();
-    const sharedRootCountById = new Map();
-
-    orderedNodeIds.forEach((id) => {
-      const resolvedRoots = rootSets.has(id)
-        ? sortByFirstAppearance(rootSets.get(id), firstAppearance)
-        : ((incoming.get(id)?.size ?? 0) === 0
-          ? [id]
-          : [sortByFirstAppearance(incoming.get(id), firstAppearance)[0] ?? id]);
-
-      primaryRootById.set(id, resolvedRoots[0] ?? id);
-      sharedRootCountById.set(id, resolvedRoots.length);
-    });
 
     return {
       supportsGraphLayout,
@@ -530,9 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
       firstAppearance,
       levels,
       roots,
-      orderedNodeIds,
-      primaryRootById,
-      sharedRootCountById
+      orderedNodeIds
     };
   };
 
@@ -559,13 +516,6 @@ document.addEventListener("DOMContentLoaded", () => {
       .sort((left, right) => left[0] - right[0])
       .map(([, ids]) => {
         const sortedIds = [...ids].sort((left, right) => {
-          const leftRoot = analysis.primaryRootById.get(left) ?? left;
-          const rightRoot = analysis.primaryRootById.get(right) ?? right;
-          const rootDiff = (analysis.firstAppearance.get(leftRoot) ?? 0) - (analysis.firstAppearance.get(rightRoot) ?? 0);
-          if (rootDiff !== 0) {
-            return rootDiff;
-          }
-
           const leftParents = sortByFirstAppearance(analysis.incoming.get(left), analysis.firstAppearance);
           const rightParents = sortByFirstAppearance(analysis.incoming.get(right), analysis.firstAppearance);
           const leftAnchor = leftParents.length === 0
@@ -576,6 +526,18 @@ document.addEventListener("DOMContentLoaded", () => {
             : averageNumbers(rightParents.map((parentId) => horizontalOrderById.get(parentId) ?? (analysis.firstAppearance.get(parentId) ?? 0)));
           if (leftAnchor !== rightAnchor) {
             return leftAnchor - rightAnchor;
+          }
+
+          const leftChildren = sortByFirstAppearance(analysis.adjacency.get(left), analysis.firstAppearance);
+          const rightChildren = sortByFirstAppearance(analysis.adjacency.get(right), analysis.firstAppearance);
+          const leftChildAnchor = leftChildren.length === 0
+            ? (analysis.firstAppearance.get(left) ?? 0)
+            : averageNumbers(leftChildren.map((childId) => analysis.firstAppearance.get(childId) ?? (analysis.firstAppearance.get(left) ?? 0)));
+          const rightChildAnchor = rightChildren.length === 0
+            ? (analysis.firstAppearance.get(right) ?? 0)
+            : averageNumbers(rightChildren.map((childId) => analysis.firstAppearance.get(childId) ?? (analysis.firstAppearance.get(right) ?? 0)));
+          if (leftChildAnchor !== rightChildAnchor) {
+            return leftChildAnchor - rightChildAnchor;
           }
 
           return (analysis.firstAppearance.get(left) ?? 0) - (analysis.firstAppearance.get(right) ?? 0);
@@ -597,91 +559,91 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   };
 
-  const buildGraphRoutes = (analysis, maxRoutes = 24) => {
-    if (!analysis.supportsGraphLayout) {
-      return {
-        routes: [],
-        truncated: false
-      };
-    }
+  const renderGraphConnectionBadge = (tone, label) =>
+    `<span class="service-graph-connection-badge ${tone}">${escapeGraphHtml(label)}</span>`;
 
-    const routes = [];
-    let truncated = false;
-    const roots = analysis.roots.length !== 0 ? analysis.roots : analysis.orderedNodeIds;
+  const buildGraphConnectionGroups = (connections, analysis) => {
+    const groupsBySourceId = new Map();
 
-    const visit = (currentId, path) => {
-      if (routes.length >= maxRoutes) {
-        truncated = true;
-        return;
+    connections.forEach((connection, index) => {
+      let group = groupsBySourceId.get(connection.fromId);
+      if (group === undefined) {
+        group = {
+          fromId: connection.fromId,
+          fromName: connection.fromName,
+          firstIndex: index,
+          targetsById: new Map()
+        };
+        groupsBySourceId.set(connection.fromId, group);
       }
 
-      const nextIds = sortByFirstAppearance(analysis.adjacency.get(currentId), analysis.firstAppearance);
-      const nextPath = [...path, currentId];
-
-      if (nextIds.length === 0) {
-        routes.push(nextPath.map((id) => analysis.labels.get(id) ?? id));
-        return;
+      let target = group.targetsById.get(connection.toId);
+      if (target === undefined) {
+        target = {
+          toId: connection.toId,
+          toName: connection.toName,
+          firstIndex: index,
+          count: 0
+        };
+        group.targetsById.set(connection.toId, target);
       }
 
-      nextIds.forEach((nextId) => {
-        if (!truncated) {
-          visit(nextId, nextPath);
-        }
-      });
-    };
-
-    roots.forEach((rootId) => {
-      if (!truncated) {
-        visit(rootId, []);
-      }
+      target.count += 1;
     });
 
-    return {
-      routes,
-      truncated
-    };
+    return Array.from(groupsBySourceId.values())
+      .sort((left, right) => {
+        const levelDiff = (analysis.levels.get(left.fromId) ?? 0) - (analysis.levels.get(right.fromId) ?? 0);
+        if (levelDiff !== 0) {
+          return levelDiff;
+        }
+
+        const appearanceDiff = (analysis.firstAppearance.get(left.fromId) ?? left.firstIndex) -
+          (analysis.firstAppearance.get(right.fromId) ?? right.firstIndex);
+        if (appearanceDiff !== 0) {
+          return appearanceDiff;
+        }
+
+        return left.firstIndex - right.firstIndex;
+      })
+      .map((group) => ({
+        fromId: group.fromId,
+        fromName: group.fromName,
+        incomingCount: analysis.incoming.get(group.fromId)?.size ?? 0,
+        outgoingCount: analysis.adjacency.get(group.fromId)?.size ?? 0,
+        targets: Array.from(group.targetsById.values())
+          .sort((left, right) => {
+            const levelDiff = (analysis.levels.get(left.toId) ?? 0) - (analysis.levels.get(right.toId) ?? 0);
+            if (levelDiff !== 0) {
+              return levelDiff;
+            }
+
+            const appearanceDiff = (analysis.firstAppearance.get(left.toId) ?? left.firstIndex) -
+              (analysis.firstAppearance.get(right.toId) ?? right.firstIndex);
+            if (appearanceDiff !== 0) {
+              return appearanceDiff;
+            }
+
+            return left.firstIndex - right.firstIndex;
+          })
+          .map((target) => ({
+            ...target,
+            incomingCount: analysis.incoming.get(target.toId)?.size ?? 0,
+            outgoingCount: analysis.adjacency.get(target.toId)?.size ?? 0
+          }))
+      }));
   };
 
-  const renderGraphRoutes = (analysis) => {
-    const { routes, truncated } = buildGraphRoutes(analysis);
-    if (routes.length === 0) {
-      return "";
-    }
-
-    return `
-      <div class="service-graph-routes">
-        <div class="service-graph-routes-heading">
-          <h3>Distinct routes</h3>
-          <p>Expanded routes make branches and merges easier to follow.</p>
-        </div>
-        <div class="service-graph-route-list">
-          ${routes.map((route, index) => `
-            <article class="service-graph-route-card">
-              <div class="service-graph-route-index">Route ${index + 1}</div>
-              <div class="service-graph-route-steps">
-                ${route.map((step, stepIndex) => `
-                  <span class="service-graph-route-step">${escapeGraphHtml(step)}</span>
-                  ${stepIndex < route.length - 1 ? "<span class=\"service-graph-route-arrow\" aria-hidden=\"true\">&rarr;</span>" : ""}
-                `).join("")}
-              </div>
-            </article>`).join("")}
-        </div>
-        ${truncated ? `<div class="service-graph-route-note">Showing the first ${routes.length} routes to keep the preview readable.</div>` : ""}
-      </div>`;
-  };
-
-  const renderGraphRoutesPanel = (routesPanel, connections, analysisInput = null) => {
-    if (!(routesPanel instanceof HTMLElement)) {
+  const renderGraphConnectionsPanel = (connectionsPanel, connections, analysisInput = null) => {
+    if (!(connectionsPanel instanceof HTMLElement)) {
       return;
     }
 
-    const emptyTitle = routesPanel.dataset.emptyTitle ?? "No routes yet";
-    const emptyBody = routesPanel.dataset.emptyBody ?? "Add connected products to build distinct routes.";
-    const unavailableTitle = routesPanel.dataset.unavailableTitle ?? "Routes unavailable";
-    const unavailableBody = routesPanel.dataset.unavailableBody ?? "Distinct routes are only shown when the flow can be rendered without loops.";
+    const emptyTitle = connectionsPanel.dataset.emptyTitle ?? "No connections yet";
+    const emptyBody = connectionsPanel.dataset.emptyBody ?? "Add connected products to build the connection details.";
 
     if (connections.length === 0) {
-      routesPanel.innerHTML = `
+      connectionsPanel.innerHTML = `
         <div class="empty-state compact">
           <h3>${escapeGraphHtml(emptyTitle)}</h3>
           <p>${escapeGraphHtml(emptyBody)}</p>
@@ -690,16 +652,65 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const analysis = analysisInput ?? analyzeGraph(connections);
-    const markup = renderGraphRoutes(analysis);
-    if (markup !== "") {
-      routesPanel.innerHTML = markup;
-      return;
-    }
+    const groups = buildGraphConnectionGroups(connections, analysis);
 
-    routesPanel.innerHTML = `
-      <div class="empty-state compact">
-        <h3>${escapeGraphHtml(unavailableTitle)}</h3>
-        <p>${escapeGraphHtml(unavailableBody)}</p>
+    connectionsPanel.innerHTML = `
+      <div class="service-graph-connections">
+        ${groups.map((group) => {
+          const sourceBadges = [];
+          if (group.incomingCount === 0) {
+            sourceBadges.push(renderGraphConnectionBadge("is-entry", "Entry point"));
+          } else if (group.incomingCount > 1) {
+            sourceBadges.push(renderGraphConnectionBadge("is-merge", `${group.incomingCount} incoming connections`));
+          }
+
+          if (group.outgoingCount > 1) {
+            sourceBadges.push(renderGraphConnectionBadge("is-branch", `${group.outgoingCount} outgoing connections`));
+          }
+
+          return `
+            <article class="service-graph-connection-card">
+              <div class="service-graph-connection-header">
+                <div>
+                  <div class="service-graph-connection-kicker">From</div>
+                  <h3 class="service-graph-connection-title">${escapeGraphHtml(group.fromName)}</h3>
+                </div>
+                <div class="service-graph-connection-meta">
+                  ${sourceBadges.join("")}
+                </div>
+              </div>
+              <div class="service-graph-connection-target-list">
+                ${group.targets.map((target) => {
+                  const targetBadges = [];
+                  if (target.count > 1) {
+                    targetBadges.push(renderGraphConnectionBadge("is-neutral", `${target.count} saved connections`));
+                  }
+
+                  if (target.incomingCount > 1) {
+                    targetBadges.push(renderGraphConnectionBadge("is-merge", `${target.incomingCount} incoming connections`));
+                  }
+
+                  if (target.outgoingCount > 1) {
+                    targetBadges.push(renderGraphConnectionBadge("is-branch", `${target.outgoingCount} outgoing connections`));
+                  } else if (target.outgoingCount === 0) {
+                    targetBadges.push(renderGraphConnectionBadge("is-terminal", "Endpoint"));
+                  }
+
+                  return `
+                    <div class="service-graph-connection-target">
+                      <div class="service-graph-connection-arrow" aria-hidden="true">&darr;</div>
+                      <div class="service-graph-connection-target-body">
+                        <div class="service-graph-connection-kicker">To</div>
+                        <div class="service-graph-connection-target-name">${escapeGraphHtml(target.toName)}</div>
+                      </div>
+                      <div class="service-graph-connection-meta">
+                        ${targetBadges.join("")}
+                      </div>
+                    </div>`;
+                }).join("")}
+              </div>
+            </article>`;
+        }).join("")}
       </div>`;
   };
 
@@ -799,7 +810,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.querySelectorAll("[data-service-graph-preview]").forEach((preview) => {
     const graphHost = preview.closest("[data-service-graph-host]");
-    const routesPanel = graphHost?.querySelector("[data-service-graph-routes]");
+    const connectionsPanel = graphHost?.querySelector("[data-service-graph-connections]");
     const dataScript = preview.querySelector("[data-service-graph-data]");
     if (!(dataScript instanceof HTMLScriptElement)) {
       return;
@@ -816,7 +827,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const analysis = analyzeGraph(connections);
 
       renderGraphPreview(preview, connections, analysis);
-      renderGraphRoutesPanel(routesPanel, connections, analysis);
+      renderGraphConnectionsPanel(connectionsPanel, connections, analysis);
     } catch (error) {
       console.error("Unable to render service graph preview", error);
     }
@@ -830,7 +841,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const host = editor.closest("form") ?? editor;
     const graphHost = host.querySelector("[data-service-graph-host]") ?? host;
     const preview = graphHost.querySelector("[data-service-graph-preview]");
-    const routesPanel = graphHost.querySelector("[data-service-graph-routes]");
+    const connectionsPanel = graphHost.querySelector("[data-service-graph-connections]");
 
     if (
       !(rowsContainer instanceof HTMLElement) ||
@@ -952,40 +963,57 @@ document.addEventListener("DOMContentLoaded", () => {
         fromName: state.fromName,
         toName: state.toName
       })));
-      const branchOrder = new Map(
-        (analysis.roots.length !== 0 ? analysis.roots : analysis.orderedNodeIds)
-          .map((rootId, index) => [rootId, index]));
+      const sourceOrder = new Map(
+        Array.from(new Set(
+          completedStates
+            .map((state) => state.fromId)
+            .sort((left, right) => {
+              const levelDiff = (analysis.levels.get(left) ?? 0) - (analysis.levels.get(right) ?? 0);
+              if (levelDiff !== 0) {
+                return levelDiff;
+              }
+
+              return (analysis.firstAppearance.get(left) ?? 0) - (analysis.firstAppearance.get(right) ?? 0);
+            })))
+          .map((sourceId, index) => [sourceId, index]));
       const metadataByRow = new Map();
 
       completedStates.forEach((state) => {
-        const branchRootId = analysis.primaryRootById.get(state.fromId) ?? state.fromId;
-        const branchLabel = analysis.labels.get(branchRootId) ?? state.fromName;
-        const tone = graphBranchPalette[(branchOrder.get(branchRootId) ?? 0) % graphBranchPalette.length];
-        const badges = [
-          renderBadge("is-branch", `Branch from ${branchLabel}`)
-        ];
+        const tone = graphBranchPalette[(sourceOrder.get(state.fromId) ?? 0) % graphBranchPalette.length];
+        const badges = [];
 
-        if ((analysis.adjacency.get(state.fromId)?.size ?? 0) > 1) {
-          badges.push(renderBadge("is-split", `Splits at ${state.fromName}`));
+        const incomingToSource = analysis.incoming.get(state.fromId)?.size ?? 0;
+        const outgoingFromSource = analysis.adjacency.get(state.fromId)?.size ?? 0;
+        const incomingToTarget = analysis.incoming.get(state.toId)?.size ?? 0;
+        const outgoingFromTarget = analysis.adjacency.get(state.toId)?.size ?? 0;
+
+        if (incomingToSource === 0) {
+          badges.push(renderBadge("is-entry", `Entry at ${state.fromName}`));
+        } else if (incomingToSource > 1) {
+          badges.push(renderBadge("is-merge", `${incomingToSource} inputs into ${state.fromName}`));
         }
 
-        if ((analysis.incoming.get(state.toId)?.size ?? 0) > 1) {
-          badges.push(renderBadge("is-merge", `Merges into ${state.toName}`));
+        if (outgoingFromSource > 1) {
+          badges.push(renderBadge("is-split", `${outgoingFromSource} outputs from ${state.fromName}`));
         }
 
-        if ((analysis.sharedRootCountById.get(state.toId) ?? 1) > 1) {
-          badges.push(renderBadge("is-merge", "Shared route"));
+        if (incomingToTarget > 1) {
+          badges.push(renderBadge("is-merge", `${incomingToTarget} inputs into ${state.toName}`));
+        }
+
+        if (outgoingFromTarget === 0) {
+          badges.push(renderBadge("is-terminal", `Ends at ${state.toName}`));
         }
 
         metadataByRow.set(state.row, {
-          branchRootId,
-          branchLabel,
+          sourceId: state.fromId,
+          sourceLabel: state.fromName,
           tone,
           badges
         });
       });
 
-      let previousBranchRootId = null;
+      let previousSourceId = null;
       rowStates.forEach((state) => {
         state.row.style.removeProperty("--service-connection-accent");
         state.row.style.removeProperty("--service-connection-accent-soft");
@@ -997,7 +1025,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const metadata = metadataByRow.get(state.row);
         if (metadata === undefined) {
           if (state.summary instanceof HTMLElement) {
-            state.summary.innerHTML = renderBadge("is-draft", "Complete both products to place this connection in a branch.");
+            state.summary.innerHTML = renderBadge("is-draft", "Complete both products to place this connection.");
           }
 
           return;
@@ -1006,13 +1034,13 @@ document.addEventListener("DOMContentLoaded", () => {
         state.row.style.setProperty("--service-connection-accent", metadata.tone.border);
         state.row.style.setProperty("--service-connection-accent-soft", metadata.tone.surface);
 
-        if (metadata.branchRootId !== previousBranchRootId) {
+        if (metadata.sourceId !== previousSourceId) {
           const divider = document.createElement("div");
           divider.className = "service-connection-branch-divider";
           divider.setAttribute("data-service-connection-divider", "");
-          divider.innerHTML = `Branch from <strong>${escapeGraphHtml(metadata.branchLabel)}</strong>`;
+          divider.innerHTML = `Connections from <strong>${escapeGraphHtml(metadata.sourceLabel)}</strong>`;
           rowsContainer.insertBefore(divider, state.row);
-          previousBranchRootId = metadata.branchRootId;
+          previousSourceId = metadata.sourceId;
         }
 
         if (state.summary instanceof HTMLElement) {
@@ -1021,7 +1049,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     };
 
-    const organizeRowsByBranch = () => {
+    const organizeRowsByConnection = () => {
       const rowStates = getRowStates();
       const completedStates = rowStates.filter((state) => state.fromId !== "" && state.toId !== "");
       if (completedStates.length < 2) {
@@ -1036,14 +1064,6 @@ document.addEventListener("DOMContentLoaded", () => {
       })));
 
       const sortCompletedStates = [...completedStates].sort((left, right) => {
-        const leftRoot = analysis.primaryRootById.get(left.fromId) ?? left.fromId;
-        const rightRoot = analysis.primaryRootById.get(right.fromId) ?? right.fromId;
-        const rootDiff = (analysis.firstAppearance.get(leftRoot) ?? Number.MAX_SAFE_INTEGER) -
-          (analysis.firstAppearance.get(rightRoot) ?? Number.MAX_SAFE_INTEGER);
-        if (rootDiff !== 0) {
-          return rootDiff;
-        }
-
         const levelDiff = (analysis.levels.get(left.fromId) ?? Number.MAX_SAFE_INTEGER) -
           (analysis.levels.get(right.fromId) ?? Number.MAX_SAFE_INTEGER);
         if (levelDiff !== 0) {
@@ -1077,7 +1097,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       syncBranchPresentation();
       renderGraphPreview(preview, connections, analysis);
-      renderGraphRoutesPanel(routesPanel, connections, analysis);
+      renderGraphConnectionsPanel(connectionsPanel, connections, analysis);
     };
 
     rowsContainer.addEventListener("click", (event) => {
@@ -1136,7 +1156,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (organizeButton instanceof HTMLButtonElement) {
       organizeButton.addEventListener("click", () => {
-        organizeRowsByBranch();
+        organizeRowsByConnection();
         reindexRows();
         syncPreview();
       });

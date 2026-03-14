@@ -814,6 +814,11 @@ a {
   color: var(--accent-deep);
 }
 
+.service-connection-badge.is-entry {
+  background: rgba(11, 110, 79, 0.12);
+  color: var(--accent-deep);
+}
+
 .service-connection-badge.is-merge {
   background: rgba(43, 111, 119, 0.12);
   color: #1f5660;
@@ -827,6 +832,11 @@ a {
 .service-connection-badge.is-draft {
   background: rgba(82, 96, 109, 0.12);
   color: var(--muted);
+}
+
+.service-connection-badge.is-terminal {
+  background: rgba(82, 96, 109, 0.12);
+  color: #36424f;
 }
 
 .service-connection-branch-divider {
@@ -908,77 +918,115 @@ a {
   stroke-linecap: round;
 }
 
-.service-graph-routes {
+.service-graph-connections {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
 }
 
-.service-graph-routes-heading {
+.service-graph-connection-card {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.service-graph-connection-header {
   display: flex;
-  align-items: center;
+  align-items: start;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
 }
 
-.service-graph-routes-heading h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.service-graph-routes-heading p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.88rem;
-}
-
-.service-graph-route-list {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.service-graph-route-card {
-  display: grid;
-  gap: 0.55rem;
-  padding: 0.95rem 1rem;
-  border: 1px solid rgba(31, 41, 51, 0.08);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.68);
-}
-
-.service-graph-route-index {
-  font-size: 0.78rem;
+.service-graph-connection-kicker {
+  font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.service-graph-route-steps {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
+.service-graph-connection-title {
+  margin: 0;
+  font-size: 1rem;
 }
 
-.service-graph-route-step {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.6rem 0.85rem;
-  border-radius: 0.9rem;
-  background: rgba(11, 110, 79, 0.08);
-  font-weight: 700;
+.service-graph-connection-target-list {
+  display: grid;
+  gap: 0.75rem;
 }
 
-.service-graph-route-arrow {
-  color: var(--muted);
+.service-graph-connection-target {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  background: linear-gradient(135deg, rgba(247, 243, 235, 0.72), rgba(255, 255, 255, 0.62));
+}
+
+.service-graph-connection-arrow {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  background: rgba(11, 110, 79, 0.1);
+  color: var(--accent-deep);
   font-size: 1rem;
   font-weight: 700;
 }
 
-.service-graph-route-note {
-  color: var(--muted);
-  font-size: 0.85rem;
+.service-graph-connection-target-body {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.service-graph-connection-target-name {
+  font-weight: 700;
+}
+
+.service-graph-connection-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.45rem;
+}
+
+.service-graph-connection-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(82, 96, 109, 0.12);
+  color: #36424f;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.service-graph-connection-badge.is-entry,
+.service-graph-connection-badge.is-branch {
+  background: rgba(11, 110, 79, 0.12);
+  color: var(--accent-deep);
+}
+
+.service-graph-connection-badge.is-merge {
+  background: rgba(43, 111, 119, 0.12);
+  color: #1f5660;
+}
+
+.service-graph-connection-badge.is-terminal {
+  background: rgba(139, 94, 52, 0.12);
+  color: #744722;
+}
+
+.service-graph-connection-badge.is-neutral {
+  background: rgba(82, 96, 109, 0.12);
+  color: #36424f;
 }
 
 .service-graph-fallback {
@@ -1674,9 +1722,21 @@ a {
     display: none;
   }
 
-  .service-graph-routes-heading {
+  .service-graph-connection-header {
     align-items: start;
     flex-direction: column;
+  }
+
+  .service-graph-connection-target {
+    grid-template-columns: 1fr;
+  }
+
+  .service-graph-connection-arrow {
+    display: none;
+  }
+
+  .service-graph-connection-meta {
+    justify-content: start;
   }
 }
 

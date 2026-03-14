@@ -108,22 +108,4 @@
         }
     </section>
 
-    @if (Model.Connections.Count != 0 && Model.UsesGraphConnections)
-    {
-        <section class="content-card">
-            <div class="section-heading">
-                <div>
-                    <span class="eyebrow">Routes</span>
-                    <h2>Distinct routes</h2>
-                    <p>Each complete route is listed separately from the diagram so branches are easier to compare.</p>
-                </div>
-            </div>
-
-            <div data-service-graph-routes
-                 data-empty-title="No routes yet"
-                 data-empty-body="Add connected products to build distinct routes."
-                 data-unavailable-title="Routes unavailable"
-                 data-unavailable-body="Distinct routes are only shown when the flow can be rendered without loops."></div>
-        </section>
-    }
 </div>
