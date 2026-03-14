@@ -53,6 +53,42 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
+    public async Task CreatePostAllowsRepeatedProductsInServiceFlow()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedConfigurableOptionsAsync();
+
+        var products = await fixture.SeedProductsAsync("Portal", "Gateway", "Queue");
+        using var controller = fixture.CreateController();
+
+        var result = await controller.Create(new ServiceEditViewModel
+        {
+            Name = "Loopback Flow",
+            Owner = "Team Blue",
+            LifecycleStatus = "Production",
+            ProductRows =
+            [
+                new ServiceProductRowViewModel { ProductId = products[0].Id },
+                new ServiceProductRowViewModel { ProductId = products[1].Id },
+                new ServiceProductRowViewModel { ProductId = products[0].Id },
+                new ServiceProductRowViewModel { ProductId = products[2].Id }
+            ]
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ServicesController.Index), redirect.ActionName);
+
+        var service = await fixture.DbContext.ServiceCatalogItems
+            .Include(x => x.ProductLinks)
+            .ThenInclude(x => x.ProductCatalogItem)
+            .SingleAsync();
+
+        Assert.Equal(
+            ["Portal", "Gateway", "Portal", "Queue"],
+            service.GetOrderedProductLinks().Select(x => x.ProductCatalogItem.Name).ToArray());
+    }
+
+    [Fact]
     public async Task EditPostRebuildsOrderedProductLinksAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();

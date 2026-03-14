@@ -41,13 +41,6 @@ public sealed class ServiceEditViewModel : IValidatableObject
                 "Select at least two products to define a service connection.",
                 [nameof(ProductRows)]);
         }
-
-        if (selectedProductIds.Count != selectedProductIds.Distinct().Count())
-        {
-            yield return new ValidationResult(
-                "Each product can only be selected once in a service.",
-                [nameof(ProductRows)]);
-        }
     }
 
     public static ServiceEditViewModel FromService(ServiceCatalogItem service) =>
