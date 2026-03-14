@@ -13,6 +13,9 @@
             <a class="admin-nav-link @(activeItem == "Users" ? "is-active" : string.Empty)" asp-controller="Users" asp-action="Index">Users</a>
             <a class="admin-nav-link @(activeItem == "Configuration" ? "is-active" : string.Empty)" asp-controller="Configuration" asp-action="Index">Configuration</a>
             <a class="admin-nav-link @(activeItem == "ChangeLog" ? "is-active" : string.Empty)" asp-controller="ChangeLog" asp-action="Index">Change Log</a>
+            <a class="admin-nav-link @(activeItem == "RestoreProducts" ? "is-active" : string.Empty)" asp-controller="Products" asp-action="Restore">Restore Products</a>
+            <a class="admin-nav-link @(activeItem == "RestoreServices" ? "is-active" : string.Empty)" asp-controller="Services" asp-action="Restore">Restore Services</a>
+            <a class="admin-nav-link @(activeItem == "RestoreReference" ? "is-active" : string.Empty)" asp-controller="Reference" asp-action="Restore">Restore Reference</a>
         }
     </nav>
 </aside>

@@ -38,6 +38,9 @@ public sealed class ControllerAuthorizationTests
         AssertMethodPolicy<ProductsController>(nameof(ProductsController.BulkEdit), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<ProductsController>(nameof(ProductsController.Delete), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<ProductsController>(nameof(ProductsController.DeleteConfirmed), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ProductsController>(nameof(ProductsController.Restore), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ProductsController>(nameof(ProductsController.RestoreDeleted), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ProductsController>(nameof(ProductsController.PermanentDelete), AppPolicies.AdminOnly, 1);
     }
 
     [Fact]
@@ -49,6 +52,9 @@ public sealed class ControllerAuthorizationTests
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Delete), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.DeleteConfirmed), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Restore), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ServicesController>(nameof(ServicesController.RestoreDeleted), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ServicesController>(nameof(ServicesController.PermanentDelete), AppPolicies.AdminOnly, 1);
     }
 
     [Fact]
@@ -56,8 +62,10 @@ public sealed class ControllerAuthorizationTests
     {
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.VerifyImportAsync), AppPolicies.AdminOnly, 1);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.ImportVerifiedAsync), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreAsync), AppPolicies.AdminOnly, 0);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponentAsync), AppPolicies.AdminOnly, 1);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponentAsync), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.PermanentlyDeleteComponentAsync), AppPolicies.AdminOnly, 1);
     }
 
     private static void AssertClassPolicy<TController>(string expectedPolicy)

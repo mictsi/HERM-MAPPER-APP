@@ -28,6 +28,25 @@ public sealed class ReferenceController(
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> RestoreAsync()
+    {
+        var components = await dbContext.TrmComponents
+            .AsNoTracking()
+            .Include(x => x.CapabilityLinks)
+            .ThenInclude(x => x.TrmCapability)
+            .Where(x => x.IsDeleted)
+            .OrderByDescending(x => x.DeletedUtc)
+            .ThenBy(x => x.Name)
+            .ToListAsync();
+
+        return View("Restore", new ReferenceRestoreViewModel
+        {
+            Components = components,
+            StatusMessage = TempData["ImportStatusMessage"] as string
+        });
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> VerifyImportAsync(IFormFile? workbook)
@@ -165,7 +184,7 @@ public sealed class ReferenceController(
             return BadRequest(ModelState);
         }
 
-        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id);
+        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (component is null)
         {
             return NotFound();
@@ -199,7 +218,7 @@ public sealed class ReferenceController(
             return BadRequest(ModelState);
         }
 
-        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id);
+        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (component is null)
         {
             return NotFound();
@@ -219,7 +238,36 @@ public sealed class ReferenceController(
             $"Restored component {component.DisplayLabel} from trash.");
 
         TempData["ImportStatusMessage"] = $"Restored component {component.DisplayLabel}.";
-        return RedirectToAction("Index");
+        return RedirectToAction("Restore");
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PermanentlyDeleteComponentAsync(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+        if (component is null)
+        {
+            return NotFound();
+        }
+
+        dbContext.TrmComponents.Remove(component);
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Component",
+            "PermanentDelete",
+            nameof(TrmComponent),
+            component.Id,
+            $"Permanently deleted component {component.DisplayLabel}.");
+
+        TempData["ImportStatusMessage"] = $"Permanently deleted component {component.DisplayLabel}.";
+        return RedirectToAction("Restore");
     }
 
     public async Task<IActionResult> HistoryAsync(int id)
@@ -335,14 +383,6 @@ public sealed class ReferenceController(
             Components = await componentsQuery
                 .OrderBy(x => x.IsCustom)
                 .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
-                .ToListAsync(),
-            TrashedComponents = await dbContext.TrmComponents
-                .AsNoTracking()
-                .Include(x => x.CapabilityLinks)
-                .ThenInclude(x => x.TrmCapability)
-                .Where(x => x.IsDeleted)
-                .OrderByDescending(x => x.DeletedUtc)
-                .ThenBy(x => x.Name)
                 .ToListAsync(),
             ImportReview = importReview ?? new WorkbookImportReviewViewModel(),
             ImportStatusMessage = importStatusMessage

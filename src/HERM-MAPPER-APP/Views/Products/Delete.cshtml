@@ -1,13 +1,13 @@
 @model ProductCatalogItem
 @{
-    ViewData["Title"] = "Delete Product";
+    ViewData["Title"] = "Trash Product";
 }
 
 <section class="page-header">
     <div>
         <span class="eyebrow">Catalogue CRUD</span>
-        <h1>Delete @Model.Name?</h1>
-        <p>This removes the product and all of its stored HERM mappings from SQLite.</p>
+        <h1>Move @Model.Name to trash?</h1>
+        <p>This hides the product from the catalogue. Administrators can restore it or permanently delete it later from Admin.</p>
     </div>
 </section>
 
@@ -23,7 +23,7 @@
 
     <form asp-action="Delete" method="post" class="d-flex gap-2">
         <input type="hidden" asp-for="Id" />
-        <button type="submit" class="btn btn-danger">Delete</button>
+        <button type="submit" class="btn btn-danger">Move to trash</button>
         <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
     </form>
 </section>

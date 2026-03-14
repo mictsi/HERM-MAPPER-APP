@@ -1,0 +1,82 @@
+@using HERMMapperApp.Services
+@model ProductRestoreViewModel
+@{
+    ViewData["Title"] = "Restore Products";
+    ViewData["AdminNav"] = "RestoreProducts";
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Deleted catalogue items</span>
+                <h1>Restore products</h1>
+                <p>Restore products back into the catalogue or permanently delete them.</p>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-success mb-0">@Model.StatusMessage</div>
+            </section>
+        }
+
+        <section class="content-card">
+            @if (Model.Products.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <h3>No deleted products</h3>
+                    <p>The product trash is empty.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Owners</th>
+                                <th>Mappings</th>
+                                <th>Deleted</th>
+                                <th>Reason</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var product in Model.Products)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@product.Name</strong>
+                                    <div class="table-subline">@product.Vendor @product.Version</div>
+                                </td>
+                                <td>@(product.OwnerDisplay ?? "-")</td>
+                                <td>@product.Mappings.Count</td>
+                                <td>@await TimeZoneDisplay.FormatUtcAsync(product.DeletedUtc)</td>
+                                <td>@(product.DeletedReason ?? "-")</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <form asp-action="RestoreDeleted" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@product.Id" />
+                                            <button class="btn btn-outline-primary" type="submit">Restore</button>
+                                        </form>
+                                        <form asp-action="PermanentDelete" method="post" class="d-inline" onsubmit="return confirm('Permanently delete this product?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@product.Id" />
+                                            <button class="btn btn-outline-danger" type="submit">Delete forever</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

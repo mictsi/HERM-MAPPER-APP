@@ -302,7 +302,7 @@ public sealed class ProductsControllerCrudTests
     }
 
     [Fact]
-    public async Task DeleteConfirmedRemovesProductAndWritesAudit()
+    public async Task DeleteConfirmedSoftDeletesProductAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var product = new ProductCatalogItem { Name = "Sentinel" };
@@ -313,8 +313,59 @@ public sealed class ProductsControllerCrudTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ProductsController.Index), redirect.ActionName);
-        Assert.Empty(await fixture.DbContext.ProductCatalogItems.ToListAsync());
+        var deletedProduct = await fixture.DbContext.ProductCatalogItems.SingleAsync();
+        Assert.True(deletedProduct.IsDeleted);
+        Assert.NotNull(deletedProduct.DeletedUtc);
+        Assert.Equal("Moved to trash from the product catalogue.", deletedProduct.DeletedReason);
         Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task RestoreDeletedClearsSoftDeleteStateAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new ProductCatalogItem
+        {
+            Name = "Sentinel",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow.AddDays(-1),
+            DeletedReason = "Moved to trash from the product catalogue."
+        };
+        fixture.DbContext.ProductCatalogItems.Add(product);
+        await fixture.DbContext.SaveChangesAsync();
+
+        var result = await fixture.CreateController().RestoreDeleted(product.Id);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ProductsController.Restore), redirect.ActionName);
+
+        var restoredProduct = await fixture.DbContext.ProductCatalogItems.SingleAsync();
+        Assert.False(restoredProduct.IsDeleted);
+        Assert.Null(restoredProduct.DeletedUtc);
+        Assert.Null(restoredProduct.DeletedReason);
+        Assert.Equal("Restore", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task PermanentDeleteRemovesDeletedProductAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new ProductCatalogItem
+        {
+            Name = "Sentinel",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow.AddDays(-1),
+            DeletedReason = "Moved to trash from the product catalogue."
+        };
+        fixture.DbContext.ProductCatalogItems.Add(product);
+        await fixture.DbContext.SaveChangesAsync();
+
+        var result = await fixture.CreateController().PermanentDelete(product.Id);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ProductsController.Restore), redirect.ActionName);
+        Assert.Empty(await fixture.DbContext.ProductCatalogItems.ToListAsync());
+        Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
 
     private sealed class TestFixture : IAsyncDisposable

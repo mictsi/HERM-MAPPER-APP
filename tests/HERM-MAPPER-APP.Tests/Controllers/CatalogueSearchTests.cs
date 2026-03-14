@@ -94,6 +94,29 @@ public sealed class CatalogueSearchTests
     }
 
     [Fact]
+    public async Task ProductsIndexExcludesDeletedProducts()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        fixture.DbContext.ProductCatalogItems.AddRange(
+            CreateProduct("Visible Product", null, null),
+            new ProductCatalogItem
+            {
+                Name = "Deleted Product",
+                IsDeleted = true,
+                DeletedUtc = DateTime.UtcNow,
+                DeletedReason = "Moved to trash from the product catalogue."
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateProductsController();
+        var result = await controller.Index(null);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductsIndexViewModel>(view.Model);
+        Assert.Collection(model.Products, product => Assert.Equal("Visible Product", product.Name));
+    }
+
+    [Fact]
     public async Task ReferenceIndexSearchMatchesPartialStringsForTypeCapabilityAndDomain()
     {
         await using var fixture = await TestFixture.CreateAsync();

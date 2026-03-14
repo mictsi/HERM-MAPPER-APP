@@ -1,0 +1,83 @@
+@using HERMMapperApp.Services
+@model ReferenceRestoreViewModel
+@{
+    ViewData["Title"] = "Restore Reference";
+    ViewData["AdminNav"] = "RestoreReference";
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Deleted HERM TRM components</span>
+                <h1>Restore reference components</h1>
+                <p>Restore components back into the catalogue or permanently delete them.</p>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-success mb-0">@Model.StatusMessage</div>
+            </section>
+        }
+
+        <section class="content-card">
+            @if (Model.Components.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <h3>No deleted components</h3>
+                    <p>The reference trash is empty.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                <th>Capabilities</th>
+                                <th>Deleted</th>
+                                <th>Reason</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var component in Model.Components)
+                        {
+                            var capabilityNames = component.CapabilityLinks
+                                .Where(x => x.TrmCapability is not null)
+                                .Select(x => $"{x.TrmCapability!.Code} {x.TrmCapability.Name}")
+                                .OrderBy(x => x)
+                                .ToList();
+                            <tr>
+                                <td>@component.DisplayLabel</td>
+                                <td>@(capabilityNames.Count == 0 ? "-" : string.Join(", ", capabilityNames))</td>
+                                <td>@await TimeZoneDisplay.FormatUtcAsync(component.DeletedUtc)</td>
+                                <td>@(component.DeletedReason ?? "-")</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <a class="btn btn-outline-secondary" asp-action="History" asp-route-id="@component.Id">History</a>
+                                        <form asp-action="RestoreComponent" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@component.Id" />
+                                            <button class="btn btn-outline-primary" type="submit">Restore</button>
+                                        </form>
+                                        <form asp-action="PermanentlyDeleteComponent" method="post" class="d-inline" onsubmit="return confirm('Permanently delete this component?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@component.Id" />
+                                            <button class="btn btn-outline-danger" type="submit">Delete forever</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

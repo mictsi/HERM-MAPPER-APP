@@ -1,0 +1,84 @@
+@using HERMMapperApp.Services
+@model ServiceRestoreViewModel
+@{
+    ViewData["Title"] = "Restore Services";
+    ViewData["AdminNav"] = "RestoreServices";
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Deleted service catalogue items</span>
+                <h1>Restore services</h1>
+                <p>Restore services back into the catalogue or permanently delete them.</p>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-success mb-0">@Model.StatusMessage</div>
+            </section>
+        }
+
+        <section class="content-card">
+            @if (Model.Services.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <h3>No deleted services</h3>
+                    <p>The service trash is empty.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Service</th>
+                                <th>Owner</th>
+                                <th>Status</th>
+                                <th>Products</th>
+                                <th>Deleted</th>
+                                <th>Reason</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var service in Model.Services)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@service.Name</strong>
+                                    <div class="table-subline">@(string.IsNullOrWhiteSpace(service.Description) ? "No description provided." : service.Description)</div>
+                                </td>
+                                <td>@service.Owner</td>
+                                <td>@service.LifecycleStatus</td>
+                                <td>@service.ProductLinks.Count</td>
+                                <td>@await TimeZoneDisplay.FormatUtcAsync(service.DeletedUtc)</td>
+                                <td>@(service.DeletedReason ?? "-")</td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <form asp-action="RestoreDeleted" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@service.Id" />
+                                            <button class="btn btn-outline-primary" type="submit">Restore</button>
+                                        </form>
+                                        <form asp-action="PermanentDelete" method="post" class="d-inline" onsubmit="return confirm('Permanently delete this service?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@service.Id" />
+                                            <button class="btn btn-outline-danger" type="submit">Delete forever</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

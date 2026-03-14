@@ -23,6 +23,7 @@ public sealed class MappingsController(
     {
         var productsQuery = dbContext.ProductCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.TrmDomain)
             .Include(x => x.Mappings)
@@ -63,10 +64,10 @@ public sealed class MappingsController(
             Status = status,
             DomainId = domainId,
             CapabilityId = capabilityId,
-            DraftCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.Draft),
-            InReviewCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.InReview),
-            CompleteCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.Complete),
-            OutOfScopeCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.OutOfScope),
+            DraftCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.Draft && x.ProductCatalogItem != null && !x.ProductCatalogItem.IsDeleted),
+            InReviewCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.InReview && x.ProductCatalogItem != null && !x.ProductCatalogItem.IsDeleted),
+            CompleteCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.Complete && x.ProductCatalogItem != null && !x.ProductCatalogItem.IsDeleted),
+            OutOfScopeCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.OutOfScope && x.ProductCatalogItem != null && !x.ProductCatalogItem.IsDeleted),
             Domains = await dbContext.TrmDomains.AsNoTracking().OrderBy(x => x.Code).ToListAsync(),
             Capabilities = await BuildCapabilityFilter(domainId),
             Products = await productsQuery.OrderBy(x => x.Name).ToListAsync()
@@ -80,7 +81,7 @@ public sealed class MappingsController(
         var product = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Owners)
-            .FirstOrDefaultAsync(x => x.Id == productId);
+            .FirstOrDefaultAsync(x => x.Id == productId && !x.IsDeleted);
         if (product is null)
         {
             return NotFound();
@@ -95,7 +96,7 @@ public sealed class MappingsController(
     {
         var product = await dbContext.ProductCatalogItems
             .Include(x => x.Owners)
-            .FirstOrDefaultAsync(x => x.Id == model.ProductId);
+            .FirstOrDefaultAsync(x => x.Id == model.ProductId && !x.IsDeleted);
         if (product is null)
         {
             return NotFound();
@@ -279,6 +280,7 @@ public sealed class MappingsController(
             .Include(x => x.TrmComponent)
             .ThenInclude(x => x!.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
+            .Where(x => x.ProductCatalogItem != null && !x.ProductCatalogItem.IsDeleted)
             .AsQueryable();
 
         if (!includeUnfinished)

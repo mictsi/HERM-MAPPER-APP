@@ -19,6 +19,7 @@ public sealed class ProductsController(
     {
         var query = dbContext.ProductCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .Include(x => x.Owners)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.TrmComponent)
@@ -27,7 +28,7 @@ public sealed class ProductsController(
 
         var selectedOwners = NormalizeSelections(owners);
         lifecycleStatus = NormalizeSelection(lifecycleStatus);
-    var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
+        var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
 
         var likePattern = SearchPattern.CreateContainsPattern(search);
         if (likePattern is not null)
@@ -128,7 +129,7 @@ public sealed class ProductsController(
             .ThenInclude(x => x!.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
         return product is null ? NotFound() : View(product);
     }
@@ -146,7 +147,7 @@ public sealed class ProductsController(
             .ThenInclude(x => x.TrmComponent)
             .ThenInclude(x => x!.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
         if (product is null)
         {
@@ -186,7 +187,7 @@ public sealed class ProductsController(
         var product = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Owners)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (product is null)
         {
             return NotFound();
@@ -235,7 +236,7 @@ public sealed class ProductsController(
     {
         var product = await dbContext.ProductCatalogItems
             .Include(x => x.Owners)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (product is null)
         {
             return NotFound();
@@ -285,7 +286,7 @@ public sealed class ProductsController(
 
         var products = await dbContext.ProductCatalogItems
             .Include(x => x.Owners)
-            .Where(x => input.SelectedProductIds.Contains(x.Id))
+            .Where(x => input.SelectedProductIds.Contains(x.Id) && !x.IsDeleted)
             .OrderBy(x => x.Name)
             .ToListAsync();
 
@@ -367,7 +368,7 @@ public sealed class ProductsController(
             .Include(x => x.Owners)
             .Include(x => x.Mappings)
             .AsSplitQuery()
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
         return product is null ? NotFound() : View(product);
     }
@@ -377,7 +378,82 @@ public sealed class ProductsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
-        var product = await dbContext.ProductCatalogItems.FindAsync(id);
+        var product = await dbContext.ProductCatalogItems.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        product.IsDeleted = true;
+        product.DeletedUtc = DateTime.UtcNow;
+        product.DeletedReason = "Moved to trash from the product catalogue.";
+        product.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Product",
+            "Delete",
+            nameof(ProductCatalogItem),
+            id,
+            $"Moved product {product.Name} to trash.",
+            product.DeletedReason);
+        TempData["ProductsStatusMessage"] = $"Moved product {product.Name} to trash.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> Restore()
+    {
+        var products = await dbContext.ProductCatalogItems
+            .AsNoTracking()
+            .Include(x => x.Owners)
+            .Include(x => x.Mappings)
+            .Where(x => x.IsDeleted)
+            .OrderByDescending(x => x.DeletedUtc)
+            .ThenBy(x => x.Name)
+            .ToListAsync();
+
+        return View(new ProductRestoreViewModel
+        {
+            Products = products,
+            StatusMessage = TempData["ProductsStatusMessage"] as string
+        });
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreDeleted(int id)
+    {
+        var product = await dbContext.ProductCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        product.IsDeleted = false;
+        product.DeletedUtc = null;
+        product.DeletedReason = null;
+        product.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Product",
+            "Restore",
+            nameof(ProductCatalogItem),
+            product.Id,
+            $"Restored product {product.Name} from trash.");
+
+        TempData["ProductsStatusMessage"] = $"Restored product {product.Name}.";
+        return RedirectToAction(nameof(Restore));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PermanentDelete(int id)
+    {
+        var product = await dbContext.ProductCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (product is null)
         {
             return NotFound();
@@ -387,11 +463,13 @@ public sealed class ProductsController(
         await dbContext.SaveChangesAsync();
         await auditLogService.WriteAsync(
             "Product",
-            "Delete",
+            "PermanentDelete",
             nameof(ProductCatalogItem),
             id,
-            $"Deleted product {product.Name}.");
-        return RedirectToAction(nameof(Index));
+            $"Permanently deleted product {product.Name}.");
+
+        TempData["ProductsStatusMessage"] = $"Permanently deleted product {product.Name}.";
+        return RedirectToAction(nameof(Restore));
     }
 
     private async Task PopulateFormOptionsAsync(ProductEditViewModel model)
@@ -409,7 +487,7 @@ public sealed class ProductsController(
         var products = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Owners)
-            .Where(x => model.SelectedProductIds.Contains(x.Id))
+            .Where(x => model.SelectedProductIds.Contains(x.Id) && !x.IsDeleted)
             .OrderBy(x => x.Name)
             .ToListAsync();
 

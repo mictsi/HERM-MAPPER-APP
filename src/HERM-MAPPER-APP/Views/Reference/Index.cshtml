@@ -12,7 +12,7 @@
     <div>
         <span class="eyebrow">Imported HERM TRM reference</span>
         <h1>Browse domains, capabilities, and components</h1>
-        <p>Review the current reference model here. Catalogue imports are verified and applied from Configuration.</p>
+        <p>Review the current reference model here. Catalogue imports are verified and applied from Configuration, and deleted components are managed from Admin.</p>
     </div>
 </section>
 
@@ -182,56 +182,3 @@
     </div>
 </div>
 
-<section class="content-card">
-    <div class="section-heading">
-        <div>
-            <span class="eyebrow">Trash</span>
-            <h2>@Model.TrashedComponents.Count deleted component(s)</h2>
-        </div>
-    </div>
-
-    @if (Model.TrashedComponents.Count == 0)
-    {
-        <div class="empty-state compact">
-            <h3>Trash is empty</h3>
-            <p>Deleted components stay here until they are restored.</p>
-        </div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>Component</th>
-                        <th>Deleted</th>
-                        <th>Reason</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var component in Model.TrashedComponents)
-                {
-                    <tr>
-                        <td>@component.DisplayLabel</td>
-                        <td>@await TimeZoneDisplay.FormatUtcAsync(component.DeletedUtc)</td>
-                        <td>@(component.DeletedReason ?? "-")</td>
-                        <td class="text-end">
-                            <div class="btn-group btn-group-sm">
-                                <a class="btn btn-outline-secondary" asp-action="History" asp-route-id="@component.Id">History</a>
-                                @if (isAdministrator)
-                                {
-                                <form asp-action="RestoreComponent" method="post" class="d-inline">
-                                    <input type="hidden" name="id" value="@component.Id" />
-                                    <button class="btn btn-outline-primary" type="submit">Restore</button>
-                                </form>
-                                }
-                            </div>
-                        </td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
-    }
-</section>

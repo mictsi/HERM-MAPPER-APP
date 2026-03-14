@@ -30,6 +30,7 @@ public sealed class ServicesController(
 
         var query = dbContext.ServiceCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .Include(x => x.ProductLinks)
             .ThenInclude(x => x.ProductCatalogItem)
             .AsSplitQuery()
@@ -87,7 +88,7 @@ public sealed class ServicesController(
     public async Task<IActionResult> Create(ServiceEditViewModel input)
     {
         NormalizeFormInput(input);
-        await ValidateSelectedProductsAsync(input);
+        await ValidateSelectedProductsAsync(input, Array.Empty<int>());
 
         if (!ModelState.IsValid)
         {
@@ -150,7 +151,11 @@ public sealed class ServicesController(
 
         input.Id = id;
         NormalizeFormInput(input);
-        await ValidateSelectedProductsAsync(input);
+        var allowedDeletedProductIds = service.ProductLinks
+            .Select(x => x.ProductCatalogItemId)
+            .Distinct()
+            .ToList();
+        await ValidateSelectedProductsAsync(input, allowedDeletedProductIds);
 
         if (!ModelState.IsValid)
         {
@@ -212,7 +217,83 @@ public sealed class ServicesController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
-        var service = await dbContext.ServiceCatalogItems.FindAsync(id);
+        var service = await dbContext.ServiceCatalogItems.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (service is null)
+        {
+            return NotFound();
+        }
+
+        service.IsDeleted = true;
+        service.DeletedUtc = DateTime.UtcNow;
+        service.DeletedReason = "Moved to trash from the service catalogue.";
+        service.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Service",
+            "Delete",
+            nameof(ServiceCatalogItem),
+            id,
+            $"Moved service {service.Name} to trash.",
+            service.DeletedReason);
+
+        TempData["ServicesStatusMessage"] = $"Moved service {service.Name} to trash.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> Restore()
+    {
+        var services = await dbContext.ServiceCatalogItems
+            .AsNoTracking()
+            .Include(x => x.ProductLinks)
+            .ThenInclude(x => x.ProductCatalogItem)
+            .Where(x => x.IsDeleted)
+            .OrderByDescending(x => x.DeletedUtc)
+            .ThenBy(x => x.Name)
+            .ToListAsync();
+
+        return View(new ServiceRestoreViewModel
+        {
+            Services = services,
+            StatusMessage = TempData["ServicesStatusMessage"] as string
+        });
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreDeleted(int id)
+    {
+        var service = await dbContext.ServiceCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+        if (service is null)
+        {
+            return NotFound();
+        }
+
+        service.IsDeleted = false;
+        service.DeletedUtc = null;
+        service.DeletedReason = null;
+        service.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Service",
+            "Restore",
+            nameof(ServiceCatalogItem),
+            service.Id,
+            $"Restored service {service.Name} from trash.");
+
+        TempData["ServicesStatusMessage"] = $"Restored service {service.Name}.";
+        return RedirectToAction(nameof(Restore));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PermanentDelete(int id)
+    {
+        var service = await dbContext.ServiceCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (service is null)
         {
             return NotFound();
@@ -222,13 +303,13 @@ public sealed class ServicesController(
         await dbContext.SaveChangesAsync();
         await auditLogService.WriteAsync(
             "Service",
-            "Delete",
+            "PermanentDelete",
             nameof(ServiceCatalogItem),
             id,
-            $"Deleted service {service.Name}.");
+            $"Permanently deleted service {service.Name}.");
 
-        TempData["ServicesStatusMessage"] = $"Deleted service {service.Name}.";
-        return RedirectToAction(nameof(Index));
+        TempData["ServicesStatusMessage"] = $"Permanently deleted service {service.Name}.";
+        return RedirectToAction(nameof(Restore));
     }
 
     private async Task PopulateFormOptionsAsync(ServiceEditViewModel model)
@@ -241,13 +322,19 @@ public sealed class ServicesController(
             ConfigurableFieldNames.LifecycleStatus,
             model.LifecycleStatus,
             "Choose status");
-        model.ProductOptions = await BuildProductOptionsAsync();
+        model.ProductOptions = await BuildProductOptionsAsync(model.ProductRows.Select(x => x.ProductId));
     }
 
-    private async Task<List<SelectListItem>> BuildProductOptionsAsync()
+    private async Task<List<SelectListItem>> BuildProductOptionsAsync(IEnumerable<int?> selectedProductIds)
     {
+        var selectedIds = selectedProductIds
+            .Where(x => x is > 0)
+            .Select(x => x!.Value)
+            .ToHashSet();
+
         var products = await dbContext.ProductCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted || selectedIds.Contains(x.Id))
             .OrderBy(x => x.Name)
             .ThenBy(x => x.Vendor)
             .ThenBy(x => x.Version)
@@ -274,8 +361,8 @@ public sealed class ServicesController(
             .ToList();
 
         return detailParts.Count == 0
-            ? product.Name
-            : $"{product.Name} ({string.Join(" ", detailParts)})";
+            ? BuildDeletedProductLabel(product.Name, product.IsDeleted)
+            : BuildDeletedProductLabel($"{product.Name} ({string.Join(" ", detailParts)})", product.IsDeleted);
     }
 
     private async Task<ServiceCatalogItem?> LoadServiceAsync(int id, bool asNoTracking)
@@ -283,6 +370,7 @@ public sealed class ServicesController(
         IQueryable<ServiceCatalogItem> query = dbContext.ServiceCatalogItems
             .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
             .ThenInclude(x => x.ProductCatalogItem)
+            .Where(x => !x.IsDeleted)
             .AsSplitQuery();
 
         if (asNoTracking)
@@ -311,7 +399,7 @@ public sealed class ServicesController(
         };
     }
 
-    private async Task ValidateSelectedProductsAsync(ServiceEditViewModel input)
+    private async Task ValidateSelectedProductsAsync(ServiceEditViewModel input, IReadOnlyCollection<int> allowedDeletedProductIds)
     {
         var selectedProductIds = input.ProductRows
             .Where(x => x.ProductId is > 0)
@@ -326,7 +414,7 @@ public sealed class ServicesController(
 
         var existingProductIds = await dbContext.ProductCatalogItems
             .AsNoTracking()
-            .Where(x => selectedProductIds.Contains(x.Id))
+            .Where(x => selectedProductIds.Contains(x.Id) && (!x.IsDeleted || allowedDeletedProductIds.Contains(x.Id)))
             .Select(x => x.Id)
             .ToListAsync();
 
@@ -390,6 +478,9 @@ public sealed class ServicesController(
 
         return connections;
     }
+
+    private static string BuildDeletedProductLabel(string label, bool isDeleted) =>
+        isDeleted ? $"{label} [deleted]" : label;
 
     private static IQueryable<ServiceCatalogItem> ApplySort(IQueryable<ServiceCatalogItem> query, string sort) =>
         sort switch

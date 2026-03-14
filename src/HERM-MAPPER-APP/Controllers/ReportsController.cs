@@ -19,7 +19,11 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
 
         var mappings = await dbContext.ProductMappings
             .AsNoTracking()
-            .Where(x => x.MappingStatus == Models.MappingStatus.Complete && x.TrmComponentId != null)
+            .Where(x =>
+                x.MappingStatus == Models.MappingStatus.Complete &&
+                x.TrmComponentId != null &&
+                x.ProductCatalogItem != null &&
+                !x.ProductCatalogItem.IsDeleted)
             .Include(x => x.ProductCatalogItem)
             .ThenInclude(x => x!.Owners)
             .Include(x => x.TrmDomain)
@@ -42,6 +46,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
 
         var products = await dbContext.ProductCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .Include(x => x.Owners)
             .OrderBy(x => x.Name)
             .ToListAsync();

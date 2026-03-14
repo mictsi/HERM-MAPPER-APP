@@ -18,6 +18,8 @@ public sealed partial class DatabaseInitializer(
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureServiceTablesAsync(cancellationToken);
         await EnsureProductOwnerTableAsync(cancellationToken);
+        await EnsureProductSoftDeleteColumnsAsync(cancellationToken);
+        await EnsureServiceSoftDeleteColumnsAsync(cancellationToken);
         await EnsureAppSettingsTableAsync(cancellationToken);
         await EnsureUsersTableAsync(cancellationToken);
         await EnsureRoleNormalizationAsync(cancellationToken);
@@ -376,6 +378,9 @@ public sealed partial class DatabaseInitializer(
                     "Description" TEXT NULL,
                     "Owner" TEXT NOT NULL,
                     "LifecycleStatus" TEXT NOT NULL,
+                    "IsDeleted" INTEGER NOT NULL DEFAULT 0,
+                    "DeletedUtc" TEXT NULL,
+                    "DeletedReason" TEXT NULL,
                     "CreatedUtc" TEXT NOT NULL,
                     "UpdatedUtc" TEXT NOT NULL
                 )
@@ -440,6 +445,9 @@ public sealed partial class DatabaseInitializer(
                         [Description] NVARCHAR(2000) NULL,
                         [Owner] NVARCHAR(120) NOT NULL,
                         [LifecycleStatus] NVARCHAR(80) NOT NULL,
+                        [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ServiceCatalogItems_IsDeleted] DEFAULT 0,
+                        [DeletedUtc] DATETIME2 NULL,
+                        [DeletedReason] NVARCHAR(400) NULL,
                         [CreatedUtc] DATETIME2 NOT NULL,
                         [UpdatedUtc] DATETIME2 NOT NULL
                     );
@@ -521,6 +529,130 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     CREATE INDEX [IX_ServiceCatalogItems_LifecycleStatus]
                     ON [ServiceCatalogItems] ([LifecycleStatus]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureProductSoftDeleteColumnsAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            if (!await SqliteColumnExistsAsync("ProductCatalogItems", "IsDeleted", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ProductCatalogItems ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("ProductCatalogItems", "DeletedUtc", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ProductCatalogItems ADD COLUMN DeletedUtc TEXT NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("ProductCatalogItems", "DeletedReason", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ProductCatalogItems ADD COLUMN DeletedReason TEXT NULL",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ProductCatalogItems]', N'IsDeleted') IS NULL
+                BEGIN
+                    ALTER TABLE [ProductCatalogItems]
+                    ADD [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ProductCatalogItems_IsDeleted] DEFAULT 0;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ProductCatalogItems]', N'DeletedUtc') IS NULL
+                BEGIN
+                    ALTER TABLE [ProductCatalogItems]
+                    ADD [DeletedUtc] DATETIME2 NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ProductCatalogItems]', N'DeletedReason') IS NULL
+                BEGIN
+                    ALTER TABLE [ProductCatalogItems]
+                    ADD [DeletedReason] NVARCHAR(400) NULL;
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureServiceSoftDeleteColumnsAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            if (!await SqliteColumnExistsAsync("ServiceCatalogItems", "IsDeleted", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ServiceCatalogItems ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("ServiceCatalogItems", "DeletedUtc", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ServiceCatalogItems ADD COLUMN DeletedUtc TEXT NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("ServiceCatalogItems", "DeletedReason", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ServiceCatalogItems ADD COLUMN DeletedReason TEXT NULL",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ServiceCatalogItems]', N'IsDeleted') IS NULL
+                BEGIN
+                    ALTER TABLE [ServiceCatalogItems]
+                    ADD [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ServiceCatalogItems_IsDeleted] DEFAULT 0;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ServiceCatalogItems]', N'DeletedUtc') IS NULL
+                BEGIN
+                    ALTER TABLE [ServiceCatalogItems]
+                    ADD [DeletedUtc] DATETIME2 NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ServiceCatalogItems]', N'DeletedReason') IS NULL
+                BEGIN
+                    ALTER TABLE [ServiceCatalogItems]
+                    ADD [DeletedReason] NVARCHAR(400) NULL;
                 END
                 """,
                 cancellationToken);

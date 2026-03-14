@@ -123,6 +123,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Vendor).HasMaxLength(120);
             entity.Property(x => x.Version).HasMaxLength(80);
             entity.Property(x => x.LifecycleStatus).HasMaxLength(80);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
         });
 
         modelBuilder.Entity<ProductCatalogItemOwner>(entity =>
@@ -165,6 +166,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Description).HasMaxLength(2000);
             entity.Property(x => x.Owner).HasMaxLength(120);
             entity.Property(x => x.LifecycleStatus).HasMaxLength(80);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
         });
 
         modelBuilder.Entity<ServiceCatalogItemProduct>(entity =>

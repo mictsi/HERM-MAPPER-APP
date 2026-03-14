@@ -151,6 +151,37 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
+    public async Task IndexExcludesDeletedServices()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedConfigurableOptionsAsync();
+
+        fixture.DbContext.ServiceCatalogItems.AddRange(
+            new ServiceCatalogItem
+            {
+                Name = "Visible Service",
+                Owner = "Team Blue",
+                LifecycleStatus = "Production"
+            },
+            new ServiceCatalogItem
+            {
+                Name = "Deleted Service",
+                Owner = "Team Blue",
+                LifecycleStatus = "Production",
+                IsDeleted = true,
+                DeletedUtc = DateTime.UtcNow,
+                DeletedReason = "Moved to trash from the service catalogue."
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var result = await fixture.CreateController().Index(null, null, null, null);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ServicesIndexViewModel>(view.Model);
+        Assert.Collection(model.Services, service => Assert.Equal("Visible Service", service.Name));
+    }
+
+    [Fact]
     public async Task VisualizeReturnsConnectionsInSavedOrder()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -186,7 +217,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task DeleteConfirmedRemovesServiceAndWritesAudit()
+    public async Task DeleteConfirmedSoftDeletesServiceAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -203,8 +234,65 @@ public sealed class ServicesControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ServicesController.Index), redirect.ActionName);
-        Assert.Empty(await fixture.DbContext.ServiceCatalogItems.ToListAsync());
+        var deletedService = await fixture.DbContext.ServiceCatalogItems.SingleAsync();
+        Assert.True(deletedService.IsDeleted);
+        Assert.NotNull(deletedService.DeletedUtc);
+        Assert.Equal("Moved to trash from the service catalogue.", deletedService.DeletedReason);
         Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task RestoreDeletedClearsSoftDeleteStateAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
+        {
+            Name = "Legacy Service",
+            Owner = "Team Blue",
+            LifecycleStatus = "Production",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow.AddDays(-1),
+            DeletedReason = "Moved to trash from the service catalogue."
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
+        var result = await fixture.CreateController().RestoreDeleted(serviceId);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ServicesController.Restore), redirect.ActionName);
+
+        var restoredService = await fixture.DbContext.ServiceCatalogItems.SingleAsync();
+        Assert.False(restoredService.IsDeleted);
+        Assert.Null(restoredService.DeletedUtc);
+        Assert.Null(restoredService.DeletedReason);
+        Assert.Equal("Restore", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task PermanentDeleteRemovesDeletedServiceAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
+        {
+            Name = "Legacy Service",
+            Owner = "Team Blue",
+            LifecycleStatus = "Production",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow.AddDays(-1),
+            DeletedReason = "Moved to trash from the service catalogue."
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
+        var result = await fixture.CreateController().PermanentDelete(serviceId);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ServicesController.Restore), redirect.ActionName);
+        Assert.Empty(await fixture.DbContext.ServiceCatalogItems.ToListAsync());
+        Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
 
     private sealed class TestFixture : IAsyncDisposable

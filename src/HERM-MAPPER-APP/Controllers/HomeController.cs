@@ -19,14 +19,18 @@ public sealed class HomeController(AppDbContext dbContext) : Controller
 
         var model = new HomeDashboardViewModel
         {
-            ProductCount = await dbContext.ProductCatalogItems.CountAsync(),
-            CompletedMappings = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.Complete),
+            ProductCount = await dbContext.ProductCatalogItems.CountAsync(x => !x.IsDeleted),
+            CompletedMappings = await dbContext.ProductMappings.CountAsync(x =>
+                x.MappingStatus == MappingStatus.Complete &&
+                x.ProductCatalogItem != null &&
+                !x.ProductCatalogItem.IsDeleted),
             ReferenceComponentCount = await dbContext.TrmComponents.CountAsync(x => !x.IsDeleted),
             DomainCount = await dbContext.TrmDomains.CountAsync(),
             CapabilityCount = await dbContext.TrmCapabilities.CountAsync(),
             HasReferenceModel = await dbContext.TrmDomains.AnyAsync(),
             RecentProducts = await dbContext.ProductCatalogItems
                 .AsNoTracking()
+                .Where(x => !x.IsDeleted)
                 .Include(x => x.Mappings)
                 .ThenInclude(x => x.TrmComponent)
                 .OrderByDescending(x => x.UpdatedUtc)
