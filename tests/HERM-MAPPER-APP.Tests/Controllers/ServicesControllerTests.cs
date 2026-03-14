@@ -3,6 +3,7 @@ using HERMMapperApp.Data;
 using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
@@ -59,15 +60,31 @@ public sealed class ServicesControllerTests
 
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
         using var controller = fixture.CreateController();
+        var canvasStateJson = JsonSerializer.Serialize(
+            new
+            {
+                nodes = new[]
+                {
+                    new { productId = products[0].Id, x = 120, y = 80 },
+                    new { productId = products[1].Id, x = 380, y = 80 },
+                    new { productId = products[2].Id, x = 380, y = 280 },
+                    new { productId = products[3].Id, x = 650, y = 280 }
+                },
+                connections = new[]
+                {
+                    new { fromProductId = products[0].Id, toProductId = products[1].Id },
+                    new { fromProductId = products[0].Id, toProductId = products[2].Id },
+                    new { fromProductId = products[2].Id, toProductId = products[3].Id }
+                }
+            },
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
 
         var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
         {
-            ConnectionRows =
-            [
-                new ServiceConnectionRowInputViewModel { FromProductId = products[0].Id, ToProductId = products[1].Id },
-                new ServiceConnectionRowInputViewModel { FromProductId = products[0].Id, ToProductId = products[2].Id },
-                new ServiceConnectionRowInputViewModel { FromProductId = products[2].Id, ToProductId = products[3].Id }
-            ]
+            CanvasStateJson = canvasStateJson
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
@@ -84,6 +101,13 @@ public sealed class ServicesControllerTests
             ["Entry", "API", "Broker", "Portal"],
             service.GetOrderedProductLinks().Select(x => x.ProductCatalogItem.Name).ToArray());
         Assert.Equal(3, service.ProductConnections.Count);
+        Assert.NotNull(service.ConnectionLayoutJson);
+        using (var document = JsonDocument.Parse(service.ConnectionLayoutJson!))
+        {
+            Assert.Equal(4, document.RootElement.GetProperty("nodes").GetArrayLength());
+            Assert.Equal(3, document.RootElement.GetProperty("connections").GetArrayLength());
+        }
+
         Assert.Equal("UpdateConnections", audit.Action);
     }
 

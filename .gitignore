@@ -4,3 +4,4 @@ obj/
 .dotnet-cli/
 TestResults/
 .artifacts/
+output/

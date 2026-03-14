@@ -833,6 +833,894 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  const normalizeCanvasNode = (node) => {
+    if (node === null || typeof node !== "object") {
+      return null;
+    }
+
+    const read = (...names) => {
+      for (const name of names) {
+        if (Object.prototype.hasOwnProperty.call(node, name) &&
+          node[name] !== null &&
+          node[name] !== undefined &&
+          node[name] !== "") {
+          return node[name];
+        }
+      }
+
+      return "";
+    };
+
+    const productId = String(read("productId", "ProductId"));
+    if (productId === "" || productId === "0") {
+      return null;
+    }
+
+    const x = Number(read("x", "X"));
+    const y = Number(read("y", "Y"));
+
+    return {
+      productId,
+      x: Number.isFinite(x) ? x : null,
+      y: Number.isFinite(y) ? y : null
+    };
+  };
+
+  const parseServiceCanvasState = (value) => {
+    if (typeof value !== "string" || value.trim() === "") {
+      return {
+        nodes: [],
+        connections: []
+      };
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      return {
+        nodes: Array.isArray(parsed?.nodes)
+          ? parsed.nodes
+            .map(normalizeCanvasNode)
+            .filter((node) => node !== null)
+          : [],
+        connections: Array.isArray(parsed?.connections)
+          ? parsed.connections
+            .map(normalizeGraphConnection)
+            .filter((connection) => connection !== null)
+            .filter((connection) => connection.fromId !== "" && connection.toId !== "")
+          : []
+      };
+    } catch (error) {
+      console.error("Unable to parse service canvas state", error);
+      return null;
+    }
+  };
+
+  document.querySelectorAll("[data-service-canvas-editor]").forEach((editor) => {
+    const form = editor.closest("form");
+    const stateInput = editor.querySelector("[data-service-canvas-state-input]");
+    const board = editor.querySelector("[data-service-canvas-board]");
+    const surface = editor.querySelector("[data-service-canvas-surface]");
+    const nodesHost = editor.querySelector("[data-service-canvas-nodes]");
+    const lines = editor.querySelector("[data-service-canvas-lines]");
+    const emptyState = editor.querySelector("[data-service-canvas-empty]");
+    const summary = editor.querySelector("[data-service-canvas-summary]");
+    const connectorBanner = editor.querySelector("[data-service-canvas-connector-banner]");
+    const selectionBanner = editor.querySelector("[data-service-canvas-selection-banner]");
+    const selectionCopy = editor.querySelector("[data-service-canvas-selection-copy]");
+    const selectionRemoveButton = editor.querySelector("[data-service-canvas-selection-remove]");
+    const autoLayoutButton = editor.querySelector("[data-service-canvas-autolayout]");
+    const clearButton = editor.querySelector("[data-service-canvas-clear]");
+    const paletteSearch = editor.querySelector("[data-service-canvas-palette-search]");
+    const paletteEmpty = editor.querySelector("[data-service-canvas-palette-empty]");
+    const paletteItems = Array.from(editor.querySelectorAll("[data-service-canvas-product]"))
+      .filter((item) => item instanceof HTMLButtonElement);
+
+    if (
+      !(form instanceof HTMLFormElement) ||
+      !(stateInput instanceof HTMLInputElement) ||
+      !(board instanceof HTMLElement) ||
+      !(surface instanceof HTMLElement) ||
+      !(nodesHost instanceof HTMLElement) ||
+      !(lines instanceof SVGSVGElement) ||
+      !(emptyState instanceof HTMLElement) ||
+      !(summary instanceof HTMLElement) ||
+      !(connectorBanner instanceof HTMLElement) ||
+      !(selectionBanner instanceof HTMLElement) ||
+      !(selectionCopy instanceof HTMLElement) ||
+      !(selectionRemoveButton instanceof HTMLButtonElement)
+    ) {
+      return;
+    }
+
+    const productsById = new Map();
+    paletteItems.forEach((item) => {
+      const productId = item.dataset.productId ?? "";
+      if (productId !== "") {
+        productsById.set(productId, item.dataset.productLabel ?? item.textContent?.trim() ?? productId);
+      }
+    });
+
+    const state = {
+      nodes: new Map(),
+      connections: [],
+      connectorSourceId: null,
+      selectedConnectionKey: null,
+      pointer: null,
+      dragging: null,
+      ignoreNextClickProductId: null
+    };
+
+    let renderQueued = false;
+    const canvasNodeWidth = 220;
+    const canvasNodeHeight = 124;
+    const canvasPadding = 32;
+    const connectorStartGap = 3;
+    const connectorEndGap = 5;
+
+    const getLabel = (productId) => productsById.get(productId) ?? `Product ${productId}`;
+
+    const buildConnectionRecord = (fromId, toId, sequence = 0) => ({
+      sequence,
+      fromId,
+      toId,
+      fromName: getLabel(fromId),
+      toName: getLabel(toId)
+    });
+
+    const buildConnectionKey = (fromId, toId) => `${fromId}->${toId}`;
+
+    const getRenderableConnections = () =>
+      state.connections.map((connection, index) =>
+        buildConnectionRecord(connection.fromId, connection.toId, index + 1));
+
+    const serializeState = () => {
+      stateInput.value = JSON.stringify({
+        nodes: Array.from(state.nodes.values())
+          .sort((left, right) => Number(left.productId) - Number(right.productId))
+          .map((node) => ({
+            productId: Number(node.productId),
+            x: Math.round(node.x ?? 0),
+            y: Math.round(node.y ?? 0)
+          })),
+        connections: state.connections.map((connection) => ({
+          fromProductId: Number(connection.fromId),
+          toProductId: Number(connection.toId)
+        }))
+      });
+    };
+
+    const updatePaletteUsage = () => {
+      paletteItems.forEach((item) => {
+        item.classList.toggle("is-used", state.nodes.has(item.dataset.productId ?? ""));
+      });
+    };
+
+    const filterPalette = () => {
+      const query = paletteSearch instanceof HTMLInputElement
+        ? paletteSearch.value.trim().toLocaleLowerCase()
+        : "";
+      let visibleCount = 0;
+
+      paletteItems.forEach((item) => {
+        const label = (item.dataset.productLabel ?? item.textContent ?? "").toLocaleLowerCase();
+        const isVisible = query === "" || label.includes(query);
+        item.hidden = !isVisible;
+        if (isVisible) {
+          visibleCount += 1;
+        }
+      });
+
+      if (paletteEmpty instanceof HTMLElement) {
+        paletteEmpty.hidden = visibleCount !== 0;
+      }
+    };
+
+    const updateSummary = () => {
+      const nodeCount = state.nodes.size;
+      const connectionCount = state.connections.length;
+      summary.textContent = `${nodeCount} product${nodeCount === 1 ? "" : "s"} on canvas. ${connectionCount} connection${connectionCount === 1 ? "" : "s"}.`;
+    };
+
+    const updateConnectorBanner = () => {
+      if (state.connectorSourceId === null) {
+        connectorBanner.hidden = true;
+        connectorBanner.textContent = "";
+        return;
+      }
+
+      connectorBanner.hidden = false;
+      connectorBanner.textContent = `Connecting from ${getLabel(state.connectorSourceId)}. Click a target node to add or remove the connection. Click a line to delete it. Press Esc or click empty space to cancel.`;
+    };
+
+    const updateSelectionBanner = () => {
+      if (state.selectedConnectionKey === null) {
+        selectionBanner.hidden = true;
+        selectionCopy.textContent = "";
+        return;
+      }
+
+      const selectedConnection = state.connections.find((connection) =>
+        buildConnectionKey(connection.fromId, connection.toId) === state.selectedConnectionKey);
+      if (selectedConnection === undefined) {
+        state.selectedConnectionKey = null;
+        selectionBanner.hidden = true;
+        selectionCopy.textContent = "";
+        return;
+      }
+
+      selectionBanner.hidden = false;
+      selectionCopy.textContent = `Selected connection: ${getLabel(selectedConnection.fromId)} to ${getLabel(selectedConnection.toId)}.`;
+    };
+
+    const updateEmptyState = () => {
+      emptyState.hidden = state.nodes.size !== 0;
+    };
+
+    const ensureNode = (productId) => {
+      if (!state.nodes.has(productId)) {
+        state.nodes.set(productId, {
+          productId,
+          label: getLabel(productId),
+          x: null,
+          y: null
+        });
+      }
+
+      return state.nodes.get(productId);
+    };
+
+    const setNodePosition = (productId, x, y) => {
+      const node = ensureNode(productId);
+      if (node === undefined) {
+        return;
+      }
+
+      node.x = Math.max(canvasPadding, Math.round(Number.isFinite(x) ? x : canvasPadding));
+      node.y = Math.max(canvasPadding, Math.round(Number.isFinite(y) ? y : canvasPadding));
+    };
+
+    const getDefaultNodePosition = () => {
+      const index = state.nodes.size;
+      return {
+        x: 56 + ((index % 3) * 250),
+        y: 56 + (Math.floor(index / 3) * 168)
+      };
+    };
+
+    const getViewportPlacementPoint = () => ({
+      x: board.scrollLeft + (board.clientWidth / 2) - (canvasNodeWidth / 2),
+      y: board.scrollTop + (board.clientHeight / 2) - (canvasNodeHeight / 2)
+    });
+
+    const revealNode = (productId) => {
+      requestAnimationFrame(() => {
+        const nodeElement = nodesHost.querySelector(`[data-service-canvas-node][data-node-id="${productId}"]`);
+        if (nodeElement instanceof HTMLElement) {
+          nodeElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "center"
+          });
+        }
+      });
+    };
+
+    const placeNode = (productId, point = null) => {
+      const alreadyExists = state.nodes.has(productId);
+      ensureNode(productId);
+      if (point !== null || !alreadyExists) {
+        const nextPoint = point ?? (state.nodes.size <= 1 ? getViewportPlacementPoint() : getDefaultNodePosition());
+        setNodePosition(productId, nextPoint.x, nextPoint.y);
+      }
+
+      scheduleRender();
+      revealNode(productId);
+    };
+
+    const removeNode = (productId) => {
+      state.nodes.delete(productId);
+      state.connections = state.connections.filter((connection) =>
+        connection.fromId !== productId && connection.toId !== productId);
+
+      if (state.connectorSourceId === productId) {
+        state.connectorSourceId = null;
+      }
+
+      if (state.selectedConnectionKey !== null) {
+        const selectedConnectionStillExists = state.connections.some((connection) =>
+          buildConnectionKey(connection.fromId, connection.toId) === state.selectedConnectionKey);
+        if (!selectedConnectionStillExists) {
+          state.selectedConnectionKey = null;
+        }
+      }
+
+      scheduleRender();
+    };
+
+    const clearCanvas = () => {
+      state.nodes.clear();
+      state.connections = [];
+      state.connectorSourceId = null;
+      state.selectedConnectionKey = null;
+      state.pointer = null;
+      state.dragging = null;
+      state.ignoreNextClickProductId = null;
+      scheduleRender();
+    };
+
+    const toggleConnection = (fromId, toId) => {
+      if (fromId === toId) {
+        return;
+      }
+
+      const existingIndex = state.connections.findIndex((connection) =>
+        connection.fromId === fromId && connection.toId === toId);
+      if (existingIndex >= 0) {
+        state.connections.splice(existingIndex, 1);
+        if (state.selectedConnectionKey === buildConnectionKey(fromId, toId)) {
+          state.selectedConnectionKey = null;
+        }
+        return;
+      }
+
+      state.connections.push({ fromId, toId });
+    };
+
+    const applyGridLayout = (orderedProductIds) => {
+      const productIds = orderedProductIds.length !== 0
+        ? orderedProductIds.filter((productId) => state.nodes.has(productId))
+        : Array.from(state.nodes.keys());
+      const columns = Math.max(1, Math.ceil(Math.sqrt(productIds.length)));
+
+      productIds.forEach((productId, index) => {
+        setNodePosition(
+          productId,
+          56 + ((index % columns) * 250),
+          56 + (Math.floor(index / columns) * 170));
+      });
+    };
+
+    const applyAutoLayout = () => {
+      const connections = getRenderableConnections();
+      const nodeIds = Array.from(state.nodes.keys());
+
+      if (nodeIds.length === 0) {
+        scheduleRender();
+        return;
+      }
+
+      if (connections.length === 0) {
+        applyGridLayout(nodeIds.sort((left, right) => getLabel(left).localeCompare(getLabel(right))));
+        scheduleRender();
+        return;
+      }
+
+      const analysis = analyzeGraph(connections);
+      const layout = buildGraphLayout(analysis);
+      if (!layout.supportsGraphLayout) {
+        applyGridLayout(analysis.orderedNodeIds);
+        scheduleRender();
+        return;
+      }
+
+      layout.rows.forEach((row, rowIndex) => {
+        row.forEach((node, columnIndex) => {
+          setNodePosition(node.id, 72 + (columnIndex * 250), 72 + (rowIndex * 180));
+        });
+      });
+
+      scheduleRender();
+    };
+
+    const renderNodeBadges = (productId) => {
+      const incomingCount = state.connections.filter((connection) => connection.toId === productId).length;
+      const outgoingCount = state.connections.filter((connection) => connection.fromId === productId).length;
+      const badges = [];
+
+      if (incomingCount === 0 && state.connections.length !== 0) {
+        badges.push("<span class=\"service-canvas-node-badge is-entry\">Entry</span>");
+      } else if (incomingCount > 1) {
+        badges.push(`<span class="service-canvas-node-badge is-merge">${incomingCount} in</span>`);
+      }
+
+      if (outgoingCount > 1) {
+        badges.push(`<span class="service-canvas-node-badge is-branch">${outgoingCount} out</span>`);
+      } else if (outgoingCount === 0 && state.connections.length !== 0) {
+        badges.push("<span class=\"service-canvas-node-badge is-terminal\">End</span>");
+      }
+
+      return badges.length === 0
+        ? "<div class=\"service-canvas-node-caption\">Drag to move. Use Connect to add links.</div>"
+        : `<div class="service-canvas-node-badges">${badges.join("")}</div>`;
+    };
+
+    const renderNodes = () => {
+      const connections = getRenderableConnections();
+      const analysis = analyzeGraph(connections);
+      const orderedNodes = Array.from(state.nodes.values())
+        .sort((left, right) => {
+          const leftY = left.y ?? Number.MAX_SAFE_INTEGER;
+          const rightY = right.y ?? Number.MAX_SAFE_INTEGER;
+          if (leftY !== rightY) {
+            return leftY - rightY;
+          }
+
+          const leftX = left.x ?? Number.MAX_SAFE_INTEGER;
+          const rightX = right.x ?? Number.MAX_SAFE_INTEGER;
+          if (leftX !== rightX) {
+            return leftX - rightX;
+          }
+
+          return getLabel(left.productId).localeCompare(getLabel(right.productId));
+        });
+
+      nodesHost.innerHTML = orderedNodes
+        .map((node) => {
+          const toneIndex = analysis.firstAppearance.get(node.productId) ?? orderedNodes.findIndex((candidate) => candidate.productId === node.productId);
+          const tone = graphBranchPalette[toneIndex % graphBranchPalette.length];
+
+          return `
+            <article class="service-canvas-node${state.connectorSourceId === node.productId ? " is-connector-source" : ""}"
+                     data-service-canvas-node
+                     data-node-id="${escapeGraphHtml(node.productId)}"
+                     style="left:${Math.round(node.x ?? 0)}px; top:${Math.round(node.y ?? 0)}px; --service-canvas-node-border:${tone.border}; --service-canvas-node-surface:${tone.surface};">
+              <div class="service-canvas-node-head">
+                <div class="service-canvas-node-title">${escapeGraphHtml(node.label)}</div>
+                <div class="service-canvas-node-actions">
+                  <button type="button"
+                          class="service-canvas-node-action${state.connectorSourceId === node.productId ? " is-active" : ""}"
+                          data-service-canvas-connect
+                          aria-label="Connect ${escapeGraphHtml(node.label)}"
+                          aria-pressed="${state.connectorSourceId === node.productId ? "true" : "false"}">${state.connectorSourceId === node.productId ? "Cancel" : "Connect"}</button>
+                  <button type="button"
+                          class="service-canvas-node-action is-danger"
+                          data-service-canvas-remove
+                          aria-label="Remove ${escapeGraphHtml(node.label)}">Remove</button>
+                </div>
+              </div>
+              ${renderNodeBadges(node.productId)}
+            </article>`;
+        })
+        .join("");
+    };
+
+    const refreshSurfaceSize = () => {
+      const minimumWidth = Math.max(board.clientWidth - 2, 880);
+      const minimumHeight = 520;
+      let width = minimumWidth;
+      let height = minimumHeight;
+
+      Array.from(nodesHost.querySelectorAll("[data-service-canvas-node]")).forEach((element) => {
+        if (!(element instanceof HTMLElement)) {
+          return;
+        }
+
+        const left = Number.parseFloat(element.style.left) || 0;
+        const top = Number.parseFloat(element.style.top) || 0;
+        width = Math.max(width, left + element.offsetWidth + 96);
+        height = Math.max(height, top + element.offsetHeight + 96);
+      });
+
+      surface.style.width = `${Math.round(width)}px`;
+      surface.style.height = `${Math.round(height)}px`;
+    };
+
+    const getNodeAnchor = (productId, side, gap = 0) => {
+      const nodeElement = nodesHost.querySelector(`[data-service-canvas-node][data-node-id="${productId}"]`);
+      if (!(nodeElement instanceof HTMLElement)) {
+        return null;
+      }
+
+      const surfaceRect = surface.getBoundingClientRect();
+      const nodeRect = nodeElement.getBoundingClientRect();
+
+      return {
+        x: nodeRect.left - surfaceRect.left + board.scrollLeft + (nodeRect.width / 2),
+        y: side === "bottom"
+          ? nodeRect.bottom - surfaceRect.top + board.scrollTop + gap
+          : nodeRect.top - surfaceRect.top + board.scrollTop - gap
+      };
+    };
+
+    const buildConnectorPath = (start, end) => {
+      const midpointY = start.y + ((end.y - start.y) / 2);
+      return `M ${start.x} ${start.y} C ${start.x} ${midpointY}, ${end.x} ${midpointY}, ${end.x} ${end.y}`;
+    };
+
+    const drawConnections = () => {
+      const width = Math.max(surface.scrollWidth, surface.clientWidth);
+      const height = Math.max(surface.scrollHeight, surface.clientHeight);
+
+      lines.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      lines.setAttribute("width", String(width));
+      lines.setAttribute("height", String(height));
+
+      const renderedConnections = state.connections
+        .map((connection) => {
+          const fromNode = state.nodes.get(connection.fromId);
+          const toNode = state.nodes.get(connection.toId);
+          if (fromNode === undefined || toNode === undefined) {
+            return "";
+          }
+
+          const flowsDown = (fromNode.y ?? 0) <= (toNode.y ?? 0);
+          const start = getNodeAnchor(connection.fromId, flowsDown ? "bottom" : "top", connectorStartGap);
+          const end = getNodeAnchor(connection.toId, flowsDown ? "top" : "bottom", connectorEndGap);
+          if (start === null || end === null) {
+            return "";
+          }
+
+          const connectionKey = buildConnectionKey(connection.fromId, connection.toId);
+          const isSelected = state.selectedConnectionKey === connectionKey;
+
+          return `
+            <path class="service-canvas-line-hit"
+                  data-service-canvas-line
+                  data-from-id="${escapeGraphHtml(connection.fromId)}"
+                  data-to-id="${escapeGraphHtml(connection.toId)}"
+                  d="${buildConnectorPath(start, end)}">
+              <title>Select ${escapeGraphHtml(getLabel(connection.fromId))} to ${escapeGraphHtml(getLabel(connection.toId))}</title>
+            </path>
+            <path class="service-canvas-line${isSelected ? " is-selected" : ""}"
+                  d="${buildConnectorPath(start, end)}" />`;
+        })
+        .join("");
+
+      let previewPath = "";
+      if (state.connectorSourceId !== null && state.pointer !== null) {
+        const sourceNode = state.nodes.get(state.connectorSourceId);
+        if (sourceNode !== undefined) {
+          const previewStart = getNodeAnchor(state.connectorSourceId, "bottom", connectorStartGap);
+          if (previewStart !== null) {
+            previewPath = `<path class="service-canvas-line is-preview" d="${buildConnectorPath(previewStart, state.pointer)}" />`;
+          }
+        }
+      }
+
+      lines.innerHTML = `
+        <defs>
+          <marker id="service-canvas-arrow" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M 0 0 L 11 5.5 L 0 11 z" class="service-canvas-line-arrow"></path>
+          </marker>
+        </defs>
+        ${renderedConnections}
+        ${previewPath}`;
+    };
+
+    const render = () => {
+      renderQueued = false;
+      renderNodes();
+      updatePaletteUsage();
+      updateSummary();
+      updateConnectorBanner();
+      updateSelectionBanner();
+      surface.classList.toggle("is-connector-active", state.connectorSourceId !== null);
+      serializeState();
+
+      requestAnimationFrame(() => {
+        refreshSurfaceSize();
+        drawConnections();
+        updateEmptyState();
+      });
+    };
+
+    const scheduleRender = () => {
+      if (renderQueued) {
+        return;
+      }
+
+      renderQueued = true;
+      requestAnimationFrame(render);
+    };
+
+    const cancelConnector = () => {
+      state.connectorSourceId = null;
+      state.pointer = null;
+      scheduleRender();
+    };
+
+    const clearSelectedConnection = () => {
+      if (state.selectedConnectionKey === null) {
+        return;
+      }
+
+      state.selectedConnectionKey = null;
+      scheduleRender();
+    };
+
+    const toSurfacePoint = (clientX, clientY) => {
+      const rect = surface.getBoundingClientRect();
+      return {
+        x: clientX - rect.left + board.scrollLeft,
+        y: clientY - rect.top + board.scrollTop
+      };
+    };
+
+    const initialState = parseServiceCanvasState(stateInput.value);
+    if (initialState !== null) {
+      initialState.nodes.forEach((node) => {
+        const stateNode = ensureNode(node.productId);
+        if (stateNode !== undefined) {
+          stateNode.x = node.x;
+          stateNode.y = node.y;
+        }
+      });
+
+      initialState.connections.forEach((connection) => {
+        ensureNode(connection.fromId);
+        ensureNode(connection.toId);
+
+        if (!state.connections.some((candidate) =>
+          candidate.fromId === connection.fromId && candidate.toId === connection.toId)) {
+          state.connections.push({
+            fromId: connection.fromId,
+            toId: connection.toId
+          });
+        }
+      });
+    }
+
+    if (Array.from(state.nodes.values()).some((node) => node.x === null || node.y === null)) {
+      applyAutoLayout();
+    } else {
+      scheduleRender();
+    }
+
+    paletteItems.forEach((item) => {
+      item.addEventListener("dragstart", (event) => {
+        const productId = item.dataset.productId ?? "";
+        if (productId === "") {
+          return;
+        }
+
+        event.dataTransfer?.setData("text/service-product-id", productId);
+        if (event.dataTransfer !== null) {
+          event.dataTransfer.effectAllowed = "copy";
+        }
+      });
+
+      item.addEventListener("click", () => {
+        const productId = item.dataset.productId ?? "";
+        if (productId !== "") {
+          placeNode(productId);
+        }
+      });
+    });
+
+    if (paletteSearch instanceof HTMLInputElement) {
+      paletteSearch.addEventListener("input", () => {
+        filterPalette();
+      });
+    }
+
+    filterPalette();
+
+    surface.addEventListener("dragover", (event) => {
+      if (event.dataTransfer?.types.includes("text/service-product-id")) {
+        event.preventDefault();
+        surface.classList.add("is-drag-target");
+      }
+    });
+
+    surface.addEventListener("dragleave", () => {
+      surface.classList.remove("is-drag-target");
+    });
+
+    surface.addEventListener("drop", (event) => {
+      event.preventDefault();
+      surface.classList.remove("is-drag-target");
+
+      const productId = event.dataTransfer?.getData("text/service-product-id") ?? "";
+      if (productId === "") {
+        return;
+      }
+
+      placeNode(productId, toSurfacePoint(event.clientX, event.clientY));
+    });
+
+    nodesHost.addEventListener("pointerdown", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || target.closest("button")) {
+        return;
+      }
+
+      const nodeElement = target.closest("[data-service-canvas-node]");
+      if (!(nodeElement instanceof HTMLElement)) {
+        return;
+      }
+
+      const productId = nodeElement.dataset.nodeId ?? "";
+      const node = state.nodes.get(productId);
+      if (node === undefined) {
+        return;
+      }
+
+      const point = toSurfacePoint(event.clientX, event.clientY);
+      state.dragging = {
+        productId,
+        offsetX: point.x - (node.x ?? 0),
+        offsetY: point.y - (node.y ?? 0),
+        originX: point.x,
+        originY: point.y,
+        moved: false
+      };
+      nodeElement.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    });
+
+    surface.addEventListener("pointermove", (event) => {
+      const point = toSurfacePoint(event.clientX, event.clientY);
+
+      if (state.connectorSourceId !== null) {
+        state.pointer = point;
+      }
+
+      if (state.dragging !== null) {
+        const movedX = Math.abs(point.x - state.dragging.originX);
+        const movedY = Math.abs(point.y - state.dragging.originY);
+        if (movedX > 4 || movedY > 4) {
+          state.dragging.moved = true;
+        }
+
+        setNodePosition(
+          state.dragging.productId,
+          point.x - state.dragging.offsetX,
+          point.y - state.dragging.offsetY);
+      }
+
+      if (state.connectorSourceId !== null || state.dragging !== null) {
+        scheduleRender();
+      }
+    });
+
+    const finishDrag = () => {
+      if (state.dragging !== null) {
+        state.ignoreNextClickProductId = state.dragging.moved
+          ? state.dragging.productId
+          : null;
+        state.dragging = null;
+        scheduleRender();
+      }
+    };
+
+    surface.addEventListener("pointerup", finishDrag);
+    window.addEventListener("pointerup", finishDrag);
+
+    surface.addEventListener("pointerleave", () => {
+      if (state.connectorSourceId !== null) {
+        state.pointer = null;
+        scheduleRender();
+      }
+    });
+
+    nodesHost.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const nodeElement = target.closest("[data-service-canvas-node]");
+      if (!(nodeElement instanceof HTMLElement)) {
+        return;
+      }
+
+      const productId = nodeElement.dataset.nodeId ?? "";
+      if (productId === "") {
+        return;
+      }
+
+      if (state.ignoreNextClickProductId === productId) {
+        state.ignoreNextClickProductId = null;
+        return;
+      }
+
+      if (target.closest("[data-service-canvas-remove]")) {
+        removeNode(productId);
+        return;
+      }
+
+      if (target.closest("[data-service-canvas-connect]")) {
+        state.connectorSourceId = state.connectorSourceId === productId ? null : productId;
+        state.pointer = null;
+        scheduleRender();
+        return;
+      }
+
+      if (state.connectorSourceId !== null && state.connectorSourceId !== productId) {
+        const sourceId = state.connectorSourceId;
+        toggleConnection(sourceId, productId);
+        state.selectedConnectionKey = null;
+        state.connectorSourceId = productId;
+        state.pointer = null;
+        scheduleRender();
+      }
+    });
+
+    surface.addEventListener("click", (event) => {
+      if (event.target === surface || event.target === emptyState) {
+        cancelConnector();
+        clearSelectedConnection();
+      }
+    });
+
+    surface.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        cancelConnector();
+      }
+    });
+
+    lines.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof SVGPathElement)) {
+        return;
+      }
+
+      const fromId = target.dataset.fromId ?? "";
+      const toId = target.dataset.toId ?? "";
+      if (fromId === "" || toId === "") {
+        return;
+      }
+
+      const connectionKey = buildConnectionKey(fromId, toId);
+      const existingConnection = state.connections.some((connection) =>
+        buildConnectionKey(connection.fromId, connection.toId) === connectionKey);
+      if (!existingConnection) {
+        return;
+      }
+
+      state.connectorSourceId = null;
+      state.pointer = null;
+      state.selectedConnectionKey = state.selectedConnectionKey === connectionKey
+        ? null
+        : connectionKey;
+      scheduleRender();
+    });
+
+    selectionRemoveButton.addEventListener("click", () => {
+      if (state.selectedConnectionKey === null) {
+        return;
+      }
+
+      const existingIndex = state.connections.findIndex((connection) =>
+        buildConnectionKey(connection.fromId, connection.toId) === state.selectedConnectionKey);
+      if (existingIndex < 0) {
+        state.selectedConnectionKey = null;
+        scheduleRender();
+        return;
+      }
+
+      state.connections.splice(existingIndex, 1);
+      state.selectedConnectionKey = null;
+      scheduleRender();
+    });
+
+    board.addEventListener("scroll", () => {
+      if (state.connectorSourceId !== null) {
+        scheduleRender();
+      }
+    });
+
+    if (autoLayoutButton instanceof HTMLButtonElement) {
+      autoLayoutButton.addEventListener("click", () => {
+        applyAutoLayout();
+      });
+    }
+
+    if (clearButton instanceof HTMLButtonElement) {
+      clearButton.addEventListener("click", () => {
+        clearCanvas();
+      });
+    }
+
+    form.addEventListener("submit", () => {
+      serializeState();
+    });
+
+    window.addEventListener("resize", () => {
+      scheduleRender();
+    });
+  });
+
   document.querySelectorAll("[data-service-connection-editor]").forEach((editor) => {
     const rowsContainer = editor.querySelector("[data-service-connection-rows]");
     const rowTemplate = editor.querySelector("[data-service-connection-row-template]");

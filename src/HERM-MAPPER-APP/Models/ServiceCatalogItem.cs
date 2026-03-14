@@ -21,6 +21,8 @@ public sealed class ServiceCatalogItem
     [Display(Name = "Lifecycle status")]
     public string LifecycleStatus { get; set; } = string.Empty;
 
+    public string? ConnectionLayoutJson { get; set; }
+
     public bool IsDeleted { get; set; }
     public DateTime? DeletedUtc { get; set; }
 

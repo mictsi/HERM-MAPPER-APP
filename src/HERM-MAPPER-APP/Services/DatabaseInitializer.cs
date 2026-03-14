@@ -20,6 +20,7 @@ public sealed partial class DatabaseInitializer(
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureProductSoftDeleteColumnsAsync(cancellationToken);
         await EnsureServiceSoftDeleteColumnsAsync(cancellationToken);
+        await EnsureServiceConnectionLayoutColumnAsync(cancellationToken);
         await EnsureAppSettingsTableAsync(cancellationToken);
         await EnsureUsersTableAsync(cancellationToken);
         await EnsureRoleNormalizationAsync(cancellationToken);
@@ -378,6 +379,7 @@ public sealed partial class DatabaseInitializer(
                     "Description" TEXT NULL,
                     "Owner" TEXT NOT NULL,
                     "LifecycleStatus" TEXT NOT NULL,
+                    "ConnectionLayoutJson" TEXT NULL,
                     "IsDeleted" INTEGER NOT NULL DEFAULT 0,
                     "DeletedUtc" TEXT NULL,
                     "DeletedReason" TEXT NULL,
@@ -491,6 +493,7 @@ public sealed partial class DatabaseInitializer(
                         [Description] NVARCHAR(2000) NULL,
                         [Owner] NVARCHAR(120) NOT NULL,
                         [LifecycleStatus] NVARCHAR(80) NOT NULL,
+                        [ConnectionLayoutJson] NVARCHAR(MAX) NULL,
                         [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ServiceCatalogItems_IsDeleted] DEFAULT 0,
                         [DeletedUtc] DATETIME2 NULL,
                         [DeletedReason] NVARCHAR(400) NULL,
@@ -780,6 +783,34 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     ALTER TABLE [ServiceCatalogItems]
                     ADD [DeletedReason] NVARCHAR(400) NULL;
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureServiceConnectionLayoutColumnAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            if (!await SqliteColumnExistsAsync("ServiceCatalogItems", "ConnectionLayoutJson", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ServiceCatalogItems ADD COLUMN ConnectionLayoutJson TEXT NULL",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ServiceCatalogItems]', N'ConnectionLayoutJson') IS NULL
+                BEGIN
+                    ALTER TABLE [ServiceCatalogItems]
+                    ADD [ConnectionLayoutJson] NVARCHAR(MAX) NULL;
                 END
                 """,
                 cancellationToken);

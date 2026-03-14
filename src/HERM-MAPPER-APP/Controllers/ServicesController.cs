@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using HERMMapperApp.Data;
 using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
@@ -17,6 +18,8 @@ public sealed class ServicesController(
     AuditLogService auditLogService,
     ConfigurableFieldService configurableFieldService) : Controller
 {
+    private static readonly JsonSerializerOptions CanvasStateJsonOptions = new(JsonSerializerDefaults.Web);
+
     public async Task<IActionResult> Index(
         string? search,
         string? owner = null,
@@ -203,9 +206,11 @@ public sealed class ServicesController(
 
         input.ServiceId = id;
         HydrateConnectionEditorSummary(input, service);
+        ApplyCanvasState(input);
         NormalizeConnectionInput(input);
-        var allowedDeletedProductIds = GetAllowedDeletedProductIds(service);
+        var allowedDeletedProductIds = GetAllowedDeletedProductIds(service, input.CanvasNodes);
         await ValidateConnectionRowsAsync(input, allowedDeletedProductIds);
+        input.CanvasStateJson = BuildConnectionCanvasStateJson(service, input);
 
         if (!ModelState.IsValid)
         {
@@ -216,6 +221,7 @@ public sealed class ServicesController(
 
         SynchronizeProductConnections(service, input.ConnectionRows);
         SynchronizeLegacyProductLinksFromConnections(service, input.ConnectionRows);
+        service.ConnectionLayoutJson = input.CanvasStateJson;
         service.UpdatedUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync();
@@ -388,11 +394,13 @@ public sealed class ServicesController(
             ServiceOwner = service.Owner,
             ServiceLifecycleStatus = service.LifecycleStatus,
             UsesLegacyFlow = service.ProductConnections.Count == 0 && service.ProductLinks.Count > 1,
-            ConnectionRows = BuildConnectionRowsForEditor(service)
+            ConnectionRows = BuildConnectionRowsForEditor(service),
+            CanvasNodes = ParseConnectionLayoutNodes(service.ConnectionLayoutJson)
         };
 
         EnsureConnectionRows(model);
-        await PopulateConnectionEditorOptionsAsync(model, GetAllowedDeletedProductIds(service));
+        model.CanvasStateJson = BuildConnectionCanvasStateJson(service, model);
+        await PopulateConnectionEditorOptionsAsync(model, GetAllowedDeletedProductIds(service, model.CanvasNodes));
         return model;
     }
 
@@ -711,13 +719,16 @@ public sealed class ServicesController(
         _ => $"{string.Join(", ", productNames.Take(3))} +{productNames.Count - 3} more"
     };
 
-    private static IReadOnlyCollection<int> GetAllowedDeletedProductIds(ServiceCatalogItem service) => service.ProductLinks
+    private static IReadOnlyCollection<int> GetAllowedDeletedProductIds(
+        ServiceCatalogItem service,
+        IEnumerable<ServiceConnectionCanvasNodeInputViewModel>? canvasNodes = null) => service.ProductLinks
         .Select(link => link.ProductCatalogItemId)
         .Concat(service.ProductConnections.SelectMany(connection => new[]
         {
             connection.FromProductCatalogItemId,
             connection.ToProductCatalogItemId
         }))
+        .Concat(canvasNodes?.Where(node => node.ProductId > 0).Select(node => node.ProductId) ?? [])
         .Distinct()
         .ToList();
 
@@ -844,6 +855,7 @@ public sealed class ServicesController(
     private static void NormalizeConnectionInput(ServiceConnectionEditorViewModel input)
     {
         input.ConnectionRows = NormalizeConnectionRows(input.ConnectionRows);
+        input.CanvasNodes = NormalizeCanvasNodes(input.CanvasNodes);
     }
 
     private static List<ServiceConnectionRowInputViewModel> NormalizeConnectionRows(
@@ -873,6 +885,153 @@ public sealed class ServicesController(
         }
 
         return normalized;
+    }
+
+    private void ApplyCanvasState(ServiceConnectionEditorViewModel input)
+    {
+        if (string.IsNullOrWhiteSpace(input.CanvasStateJson))
+        {
+            return;
+        }
+
+        try
+        {
+            var canvasState = JsonSerializer.Deserialize<ServiceConnectionCanvasStateInputViewModel>(
+                input.CanvasStateJson,
+                CanvasStateJsonOptions);
+
+            if (canvasState is null)
+            {
+                ModelState.AddModelError(nameof(input.CanvasStateJson), "The connection canvas could not be read.");
+                return;
+            }
+
+            input.CanvasNodes = canvasState.Nodes;
+            input.ConnectionRows = canvasState.Connections;
+        }
+        catch (JsonException)
+        {
+            ModelState.AddModelError(nameof(input.CanvasStateJson), "The connection canvas could not be read.");
+        }
+    }
+
+    private static List<ServiceConnectionCanvasNodeInputViewModel> ParseConnectionLayoutNodes(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            var canvasState = JsonSerializer.Deserialize<ServiceConnectionCanvasStateInputViewModel>(
+                json,
+                CanvasStateJsonOptions);
+
+            return NormalizeCanvasNodes(canvasState?.Nodes);
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static List<ServiceConnectionCanvasNodeInputViewModel> NormalizeCanvasNodes(
+        IEnumerable<ServiceConnectionCanvasNodeInputViewModel>? nodes)
+    {
+        var normalized = new List<ServiceConnectionCanvasNodeInputViewModel>();
+        if (nodes is null)
+        {
+            return normalized;
+        }
+
+        var seenProductIds = new HashSet<int>();
+        foreach (var node in nodes)
+        {
+            if (node.ProductId <= 0 || !seenProductIds.Add(node.ProductId))
+            {
+                continue;
+            }
+
+            normalized.Add(new ServiceConnectionCanvasNodeInputViewModel
+            {
+                ProductId = node.ProductId,
+                X = NormalizeCoordinate(node.X),
+                Y = NormalizeCoordinate(node.Y)
+            });
+        }
+
+        return normalized;
+    }
+
+    private static double? NormalizeCoordinate(double? value) => value is double coordinate && double.IsFinite(coordinate)
+        ? Math.Round(coordinate, 2)
+        : null;
+
+    private static string BuildConnectionCanvasStateJson(
+        ServiceCatalogItem service,
+        ServiceConnectionEditorViewModel input)
+    {
+        var connections = NormalizeConnectionRows(input.ConnectionRows);
+        var savedLayoutNodes = ParseConnectionLayoutNodes(service.ConnectionLayoutJson);
+        var nodesByProductId = new Dictionary<int, ServiceConnectionCanvasNodeInputViewModel>();
+
+        void AddNode(ServiceConnectionCanvasNodeInputViewModel node)
+        {
+            if (node.ProductId <= 0)
+            {
+                return;
+            }
+
+            if (!nodesByProductId.TryGetValue(node.ProductId, out var existingNode))
+            {
+                nodesByProductId[node.ProductId] = new ServiceConnectionCanvasNodeInputViewModel
+                {
+                    ProductId = node.ProductId,
+                    X = node.X,
+                    Y = node.Y
+                };
+                return;
+            }
+
+            if (existingNode.X is null && node.X is not null)
+            {
+                existingNode.X = node.X;
+            }
+
+            if (existingNode.Y is null && node.Y is not null)
+            {
+                existingNode.Y = node.Y;
+            }
+        }
+
+        foreach (var node in savedLayoutNodes)
+        {
+            AddNode(node);
+        }
+
+        foreach (var node in input.CanvasNodes)
+        {
+            AddNode(node);
+        }
+
+        foreach (var productId in connections
+                     .Where(connection => connection.FromProductId is > 0 && connection.ToProductId is > 0)
+                     .SelectMany(connection => new[] { connection.FromProductId!.Value, connection.ToProductId!.Value })
+                     .Distinct())
+        {
+            AddNode(new ServiceConnectionCanvasNodeInputViewModel { ProductId = productId });
+        }
+
+        return JsonSerializer.Serialize(
+            new ServiceConnectionCanvasStateInputViewModel
+            {
+                Nodes = nodesByProductId.Values
+                    .OrderBy(node => node.ProductId)
+                    .ToList(),
+                Connections = connections
+            },
+            CanvasStateJsonOptions);
     }
 
     private static void HydrateConnectionEditorSummary(ServiceConnectionEditorViewModel model, ServiceCatalogItem service)

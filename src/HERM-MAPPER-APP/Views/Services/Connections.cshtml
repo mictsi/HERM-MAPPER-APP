@@ -1,7 +1,9 @@
-@using System.Globalization
 @model ServiceConnectionEditorViewModel
 @{
     ViewData["Title"] = "Connect Products";
+    var paletteProducts = Model.ProductOptions
+        .Where(option => !string.IsNullOrWhiteSpace(option.Value))
+        .ToList();
 }
 
 <section class="page-header">
@@ -51,138 +53,105 @@
         </div>
     </section>
 
-    <section class="content-card service-connection-editor service-connection-editor-card" data-service-connection-editor>
+    <section class="content-card service-canvas-editor" data-service-canvas-editor>
         <div class="section-heading">
             <div>
                 <span class="eyebrow">Connected products</span>
                 <h2>Connect products</h2>
-                <p>Create explicit <code>from</code> and <code>to</code> links, then use <strong>Organize connections</strong> to regroup related edges.</p>
+                <p>Build the service map directly on the canvas. Drag products in, move them where they belong, then use the connector wand to draw the links.</p>
             </div>
         </div>
 
-        <div asp-validation-for="ConnectionRows" class="text-danger mb-3"></div>
+        <div asp-validation-for="ConnectionRows" class="text-danger mb-2"></div>
+        <div asp-validation-for="CanvasStateJson" class="text-danger mb-3"></div>
+        <input asp-for="CanvasStateJson" type="hidden" data-service-canvas-state-input />
 
-        @if (Model.ProductOptions.Count <= 1)
-        {
-            <div class="form-note mb-3">
-                Add products in the product catalogue first. Once products exist, you can connect them here.
-            </div>
-        }
-
-        <div class="service-connection-header" aria-hidden="true">
-            <div class="service-connection-header-label">#</div>
-            <div class="service-connection-header-label">From</div>
-            <div class="service-connection-header-label">To</div>
-            <div class="service-connection-header-label service-connection-header-actions">Actions</div>
-        </div>
-
-        <div class="service-connection-stack" data-service-connection-rows>
-            @for (var index = 0; index < Model.ConnectionRows.Count; index++)
-            {
-                var row = Model.ConnectionRows[index];
-                <div class="service-connection-row" data-service-connection-row>
-                    <div class="service-connection-order" data-service-connection-order>@(index + 1)</div>
-                    <div class="service-connection-field">
-                        <select class="form-select form-select-sm"
-                                id="ConnectionRows_@(index)__FromProductId"
-                                name="ConnectionRows[@index].FromProductId"
-                                data-service-connection-from
-                                aria-label="From product">
-                            @foreach (var option in Model.ProductOptions)
-                            {
-                                <option value="@option.Value" selected="@(row.FromProductId?.ToString(CultureInfo.InvariantCulture) == option.Value ? "selected" : null)">@option.Text</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="service-connection-field">
-                        <select class="form-select form-select-sm"
-                                id="ConnectionRows_@(index)__ToProductId"
-                                name="ConnectionRows[@index].ToProductId"
-                                data-service-connection-to
-                                aria-label="To product">
-                            @foreach (var option in Model.ProductOptions)
-                            {
-                                <option value="@option.Value" selected="@(row.ToProductId?.ToString(CultureInfo.InvariantCulture) == option.Value ? "selected" : null)">@option.Text</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="service-connection-actions">
-                        <button type="button" class="btn btn-sm btn-outline-secondary service-action-button" data-service-connection-add-row>Add</button>
-                        <button type="button" class="btn btn-sm btn-outline-danger" data-service-connection-remove-row>Remove</button>
-                    </div>
-                    <div class="service-connection-summary" data-service-connection-summary></div>
+        <div class="service-canvas-layout">
+            <aside class="service-canvas-palette">
+                <div class="service-canvas-palette-heading">
+                    <span class="eyebrow">Palette</span>
+                    <h3>Products</h3>
+                    <p>Search, then drag products into the workspace or click once to place them.</p>
                 </div>
-            }
-        </div>
 
-        <div class="service-connection-toolbar">
-            <div class="service-connection-toolbar-copy">Add as many edges as you need to create branches, merges, or parallel paths.</div>
-            <div class="service-connection-toolbar-actions">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-service-connection-organize>Organize connections</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-service-connection-add-tail>+ Add connection</button>
-            </div>
-        </div>
-
-        <template data-service-connection-row-template>
-            <div class="service-connection-row" data-service-connection-row>
-                <div class="service-connection-order" data-service-connection-order>1</div>
-                <div class="service-connection-field">
-                    <select class="form-select form-select-sm"
-                            id="ConnectionRows___index___FromProductId"
-                            name="ConnectionRows[__index__].FromProductId"
-                            data-service-connection-from
-                            aria-label="From product">
-                        @foreach (var option in Model.ProductOptions)
+                @if (paletteProducts.Count == 0)
+                {
+                    <div class="form-note mb-0">
+                        Add products in the product catalogue first. Once products exist, you can place them here.
+                    </div>
+                }
+                else
+                {
+                    <div class="service-canvas-palette-search">
+                        <input type="search"
+                               class="form-control form-control-sm"
+                               placeholder="Search products"
+                               aria-label="Search products"
+                               data-service-canvas-palette-search />
+                    </div>
+                    <div class="service-canvas-palette-list">
+                        @foreach (var product in paletteProducts)
                         {
-                            <option value="@option.Value">@option.Text</option>
+                            <button type="button"
+                                    class="service-canvas-product"
+                                    draggable="true"
+                                    data-service-canvas-product
+                                    data-product-id="@product.Value"
+                                    data-product-label="@product.Text">
+                                <span class="service-canvas-product-title">@product.Text</span>
+                            </button>
                         }
-                    </select>
+                    </div>
+                    <div class="service-canvas-palette-empty" data-service-canvas-palette-empty hidden>
+                        No products match that search.
+                    </div>
+                }
+            </aside>
+
+            <div class="service-canvas-workspace">
+                <div class="service-canvas-toolbar">
+                    <div>
+                        <div class="service-canvas-toolbar-title">Workspace</div>
+                        <p>Move products until the map feels right. Click <strong>Connect</strong> on one node, then click another node to add or remove the connection.</p>
+                    </div>
+                    <div class="service-canvas-toolbar-actions">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-service-canvas-autolayout>Auto layout</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-service-canvas-clear>Clear canvas</button>
+                    </div>
                 </div>
-                <div class="service-connection-field">
-                    <select class="form-select form-select-sm"
-                            id="ConnectionRows___index___ToProductId"
-                            name="ConnectionRows[__index__].ToProductId"
-                            data-service-connection-to
-                            aria-label="To product">
-                        @foreach (var option in Model.ProductOptions)
-                        {
-                            <option value="@option.Value">@option.Text</option>
-                        }
-                    </select>
+
+                <div class="service-canvas-connector-banner" data-service-canvas-connector-banner hidden></div>
+                <div class="service-canvas-selection-banner" data-service-canvas-selection-banner hidden>
+                    <span data-service-canvas-selection-copy></span>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-service-canvas-selection-remove>
+                        Remove connection
+                    </button>
                 </div>
-                <div class="service-connection-actions">
-                    <button type="button" class="btn btn-sm btn-outline-secondary service-action-button" data-service-connection-add-row>Add</button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" data-service-connection-remove-row>Remove</button>
+
+                <div class="service-canvas-board" data-service-canvas-board>
+                    <div class="service-canvas-surface" data-service-canvas-surface tabindex="0">
+                        <svg class="service-canvas-lines" data-service-canvas-lines aria-hidden="true"></svg>
+                        <div class="service-canvas-empty" data-service-canvas-empty>
+                            <h3>Start with products</h3>
+                            <p>Drag products from the left into the canvas to build the flow.</p>
+                        </div>
+                        <div class="service-canvas-nodes" data-service-canvas-nodes></div>
+                    </div>
                 </div>
-                <div class="service-connection-summary" data-service-connection-summary></div>
+
+                <div class="service-canvas-footer">
+                    <div class="service-canvas-summary" data-service-canvas-summary>
+                        0 products on canvas. 0 connections.
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="submit" class="btn btn-primary">Save connected products</button>
+                        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.ServiceId">Edit details</a>
+                        <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.ServiceId">Visualize</a>
+                    </div>
+                </div>
             </div>
-        </template>
+        </div>
     </section>
-
-    <div data-service-graph-host>
-        <section class="content-card">
-            <div class="section-heading">
-                <div>
-                    <span class="eyebrow">Preview</span>
-                    <h2>Connection map</h2>
-                    <p>The preview updates as you edit the flow. The graph now runs top to bottom to keep wider flows visible.</p>
-                </div>
-            </div>
-
-            <div class="service-graph-preview"
-                 data-service-graph-preview
-                 data-empty-title="No connected products yet"
-                 data-empty-body="Add at least one complete connection to preview the service flow."
-                 data-loop-title="Loop detected"
-                 data-loop-body="This flow includes a loop, so the preview is shown as connection pairs instead of a top-to-bottom graph."></div>
-
-            <div class="d-flex gap-2 mt-4">
-                <button type="submit" class="btn btn-primary">Save connected products</button>
-                <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.ServiceId">Edit details</a>
-            </div>
-        </section>
-
-    </div>
 </form>
 
 @section Scripts {
