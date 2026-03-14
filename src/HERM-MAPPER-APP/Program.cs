@@ -141,6 +141,9 @@ public partial class Program
             : CookieSecurePolicy.Always;
     }
 
+    public static SameSiteMode BuildAuthenticationCookieSameSite(bool openIdConnectEnabled) =>
+        openIdConnectEnabled ? SameSiteMode.Lax : SameSiteMode.Strict;
+
     public static string BuildCookieName(string cookieName, CookieSecurePolicy securePolicy) =>
         securePolicy == CookieSecurePolicy.Always
             ? $"__Host-{cookieName}"
@@ -181,6 +184,7 @@ public partial class Program
         var localAuthenticationOptions = BuildLocalAuthenticationOptions(configuration);
         var openIdConnectAuthenticationOptions = BuildOpenIdConnectAuthenticationOptions(configuration);
         var cookieSecurePolicy = BuildCookieSecurePolicy(configuration, environmentName);
+        var authenticationCookieSameSite = BuildAuthenticationCookieSameSite(openIdConnectAuthenticationOptions.Enabled);
         var antiforgeryCookieName = BuildCookieName(AntiforgeryCookieName, cookieSecurePolicy);
         var authenticationCookieName = BuildCookieName(AuthenticationCookieName, cookieSecurePolicy);
 
@@ -245,7 +249,7 @@ public partial class Program
             options.Cookie.HttpOnly = true;
             options.Cookie.Path = "/";
             options.Cookie.SecurePolicy = cookieSecurePolicy;
-            options.Cookie.SameSite = SameSiteMode.Strict;
+            options.Cookie.SameSite = authenticationCookieSameSite;
             options.Cookie.IsEssential = true;
             options.SlidingExpiration = true;
             options.ExpireTimeSpan = authenticationSecurityOptions.SessionTimeout;

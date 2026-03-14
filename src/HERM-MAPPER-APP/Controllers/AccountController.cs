@@ -143,9 +143,8 @@ public sealed class AccountController(
         return RedirectToAction("Index", "Home");
     }
 
-    [HttpPost]
+    [HttpGet]
     [AllowAnonymous]
-    [ValidateAntiForgeryToken]
     public IActionResult ExternalLogin(string? returnUrl = null)
     {
         if (!openIdConnectAuthenticationOptions.Enabled)

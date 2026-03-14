@@ -80,6 +80,7 @@ The web application now lives under `src/HERM-MAPPER-APP` and automated tests li
 - SQLite paths support `|DataDirectory|` and `|HomeDirectory|` tokens; `|HomeDirectory|/data/...` is suitable for durable Azure App Service storage
 - Console logging can be controlled with `Diagnostics:Console:*` or `HERM_Diagnostics__Console__*`
 - SQL command logging can be controlled with `Diagnostics:Sql:*` or `HERM_Diagnostics__Sql__*`
+- Microsoft Entra ID app registration and role-group setup steps are documented in `docs/entra-app-registration-setup.md`
 
 Example environment variables:
 ```powershell

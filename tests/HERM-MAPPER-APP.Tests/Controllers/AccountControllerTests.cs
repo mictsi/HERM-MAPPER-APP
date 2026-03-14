@@ -94,6 +94,31 @@ public sealed class AccountControllerTests
         Assert.Contains(controller.ModelState[string.Empty]!.Errors, error => error.ErrorMessage.Contains("Local login is disabled", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task ExternalLoginWhenOpenIdConnectIsDisabledReturnsNotFound()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        using var controller = fixture.CreateController(openIdConnectEnabled: false);
+        var result = controller.ExternalLogin();
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task ExternalLoginWhenOpenIdConnectIsEnabledChallengesConfiguredScheme()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        using var controller = fixture.CreateController(openIdConnectEnabled: true);
+        var result = controller.ExternalLogin("/Products");
+
+        var challengeResult = Assert.IsType<ChallengeResult>(result);
+        Assert.Single(challengeResult.AuthenticationSchemes);
+        Assert.Equal(Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme, challengeResult.AuthenticationSchemes[0]);
+        Assert.Equal("/Products", challengeResult.Properties?.RedirectUri);
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

@@ -125,6 +125,13 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
+    public void BuildAuthenticationCookieSameSiteUsesLaxForOpenIdConnect()
+    {
+        Assert.Equal(SameSiteMode.Strict, Program.BuildAuthenticationCookieSameSite(openIdConnectEnabled: false));
+        Assert.Equal(SameSiteMode.Lax, Program.BuildAuthenticationCookieSameSite(openIdConnectEnabled: true));
+    }
+
+    [Fact]
     public void ParseLogLevelReturnsFallbackWhenValueIsInvalid()
     {
         var parsed = Program.ParseLogLevel("not-a-level", LogLevel.Error);
