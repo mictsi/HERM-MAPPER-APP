@@ -5,6 +5,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <CoverletOutput>$(MSBuildProjectDirectory)\TestResults\coverage\</CoverletOutput>
+    <ExpandedAppCoverageThreshold>90</ExpandedAppCoverageThreshold>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,10 +22,19 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="coverlet.msbuild" Version="6.0.4">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\HERM-MAPPER-APP\HERM-MAPPER-APP.csproj" />
   </ItemGroup>
+
+  <Target Name="VerifyExpandedAppCoverage" AfterTargets="GenerateCoverageResult" Condition="'$(CollectCoverage)' == 'true'">
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\VerifyExpandedAppCoverage.ps1&quot; -CoveragePath &quot;$(CoverletOutput)coverage.cobertura.xml&quot; -Threshold $(ExpandedAppCoverageThreshold)" />
+  </Target>
 
 </Project>

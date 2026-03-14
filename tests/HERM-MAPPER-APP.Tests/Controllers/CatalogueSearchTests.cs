@@ -20,7 +20,7 @@ public sealed class CatalogueSearchTests
     public async Task ProductsIndexSearchMatchesPartialStringsCaseInsensitively()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        fixture.DbContext.ConfigurableFieldOptions.AddRange(
+        await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
             new ConfigurableFieldOption
             {
                 FieldName = ConfigurableFieldNames.Owner,
@@ -33,7 +33,7 @@ public sealed class CatalogueSearchTests
                 Value = "Production",
                 SortOrder = 1
             });
-        fixture.DbContext.ProductCatalogItems.AddRange(
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(
             CreateProduct("SharePoint Online", "Microsoft", "Production", "Collaboration Team"),
             CreateProduct("ServiceNow", "ServiceNow", null));
         await fixture.DbContext.SaveChangesAsync();
@@ -52,7 +52,7 @@ public sealed class CatalogueSearchTests
     public async Task ProductsIndexFiltersByMultipleOwnersAndLifecycle()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        fixture.DbContext.ConfigurableFieldOptions.AddRange(
+        await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
             new ConfigurableFieldOption
             {
                 FieldName = ConfigurableFieldNames.Owner,
@@ -77,7 +77,7 @@ public sealed class CatalogueSearchTests
                 Value = "Trial",
                 SortOrder = 2
             });
-        fixture.DbContext.ProductCatalogItems.AddRange(
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(
             CreateProduct("Payments Hub", null, "Production", "Finance Team"),
             CreateProduct("Platform Core", null, "Production", "Platform Team"),
             CreateProduct("Developer Portal", null, "Trial", "Platform Team"));
@@ -97,7 +97,7 @@ public sealed class CatalogueSearchTests
     public async Task ProductsIndexExcludesDeletedProducts()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        fixture.DbContext.ProductCatalogItems.AddRange(
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(
             CreateProduct("Visible Product", null, null),
             new ProductCatalogItem
             {
@@ -159,12 +159,12 @@ public sealed class CatalogueSearchTests
             IsCustom = false
         };
 
-        fixture.DbContext.TrmDomains.AddRange(finance, security);
-        fixture.DbContext.TrmCapabilities.AddRange(payments, identity);
-        fixture.DbContext.TrmComponents.AddRange(customComponent, modelComponent);
+        await fixture.DbContext.TrmDomains.AddRangeAsync(finance, security);
+        await fixture.DbContext.TrmCapabilities.AddRangeAsync(payments, identity);
+        await fixture.DbContext.TrmComponents.AddRangeAsync(customComponent, modelComponent);
         await fixture.DbContext.SaveChangesAsync();
 
-        fixture.DbContext.TrmComponentCapabilityLinks.AddRange(
+        await fixture.DbContext.TrmComponentCapabilityLinks.AddRangeAsync(
             new TrmComponentCapabilityLink
             {
                 TrmComponentId = customComponent.Id,

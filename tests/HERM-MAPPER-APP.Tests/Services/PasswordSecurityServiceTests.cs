@@ -24,4 +24,23 @@ public sealed class PasswordSecurityServiceTests
         Assert.True(PasswordHashService.VerifyPassword("ChangeMeNow!123", hash));
         Assert.False(PasswordHashService.VerifyPassword("WrongPassword!123", hash));
     }
+
+    [Fact]
+    public void PasswordPolicyAcceptsStrongPasswordAndCalculatesMaximumStrength()
+    {
+        var result = PasswordPolicyService.Validate("StrongPassword!1234");
+
+        Assert.True(result.IsValid);
+        Assert.Empty(result.Errors);
+        Assert.Equal(100, result.StrengthScore);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-a-valid-hash")]
+    [InlineData("pbkdf2-sha512$invalid$not-base64$still-not-base64")]
+    public void PasswordHashRejectsMalformedHashes(string passwordHash)
+    {
+        Assert.False(PasswordHashService.VerifyPassword("ChangeMeNow!123", passwordHash));
+    }
 }

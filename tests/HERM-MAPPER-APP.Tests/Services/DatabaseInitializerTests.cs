@@ -60,7 +60,7 @@ public sealed class DatabaseInitializerTests
     public async Task InitializeAsyncBackfillsAndNormalizesSortOrderForExistingOptions()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        fixture.DbContext.ConfigurableFieldOptions.AddRange(
+        await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
             new ConfigurableFieldOption
             {
                 FieldName = ConfigurableFieldNames.Owner,
@@ -92,7 +92,7 @@ public sealed class DatabaseInitializerTests
     public async Task InitializeAsyncNormalizesLegacyUserRoles()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        fixture.DbContext.AppUsers.AddRange(
+        await fixture.DbContext.AppUsers.AddRangeAsync(
             new AppUser
             {
                 GivenName = "Legacy",

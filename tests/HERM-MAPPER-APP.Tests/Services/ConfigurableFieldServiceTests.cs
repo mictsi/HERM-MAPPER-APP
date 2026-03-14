@@ -13,7 +13,7 @@ public sealed class ConfigurableFieldServiceTests
     public async Task GetMultiSelectListAsyncIncludesUnknownSelectedValuesOnlyOnce()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        fixture.DbContext.ConfigurableFieldOptions.AddRange(
+        await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
             new ConfigurableFieldOption
             {
                 FieldName = ConfigurableFieldNames.Owner,
@@ -42,7 +42,7 @@ public sealed class ConfigurableFieldServiceTests
     public async Task GetSelectListAsyncAddsUnknownSelectionAfterConfiguredOptions()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        fixture.DbContext.ConfigurableFieldOptions.AddRange(
+        await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
             new ConfigurableFieldOption
             {
                 FieldName = ConfigurableFieldNames.LifecycleStatus,

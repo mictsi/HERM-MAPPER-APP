@@ -45,6 +45,62 @@ public sealed class ConfiguredTimeZoneServiceTests
         Assert.Equal(TimeZoneInfo.Utc.Id, timeZone.Id);
     }
 
+    [Fact]
+    public async Task GetTimeZoneIdAsyncUsesCachedConfiguredZone()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        fixture.DbContext.AppSettings.Add(new AppSetting
+        {
+            Key = AppSettingKeys.DisplayTimeZone,
+            Value = "W. Europe Standard Time",
+            UpdatedUtc = DateTime.UtcNow
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var service = new ConfiguredTimeZoneService(new AppSettingsService(fixture.DbContext));
+
+        var firstId = await service.GetTimeZoneIdAsync();
+
+        var setting = await fixture.DbContext.AppSettings.SingleAsync();
+        setting.Value = "UTC";
+        await fixture.DbContext.SaveChangesAsync();
+
+        var cachedId = await service.GetTimeZoneIdAsync();
+
+        Assert.Equal(firstId, cachedId);
+        Assert.Equal("W. Europe Standard Time", cachedId);
+    }
+
+    [Fact]
+    public async Task FormatUtcAsyncReturnsNullWhenNullableValueIsMissing()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = new ConfiguredTimeZoneService(new AppSettingsService(fixture.DbContext));
+
+        var formatted = await service.FormatUtcAsync((DateTime?)null);
+
+        Assert.Null(formatted);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ResolveTimeZoneReturnsUtcForBlankValues(string? configuredId)
+    {
+        var timeZone = ConfiguredTimeZoneService.ResolveTimeZone(configuredId);
+
+        Assert.Equal(TimeZoneInfo.Utc.Id, timeZone.Id);
+    }
+
+    [Fact]
+    public void ResolveTimeZoneReturnsConfiguredZoneWhenItExists()
+    {
+        var timeZone = ConfiguredTimeZoneService.ResolveTimeZone("UTC");
+
+        Assert.Equal(TimeZoneInfo.Utc.Id, timeZone.Id);
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

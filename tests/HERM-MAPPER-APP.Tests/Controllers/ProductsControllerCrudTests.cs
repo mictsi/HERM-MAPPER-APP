@@ -15,6 +15,195 @@ namespace HERMMapperApp.Tests.Controllers;
 public sealed class ProductsControllerCrudTests
 {
     [Fact]
+    public async Task IndexFiltersBySearchOwnerAndLifecycleStatus()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedConfigurableOptionsAsync();
+
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(
+            new ProductCatalogItem
+            {
+                Name = "Sentinel",
+                Vendor = "Contoso",
+                LifecycleStatus = "Production",
+                Owners = [new ProductCatalogItemOwner { OwnerValue = "Team Blue" }]
+            },
+            new ProductCatalogItem
+            {
+                Name = "Atlas",
+                Vendor = "Contoso",
+                LifecycleStatus = "Trial",
+                Owners = [new ProductCatalogItemOwner { OwnerValue = "Team Red" }]
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.Index("Sent", ["team blue"], " Production ");
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductsIndexViewModel>(view.Model);
+        Assert.Equal("Sent", model.Search);
+        Assert.Equal(["team blue"], model.SelectedOwners);
+        Assert.Equal("Production", model.LifecycleStatus);
+        Assert.Single(model.Products);
+        Assert.Equal("Sentinel", model.Products[0].Name);
+    }
+
+    [Fact]
+    public async Task CreateGetPopulatesOwnerAndLifecycleOptions()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedConfigurableOptionsAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.Create();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductEditViewModel>(view.Model);
+        Assert.Contains(model.OwnerOptions, option => option.Value == "Team Blue");
+        Assert.Contains(model.LifecycleStatusOptions, option => option.Value == "Production");
+    }
+
+    [Fact]
+    public async Task CreatePostInvalidModelReturnsViewWithOptions()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedConfigurableOptionsAsync();
+        using var controller = fixture.CreateController();
+        controller.ModelState.AddModelError(nameof(ProductEditViewModel.Name), "Required");
+
+        var result = await controller.Create(new ProductEditViewModel
+        {
+            Name = string.Empty,
+            Owners = ["Team Blue"],
+            LifecycleStatus = "Production"
+        });
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductEditViewModel>(view.Model);
+        Assert.Contains(model.OwnerOptions, option => option.Value == "Team Blue");
+        Assert.Contains(model.LifecycleStatusOptions, option => option.Value == "Production");
+    }
+
+    [Fact]
+    public async Task DetailsReturnsProductWithMappings()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var capability = new TrmCapability { Code = "TP001", Name = "Observability", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var component = new TrmComponent { Code = "TC001", Name = "Monitoring", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var product = new ProductCatalogItem { Name = "Sentinel" };
+        var mapping = new ProductMapping { ProductCatalogItem = product, TrmDomain = domain, TrmCapability = capability, TrmComponent = component, MappingStatus = MappingStatus.Complete };
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product, mapping);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.Details(product.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductCatalogItem>(view.Model);
+        Assert.Single(model.Mappings);
+        Assert.Equal(component.Id, Assert.Single(model.Mappings).TrmComponentId);
+    }
+
+    [Fact]
+    public async Task DetailsReturnsNotFoundWhenProductMissing()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.Details(999);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task EditGetReturnsNotFoundWhenProductMissing()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.Edit(999);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task EditPostInvalidModelReturnsViewWithOptions()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedConfigurableOptionsAsync();
+        var product = new ProductCatalogItem { Name = "Sentinel" };
+        fixture.DbContext.ProductCatalogItems.Add(product);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        controller.ModelState.AddModelError(nameof(ProductEditViewModel.Name), "Required");
+        var result = await controller.Edit(product.Id, new ProductEditViewModel
+        {
+            Name = string.Empty,
+            Owners = ["Team Blue"],
+            LifecycleStatus = "Production"
+        });
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductEditViewModel>(view.Model);
+        Assert.Equal(product.Id, model.Id);
+        Assert.Contains(model.OwnerOptions, option => option.Value == "Team Blue");
+    }
+
+    [Fact]
+    public async Task BulkEditGetRedirectsWhenNothingSelected()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.BulkEdit(null, "atlas", ["Team Blue"], "Production");
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/Products?search=atlas&lifecycleStatus=Production&owners=Team%20Blue", redirect.Url);
+        Assert.Equal("Select one or more products before opening bulk edit.", controller.TempData["ProductsErrorMessage"]);
+    }
+
+    [Fact]
+    public async Task DeleteGetReturnsProductView()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new ProductCatalogItem { Name = "Sentinel", Owners = [new ProductCatalogItemOwner { OwnerValue = "Team Blue" }] };
+        fixture.DbContext.ProductCatalogItems.Add(product);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.Delete(product.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductCatalogItem>(view.Model);
+        Assert.Equal("Sentinel", model.Name);
+    }
+
+    [Fact]
+    public async Task RestoreGetReturnsDeletedProductsAndStatusMessage()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        fixture.DbContext.ProductCatalogItems.Add(new ProductCatalogItem
+        {
+            Name = "Sentinel",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow,
+            DeletedReason = "Moved to trash"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        controller.TempData["ProductsStatusMessage"] = "Restored";
+        var result = await controller.Restore();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductRestoreViewModel>(view.Model);
+        Assert.Equal("Restored", model.StatusMessage);
+        Assert.Single(model.Products);
+    }
+    [Fact]
     public async Task CreatePostPersistsProductNormalizesSelectionsAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -95,7 +284,7 @@ public sealed class ProductsControllerCrudTests
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
 
-        fixture.DbContext.ProductCatalogItems.AddRange(
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(
             new ProductCatalogItem
             {
                 Name = "Sentinel",
@@ -117,7 +306,8 @@ public sealed class ProductsControllerCrudTests
             .Select(x => x.Id)
             .ToArrayAsync();
 
-        var result = await fixture.CreateController().BulkEdit(selectedIds, "atlas", ["Team Blue"], "Production");
+        using var controller = fixture.CreateController();
+        var result = await controller.BulkEdit(selectedIds, "atlas", ["Team Blue"], "Production");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ProductBulkEditViewModel>(view.Model);
@@ -158,7 +348,7 @@ public sealed class ProductsControllerCrudTests
             Owners = [new ProductCatalogItemOwner { OwnerValue = "Team Red" }]
         };
 
-        fixture.DbContext.ProductCatalogItems.AddRange(sentinel, atlas, draft);
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(sentinel, atlas, draft);
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
@@ -226,7 +416,7 @@ public sealed class ProductsControllerCrudTests
             Owners = [new ProductCatalogItemOwner { OwnerValue = "Team Red" }]
         };
 
-        fixture.DbContext.ProductCatalogItems.AddRange(sentinel, atlas);
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(sentinel, atlas);
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
@@ -262,10 +452,10 @@ public sealed class ProductsControllerCrudTests
         var component = new TrmComponent { Code = "TC001", Name = "Monitoring", ParentCapability = capability, ParentCapabilityCode = capability.Code };
         var product = new ProductCatalogItem { Name = "Sentinel" };
 
-        fixture.DbContext.AddRange(domain, capability, component, product);
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
         await fixture.DbContext.SaveChangesAsync();
 
-        fixture.DbContext.ProductMappings.AddRange(
+        await fixture.DbContext.ProductMappings.AddRangeAsync(
             new ProductMapping
             {
                 ProductCatalogItemId = product.Id,
@@ -291,7 +481,8 @@ public sealed class ProductsControllerCrudTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateController().Visualize(product.Id);
+        using var visualizeController = fixture.CreateController();
+        var result = await visualizeController.Visualize(product.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ProductVisualizationViewModel>(view.Model);
@@ -309,7 +500,8 @@ public sealed class ProductsControllerCrudTests
         fixture.DbContext.ProductCatalogItems.Add(product);
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateController().DeleteConfirmed(product.Id);
+        using var deleteController = fixture.CreateController();
+        var result = await deleteController.DeleteConfirmed(product.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ProductsController.Index), redirect.ActionName);
@@ -334,7 +526,8 @@ public sealed class ProductsControllerCrudTests
         fixture.DbContext.ProductCatalogItems.Add(product);
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateController().RestoreDeleted(product.Id);
+        using var restoreController = fixture.CreateController();
+        var result = await restoreController.RestoreDeleted(product.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ProductsController.Restore), redirect.ActionName);
@@ -360,7 +553,8 @@ public sealed class ProductsControllerCrudTests
         fixture.DbContext.ProductCatalogItems.Add(product);
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateController().PermanentDelete(product.Id);
+        using var permanentDeleteController = fixture.CreateController();
+        var result = await permanentDeleteController.PermanentDelete(product.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ProductsController.Restore), redirect.ActionName);
@@ -411,7 +605,7 @@ public sealed class ProductsControllerCrudTests
 
         public async Task SeedConfigurableOptionsAsync()
         {
-            DbContext.ConfigurableFieldOptions.AddRange(
+            await DbContext.ConfigurableFieldOptions.AddRangeAsync(
                 new ConfigurableFieldOption { FieldName = ConfigurableFieldNames.Owner, Value = "Team Blue", SortOrder = 1 },
                 new ConfigurableFieldOption { FieldName = ConfigurableFieldNames.Owner, Value = "Team Red", SortOrder = 2 },
                 new ConfigurableFieldOption { FieldName = ConfigurableFieldNames.Owner, Value = "Team Green", SortOrder = 3 },

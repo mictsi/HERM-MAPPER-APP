@@ -236,7 +236,9 @@ public sealed class TrmWorkbookImportServiceTests
             var dbContext = new AppDbContext(options);
             await dbContext.Database.EnsureCreatedAsync();
 
-            return new TestFixture(connection, new TemporaryDirectory(), dbContext);
+            var tempDirectory = new TemporaryDirectory();
+
+            return new TestFixture(connection, tempDirectory, dbContext);
         }
 
         public TrmWorkbookImportService CreateService() =>

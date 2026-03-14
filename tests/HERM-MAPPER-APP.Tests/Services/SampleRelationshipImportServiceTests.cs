@@ -225,7 +225,9 @@ public sealed class SampleRelationshipImportServiceTests
             var dbContext = new AppDbContext(options);
             await dbContext.Database.EnsureCreatedAsync();
 
-            return new TestFixture(connection, new TemporaryDirectory(), dbContext);
+            var tempDirectory = new TemporaryDirectory();
+
+            return new TestFixture(connection, tempDirectory, dbContext);
         }
 
         public async Task<(TrmDomain Domain, TrmCapability Capability, TrmComponent Component)> SeedHierarchyAsync(string domainName, string capabilityName, string componentName, string componentCode)

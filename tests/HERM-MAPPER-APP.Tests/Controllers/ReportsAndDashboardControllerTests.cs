@@ -56,7 +56,7 @@ public sealed class ReportsAndDashboardControllerTests
             LifecycleStatus = "Trial"
         };
 
-        fixture.DbContext.AddRange(domain, capability, component, mappedProduct, unassignedProduct, trialProduct);
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, mappedProduct, unassignedProduct, trialProduct);
         await fixture.DbContext.SaveChangesAsync();
 
         fixture.DbContext.ProductMappings.Add(new ProductMapping
@@ -143,11 +143,11 @@ public sealed class ReportsAndDashboardControllerTests
             })
             .ToList();
 
-        fixture.DbContext.AddRange(domain, capability, activeComponent, deletedComponent);
-        fixture.DbContext.ProductCatalogItems.AddRange(products);
+        await fixture.DbContext.AddRangeAsync(domain, capability, activeComponent, deletedComponent);
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(products);
         await fixture.DbContext.SaveChangesAsync();
 
-        fixture.DbContext.ProductMappings.AddRange(
+        await fixture.DbContext.ProductMappings.AddRangeAsync(
             new ProductMapping
             {
                 ProductCatalogItemId = products[0].Id,
