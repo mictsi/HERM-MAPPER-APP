@@ -7,13 +7,16 @@
     <div>
         <span class="eyebrow">Service design</span>
         <h1>Edit @Model.Name</h1>
-        <p>Update the service metadata or change the ordered product chain to redefine its connections.</p>
+        <p>Update the service metadata here, then use the separate Connect products page for the connected products.</p>
     </div>
-    <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.Id">Visualize</a>
+    <div class="d-flex gap-2">
+        <a class="btn btn-primary" asp-action="Connections" asp-route-id="@Model.Id">Connect products</a>
+        <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.Id">Visualize</a>
+    </div>
 </section>
 
 <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
-    <partial name="_Form" model="Model" />
+    <partial name="_DetailsForm" model="Model" />
 </form>
 
 @section Scripts {

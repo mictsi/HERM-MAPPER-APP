@@ -1,0 +1,41 @@
+@model ServiceEditViewModel
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Service details</span>
+            <h2>Metadata</h2>
+            <p>The connected products are managed on the separate Connect products page.</p>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <label asp-for="Name" class="form-label"></label>
+            <input asp-for="Name" class="form-control" />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+        <div class="col-lg-3">
+            <label asp-for="Owner" class="form-label"></label>
+            <select asp-for="Owner" asp-items="Model.OwnerOptions" class="form-select"></select>
+            <span asp-validation-for="Owner" class="text-danger"></span>
+        </div>
+        <div class="col-lg-3">
+            <label asp-for="LifecycleStatus" class="form-label"></label>
+            <select asp-for="LifecycleStatus" asp-items="Model.LifecycleStatusOptions" class="form-select"></select>
+            <span asp-validation-for="LifecycleStatus" class="text-danger"></span>
+        </div>
+        <div class="col-12">
+            <label asp-for="Description" class="form-label"></label>
+            <textarea asp-for="Description" class="form-control" rows="4"></textarea>
+            <span asp-validation-for="Description" class="text-danger"></span>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary">Save service</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</section>

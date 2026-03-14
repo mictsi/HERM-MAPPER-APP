@@ -22,15 +22,9 @@ public sealed class ServiceIndexRowViewModel
     public string LifecycleStatus { get; init; } = string.Empty;
     public DateTime UpdatedUtc { get; init; }
     public IReadOnlyList<string> ProductNames { get; init; } = [];
-
-    public int ProductCount => ProductNames.Count;
-    public int ConnectionCount => Math.Max(0, ProductNames.Count - 1);
-    public string ProductPreview => ProductNames.Count switch
-    {
-        0 => "-",
-        <= 3 => string.Join(", ", ProductNames),
-        _ => $"{string.Join(", ", ProductNames.Take(3))} +{ProductNames.Count - 3} more"
-    };
+    public int ProductCount { get; init; }
+    public int ConnectionCount { get; init; }
+    public string ProductPreview { get; init; } = "-";
 }
 
 public static class ServiceSortOptions

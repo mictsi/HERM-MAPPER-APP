@@ -41,6 +41,7 @@
                                 <th>Owner</th>
                                 <th>Status</th>
                                 <th>Products</th>
+                                <th>Connections</th>
                                 <th>Deleted</th>
                                 <th>Reason</th>
                                 <th></th>
@@ -53,13 +54,14 @@
                                 <td>
                                     <strong>@service.Name</strong>
                                     <div class="table-subline">@(string.IsNullOrWhiteSpace(service.Description) ? "No description provided." : service.Description)</div>
-                                </td>
-                                <td>@service.Owner</td>
-                                <td>@service.LifecycleStatus</td>
-                                <td>@service.ProductLinks.Count</td>
-                                <td>@await TimeZoneDisplay.FormatUtcAsync(service.DeletedUtc)</td>
-                                <td>@(service.DeletedReason ?? "-")</td>
-                                <td class="text-end">
+                                 </td>
+                                 <td>@service.Owner</td>
+                                 <td>@service.LifecycleStatus</td>
+                                 <td>@service.ProductLinks.Count</td>
+                                 <td>@service.ConnectionCount</td>
+                                 <td>@await TimeZoneDisplay.FormatUtcAsync(service.DeletedUtc)</td>
+                                 <td>@(service.DeletedReason ?? "-")</td>
+                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
                                         <form asp-action="RestoreDeleted" method="post" class="d-inline">
                                             @Html.AntiForgeryToken()

@@ -19,6 +19,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ProductMapping> ProductMappings => Set<ProductMapping>();
     public DbSet<ServiceCatalogItem> ServiceCatalogItems => Set<ServiceCatalogItem>();
     public DbSet<ServiceCatalogItemProduct> ServiceCatalogItemProducts => Set<ServiceCatalogItemProduct>();
+    public DbSet<ServiceCatalogItemConnection> ServiceCatalogItemConnections => Set<ServiceCatalogItemConnection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -182,6 +183,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.ProductCatalogItem)
                 .WithMany()
                 .HasForeignKey(x => x.ProductCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ServiceCatalogItemConnection>(entity =>
+        {
+            entity.HasIndex(x => new { x.ServiceCatalogItemId, x.SortOrder }).IsUnique();
+            entity.HasIndex(x => new { x.ServiceCatalogItemId, x.FromProductCatalogItemId, x.ToProductCatalogItemId }).IsUnique();
+            entity.HasIndex(x => x.FromProductCatalogItemId);
+            entity.HasIndex(x => x.ToProductCatalogItemId);
+
+            entity.HasOne(x => x.ServiceCatalogItem)
+                .WithMany(x => x.ProductConnections)
+                .HasForeignKey(x => x.ServiceCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.FromProductCatalogItem)
+                .WithMany()
+                .HasForeignKey(x => x.FromProductCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ToProductCatalogItem)
+                .WithMany()
+                .HasForeignKey(x => x.ToProductCatalogItemId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

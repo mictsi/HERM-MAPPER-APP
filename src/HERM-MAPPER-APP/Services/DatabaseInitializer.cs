@@ -404,6 +404,24 @@ public sealed partial class DatabaseInitializer(
 
             await dbContext.Database.ExecuteSqlRawAsync(
                 """
+                CREATE TABLE IF NOT EXISTS "ServiceCatalogItemConnections" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_ServiceCatalogItemConnections" PRIMARY KEY AUTOINCREMENT,
+                    "ServiceCatalogItemId" INTEGER NOT NULL,
+                    "FromProductCatalogItemId" INTEGER NOT NULL,
+                    "ToProductCatalogItemId" INTEGER NOT NULL,
+                    "SortOrder" INTEGER NOT NULL,
+                    CONSTRAINT "FK_ServiceCatalogItemConnections_ServiceCatalogItems_ServiceCatalogItemId"
+                        FOREIGN KEY ("ServiceCatalogItemId") REFERENCES "ServiceCatalogItems" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_ServiceCatalogItemConnections_ProductCatalogItems_FromProductCatalogItemId"
+                        FOREIGN KEY ("FromProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_ServiceCatalogItemConnections_ProductCatalogItems_ToProductCatalogItemId"
+                        FOREIGN KEY ("ToProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
                 CREATE UNIQUE INDEX IF NOT EXISTS "IX_ServiceCatalogItemProducts_ServiceCatalogItemId_SortOrder"
                 ON "ServiceCatalogItemProducts" ("ServiceCatalogItemId", "SortOrder")
                 """,
@@ -413,6 +431,34 @@ public sealed partial class DatabaseInitializer(
                 """
                 CREATE INDEX IF NOT EXISTS "IX_ServiceCatalogItemProducts_ProductCatalogItemId"
                 ON "ServiceCatalogItemProducts" ("ProductCatalogItemId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_ServiceCatalogItemConnections_ServiceCatalogItemId_SortOrder"
+                ON "ServiceCatalogItemConnections" ("ServiceCatalogItemId", "SortOrder")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_ServiceCatalogItemConnections_ServiceCatalogItemId_FromProductCatalogItemId_ToProductCatalogItemId"
+                ON "ServiceCatalogItemConnections" ("ServiceCatalogItemId", "FromProductCatalogItemId", "ToProductCatalogItemId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ServiceCatalogItemConnections_FromProductCatalogItemId"
+                ON "ServiceCatalogItemConnections" ("FromProductCatalogItemId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ServiceCatalogItemConnections_ToProductCatalogItemId"
+                ON "ServiceCatalogItemConnections" ("ToProductCatalogItemId")
                 """,
                 cancellationToken);
 
@@ -475,6 +521,27 @@ public sealed partial class DatabaseInitializer(
 
             await dbContext.Database.ExecuteSqlRawAsync(
                 """
+                IF OBJECT_ID(N'[ServiceCatalogItemConnections]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [ServiceCatalogItemConnections] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ServiceCatalogItemConnections] PRIMARY KEY,
+                        [ServiceCatalogItemId] INT NOT NULL,
+                        [FromProductCatalogItemId] INT NOT NULL,
+                        [ToProductCatalogItemId] INT NOT NULL,
+                        [SortOrder] INT NOT NULL,
+                        CONSTRAINT [FK_ServiceCatalogItemConnections_ServiceCatalogItems_ServiceCatalogItemId]
+                            FOREIGN KEY ([ServiceCatalogItemId]) REFERENCES [ServiceCatalogItems] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_ServiceCatalogItemConnections_ProductCatalogItems_FromProductCatalogItemId]
+                            FOREIGN KEY ([FromProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_ServiceCatalogItemConnections_ProductCatalogItems_ToProductCatalogItemId]
+                            FOREIGN KEY ([ToProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
                 IF NOT EXISTS (
                     SELECT 1
                     FROM sys.indexes
@@ -484,6 +551,66 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     CREATE UNIQUE INDEX [IX_ServiceCatalogItemProducts_ServiceCatalogItemId_SortOrder]
                     ON [ServiceCatalogItemProducts] ([ServiceCatalogItemId], [SortOrder]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ServiceCatalogItemConnections_ServiceCatalogItemId_SortOrder'
+                      AND object_id = OBJECT_ID(N'[ServiceCatalogItemConnections]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_ServiceCatalogItemConnections_ServiceCatalogItemId_SortOrder]
+                    ON [ServiceCatalogItemConnections] ([ServiceCatalogItemId], [SortOrder]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ServiceCatalogItemConnections_ServiceCatalogItemId_FromProductCatalogItemId_ToProductCatalogItemId'
+                      AND object_id = OBJECT_ID(N'[ServiceCatalogItemConnections]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_ServiceCatalogItemConnections_ServiceCatalogItemId_FromProductCatalogItemId_ToProductCatalogItemId]
+                    ON [ServiceCatalogItemConnections] ([ServiceCatalogItemId], [FromProductCatalogItemId], [ToProductCatalogItemId]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ServiceCatalogItemConnections_FromProductCatalogItemId'
+                      AND object_id = OBJECT_ID(N'[ServiceCatalogItemConnections]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ServiceCatalogItemConnections_FromProductCatalogItemId]
+                    ON [ServiceCatalogItemConnections] ([FromProductCatalogItemId]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ServiceCatalogItemConnections_ToProductCatalogItemId'
+                      AND object_id = OBJECT_ID(N'[ServiceCatalogItemConnections]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ServiceCatalogItemConnections_ToProductCatalogItemId]
+                    ON [ServiceCatalogItemConnections] ([ToProductCatalogItemId]);
                 END
                 """,
                 cancellationToken);

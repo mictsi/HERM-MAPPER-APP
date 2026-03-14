@@ -1,3 +1,4 @@
+@using System.Text.Json
 @using HERMMapperApp
 @using HERMMapperApp.Models
 @using HERMMapperApp.Services
@@ -6,6 +7,19 @@
 @{
     ViewData["Title"] = "Visualize Service Connections";
     var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var graphData = JsonSerializer.Serialize(
+        Model.Connections.Select(connection => new
+        {
+            connection.Sequence,
+            connection.FromProductId,
+            connection.ToProductId,
+            connection.FromProductName,
+            connection.ToProductName
+        }),
+        new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
 }
 
 <section class="page-header">
@@ -18,37 +32,98 @@
         <a class="btn btn-outline-secondary" asp-action="Index">Back to services</a>
         @if (canManageProductsAndServices)
         {
-        <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Service.Id">Edit connections</a>
+        <a class="btn btn-primary" asp-action="Connections" asp-route-id="@Model.Service.Id">Connect products</a>
         }
     </div>
 </section>
 
-<section class="content-card">
-    <div class="section-heading">
-        <div>
-            <span class="eyebrow">Service sequence</span>
-            <h2>Visualization</h2>
+<div data-service-graph-host>
+    <section class="content-card">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Service sequence</span>
+                <h2>Visualization</h2>
+            </div>
         </div>
-    </div>
 
-    @if (Model.ProductNames.Count < 2)
-    {
-        <div class="empty-state compact">
-            <h3>No complete flow yet</h3>
-            <p>Add at least two products to visualize the service connections.</p>
-        </div>
-    }
-    else
-    {
-        <div class="service-chain" aria-label="Service product flow">
-            @for (var index = 0; index < Model.ProductNames.Count; index++)
+        @if (Model.Connections.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No complete flow yet</h3>
+                <p>Add at least one connected product pair to visualize the service flow.</p>
+            </div>
+        }
+        else if (Model.UsesGraphConnections)
+        {
+            @if (!Model.SupportsGraphLayout)
             {
-                <div class="service-chain-node">@Model.ProductNames[index]</div>
-                @if (index < Model.ProductNames.Count - 1)
-                {
-                    <div class="service-chain-arrow" aria-hidden="true">&rarr;</div>
-                }
+                <div class="alert alert-info">
+                    This service contains a loop, so the preview is shown as connection pairs instead of a top-to-bottom graph.
+                </div>
             }
-        </div>
+
+            <div class="service-graph-preview"
+                 data-service-graph-preview
+                 data-empty-title="No connected products yet"
+                 data-empty-body="Add at least one connection to preview the service flow."
+                 data-loop-title="Loop detected"
+                 data-loop-body="This flow includes a loop, so the preview is shown as connection pairs instead of a top-to-bottom graph.">
+                <script type="application/json" data-service-graph-data>@Html.Raw(graphData)</script>
+            </div>
+
+            <div class="table-responsive mt-4">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>From</th>
+                            <th>To</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var connection in Model.Connections)
+                    {
+                        <tr>
+                            <td>@connection.Sequence</td>
+                            <td>@connection.FromProductName</td>
+                            <td>@connection.ToProductName</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="service-chain" aria-label="Service product flow">
+                @for (var index = 0; index < Model.ProductNames.Count; index++)
+                {
+                    <div class="service-chain-node">@Model.ProductNames[index]</div>
+                    @if (index < Model.ProductNames.Count - 1)
+                    {
+                        <div class="service-chain-arrow" aria-hidden="true">&rarr;</div>
+                    }
+                }
+            </div>
+        }
+    </section>
+
+    @if (Model.Connections.Count != 0 && Model.UsesGraphConnections)
+    {
+        <section class="content-card">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Routes</span>
+                    <h2>Distinct routes</h2>
+                    <p>Each complete route is listed separately from the diagram so branches are easier to compare.</p>
+                </div>
+            </div>
+
+            <div data-service-graph-routes
+                 data-empty-title="No routes yet"
+                 data-empty-body="Add connected products to build distinct routes."
+                 data-unavailable-title="Routes unavailable"
+                 data-unavailable-body="Distinct routes are only shown when the flow can be rendered without loops."></div>
+        </section>
     }
-</section>
+</div>

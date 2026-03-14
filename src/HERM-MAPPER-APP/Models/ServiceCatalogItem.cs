@@ -31,12 +31,20 @@ public sealed class ServiceCatalogItem
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     public ICollection<ServiceCatalogItemProduct> ProductLinks { get; set; } = new List<ServiceCatalogItemProduct>();
+    public ICollection<ServiceCatalogItemConnection> ProductConnections { get; set; } = new List<ServiceCatalogItemConnection>();
 
     public List<ServiceCatalogItemProduct> GetOrderedProductLinks() => ProductLinks
         .OrderBy(x => x.SortOrder)
         .ThenBy(x => x.Id)
         .ToList();
 
+    public List<ServiceCatalogItemConnection> GetOrderedProductConnections() => ProductConnections
+        .OrderBy(x => x.SortOrder)
+        .ThenBy(x => x.Id)
+        .ToList();
+
     [NotMapped]
-    public int ConnectionCount => Math.Max(0, ProductLinks.Count - 1);
+    public int ConnectionCount => ProductConnections.Count != 0
+        ? ProductConnections.Count
+        : Math.Max(0, ProductLinks.Count - 1);
 }

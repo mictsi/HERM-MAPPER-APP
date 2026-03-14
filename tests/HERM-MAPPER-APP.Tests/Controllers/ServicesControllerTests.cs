@@ -19,8 +19,6 @@ public sealed class ServicesControllerTests
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
-
-        var products = await fixture.SeedProductsAsync("Sentinel", "Purview");
         using var controller = fixture.CreateController();
 
         var result = await controller.Create(new ServiceEditViewModel
@@ -28,84 +26,79 @@ public sealed class ServicesControllerTests
             Name = "Security Operations",
             Description = "SOC tooling",
             Owner = " Team Blue ",
-            LifecycleStatus = " Production ",
-            ProductRows =
-            [
-                new ServiceProductRowViewModel { ProductId = products[0].Id },
-                new ServiceProductRowViewModel { ProductId = products[1].Id }
-            ]
+            LifecycleStatus = " Production "
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
 
-        var service = await fixture.DbContext.ServiceCatalogItems
-            .Include(x => x.ProductLinks)
-            .ThenInclude(x => x.ProductCatalogItem)
-            .SingleAsync();
+        var service = await fixture.DbContext.ServiceCatalogItems.SingleAsync();
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
 
         Assert.Equal("Security Operations", service.Name);
         Assert.Equal("Team Blue", service.Owner);
         Assert.Equal("Production", service.LifecycleStatus);
-        Assert.Equal(["Sentinel", "Purview"], service.GetOrderedProductLinks().Select(x => x.ProductCatalogItem.Name).ToArray());
+        Assert.Equal(service.Id, redirect.RouteValues!["id"]);
         Assert.Equal("Create", audit.Action);
     }
 
     [Fact]
-    public async Task CreatePostAllowsRepeatedProductsInServiceFlow()
+    public async Task ConnectionsPostPersistsBranchingGraphAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
 
-        var products = await fixture.SeedProductsAsync("Portal", "Gateway", "Queue");
-        using var controller = fixture.CreateController();
-
-        var result = await controller.Create(new ServiceEditViewModel
+        var products = await fixture.SeedProductsAsync("Entry", "API", "Broker", "Portal");
+        fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
         {
             Name = "Loopback Flow",
             Owner = "Team Blue",
-            LifecycleStatus = "Production",
-            ProductRows =
+            LifecycleStatus = "Production"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
+        using var controller = fixture.CreateController();
+
+        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        {
+            ConnectionRows =
             [
-                new ServiceProductRowViewModel { ProductId = products[0].Id },
-                new ServiceProductRowViewModel { ProductId = products[1].Id },
-                new ServiceProductRowViewModel { ProductId = products[0].Id },
-                new ServiceProductRowViewModel { ProductId = products[2].Id }
+                new ServiceConnectionRowInputViewModel { FromProductId = products[0].Id, ToProductId = products[1].Id },
+                new ServiceConnectionRowInputViewModel { FromProductId = products[0].Id, ToProductId = products[2].Id },
+                new ServiceConnectionRowInputViewModel { FromProductId = products[2].Id, ToProductId = products[3].Id }
             ]
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
 
         var service = await fixture.DbContext.ServiceCatalogItems
             .Include(x => x.ProductLinks)
             .ThenInclude(x => x.ProductCatalogItem)
+            .Include(x => x.ProductConnections)
             .SingleAsync();
+        var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
 
         Assert.Equal(
-            ["Portal", "Gateway", "Portal", "Queue"],
+            ["Entry", "API", "Broker", "Portal"],
             service.GetOrderedProductLinks().Select(x => x.ProductCatalogItem.Name).ToArray());
+        Assert.Equal(3, service.ProductConnections.Count);
+        Assert.Equal("UpdateConnections", audit.Action);
     }
 
     [Fact]
-    public async Task EditPostRebuildsOrderedProductLinksAndWritesAudit()
+    public async Task EditPostUpdatesServiceMetadataAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
 
-        var products = await fixture.SeedProductsAsync("Atlas", "Broker", "Core");
         var service = new ServiceCatalogItem
         {
             Name = "Payments",
             Description = "Existing flow",
             Owner = "Team Blue",
-            LifecycleStatus = "Trial",
-            ProductLinks =
-            [
-                new ServiceCatalogItemProduct { ProductCatalogItemId = products[0].Id, SortOrder = 1 },
-                new ServiceCatalogItemProduct { ProductCatalogItemId = products[1].Id, SortOrder = 2 }
-            ]
+            LifecycleStatus = "Trial"
         };
 
         fixture.DbContext.ServiceCatalogItems.Add(service);
@@ -117,29 +110,60 @@ public sealed class ServicesControllerTests
             Name = "Payments Revised",
             Description = "Updated flow",
             Owner = " Team Green ",
-            LifecycleStatus = " Production ",
-            ProductRows =
-            [
-                new ServiceProductRowViewModel { ProductId = products[2].Id },
-                new ServiceProductRowViewModel { ProductId = products[0].Id },
-                new ServiceProductRowViewModel { ProductId = products[1].Id }
-            ]
+            LifecycleStatus = " Production "
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
 
-        var updatedService = await fixture.DbContext.ServiceCatalogItems
-            .Include(x => x.ProductLinks)
-            .ThenInclude(x => x.ProductCatalogItem)
-            .SingleAsync(x => x.Id == service.Id);
+        var updatedService = await fixture.DbContext.ServiceCatalogItems.SingleAsync(x => x.Id == service.Id);
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
 
         Assert.Equal("Payments Revised", updatedService.Name);
         Assert.Equal("Team Green", updatedService.Owner);
         Assert.Equal("Production", updatedService.LifecycleStatus);
-        Assert.Equal(["Core", "Atlas", "Broker"], updatedService.GetOrderedProductLinks().Select(x => x.ProductCatalogItem.Name).ToArray());
         Assert.Equal("Update", audit.Action);
+    }
+
+    [Fact]
+    public async Task ConnectionsGetBuildsRowsFromLegacyLinearFlow()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var products = await fixture.SeedProductsAsync("Portal", "API", "Queue");
+        fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
+        {
+            Name = "Customer Journey",
+            Owner = "Team Blue",
+            LifecycleStatus = "Production",
+            ProductLinks =
+            [
+                new ServiceCatalogItemProduct { ProductCatalogItemId = products[0].Id, SortOrder = 1 },
+                new ServiceCatalogItemProduct { ProductCatalogItemId = products[1].Id, SortOrder = 2 },
+                new ServiceCatalogItemProduct { ProductCatalogItemId = products[2].Id, SortOrder = 3 }
+            ]
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
+        var result = await fixture.CreateController().Connections(serviceId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ServiceConnectionEditorViewModel>(view.Model);
+
+        Assert.True(model.UsesLegacyFlow);
+        Assert.Collection(
+            model.ConnectionRows,
+            row =>
+            {
+                Assert.Equal(products[0].Id, row.FromProductId);
+                Assert.Equal(products[1].Id, row.ToProductId);
+            },
+            row =>
+            {
+                Assert.Equal(products[1].Id, row.FromProductId);
+                Assert.Equal(products[2].Id, row.ToProductId);
+            });
     }
 
     [Fact]
@@ -218,21 +242,28 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task VisualizeReturnsConnectionsInSavedOrder()
+    public async Task VisualizeReturnsGraphConnectionsInSavedOrder()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
-        var products = await fixture.SeedProductsAsync("Portal", "API", "Queue");
+        var products = await fixture.SeedProductsAsync("Portal", "API", "Queue", "Dashboard");
         var service = new ServiceCatalogItem
         {
             Name = "Customer Journey",
             Owner = "Team Blue",
             LifecycleStatus = "Production",
+            ProductConnections =
+            [
+                new ServiceCatalogItemConnection { FromProductCatalogItemId = products[0].Id, ToProductCatalogItemId = products[1].Id, SortOrder = 1 },
+                new ServiceCatalogItemConnection { FromProductCatalogItemId = products[0].Id, ToProductCatalogItemId = products[2].Id, SortOrder = 2 },
+                new ServiceCatalogItemConnection { FromProductCatalogItemId = products[2].Id, ToProductCatalogItemId = products[3].Id, SortOrder = 3 }
+            ],
             ProductLinks =
             [
                 new ServiceCatalogItemProduct { ProductCatalogItemId = products[0].Id, SortOrder = 1 },
                 new ServiceCatalogItemProduct { ProductCatalogItemId = products[1].Id, SortOrder = 2 },
-                new ServiceCatalogItemProduct { ProductCatalogItemId = products[2].Id, SortOrder = 3 }
+                new ServiceCatalogItemProduct { ProductCatalogItemId = products[2].Id, SortOrder = 3 },
+                new ServiceCatalogItemProduct { ProductCatalogItemId = products[3].Id, SortOrder = 4 }
             ]
         };
 
@@ -244,12 +275,15 @@ public sealed class ServicesControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceVisualizationViewModel>(view.Model);
 
-        Assert.Equal(["Portal", "API", "Queue"], model.ProductNames.ToArray());
-        Assert.Equal(2, model.Connections.Count);
+        Assert.True(model.UsesGraphConnections);
+        Assert.Equal(["Portal", "API", "Queue", "Dashboard"], model.ProductNames.ToArray());
+        Assert.Equal(3, model.Connections.Count);
         Assert.Equal("Portal", model.Connections[0].FromProductName);
         Assert.Equal("API", model.Connections[0].ToProductName);
-        Assert.Equal("API", model.Connections[1].FromProductName);
+        Assert.Equal("Portal", model.Connections[1].FromProductName);
         Assert.Equal("Queue", model.Connections[1].ToProductName);
+        Assert.Equal("Queue", model.Connections[2].FromProductName);
+        Assert.Equal("Dashboard", model.Connections[2].ToProductName);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 bin/
 obj/
 .dotnet/
+.dotnet-cli/
 TestResults/
 .artifacts/

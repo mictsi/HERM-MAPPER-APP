@@ -31,8 +31,12 @@ public sealed class ServicesController(
         var query = dbContext.ServiceCatalogItems
             .AsNoTracking()
             .Where(x => !x.IsDeleted)
-            .Include(x => x.ProductLinks)
+            .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
             .ThenInclude(x => x.ProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.FromProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.ToProductCatalogItem)
             .AsSplitQuery()
             .AsQueryable();
 
@@ -44,7 +48,10 @@ public sealed class ServicesController(
                 (x.Description != null && EF.Functions.Like(x.Description, likePattern)) ||
                 EF.Functions.Like(x.Owner, likePattern) ||
                 EF.Functions.Like(x.LifecycleStatus, likePattern) ||
-                x.ProductLinks.Any(link => EF.Functions.Like(link.ProductCatalogItem.Name, likePattern)));
+                x.ProductLinks.Any(link => EF.Functions.Like(link.ProductCatalogItem.Name, likePattern)) ||
+                x.ProductConnections.Any(connection =>
+                    EF.Functions.Like(connection.FromProductCatalogItem.Name, likePattern) ||
+                    EF.Functions.Like(connection.ToProductCatalogItem.Name, likePattern)));
         }
 
         if (owner is not null)
@@ -57,9 +64,7 @@ public sealed class ServicesController(
             query = query.Where(x => EF.Functions.Collate(x.LifecycleStatus, caseInsensitiveCollation) == lifecycleStatus);
         }
 
-        query = ApplySort(query, sort);
-
-        var services = await query.ToListAsync();
+        var services = ApplySort(await query.ToListAsync(), sort).ToList();
 
         return View(new ServicesIndexViewModel
         {
@@ -77,8 +82,7 @@ public sealed class ServicesController(
     public async Task<IActionResult> Create()
     {
         var model = new ServiceEditViewModel();
-        EnsureEditableRows(model);
-        await PopulateFormOptionsAsync(model);
+        await PopulateServiceOptionsAsync(model);
         return View(model);
     }
 
@@ -87,13 +91,11 @@ public sealed class ServicesController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(ServiceEditViewModel input)
     {
-        NormalizeFormInput(input);
-        await ValidateSelectedProductsAsync(input, Array.Empty<int>());
+        NormalizeServiceInput(input);
 
         if (!ModelState.IsValid)
         {
-            EnsureEditableRows(input);
-            await PopulateFormOptionsAsync(input);
+            await PopulateServiceOptionsAsync(input);
             return View(input);
         }
 
@@ -107,8 +109,6 @@ public sealed class ServicesController(
             UpdatedUtc = DateTime.UtcNow
         };
 
-        SynchronizeProductLinks(service, input.ProductRows);
-
         dbContext.ServiceCatalogItems.Add(service);
         await dbContext.SaveChangesAsync();
         await auditLogService.WriteAsync(
@@ -117,10 +117,10 @@ public sealed class ServicesController(
             nameof(ServiceCatalogItem),
             service.Id,
             $"Created service {service.Name}.",
-            $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. Connections: {service.ConnectionCount}.");
+            $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. Connections: 0.");
 
-        TempData["ServicesStatusMessage"] = $"Created service {service.Name}.";
-        return RedirectToAction(nameof(Index));
+        TempData["ServicesStatusMessage"] = $"Created service {service.Name}. Design the connected products below.";
+        return RedirectToAction(nameof(Connections), new { id = service.Id });
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
@@ -133,8 +133,7 @@ public sealed class ServicesController(
         }
 
         var model = ServiceEditViewModel.FromService(service);
-        EnsureEditableRows(model);
-        await PopulateFormOptionsAsync(model);
+        await PopulateServiceOptionsAsync(model);
         return View(model);
     }
 
@@ -150,17 +149,11 @@ public sealed class ServicesController(
         }
 
         input.Id = id;
-        NormalizeFormInput(input);
-        var allowedDeletedProductIds = service.ProductLinks
-            .Select(x => x.ProductCatalogItemId)
-            .Distinct()
-            .ToList();
-        await ValidateSelectedProductsAsync(input, allowedDeletedProductIds);
+        NormalizeServiceInput(input);
 
         if (!ModelState.IsValid)
         {
-            EnsureEditableRows(input);
-            await PopulateFormOptionsAsync(input);
+            await PopulateServiceOptionsAsync(input);
             return View(input);
         }
 
@@ -169,8 +162,6 @@ public sealed class ServicesController(
         service.Owner = input.Owner!;
         service.LifecycleStatus = input.LifecycleStatus!;
         service.UpdatedUtc = DateTime.UtcNow;
-
-        SynchronizeProductLinks(service, input.ProductRows);
 
         await dbContext.SaveChangesAsync();
         await auditLogService.WriteAsync(
@@ -182,7 +173,62 @@ public sealed class ServicesController(
             $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. Connections: {service.ConnectionCount}.");
 
         TempData["ServicesStatusMessage"] = $"Updated service {service.Name}.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Connections), new { id = service.Id });
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    public async Task<IActionResult> Connections(int id)
+    {
+        var service = await LoadServiceAsync(id, asNoTracking: true);
+        if (service is null)
+        {
+            return NotFound();
+        }
+
+        var model = await BuildConnectionEditorModelAsync(service);
+        model.StatusMessage = TempData["ServicesStatusMessage"] as string;
+        return View(model);
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Connections(int id, ServiceConnectionEditorViewModel input)
+    {
+        var service = await LoadServiceAsync(id, asNoTracking: false);
+        if (service is null)
+        {
+            return NotFound();
+        }
+
+        input.ServiceId = id;
+        HydrateConnectionEditorSummary(input, service);
+        NormalizeConnectionInput(input);
+        var allowedDeletedProductIds = GetAllowedDeletedProductIds(service);
+        await ValidateConnectionRowsAsync(input, allowedDeletedProductIds);
+
+        if (!ModelState.IsValid)
+        {
+            EnsureConnectionRows(input);
+            await PopulateConnectionEditorOptionsAsync(input, allowedDeletedProductIds);
+            return View(input);
+        }
+
+        SynchronizeProductConnections(service, input.ConnectionRows);
+        SynchronizeLegacyProductLinksFromConnections(service, input.ConnectionRows);
+        service.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Service",
+            "UpdateConnections",
+            nameof(ServiceCatalogItem),
+            service.Id,
+            $"Updated connection designer for service {service.Name}.",
+            $"Connections: {service.ConnectionCount}. Products: {service.ProductLinks.Count}.");
+
+        TempData["ServicesStatusMessage"] = $"Saved connected products for {service.Name}.";
+        return RedirectToAction(nameof(Connections), new { id = service.Id });
     }
 
     public async Task<IActionResult> Visualize(int id)
@@ -193,15 +239,19 @@ public sealed class ServicesController(
             return NotFound();
         }
 
-        var orderedProductNames = service.GetOrderedProductLinks()
-            .Select(x => x.ProductCatalogItem.Name)
-            .ToList();
+        var usesGraphConnections = service.ProductConnections.Count != 0;
+        var productNames = GetOrderedProductLabels(service);
+        var connections = usesGraphConnections
+            ? BuildGraphConnections(service)
+            : BuildLegacyConnections(service);
 
         return View(new ServiceVisualizationViewModel
         {
             Service = service,
-            ProductNames = orderedProductNames,
-            Connections = BuildConnections(service.Name, orderedProductNames)
+            ProductNames = productNames,
+            Connections = connections,
+            UsesGraphConnections = usesGraphConnections,
+            SupportsGraphLayout = usesGraphConnections && CanRenderAsGraph(connections)
         });
     }
 
@@ -246,8 +296,12 @@ public sealed class ServicesController(
     {
         var services = await dbContext.ServiceCatalogItems
             .AsNoTracking()
-            .Include(x => x.ProductLinks)
+            .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
             .ThenInclude(x => x.ProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.FromProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.ToProductCatalogItem)
             .Where(x => x.IsDeleted)
             .OrderByDescending(x => x.DeletedUtc)
             .ThenBy(x => x.Name)
@@ -312,7 +366,7 @@ public sealed class ServicesController(
         return RedirectToAction(nameof(Restore));
     }
 
-    private async Task PopulateFormOptionsAsync(ServiceEditViewModel model)
+    private async Task PopulateServiceOptionsAsync(ServiceEditViewModel model)
     {
         model.OwnerOptions = await configurableFieldService.GetSelectListAsync(
             ConfigurableFieldNames.Owner,
@@ -322,14 +376,37 @@ public sealed class ServicesController(
             ConfigurableFieldNames.LifecycleStatus,
             model.LifecycleStatus,
             "Choose status");
-        model.ProductOptions = await BuildProductOptionsAsync(model.ProductRows.Select(x => x.ProductId));
     }
 
-    private async Task<List<SelectListItem>> BuildProductOptionsAsync(IEnumerable<int?> selectedProductIds)
+    private async Task<ServiceConnectionEditorViewModel> BuildConnectionEditorModelAsync(ServiceCatalogItem service)
+    {
+        var model = new ServiceConnectionEditorViewModel
+        {
+            ServiceId = service.Id,
+            ServiceName = service.Name,
+            ServiceDescription = service.Description,
+            ServiceOwner = service.Owner,
+            ServiceLifecycleStatus = service.LifecycleStatus,
+            UsesLegacyFlow = service.ProductConnections.Count == 0 && service.ProductLinks.Count > 1,
+            ConnectionRows = BuildConnectionRowsForEditor(service)
+        };
+
+        EnsureConnectionRows(model);
+        await PopulateConnectionEditorOptionsAsync(model, GetAllowedDeletedProductIds(service));
+        return model;
+    }
+
+    private async Task PopulateConnectionEditorOptionsAsync(
+        ServiceConnectionEditorViewModel model,
+        IReadOnlyCollection<int> allowedDeletedProductIds)
+    {
+        model.ProductOptions = await BuildProductOptionsAsync(allowedDeletedProductIds);
+    }
+
+    private async Task<List<SelectListItem>> BuildProductOptionsAsync(IEnumerable<int> selectedProductIds)
     {
         var selectedIds = selectedProductIds
-            .Where(x => x is > 0)
-            .Select(x => x!.Value)
+            .Where(x => x > 0)
             .ToHashSet();
 
         var products = await dbContext.ProductCatalogItems
@@ -370,6 +447,10 @@ public sealed class ServicesController(
         IQueryable<ServiceCatalogItem> query = dbContext.ServiceCatalogItems
             .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
             .ThenInclude(x => x.ProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.FromProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.ToProductCatalogItem)
             .Where(x => !x.IsDeleted)
             .AsSplitQuery();
 
@@ -383,9 +464,7 @@ public sealed class ServicesController(
 
     private static ServiceIndexRowViewModel BuildIndexRow(ServiceCatalogItem service)
     {
-        var productNames = service.GetOrderedProductLinks()
-            .Select(x => x.ProductCatalogItem.Name)
-            .ToList();
+        var productNames = GetOrderedProductLabels(service);
 
         return new ServiceIndexRowViewModel
         {
@@ -395,15 +474,46 @@ public sealed class ServicesController(
             Owner = service.Owner,
             LifecycleStatus = service.LifecycleStatus,
             UpdatedUtc = service.UpdatedUtc,
-            ProductNames = productNames
+            ProductNames = productNames,
+            ProductCount = productNames.Count,
+            ConnectionCount = service.ConnectionCount,
+            ProductPreview = BuildProductPreview(productNames)
         };
     }
 
-    private async Task ValidateSelectedProductsAsync(ServiceEditViewModel input, IReadOnlyCollection<int> allowedDeletedProductIds)
+    private async Task ValidateConnectionRowsAsync(
+        ServiceConnectionEditorViewModel input,
+        IReadOnlyCollection<int> allowedDeletedProductIds)
     {
-        var selectedProductIds = input.ProductRows
-            .Where(x => x.ProductId is > 0)
-            .Select(x => x.ProductId!.Value)
+        var rowsWithSelections = input.ConnectionRows
+            .Where(row => row.FromProductId is > 0 || row.ToProductId is > 0)
+            .ToList();
+
+        if (rowsWithSelections.Any(row => row.FromProductId is not > 0 || row.ToProductId is not > 0))
+        {
+            ModelState.AddModelError(nameof(input.ConnectionRows), "Choose both products for every connection row.");
+        }
+
+        var completedRows = rowsWithSelections
+            .Where(row => row.FromProductId is > 0 && row.ToProductId is > 0)
+            .ToList();
+
+        if (completedRows.Any(row => row.FromProductId == row.ToProductId))
+        {
+            ModelState.AddModelError(nameof(input.ConnectionRows), "A connection cannot point back to the same product in the same row.");
+        }
+
+        var duplicateEdges = completedRows
+            .GroupBy(row => new { row.FromProductId, row.ToProductId })
+            .Where(group => group.Count() > 1)
+            .ToList();
+        if (duplicateEdges.Count != 0)
+        {
+            ModelState.AddModelError(nameof(input.ConnectionRows), "Each product-to-product connection should only be listed once.");
+        }
+
+        var selectedProductIds = completedRows
+            .SelectMany(row => new[] { row.FromProductId!.Value, row.ToProductId!.Value })
             .Distinct()
             .ToList();
 
@@ -420,90 +530,326 @@ public sealed class ServicesController(
 
         if (existingProductIds.Count != selectedProductIds.Count)
         {
-            ModelState.AddModelError(nameof(input.ProductRows), "One or more selected products could not be found.");
+            ModelState.AddModelError(nameof(input.ConnectionRows), "One or more selected products could not be found.");
         }
     }
 
-    private void SynchronizeProductLinks(ServiceCatalogItem service, List<ServiceProductRowViewModel> rows)
+    private void SynchronizeProductConnections(ServiceCatalogItem service, List<ServiceConnectionRowInputViewModel> rows)
     {
+        var completedRows = rows
+            .Where(row => row.FromProductId is > 0 && row.ToProductId is > 0)
+            .ToList();
+
+        var existingConnections = service.ProductConnections
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.Id)
+            .ToList();
+
+        for (var index = 0; index < completedRows.Count; index++)
+        {
+            var row = completedRows[index];
+
+            if (index < existingConnections.Count)
+            {
+                existingConnections[index].FromProductCatalogItemId = row.FromProductId!.Value;
+                existingConnections[index].ToProductCatalogItemId = row.ToProductId!.Value;
+                existingConnections[index].SortOrder = index + 1;
+            }
+            else
+            {
+                service.ProductConnections.Add(new ServiceCatalogItemConnection
+                {
+                    FromProductCatalogItemId = row.FromProductId!.Value,
+                    ToProductCatalogItemId = row.ToProductId!.Value,
+                    SortOrder = index + 1
+                });
+            }
+        }
+
+        foreach (var existingConnection in existingConnections.Skip(completedRows.Count))
+        {
+            service.ProductConnections.Remove(existingConnection);
+            dbContext.ServiceCatalogItemConnections.Remove(existingConnection);
+        }
+    }
+
+    private void SynchronizeLegacyProductLinksFromConnections(
+        ServiceCatalogItem service,
+        IEnumerable<ServiceConnectionRowInputViewModel> rows)
+    {
+        var orderedProductIds = BuildOrderedGraphProductIds(
+            rows
+                .Where(row => row.FromProductId is > 0 && row.ToProductId is > 0)
+                .Select(row => new ConnectionPair(row.FromProductId!.Value, row.ToProductId!.Value))
+                .ToList(),
+            out _);
+
         var existingLinks = service.ProductLinks
             .OrderBy(x => x.SortOrder)
             .ThenBy(x => x.Id)
             .ToList();
 
-        for (var index = 0; index < rows.Count; index++)
+        for (var index = 0; index < orderedProductIds.Count; index++)
         {
-            var productId = rows[index].ProductId;
-            if (productId is not > 0)
-            {
-                continue;
-            }
-
             if (index < existingLinks.Count)
             {
-                existingLinks[index].ProductCatalogItemId = productId.Value;
+                existingLinks[index].ProductCatalogItemId = orderedProductIds[index];
                 existingLinks[index].SortOrder = index + 1;
             }
             else
             {
                 service.ProductLinks.Add(new ServiceCatalogItemProduct
                 {
-                    ProductCatalogItemId = productId.Value,
+                    ProductCatalogItemId = orderedProductIds[index],
                     SortOrder = index + 1
                 });
             }
         }
 
-        foreach (var existingLink in existingLinks.Skip(rows.Count))
+        foreach (var existingLink in existingLinks.Skip(orderedProductIds.Count))
         {
             service.ProductLinks.Remove(existingLink);
             dbContext.ServiceCatalogItemProducts.Remove(existingLink);
         }
     }
 
-    private static List<ServiceConnectionViewModel> BuildConnections(string serviceName, List<string> productNames)
+    private static List<ServiceConnectionRowInputViewModel> BuildConnectionRowsForEditor(ServiceCatalogItem service)
     {
+        if (service.ProductConnections.Count != 0)
+        {
+            return service.GetOrderedProductConnections()
+                .Select(connection => new ServiceConnectionRowInputViewModel
+                {
+                    FromProductId = connection.FromProductCatalogItemId,
+                    ToProductId = connection.ToProductCatalogItemId
+                })
+                .ToList();
+        }
+
+        var links = service.GetOrderedProductLinks();
+        var rows = new List<ServiceConnectionRowInputViewModel>();
+
+        for (var index = 0; index < links.Count - 1; index++)
+        {
+            rows.Add(new ServiceConnectionRowInputViewModel
+            {
+                FromProductId = links[index].ProductCatalogItemId,
+                ToProductId = links[index + 1].ProductCatalogItemId
+            });
+        }
+
+        return rows;
+    }
+
+    private static List<ServiceConnectionViewModel> BuildGraphConnections(ServiceCatalogItem service) => service
+        .GetOrderedProductConnections()
+        .Select((connection, index) => new ServiceConnectionViewModel
+        {
+            Sequence = index + 1,
+            FromProductId = connection.FromProductCatalogItemId,
+            ToProductId = connection.ToProductCatalogItemId,
+            FromProductName = BuildProductLabel(connection.FromProductCatalogItem),
+            ToProductName = BuildProductLabel(connection.ToProductCatalogItem),
+            ServiceName = service.Name
+        })
+        .ToList();
+
+    private static List<ServiceConnectionViewModel> BuildLegacyConnections(ServiceCatalogItem service)
+    {
+        var orderedLinks = service.GetOrderedProductLinks();
         var connections = new List<ServiceConnectionViewModel>();
 
-        for (var index = 0; index < productNames.Count - 1; index++)
+        for (var index = 0; index < orderedLinks.Count - 1; index++)
         {
             connections.Add(new ServiceConnectionViewModel
             {
                 Sequence = index + 1,
-                FromProductName = productNames[index],
-                ToProductName = productNames[index + 1],
-                ServiceName = serviceName
+                FromProductId = orderedLinks[index].ProductCatalogItemId,
+                ToProductId = orderedLinks[index + 1].ProductCatalogItemId,
+                FromProductName = BuildProductLabel(orderedLinks[index].ProductCatalogItem),
+                ToProductName = BuildProductLabel(orderedLinks[index + 1].ProductCatalogItem),
+                ServiceName = service.Name
             });
         }
 
         return connections;
     }
 
+    private static List<string> GetOrderedProductLabels(ServiceCatalogItem service)
+    {
+        if (service.ProductConnections.Count == 0)
+        {
+            return service.GetOrderedProductLinks()
+                .Select(link => BuildProductLabel(link.ProductCatalogItem))
+                .ToList();
+        }
+
+        var orderedConnections = service.GetOrderedProductConnections();
+        var orderedProductIds = BuildOrderedGraphProductIds(
+            orderedConnections
+                .Select(connection => new ConnectionPair(connection.FromProductCatalogItemId, connection.ToProductCatalogItemId))
+                .ToList(),
+            out _);
+
+        var labelsById = new Dictionary<int, string>();
+        foreach (var connection in orderedConnections)
+        {
+            labelsById.TryAdd(connection.FromProductCatalogItemId, BuildProductLabel(connection.FromProductCatalogItem));
+            labelsById.TryAdd(connection.ToProductCatalogItemId, BuildProductLabel(connection.ToProductCatalogItem));
+        }
+
+        return orderedProductIds
+            .Where(labelsById.ContainsKey)
+            .Select(id => labelsById[id])
+            .ToList();
+    }
+
+    private static string BuildProductPreview(IReadOnlyList<string> productNames) => productNames.Count switch
+    {
+        0 => "-",
+        <= 3 => string.Join(", ", productNames),
+        _ => $"{string.Join(", ", productNames.Take(3))} +{productNames.Count - 3} more"
+    };
+
+    private static IReadOnlyCollection<int> GetAllowedDeletedProductIds(ServiceCatalogItem service) => service.ProductLinks
+        .Select(link => link.ProductCatalogItemId)
+        .Concat(service.ProductConnections.SelectMany(connection => new[]
+        {
+            connection.FromProductCatalogItemId,
+            connection.ToProductCatalogItemId
+        }))
+        .Distinct()
+        .ToList();
+
+    private static bool CanRenderAsGraph(IReadOnlyList<ServiceConnectionViewModel> connections)
+    {
+        if (connections.Count == 0)
+        {
+            return false;
+        }
+
+        return BuildOrderedGraphProductIds(
+                connections.Select(connection => new ConnectionPair(connection.FromProductId, connection.ToProductId)).ToList(),
+                out var supportsGraphLayout)
+            .Count != 0 && supportsGraphLayout;
+    }
+
+    private static List<int> BuildOrderedGraphProductIds(
+        IReadOnlyList<ConnectionPair> connections,
+        out bool supportsGraphLayout)
+    {
+        supportsGraphLayout = false;
+        if (connections.Count == 0)
+        {
+            return [];
+        }
+
+        var firstAppearance = new Dictionary<int, int>();
+        var adjacency = new Dictionary<int, HashSet<int>>();
+        var indegree = new Dictionary<int, int>();
+        var appearanceIndex = 0;
+
+        static void EnsureNode(
+            int productId,
+            Dictionary<int, int> firstAppearance,
+            Dictionary<int, HashSet<int>> adjacency,
+            Dictionary<int, int> indegree,
+            ref int appearanceIndex)
+        {
+            if (!firstAppearance.ContainsKey(productId))
+            {
+                firstAppearance[productId] = appearanceIndex++;
+            }
+
+            adjacency.TryAdd(productId, []);
+            indegree.TryAdd(productId, 0);
+        }
+
+        foreach (var connection in connections)
+        {
+            EnsureNode(connection.FromProductId, firstAppearance, adjacency, indegree, ref appearanceIndex);
+            EnsureNode(connection.ToProductId, firstAppearance, adjacency, indegree, ref appearanceIndex);
+
+            if (adjacency[connection.FromProductId].Add(connection.ToProductId))
+            {
+                indegree[connection.ToProductId]++;
+            }
+        }
+
+        var levels = indegree.Keys.ToDictionary(productId => productId, _ => 0);
+        var remainingIndegree = indegree.ToDictionary(pair => pair.Key, pair => pair.Value);
+        var ready = remainingIndegree
+            .Where(pair => pair.Value == 0)
+            .Select(pair => pair.Key)
+            .OrderBy(productId => firstAppearance[productId])
+            .ToList();
+
+        var orderedIds = new List<int>();
+
+        while (ready.Count != 0)
+        {
+            var currentProductId = ready[0];
+            ready.RemoveAt(0);
+            orderedIds.Add(currentProductId);
+
+            foreach (var nextProductId in adjacency[currentProductId].OrderBy(productId => firstAppearance[productId]))
+            {
+                levels[nextProductId] = Math.Max(levels[nextProductId], levels[currentProductId] + 1);
+                remainingIndegree[nextProductId]--;
+                if (remainingIndegree[nextProductId] == 0)
+                {
+                    ready.Add(nextProductId);
+                    ready.Sort((left, right) => firstAppearance[left].CompareTo(firstAppearance[right]));
+                }
+            }
+        }
+
+        if (orderedIds.Count != remainingIndegree.Count)
+        {
+            return firstAppearance
+                .OrderBy(pair => pair.Value)
+                .Select(pair => pair.Key)
+                .ToList();
+        }
+
+        supportsGraphLayout = true;
+
+        return orderedIds
+            .OrderBy(productId => levels[productId])
+            .ThenBy(productId => firstAppearance[productId])
+            .ToList();
+    }
+
     private static string BuildDeletedProductLabel(string label, bool isDeleted) =>
         isDeleted ? $"{label} [deleted]" : label;
 
-    private static IQueryable<ServiceCatalogItem> ApplySort(IQueryable<ServiceCatalogItem> query, string sort) =>
+    private static IEnumerable<ServiceCatalogItem> ApplySort(IEnumerable<ServiceCatalogItem> services, string sort) =>
         sort switch
         {
-            ServiceSortOptions.Name => query.OrderBy(x => x.Name).ThenByDescending(x => x.UpdatedUtc),
-            ServiceSortOptions.NameDesc => query.OrderByDescending(x => x.Name).ThenByDescending(x => x.UpdatedUtc),
-            ServiceSortOptions.Owner => query.OrderBy(x => x.Owner).ThenBy(x => x.Name),
-            ServiceSortOptions.Lifecycle => query.OrderBy(x => x.LifecycleStatus).ThenBy(x => x.Name),
-            ServiceSortOptions.ProductCountDesc => query.OrderByDescending(x => x.ProductLinks.Count).ThenBy(x => x.Name),
-            ServiceSortOptions.UpdatedAsc => query.OrderBy(x => x.UpdatedUtc).ThenBy(x => x.Name),
-            _ => query.OrderByDescending(x => x.UpdatedUtc).ThenBy(x => x.Name)
+            ServiceSortOptions.Name => services.OrderBy(x => x.Name).ThenByDescending(x => x.UpdatedUtc),
+            ServiceSortOptions.NameDesc => services.OrderByDescending(x => x.Name).ThenByDescending(x => x.UpdatedUtc),
+            ServiceSortOptions.Owner => services.OrderBy(x => x.Owner).ThenBy(x => x.Name),
+            ServiceSortOptions.Lifecycle => services.OrderBy(x => x.LifecycleStatus).ThenBy(x => x.Name),
+            ServiceSortOptions.ProductCountDesc => services.OrderByDescending(x => x.ConnectionCount).ThenBy(x => x.Name),
+            ServiceSortOptions.UpdatedAsc => services.OrderBy(x => x.UpdatedUtc).ThenBy(x => x.Name),
+            _ => services.OrderByDescending(x => x.UpdatedUtc).ThenBy(x => x.Name)
         };
 
-    private static void NormalizeFormInput(ServiceEditViewModel input)
+    private static void NormalizeServiceInput(ServiceEditViewModel input)
     {
         input.Owner = NormalizeSelection(input.Owner);
         input.LifecycleStatus = NormalizeSelection(input.LifecycleStatus);
-        input.ProductRows = NormalizeProductRows(input.ProductRows);
     }
 
-    private static List<ServiceProductRowViewModel> NormalizeProductRows(IEnumerable<ServiceProductRowViewModel>? rows)
+    private static void NormalizeConnectionInput(ServiceConnectionEditorViewModel input)
     {
-        var normalized = new List<ServiceProductRowViewModel>();
+        input.ConnectionRows = NormalizeConnectionRows(input.ConnectionRows);
+    }
+
+    private static List<ServiceConnectionRowInputViewModel> NormalizeConnectionRows(
+        IEnumerable<ServiceConnectionRowInputViewModel>? rows)
+    {
+        var normalized = new List<ServiceConnectionRowInputViewModel>();
         if (rows is null)
         {
             return normalized;
@@ -511,18 +857,31 @@ public sealed class ServicesController(
 
         foreach (var row in rows)
         {
-            if (row.ProductId is not > 0)
+            var fromProductId = row.FromProductId is > 0 ? row.FromProductId : null;
+            var toProductId = row.ToProductId is > 0 ? row.ToProductId : null;
+
+            if (fromProductId is null && toProductId is null)
             {
                 continue;
             }
 
-            normalized.Add(new ServiceProductRowViewModel
+            normalized.Add(new ServiceConnectionRowInputViewModel
             {
-                ProductId = row.ProductId
+                FromProductId = fromProductId,
+                ToProductId = toProductId
             });
         }
 
         return normalized;
+    }
+
+    private static void HydrateConnectionEditorSummary(ServiceConnectionEditorViewModel model, ServiceCatalogItem service)
+    {
+        model.ServiceName = service.Name;
+        model.ServiceDescription = service.Description;
+        model.ServiceOwner = service.Owner;
+        model.ServiceLifecycleStatus = service.LifecycleStatus;
+        model.UsesLegacyFlow = service.ProductConnections.Count == 0 && service.ProductLinks.Count > 1;
     }
 
     private static string? NormalizeSelection(string? value) =>
@@ -540,11 +899,13 @@ public sealed class ServicesController(
             _ => ServiceSortOptions.UpdatedDesc
         };
 
-    private static void EnsureEditableRows(ServiceEditViewModel model)
+    private static void EnsureConnectionRows(ServiceConnectionEditorViewModel model)
     {
-        while (model.ProductRows.Count < 2)
+        while (model.ConnectionRows.Count < 1)
         {
-            model.ProductRows.Add(new ServiceProductRowViewModel());
+            model.ConnectionRows.Add(new ServiceConnectionRowInputViewModel());
         }
     }
+
+    private readonly record struct ConnectionPair(int FromProductId, int ToProductId);
 }

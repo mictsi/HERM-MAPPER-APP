@@ -14,7 +14,7 @@
     <div>
         <span class="eyebrow">Service catalogue</span>
         <h1>Services</h1>
-        <p>Define connected product chains as named services, then review, filter, and visualize them from one workspace.</p>
+        <p>Define service details, then open the Connect products page for any service to build branching and merged flows.</p>
     </div>
     @if (canManageProductsAndServices)
     {
@@ -78,6 +78,13 @@
 </section>
 
 <section class="content-card">
+    @if (canManageProductsAndServices && Model.Services.Count != 0)
+    {
+        <div class="alert alert-info" role="status">
+            Open <strong>Connect products</strong> from a service row, or click the service name, to use the new connection designer page.
+        </div>
+    }
+
     <div class="section-heading">
         <div>
             <span class="eyebrow">Services</span>
@@ -89,7 +96,7 @@
     {
         <div class="empty-state compact">
             <h3>No matching services</h3>
-            <p>Try a wider search, clear the filters, or create the first service.</p>
+            <p>Try a wider search, clear the filters, or create the first service. After saving a service, you’ll be taken straight to Connect products.</p>
         </div>
     }
     else
@@ -111,7 +118,14 @@
                 {
                     <tr>
                         <td>
-                            <strong>@service.Name</strong>
+                            @if (canManageProductsAndServices)
+                            {
+                                <strong><a asp-action="Connections" asp-route-id="@service.Id">@service.Name</a></strong>
+                            }
+                            else
+                            {
+                                <strong>@service.Name</strong>
+                            }
                             <div class="table-subline">@(string.IsNullOrWhiteSpace(service.Description) ? "No description provided." : service.Description)</div>
                         </td>
                         <td>@service.Owner</td>
@@ -126,7 +140,8 @@
                                 <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@service.Id">Visualize</a>
                                 @if (canManageProductsAndServices)
                                 {
-                                <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@service.Id">Edit</a>
+                                <a class="btn btn-outline-primary" asp-action="Connections" asp-route-id="@service.Id">Connect products</a>
+                                <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@service.Id">Details</a>
                                 <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@service.Id">Trash</a>
                                 }
                             </div>

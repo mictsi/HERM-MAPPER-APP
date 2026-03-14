@@ -1,10 +1,10 @@
+using Microsoft.AspNetCore.Mvc.Rendering;
 using System.ComponentModel.DataAnnotations;
 using HERMMapperApp.Models;
-using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace HERMMapperApp.ViewModels;
 
-public sealed class ServiceEditViewModel : IValidatableObject
+public sealed class ServiceEditViewModel
 {
     public int Id { get; set; }
 
@@ -22,26 +22,8 @@ public sealed class ServiceEditViewModel : IValidatableObject
     [Display(Name = "Lifecycle status")]
     public string? LifecycleStatus { get; set; }
 
-    public List<ServiceProductRowViewModel> ProductRows { get; set; } = [];
-
     public IReadOnlyList<SelectListItem> OwnerOptions { get; set; } = [];
     public IReadOnlyList<SelectListItem> LifecycleStatusOptions { get; set; } = [];
-    public IReadOnlyList<SelectListItem> ProductOptions { get; set; } = [];
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        var selectedProductIds = ProductRows
-            .Where(x => x.ProductId is > 0)
-            .Select(x => x.ProductId!.Value)
-            .ToList();
-
-        if (selectedProductIds.Count < 2)
-        {
-            yield return new ValidationResult(
-                "Select at least two products to define a service connection.",
-                [nameof(ProductRows)]);
-        }
-    }
 
     public static ServiceEditViewModel FromService(ServiceCatalogItem service) =>
         new()
@@ -50,17 +32,6 @@ public sealed class ServiceEditViewModel : IValidatableObject
             Name = service.Name,
             Description = service.Description,
             Owner = service.Owner,
-            LifecycleStatus = service.LifecycleStatus,
-            ProductRows = service.GetOrderedProductLinks()
-                .Select(x => new ServiceProductRowViewModel
-                {
-                    ProductId = x.ProductCatalogItemId
-                })
-                .ToList()
+            LifecycleStatus = service.LifecycleStatus
         };
-}
-
-public sealed class ServiceProductRowViewModel
-{
-    public int? ProductId { get; set; }
 }

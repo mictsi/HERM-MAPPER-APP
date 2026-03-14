@@ -1,0 +1,205 @@
+@using System.Globalization
+@model ServiceConnectionEditorViewModel
+@{
+    ViewData["Title"] = "Connect Products";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Connect products</span>
+        <h1>@Model.ServiceName</h1>
+        <p>Build the connected product map on its own page, including branches and merges.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary" asp-action="Index">Back to services</a>
+        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.ServiceId">Edit details</a>
+        <a class="btn btn-primary" asp-action="Visualize" asp-route-id="@Model.ServiceId">Visualize</a>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <section class="content-card">
+        <div class="alert alert-success mb-0" role="status">@Model.StatusMessage</div>
+    </section>
+}
+
+@if (Model.UsesLegacyFlow)
+{
+    <section class="content-card">
+        <div class="alert alert-info mb-0">
+            This service came from the old linear connected-products flow. Saving here converts it to the new connection designer.
+        </div>
+    </section>
+}
+
+<form asp-action="Connections" asp-route-id="@Model.ServiceId" method="post">
+    <section class="content-card">
+        <div class="detail-grid">
+            <div>
+                <div class="detail-label">Owner</div>
+                <div>@Model.ServiceOwner</div>
+            </div>
+            <div>
+                <div class="detail-label">Lifecycle</div>
+                <div>@Model.ServiceLifecycleStatus</div>
+            </div>
+            <div>
+                <div class="detail-label">Description</div>
+                <div>@(string.IsNullOrWhiteSpace(Model.ServiceDescription) ? "No description provided." : Model.ServiceDescription)</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="content-card service-connection-editor" data-service-connection-editor>
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Connected products</span>
+                <h2>Connect products</h2>
+                <p>Create explicit <code>from</code> and <code>to</code> links instead of reordering a single chain. Use <strong>Organize branches</strong> to group related paths together.</p>
+            </div>
+        </div>
+
+        <div asp-validation-for="ConnectionRows" class="text-danger mb-3"></div>
+
+        @if (Model.ProductOptions.Count <= 1)
+        {
+            <div class="form-note mb-3">
+                Add products in the product catalogue first. Once products exist, you can connect them here.
+            </div>
+        }
+
+        <div class="service-connection-header" aria-hidden="true">
+            <div class="service-connection-header-label">#</div>
+            <div class="service-connection-header-label">From</div>
+            <div class="service-connection-header-label">To</div>
+            <div class="service-connection-header-label service-connection-header-actions">Actions</div>
+        </div>
+
+        <div class="service-connection-stack" data-service-connection-rows>
+            @for (var index = 0; index < Model.ConnectionRows.Count; index++)
+            {
+                var row = Model.ConnectionRows[index];
+                <div class="service-connection-row" data-service-connection-row>
+                    <div class="service-connection-order" data-service-connection-order>@(index + 1)</div>
+                    <div>
+                        <select class="form-select"
+                                id="ConnectionRows_@(index)__FromProductId"
+                                name="ConnectionRows[@index].FromProductId"
+                                data-service-connection-from
+                                aria-label="From product">
+                            @foreach (var option in Model.ProductOptions)
+                            {
+                                <option value="@option.Value" selected="@(row.FromProductId?.ToString(CultureInfo.InvariantCulture) == option.Value ? "selected" : null)">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <select class="form-select"
+                                id="ConnectionRows_@(index)__ToProductId"
+                                name="ConnectionRows[@index].ToProductId"
+                                data-service-connection-to
+                                aria-label="To product">
+                            @foreach (var option in Model.ProductOptions)
+                            {
+                                <option value="@option.Value" selected="@(row.ToProductId?.ToString(CultureInfo.InvariantCulture) == option.Value ? "selected" : null)">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="service-connection-actions">
+                        <button type="button" class="btn btn-outline-secondary service-action-button" data-service-connection-add-row>Add</button>
+                        <button type="button" class="btn btn-outline-danger" data-service-connection-remove-row>Remove</button>
+                    </div>
+                    <div class="service-connection-summary" data-service-connection-summary></div>
+                </div>
+            }
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center gap-2 mt-3 flex-wrap">
+            <div class="small text-muted">Add as many edges as you need to create branches, merges, or parallel paths.</div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary" data-service-connection-organize>Organize branches</button>
+                <button type="button" class="btn btn-outline-secondary" data-service-connection-add-tail>+ Add connection</button>
+            </div>
+        </div>
+
+        <template data-service-connection-row-template>
+            <div class="service-connection-row" data-service-connection-row>
+                <div class="service-connection-order" data-service-connection-order>1</div>
+                <div>
+                    <select class="form-select"
+                            id="ConnectionRows___index___FromProductId"
+                            name="ConnectionRows[__index__].FromProductId"
+                            data-service-connection-from
+                            aria-label="From product">
+                        @foreach (var option in Model.ProductOptions)
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <select class="form-select"
+                            id="ConnectionRows___index___ToProductId"
+                            name="ConnectionRows[__index__].ToProductId"
+                            data-service-connection-to
+                            aria-label="To product">
+                        @foreach (var option in Model.ProductOptions)
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    </select>
+                </div>
+                <div class="service-connection-actions">
+                    <button type="button" class="btn btn-outline-secondary service-action-button" data-service-connection-add-row>Add</button>
+                    <button type="button" class="btn btn-outline-danger" data-service-connection-remove-row>Remove</button>
+                </div>
+                <div class="service-connection-summary" data-service-connection-summary></div>
+            </div>
+        </template>
+    </section>
+
+    <div data-service-graph-host>
+        <section class="content-card">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Preview</span>
+                    <h2>Connection map</h2>
+                    <p>The preview updates as you edit the flow. The graph now runs top to bottom to keep wider flows visible.</p>
+                </div>
+            </div>
+
+            <div class="service-graph-preview"
+                 data-service-graph-preview
+                 data-empty-title="No connected products yet"
+                 data-empty-body="Add at least one complete connection to preview the service flow."
+                 data-loop-title="Loop detected"
+                 data-loop-body="This flow includes a loop, so the preview is shown as connection pairs instead of a top-to-bottom graph."></div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">Save connected products</button>
+                <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.ServiceId">Edit details</a>
+            </div>
+        </section>
+
+        <section class="content-card">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Routes</span>
+                    <h2>Distinct routes</h2>
+                    <p>Each complete path is listed separately so branches and merges are easier to review.</p>
+                </div>
+            </div>
+
+            <div data-service-graph-routes
+                 data-empty-title="No routes yet"
+                 data-empty-body="Add connected products to build distinct routes."
+                 data-unavailable-title="Routes unavailable"
+                 data-unavailable-body="Distinct routes are only shown when the flow can be rendered without loops."></div>
+        </section>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

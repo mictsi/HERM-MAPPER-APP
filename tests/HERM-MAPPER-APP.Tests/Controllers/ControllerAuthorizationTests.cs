@@ -50,6 +50,8 @@ public sealed class ControllerAuthorizationTests
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Create), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Connections), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Connections), AppPolicies.ProductsAndServicesWrite, 2);
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Delete), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.DeleteConfirmed), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<ServicesController>(nameof(ServicesController.Restore), AppPolicies.AdminOnly, 0);

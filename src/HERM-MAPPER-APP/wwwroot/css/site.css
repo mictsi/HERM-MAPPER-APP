@@ -725,6 +725,305 @@ a {
   min-width: 3.25rem;
 }
 
+.service-connection-editor {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.service-connection-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.service-connection-header-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.service-connection-header-actions {
+  text-align: right;
+}
+
+.service-connection-stack {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.service-connection-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-left: 0.35rem solid var(--service-connection-accent, rgba(31, 41, 51, 0.08));
+  border-radius: 1rem;
+  background: linear-gradient(135deg, var(--service-connection-accent-soft, rgba(255, 255, 255, 0.8)), rgba(255, 255, 255, 0.62));
+}
+
+.service-connection-order {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
+  font-weight: 700;
+  color: var(--accent-deep);
+  background: rgba(11, 110, 79, 0.12);
+}
+
+.service-connection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.5rem;
+}
+
+.service-connection-summary {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-height: 1.75rem;
+}
+
+.service-connection-badge,
+.service-connection-branch-divider {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.service-connection-badge {
+  padding: 0.28rem 0.7rem;
+  background: rgba(82, 96, 109, 0.12);
+  color: #36424f;
+}
+
+.service-connection-badge.is-branch {
+  background: rgba(11, 110, 79, 0.12);
+  color: var(--accent-deep);
+}
+
+.service-connection-badge.is-merge {
+  background: rgba(43, 111, 119, 0.12);
+  color: #1f5660;
+}
+
+.service-connection-badge.is-split {
+  background: rgba(139, 94, 52, 0.12);
+  color: #744722;
+}
+
+.service-connection-badge.is-draft {
+  background: rgba(82, 96, 109, 0.12);
+  color: var(--muted);
+}
+
+.service-connection-branch-divider {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  box-shadow: 0 0.5rem 1.6rem rgba(31, 41, 51, 0.08);
+}
+
+.service-connection-branch-divider strong {
+  color: var(--accent-deep);
+}
+
+.service-graph-preview:has(.service-graph-canvas) {
+  display: flex;
+  justify-content: center;
+}
+
+.service-graph-canvas {
+  position: relative;
+  display: block;
+  width: max-content;
+  margin-inline: auto;
+  overflow: visible;
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(247, 243, 235, 0.94));
+}
+
+.service-graph-rows {
+  position: relative;
+  display: grid;
+  gap: 3rem;
+  align-items: start;
+  justify-items: start;
+  width: max-content;
+}
+
+.service-graph-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(12rem, max-content);
+  gap: 2rem;
+  align-items: start;
+  justify-content: start;
+  width: max-content;
+}
+
+.service-graph-node {
+  position: relative;
+  z-index: 1;
+  width: max-content;
+  min-width: 12rem;
+  max-width: none;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, rgba(11, 110, 79, 0.18), rgba(11, 110, 79, 0.08));
+  border: 1px solid rgba(11, 110, 79, 0.18);
+  font-weight: 700;
+  box-shadow: 0 0.8rem 2rem rgba(31, 41, 51, 0.08);
+}
+
+.service-graph-lines {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.service-graph-line {
+  fill: none;
+  stroke: rgba(82, 96, 109, 0.7);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.service-graph-routes {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.service-graph-routes-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.service-graph-routes-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.service-graph-routes-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.service-graph-route-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.service-graph-route-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.service-graph-route-index {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.service-graph-route-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.service-graph-route-step {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0.9rem;
+  background: rgba(11, 110, 79, 0.08);
+  font-weight: 700;
+}
+
+.service-graph-route-arrow {
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.service-graph-route-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.service-graph-fallback {
+  display: grid;
+  gap: 1rem;
+}
+
+.service-graph-edge-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.service-graph-edge-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.service-graph-edge-label {
+  padding: 0.8rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(11, 110, 79, 0.06);
+  font-weight: 700;
+}
+
+.service-graph-edge-arrow {
+  color: var(--muted);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.detail-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
 .dependency-path-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 1.2rem minmax(0, 1fr) 1.2rem minmax(0, 1fr) 1.2rem minmax(0, 1fr);
@@ -1288,13 +1587,30 @@ a {
     display: none;
   }
 
+  .service-connection-header {
+    display: none;
+  }
+
   .service-product-row {
     grid-template-columns: 1fr;
     align-items: stretch;
   }
 
+  .service-connection-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .service-connection-summary {
+    grid-column: 1 / -1;
+  }
+
   .service-product-order-cell {
     justify-content: space-between;
+  }
+
+  .service-connection-actions {
+    justify-content: start;
   }
 
   .service-product-actions {
@@ -1348,6 +1664,19 @@ a {
 
   .owner-tree-badges {
     justify-content: start;
+  }
+
+  .service-graph-edge-card {
+    grid-template-columns: 1fr;
+  }
+
+  .service-graph-edge-arrow {
+    display: none;
+  }
+
+  .service-graph-routes-heading {
+    align-items: start;
+    flex-direction: column;
   }
 }
 
