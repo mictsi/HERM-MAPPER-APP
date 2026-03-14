@@ -76,6 +76,73 @@ public sealed class UsersControllerTests
         Assert.True(PasswordHashService.VerifyPassword("UpdatedPass!123", updatedUser.PasswordHash));
     }
 
+    [Fact]
+    public async Task IndexFiltersUsersBySearchTerm()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        fixture.DbContext.AppUsers.AddRange(
+            BuildUser("Ada", "Lovelace", "ada@example.com", "adal", AppRoles.Admin),
+            BuildUser("Grace", "Hopper", "grace@example.com", "ghopper", AppRoles.User),
+            BuildUser("Alan", "Turing", "alan@example.com", "aturing", AppRoles.Contributor));
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.IndexAsync("hopper");
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<UsersIndexViewModel>(view.Model);
+
+        Assert.Equal("hopper", model.Search);
+        Assert.Single(model.Users);
+        Assert.Equal("Grace Hopper", model.Users[0].DisplayName);
+        Assert.Equal(1, model.TotalCount);
+    }
+
+    [Fact]
+    public async Task IndexPagesUsers()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        for (var index = 1; index <= 12; index++)
+        {
+            fixture.DbContext.AppUsers.Add(BuildUser(
+                $"User{index:00}",
+                "Example",
+                $"user{index:00}@example.com",
+                $"user{index:00}",
+                AppRoles.User));
+        }
+
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.IndexAsync(page: 2);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<UsersIndexViewModel>(view.Model);
+
+        Assert.Equal(2, model.Page);
+        Assert.Equal(10, model.PageSize);
+        Assert.Equal(12, model.TotalCount);
+        Assert.Equal(2, model.TotalPages);
+        Assert.Equal(2, model.Users.Count);
+        Assert.Equal("User11 Example", model.Users[0].DisplayName);
+        Assert.Equal("User12 Example", model.Users[1].DisplayName);
+    }
+
+    private static AppUser BuildUser(string givenName, string lastName, string email, string userName, string roleName) => new()
+    {
+        GivenName = givenName,
+        LastName = lastName,
+        Email = email,
+        UserName = userName,
+        RoleName = roleName,
+        PasswordHash = PasswordHashService.HashPassword("Password!123"),
+        CreatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        UpdatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+        PasswordChangedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+    };
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

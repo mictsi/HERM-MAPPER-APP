@@ -15,22 +15,50 @@ public sealed class UsersController(
     AppDbContext dbContext,
     AuditLogService auditLogService) : Controller
 {
-    public async Task<IActionResult> IndexAsync()
+    private const int UsersPageSize = 10;
+
+    public async Task<IActionResult> IndexAsync(string? search, int page = 1)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
+        var normalizedSearch = string.IsNullOrWhiteSpace(search)
+            ? null
+            : search.Trim();
+
+        var query = dbContext.AppUsers.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            var searchPattern = $"%{normalizedSearch}%";
+            query = query.Where(user =>
+                EF.Functions.Like(user.GivenName, searchPattern) ||
+                EF.Functions.Like(user.LastName, searchPattern) ||
+                EF.Functions.Like(user.Email, searchPattern) ||
+                EF.Functions.Like(user.UserName, searchPattern) ||
+                EF.Functions.Like(user.RoleName, searchPattern));
+        }
+
+        var totalCount = await query.CountAsync();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)UsersPageSize));
+        var currentPage = Math.Min(Math.Max(page, 1), totalPages);
+        var users = await query
+            .OrderBy(x => x.GivenName)
+            .ThenBy(x => x.LastName)
+            .Skip((currentPage - 1) * UsersPageSize)
+            .Take(UsersPageSize)
+            .ToListAsync();
+
         return View(new UsersIndexViewModel
         {
             StatusMessage = TempData["UsersStatusMessage"] as string,
             ErrorMessage = TempData["UsersErrorMessage"] as string,
-            Users = await dbContext.AppUsers
-                .AsNoTracking()
-                .OrderBy(x => x.GivenName)
-                .ThenBy(x => x.LastName)
-                .ToListAsync()
+            Search = normalizedSearch,
+            Page = currentPage,
+            PageSize = UsersPageSize,
+            TotalCount = totalCount,
+            Users = users
         });
     }
 

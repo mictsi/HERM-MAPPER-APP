@@ -2,6 +2,8 @@
 @{
     ViewData["Title"] = "Users";
     ViewData["AdminNav"] = "Users";
+    var pageStart = Math.Max(1, Model.Page - 2);
+    var pageEnd = Math.Min(Model.TotalPages, Model.Page + 2);
 }
 
 <div class="admin-shell">
@@ -31,15 +33,45 @@
         }
 
         <section class="content-card">
-            @if (Model.Users.Count == 0)
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-lg-10">
+                    <label class="form-label" for="search">Search users</label>
+                    <input class="form-control"
+                           id="search"
+                           name="search"
+                           value="@Model.Search"
+                           placeholder="Name, email, username, or role" />
+                </div>
+                <div class="col-lg-2 d-grid">
+                    <button class="btn btn-primary" type="submit">Search</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="content-card">
+            @if (Model.TotalCount == 0)
             {
                 <div class="empty-state compact">
-                    <h3>No users</h3>
-                    <p>Create the first user account.</p>
+                    <h3>@(string.IsNullOrWhiteSpace(Model.Search) ? "No users" : "No matching users")</h3>
+                    <p>
+                        @(string.IsNullOrWhiteSpace(Model.Search)
+                            ? "Create the first user account."
+                            : "Try a broader search term.")
+                    </p>
                 </div>
             }
             else
             {
+                <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+                    <div class="table-subline">
+                        Showing @Model.FirstItemNumber-@Model.LastItemNumber of @Model.TotalCount users
+                    </div>
+                    @if (Model.TotalPages > 1)
+                    {
+                        <div class="table-subline">Page @Model.Page of @Model.TotalPages</div>
+                    }
+                </div>
+
                 <div class="table-responsive">
                     <table class="table align-middle">
                         <thead>
@@ -73,6 +105,35 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if (Model.TotalPages > 1)
+                {
+                    <nav aria-label="Users pagination" class="mt-3">
+                        <ul class="pagination mb-0 flex-wrap">
+                            <li class="page-item @(Model.HasPreviousPage ? string.Empty : "disabled")">
+                                <a class="page-link"
+                                   asp-action="Index"
+                                   asp-route-search="@Model.Search"
+                                   asp-route-page="@(Model.Page - 1)">Previous</a>
+                            </li>
+                            @for (var pageNumber = pageStart; pageNumber <= pageEnd; pageNumber++)
+                            {
+                                <li class="page-item @(pageNumber == Model.Page ? "active" : string.Empty)">
+                                    <a class="page-link"
+                                       asp-action="Index"
+                                       asp-route-search="@Model.Search"
+                                       asp-route-page="@pageNumber">@pageNumber</a>
+                                </li>
+                            }
+                            <li class="page-item @(Model.HasNextPage ? string.Empty : "disabled")">
+                                <a class="page-link"
+                                   asp-action="Index"
+                                   asp-route-search="@Model.Search"
+                                   asp-route-page="@(Model.Page + 1)">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                }
             }
         </section>
     </div>

@@ -10,7 +10,25 @@ public sealed class UsersIndexViewModel
 
     public string? ErrorMessage { get; init; }
 
+    public string? Search { get; init; }
+
+    public int Page { get; init; } = 1;
+
+    public int PageSize { get; init; } = 10;
+
+    public int TotalCount { get; init; }
+
     public IReadOnlyList<AppUser> Users { get; init; } = [];
+
+    public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalCount / (double)PageSize));
+
+    public bool HasPreviousPage => Page > 1;
+
+    public bool HasNextPage => Page < TotalPages;
+
+    public int FirstItemNumber => TotalCount == 0 ? 0 : ((Page - 1) * PageSize) + 1;
+
+    public int LastItemNumber => TotalCount == 0 ? 0 : Math.Min(Page * PageSize, TotalCount);
 }
 
 public sealed class UserEditViewModel

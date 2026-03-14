@@ -1892,6 +1892,71 @@ a {
   min-width: 0;
 }
 
+.admin-disclosure {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-disclosure-summary {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-disclosure-summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-top: 0.65rem;
+  border-right: 2px solid rgba(82, 96, 109, 0.72);
+  border-bottom: 2px solid rgba(82, 96, 109, 0.72);
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+}
+
+.admin-disclosure[open] .admin-disclosure-summary::after {
+  transform: rotate(225deg);
+}
+
+.admin-disclosure-summary h2 {
+  margin-bottom: 0.25rem;
+}
+
+.admin-disclosure-summary p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 44rem;
+}
+
+.admin-disclosure-meta {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: 2rem;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.admin-disclosure-summary .status-pill {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.admin-disclosure-body {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(31, 41, 51, 0.08);
+}
+
 .admin-nav {
   display: grid;
   gap: 0.5rem;
@@ -2008,6 +2073,15 @@ a {
 
   .admin-sidebar {
     position: static;
+  }
+
+  .admin-disclosure-summary {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .admin-disclosure-summary::after {
+    display: none;
   }
 
   .hero-panel,
