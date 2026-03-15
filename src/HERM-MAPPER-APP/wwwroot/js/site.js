@@ -714,6 +714,126 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>`;
   };
 
+  const getElementBox = (element, referenceElement, scrollHost = referenceElement) => {
+    if (!(element instanceof Element) || !(referenceElement instanceof Element)) {
+      return null;
+    }
+
+    const referenceRect = referenceElement.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    const scrollLeft = scrollHost instanceof HTMLElement ? scrollHost.scrollLeft : 0;
+    const scrollTop = scrollHost instanceof HTMLElement ? scrollHost.scrollTop : 0;
+    const left = elementRect.left - referenceRect.left + scrollLeft;
+    const top = elementRect.top - referenceRect.top + scrollTop;
+
+    return {
+      left,
+      top,
+      right: left + elementRect.width,
+      bottom: top + elementRect.height,
+      width: elementRect.width,
+      height: elementRect.height,
+      centerX: left + (elementRect.width / 2),
+      centerY: top + (elementRect.height / 2)
+    };
+  };
+
+  const getOppositeAnchorSide = (side) => {
+    switch (side) {
+      case "left":
+        return "right";
+      case "right":
+        return "left";
+      case "top":
+        return "bottom";
+      default:
+        return "top";
+    }
+  };
+
+  const getBoxAnchor = (box, side, gap = 0) => {
+    if (box === null) {
+      return null;
+    }
+
+    switch (side) {
+      case "left":
+        return { x: box.left - gap, y: box.centerY, side };
+      case "right":
+        return { x: box.right + gap, y: box.centerY, side };
+      case "top":
+        return { x: box.centerX, y: box.top - gap, side };
+      default:
+        return { x: box.centerX, y: box.bottom + gap, side: "bottom" };
+    }
+  };
+
+  // Prefer side anchors when nodes are laid out more horizontally than vertically.
+  const getPreferredAnchorSides = (fromPoint, toPoint) => {
+    const deltaX = toPoint.x - fromPoint.x;
+    const deltaY = toPoint.y - fromPoint.y;
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      return deltaX >= 0
+        ? { fromSide: "right", toSide: "left" }
+        : { fromSide: "left", toSide: "right" };
+    }
+
+    return deltaY >= 0
+      ? { fromSide: "bottom", toSide: "top" }
+      : { fromSide: "top", toSide: "bottom" };
+  };
+
+  const getAnchorPairBetweenBoxes = (fromBox, toBox, startGap = 0, endGap = 0) => {
+    if (fromBox === null || toBox === null) {
+      return null;
+    }
+
+    const sides = getPreferredAnchorSides(
+      { x: fromBox.centerX, y: fromBox.centerY },
+      { x: toBox.centerX, y: toBox.centerY });
+
+    return {
+      start: getBoxAnchor(fromBox, sides.fromSide, startGap),
+      end: getBoxAnchor(toBox, sides.toSide, endGap)
+    };
+  };
+
+  const getPreviewAnchorPair = (fromBox, targetPoint, startGap = 0) => {
+    if (fromBox === null || targetPoint === null) {
+      return null;
+    }
+
+    const sides = getPreferredAnchorSides(
+      { x: fromBox.centerX, y: fromBox.centerY },
+      targetPoint);
+
+    return {
+      start: getBoxAnchor(fromBox, sides.fromSide, startGap),
+      end: {
+        x: targetPoint.x,
+        y: targetPoint.y,
+        side: getOppositeAnchorSide(sides.fromSide)
+      }
+    };
+  };
+
+  const buildConnectorPath = (start, end) => {
+    const isHorizontal =
+      start?.side === "left" ||
+      start?.side === "right" ||
+      end?.side === "left" ||
+      end?.side === "right";
+
+    if (isHorizontal) {
+      const midpointX = start.x + ((end.x - start.x) / 2);
+      return `M ${start.x} ${start.y} C ${midpointX} ${start.y}, ${midpointX} ${end.y}, ${end.x} ${end.y}`;
+    }
+
+    const midpointY = start.y + ((end.y - start.y) / 2);
+    return `M ${start.x} ${start.y} C ${start.x} ${midpointY}, ${end.x} ${midpointY}, ${end.x} ${end.y}`;
+  };
+
   const drawGraphLines = (preview, connections) => {
     const canvas = preview.querySelector("[data-service-graph-canvas]");
     const svg = preview.querySelector(".service-graph-lines");
@@ -722,7 +842,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const canvasRect = canvas.getBoundingClientRect();
     const width = Math.max(canvas.scrollWidth, canvas.clientWidth);
     const height = Math.max(canvas.scrollHeight, canvas.clientHeight);
 
@@ -739,15 +858,14 @@ document.addEventListener("DOMContentLoaded", () => {
           return "";
         }
 
-        const fromRect = fromNode.getBoundingClientRect();
-        const toRect = toNode.getBoundingClientRect();
-        const startX = fromRect.left - canvasRect.left + canvas.scrollLeft + (fromRect.width / 2);
-        const startY = fromRect.bottom - canvasRect.top + canvas.scrollTop;
-        const endX = toRect.left - canvasRect.left + canvas.scrollLeft + (toRect.width / 2);
-        const endY = toRect.top - canvasRect.top + canvas.scrollTop;
-        const controlOffset = Math.max(48, (endY - startY) * 0.35);
+        const fromBox = getElementBox(fromNode, canvas, canvas);
+        const toBox = getElementBox(toNode, canvas, canvas);
+        const anchors = getAnchorPairBetweenBoxes(fromBox, toBox);
+        if (anchors === null || anchors.start === null || anchors.end === null) {
+          return "";
+        }
 
-        return `<path class="service-graph-line" d="M ${startX} ${startY} C ${startX} ${startY + controlOffset}, ${endX} ${endY - controlOffset}, ${endX} ${endY}" />`;
+        return `<path class="service-graph-line" d="${buildConnectorPath(anchors.start, anchors.end)}" />`;
       })
       .join("");
   };
@@ -1305,26 +1423,13 @@ document.addEventListener("DOMContentLoaded", () => {
       surface.style.height = `${Math.round(height)}px`;
     };
 
-    const getNodeAnchor = (productId, side, gap = 0) => {
+    const getNodeBox = (productId) => {
       const nodeElement = nodesHost.querySelector(`[data-service-canvas-node][data-node-id="${productId}"]`);
       if (!(nodeElement instanceof HTMLElement)) {
         return null;
       }
 
-      const surfaceRect = surface.getBoundingClientRect();
-      const nodeRect = nodeElement.getBoundingClientRect();
-
-      return {
-        x: nodeRect.left - surfaceRect.left + board.scrollLeft + (nodeRect.width / 2),
-        y: side === "bottom"
-          ? nodeRect.bottom - surfaceRect.top + board.scrollTop + gap
-          : nodeRect.top - surfaceRect.top + board.scrollTop - gap
-      };
-    };
-
-    const buildConnectorPath = (start, end) => {
-      const midpointY = start.y + ((end.y - start.y) / 2);
-      return `M ${start.x} ${start.y} C ${start.x} ${midpointY}, ${end.x} ${midpointY}, ${end.x} ${end.y}`;
+      return getElementBox(nodeElement, surface, board);
     };
 
     const drawConnections = () => {
@@ -1343,26 +1448,27 @@ document.addEventListener("DOMContentLoaded", () => {
             return "";
           }
 
-          const flowsDown = (fromNode.y ?? 0) <= (toNode.y ?? 0);
-          const start = getNodeAnchor(connection.fromId, flowsDown ? "bottom" : "top", connectorStartGap);
-          const end = getNodeAnchor(connection.toId, flowsDown ? "top" : "bottom", connectorEndGap);
-          if (start === null || end === null) {
+          const fromBox = getNodeBox(connection.fromId);
+          const toBox = getNodeBox(connection.toId);
+          const anchors = getAnchorPairBetweenBoxes(fromBox, toBox, connectorStartGap, connectorEndGap);
+          if (anchors === null || anchors.start === null || anchors.end === null) {
             return "";
           }
 
           const connectionKey = buildConnectionKey(connection.fromId, connection.toId);
           const isSelected = state.selectedConnectionKey === connectionKey;
+          const path = buildConnectorPath(anchors.start, anchors.end);
 
           return `
             <path class="service-canvas-line-hit"
                   data-service-canvas-line
                   data-from-id="${escapeGraphHtml(connection.fromId)}"
                   data-to-id="${escapeGraphHtml(connection.toId)}"
-                  d="${buildConnectorPath(start, end)}">
+                  d="${path}">
               <title>Select ${escapeGraphHtml(getLabel(connection.fromId))} to ${escapeGraphHtml(getLabel(connection.toId))}</title>
             </path>
             <path class="service-canvas-line${isSelected ? " is-selected" : ""}"
-                  d="${buildConnectorPath(start, end)}" />`;
+                  d="${path}" />`;
         })
         .join("");
 
@@ -1370,9 +1476,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (state.connectorSourceId !== null && state.pointer !== null) {
         const sourceNode = state.nodes.get(state.connectorSourceId);
         if (sourceNode !== undefined) {
-          const previewStart = getNodeAnchor(state.connectorSourceId, "bottom", connectorStartGap);
-          if (previewStart !== null) {
-            previewPath = `<path class="service-canvas-line is-preview" d="${buildConnectorPath(previewStart, state.pointer)}" />`;
+          const sourceBox = getNodeBox(state.connectorSourceId);
+          const previewAnchors = getPreviewAnchorPair(sourceBox, state.pointer, connectorStartGap);
+          if (previewAnchors !== null && previewAnchors.start !== null && previewAnchors.end !== null) {
+            previewPath = `<path class="service-canvas-line is-preview" d="${buildConnectorPath(previewAnchors.start, previewAnchors.end)}" />`;
           }
         }
       }
