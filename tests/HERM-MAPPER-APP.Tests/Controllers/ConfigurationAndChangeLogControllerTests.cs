@@ -76,6 +76,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
 
         var option = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync();
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
@@ -104,12 +105,13 @@ public sealed class ConfigurationAndChangeLogControllerTests
         controller.TempData["ConfigurationStatusMessage"] = "Saved";
         controller.TempData["ConfigurationError"] = "Warning";
 
-        var result = await controller.Index();
+        var result = await controller.Index(ConfigurableFieldNames.Owner);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("Saved", model.StatusMessage);
         Assert.Equal("Warning", model.ErrorMessage);
+        Assert.Equal(ConfigurableFieldNames.Owner, model.ExpandedFieldName);
         Assert.Equal("UTC", model.DisplayTimeZoneId);
         Assert.NotEmpty(model.Fields);
     }
@@ -317,6 +319,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
         Assert.Equal(1, await fixture.DbContext.ConfigurableFieldOptions.CountAsync());
         Assert.Equal("Owner value 'team blue' already exists.", controller.TempData["ConfigurationError"]);
     }
@@ -360,6 +363,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
 
         var options = await fixture.DbContext.ConfigurableFieldOptions
             .OrderBy(x => x.SortOrder)
@@ -405,6 +409,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
 
         var options = await fixture.DbContext.ConfigurableFieldOptions
             .OrderBy(x => x.SortOrder)
@@ -621,6 +626,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
         Assert.Equal("Enter a value before saving.", controller.TempData["ConfigurationError"]);
     }
 

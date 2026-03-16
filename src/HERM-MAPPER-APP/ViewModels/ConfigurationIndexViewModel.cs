@@ -9,6 +9,7 @@ public sealed class ConfigurationIndexViewModel
 {
     public string? StatusMessage { get; init; }
     public string? ErrorMessage { get; init; }
+    public string? ExpandedFieldName { get; init; }
     public string DisplayTimeZoneId { get; init; } = AppSettingDefaults.DisplayTimeZone;
     public IReadOnlyList<SelectListItem> AvailableTimeZones { get; init; } = [];
     public WorkbookImportReviewViewModel CatalogueImportReview { get; init; } = new();

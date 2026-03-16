@@ -324,8 +324,9 @@
 
         @foreach (var field in Model.Fields)
         {
+            var isExpandedField = string.Equals(Model.ExpandedFieldName, field.FieldName, StringComparison.OrdinalIgnoreCase);
             <section class="content-card">
-                <details class="admin-disclosure">
+                <details class="admin-disclosure" @(isExpandedField ? "open" : null)>
                     <summary class="admin-disclosure-summary">
                         <div>
                             <span class="eyebrow">Configurable field</span>

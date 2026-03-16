@@ -20,9 +20,9 @@ public sealed class ConfigurationController(
     SampleRelationshipImportService sampleRelationshipImportService,
     IWebHostEnvironment environment) : Controller
 {
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(string? expandedFieldName = null)
     {
-        return View(await BuildViewModelAsync());
+        return View(await BuildViewModelAsync(expandedFieldName: expandedFieldName));
     }
 
     [HttpPost]
@@ -252,13 +252,13 @@ public sealed class ConfigurationController(
         if (!ConfigurableFieldNames.IsSupported(input.FieldName))
         {
             TempData["ConfigurationError"] = "That field is not supported.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToIndex();
         }
 
         if (string.IsNullOrWhiteSpace(input.Value))
         {
             TempData["ConfigurationError"] = "Enter a value before saving.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToIndex(input.FieldName);
         }
 
         var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
@@ -270,7 +270,7 @@ public sealed class ConfigurationController(
         if (exists)
         {
             TempData["ConfigurationError"] = $"{ConfigurableFieldNames.GetLabel(input.FieldName)} value '{input.Value}' already exists.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToIndex(input.FieldName);
         }
 
         var option = new ConfigurableFieldOption
@@ -291,7 +291,7 @@ public sealed class ConfigurationController(
             $"Added configuration value '{option.Value}' to {option.FieldName}.");
 
         TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(input.FieldName)} value '{option.Value}' was added.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToIndex(input.FieldName);
     }
 
     [HttpPost]
@@ -301,7 +301,7 @@ public sealed class ConfigurationController(
         var option = await dbContext.ConfigurableFieldOptions.FindAsync(input.Id);
         if (option is null)
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToIndex();
         }
 
         var fieldOptions = await dbContext.ConfigurableFieldOptions
@@ -331,7 +331,7 @@ public sealed class ConfigurationController(
             $"New position: {option.SortOrder}.");
 
         TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(option.FieldName)} order was updated.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToIndex(option.FieldName);
     }
 
     [HttpPost]
@@ -341,7 +341,7 @@ public sealed class ConfigurationController(
         var option = await dbContext.ConfigurableFieldOptions.FindAsync(id);
         if (option is null)
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToIndex();
         }
 
         dbContext.ConfigurableFieldOptions.Remove(option);
@@ -355,7 +355,7 @@ public sealed class ConfigurationController(
             $"Removed configuration value '{option.Value}' from {option.FieldName}.");
 
         TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(option.FieldName)} value '{option.Value}' was removed.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToIndex(option.FieldName);
     }
 
     [HttpPost]
@@ -437,7 +437,8 @@ public sealed class ConfigurationController(
 
     private async Task<ConfigurationIndexViewModel> BuildViewModelAsync(
         WorkbookImportReviewViewModel? catalogueImportReview = null,
-        ProductImportReviewViewModel? productImportReview = null)
+        ProductImportReviewViewModel? productImportReview = null,
+        string? expandedFieldName = null)
     {
         var fields = new List<ConfigurationFieldGroupViewModel>();
         var displayTimeZoneId = await appSettingsService.GetValueAsync(
@@ -458,6 +459,9 @@ public sealed class ConfigurationController(
         {
             StatusMessage = TempData["ConfigurationStatusMessage"] as string,
             ErrorMessage = TempData["ConfigurationError"] as string,
+            ExpandedFieldName = ConfigurableFieldNames.IsSupported(expandedFieldName)
+                ? expandedFieldName
+                : null,
             DisplayTimeZoneId = displayTimeZoneId,
             AvailableTimeZones = BuildTimeZoneOptions(displayTimeZoneId),
             CatalogueImportReview = catalogueImportReview ?? new WorkbookImportReviewViewModel(),
@@ -525,4 +529,9 @@ public sealed class ConfigurationController(
             System.IO.File.Delete(pendingPath);
         }
     }
+
+    private RedirectToActionResult RedirectToIndex(string? expandedFieldName = null) =>
+        ConfigurableFieldNames.IsSupported(expandedFieldName)
+            ? RedirectToAction(nameof(Index), new { expandedFieldName })
+            : RedirectToAction(nameof(Index));
 }
