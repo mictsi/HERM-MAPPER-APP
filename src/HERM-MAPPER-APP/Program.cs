@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -197,6 +199,9 @@ public partial class Program
         services.AddSingleton(localAuthenticationOptions);
         services.AddSingleton(openIdConnectAuthenticationOptions);
         services.AddHttpContextAccessor();
+        services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck>("database");
+        services.AddOutputCache();
         services.AddAntiforgery(options =>
         {
             options.Cookie.Name = antiforgeryCookieName;
@@ -377,8 +382,26 @@ public partial class Program
 
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseOutputCache();
 
         app.MapStaticAssets().AllowAnonymous();
+        app.MapHealthChecks("/health", new HealthCheckOptions
+        {
+            AllowCachingResponses = true,
+            ResponseWriter = async (context, report) =>
+            {
+                context.Response.ContentType = "text/plain; charset=utf-8";
+                context.Response.Headers["Cache-Control"] = "public,max-age=60";
+
+                var responseText = report.Status == HealthStatus.Healthy
+                    ? "healthy"
+                    : "unhealthy";
+
+                await context.Response.WriteAsync(responseText);
+            }
+        })
+            .CacheOutput(policy => policy.Expire(TimeSpan.FromSeconds(60)))
+            .AllowAnonymous();
 
         app.MapControllerRoute(
             name: "default",

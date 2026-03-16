@@ -40,6 +40,38 @@ public sealed class ProgramHostIntegrationTests
         Assert.Contains("<form", body, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ApplicationStartupServesHealthEndpointWithoutAuthentication()
+    {
+        using var factory = new HermAppFactory();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var response = await client.GetAsync("/health");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("healthy", body);
+    }
+
+    [Fact]
+    public async Task ApplicationStartupCachesHealthEndpointForSixtySeconds()
+    {
+        using var factory = new HermAppFactory();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false
+        });
+
+        using var response = await client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.TryGetValues("Cache-Control", out var cacheControlValues));
+        Assert.Contains(cacheControlValues, value => string.Equals(value.Replace(" ", string.Empty), "public,max-age=60", StringComparison.Ordinal));
+    }
+
     private sealed class HermAppFactory : WebApplicationFactory<Program>
     {
         private readonly TemporaryDirectory contentRoot = new();
