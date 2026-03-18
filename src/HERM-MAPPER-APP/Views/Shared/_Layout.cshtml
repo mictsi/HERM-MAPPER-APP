@@ -71,6 +71,37 @@
                                 </ul>
                             </li>
                             }
+                            <li class="nav-item dropdown herm-info-nav-item">
+                                <button class="nav-link nav-icon-link herm-info-trigger dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="About HERM Mapper">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="10" fill="currentColor" />
+                                        <circle cx="12" cy="7.5" r="1.25" fill="#fff" />
+                                        <path d="M10.85 10.5a1.15 1.15 0 0 1 1.15-1.15h0a1.15 1.15 0 0 1 1.15 1.15v5.7h1.1a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5h1.1Z" fill="#fff" />
+                                    </svg>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end herm-info-menu">
+                                    <div class="herm-info-panel">
+                                        <span class="herm-info-eyebrow">About HERM</span>
+                                        <p class="herm-info-copy">
+                                            Version 3.2.0, &copy; 2025 CAUDIT; The HERM, the Higher Education Reference Models, is a collaborative community effort curated by the CAUDIT Enterprise Architecture group in active partnership with EUNIS, UCISA, and EDUCAUSE peer groups. The HERM is offered under the Creative Commons 4.0 CC BY-NC-SA license: you are free to use and adapt it, provided you do not use it for commercial gain. We encourage and require that any extensions or adaptations be shared back to benefit the global community. CAUDIT acknowledges the generous contributions of FromHereOn Pty Ltd. Please visit <a href="https://caudit.edu.au/" target="_blank" rel="noopener noreferrer">caudit.edu.au</a> for more information, and email <a href="mailto:herm-feedback@googlegroups.com">herm-feedback@googlegroups.com</a> with any feedback, suggestions, questions, and share-alike submissions.
+                                        </p>
+                                        <div class="herm-info-logo-grid" aria-label="Partner organisations">
+                                            <div class="herm-info-logo-card">
+                                                <img src="~/images/caudit-wordmark.svg" asp-append-version="true" alt="CAUDIT logo" class="herm-info-logo herm-info-logo-caudit" />
+                                            </div>
+                                            <div class="herm-info-logo-card">
+                                                <img src="~/images/eunis-wordmark.svg" asp-append-version="true" alt="EUNIS logo" class="herm-info-logo herm-info-logo-eunis" />
+                                            </div>
+                                            <div class="herm-info-logo-card">
+                                                <img src="~/images/ucisa-wordmark.svg" asp-append-version="true" alt="UCISA logo" class="herm-info-logo herm-info-logo-ucisa" />
+                                            </div>
+                                            <div class="herm-info-logo-card">
+                                                <img src="~/images/educause-wordmark.svg" asp-append-version="true" alt="EDUCAUSE wordmark" class="herm-info-logo herm-info-logo-educause" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
                             @if (isLocalAccount)
                             {
                             <li class="nav-item">

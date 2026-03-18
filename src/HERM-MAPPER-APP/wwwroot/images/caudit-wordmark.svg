@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 260" role="img" aria-labelledby="title desc">
+  <title id="title">CAUDIT</title>
+  <desc id="desc">Stylized CAUDIT wordmark with a geometric emblem.</desc>
+  <g fill="none" stroke="#b6242b" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="54,130 108,38 214,38 268,130 214,222 108,222" stroke-width="12"/>
+    <polygon points="86,130 126,62 196,62 236,130 196,198 126,198" stroke-width="12"/>
+    <polygon points="118,130 144,86 178,86 204,130 178,174 144,174" stroke-width="12"/>
+    <path d="M120 130h88" stroke-width="12"/>
+    <path d="M140 96h64" stroke-width="12"/>
+    <path d="M140 164h64" stroke-width="12"/>
+  </g>
+  <text x="320" y="182" fill="#b6242b" font-family="Aptos, Segoe UI, Arial, sans-serif" font-size="172" font-weight="700" letter-spacing="6">CAUDIT</text>
+</svg>

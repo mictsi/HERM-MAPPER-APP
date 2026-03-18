@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 260" role="img" aria-labelledby="title desc">
+  <title id="title">UCISA</title>
+  <desc id="desc">Stylized UCISA wordmark with magenta orbital sweeps.</desc>
+  <path d="M408 32c132-80 342-66 446 6 68 46 97 118 73 183-9-56-39-102-89-134-103-68-291-78-414-12z" fill="#ef3ba6"/>
+  <path d="M134 228c74 20 210 18 346-34 96-37 172-95 220-161-24 84-100 165-211 214-124 55-262 65-355 31z" fill="#ef3ba6"/>
+  <circle cx="388" cy="92" r="20" fill="#ef3ba6"/>
+  <text x="30" y="190" fill="#262b2e" font-family="Aptos, Segoe UI, Arial, sans-serif" font-size="176" font-weight="400" letter-spacing="2">ucisa</text>
+</svg>

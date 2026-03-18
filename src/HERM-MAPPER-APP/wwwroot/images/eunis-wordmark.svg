@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 240" role="img" aria-labelledby="title desc">
+  <title id="title">EUNIS</title>
+  <desc id="desc">Stylized EUNIS wordmark with vertical accent bars.</desc>
+  <g fill="#ef2a18">
+    <rect x="34" y="154" width="22" height="56" rx="11"/>
+    <rect x="66" y="120" width="22" height="90" rx="11"/>
+    <rect x="98" y="86" width="22" height="124" rx="11"/>
+    <rect x="130" y="46" width="22" height="164" rx="11"/>
+    <rect x="162" y="86" width="22" height="124" rx="11"/>
+    <rect x="194" y="120" width="22" height="90" rx="11"/>
+    <rect x="226" y="154" width="22" height="56" rx="11"/>
+    <circle cx="45" cy="101" r="11"/>
+    <circle cx="109" cy="215" r="11"/>
+    <circle cx="141" cy="25" r="11"/>
+    <circle cx="205" cy="101" r="11"/>
+  </g>
+  <text x="310" y="176" fill="#ef2a18" font-family="Aptos, Segoe UI, Arial, sans-serif" font-size="156" font-weight="700" letter-spacing="4">EUNIS</text>
+</svg>

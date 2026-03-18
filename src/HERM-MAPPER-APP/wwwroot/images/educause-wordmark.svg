@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 220" role="img" aria-labelledby="title desc">
+  <title id="title">EDUCAUSE</title>
+  <desc id="desc">Clean EDUCAUSE wordmark placeholder.</desc>
+  <rect x="28" y="48" width="24" height="124" rx="12" fill="#0b6e4f"/>
+  <circle cx="40" cy="30" r="12" fill="#0b6e4f"/>
+  <text x="92" y="156" fill="#1f2933" font-family="Aptos, Segoe UI, Arial, sans-serif" font-size="128" font-weight="700" letter-spacing="6">EDUCAUSE</text>
+</svg>
