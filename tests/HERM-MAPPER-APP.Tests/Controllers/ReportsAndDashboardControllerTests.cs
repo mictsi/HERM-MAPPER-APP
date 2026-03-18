@@ -1,10 +1,12 @@
 using HERMMapperApp.Controllers;
 using HERMMapperApp.Data;
 using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 using Xunit;
 
 namespace HERMMapperApp.Tests.Controllers;
@@ -100,6 +102,84 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Equal(5, model.SankeyLinks.Count);
         Assert.Contains(model.Paths, path => path.OwnerName == "Team Blue" && path.ProductName == "Sentinel");
         Assert.Contains(model.Paths, path => path.OwnerName == "Team Red" && path.ComponentLabel == "TC001 Monitoring");
+        Assert.Equal(1, model.ModelDiagram.DomainCount);
+        Assert.Equal(1, model.ModelDiagram.CapabilityCount);
+        Assert.Equal(1, model.ModelDiagram.ComponentCount);
+        Assert.Equal(3, model.ModelDiagram.ProductCount);
+        Assert.Equal(1, model.ModelDiagram.MappedProductCount);
+        Assert.Equal(2, model.ModelDiagram.UnmappedProductCount);
+        Assert.Single(model.ModelDiagram.Domains);
+        Assert.Single(model.ModelDiagram.Domains[0].Capabilities);
+        Assert.Single(model.ModelDiagram.Domains[0].Capabilities[0].Components);
+        Assert.Single(model.ModelDiagram.Domains[0].Capabilities[0].Components[0].Products);
+        Assert.Equal(["Legacy Tool", "Pilot Tool"], model.ModelDiagram.UnmappedProducts.Select(x => x.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task ReportsDownloadEndpointsReturnDrawIoAndArchiXml()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var domain = new TrmDomain
+        {
+            Code = "TD001",
+            Name = "Technology"
+        };
+        var capability = new TrmCapability
+        {
+            Code = "TP001",
+            Name = "Observability",
+            ParentDomain = domain,
+            ParentDomainCode = domain.Code
+        };
+        var component = new TrmComponent
+        {
+            Code = "TC001",
+            Name = "Monitoring",
+            ParentCapability = capability,
+            ParentCapabilityCode = capability.Code
+        };
+        var product = new ProductCatalogItem
+        {
+            Name = "Sentinel",
+            Vendor = "Contoso",
+            Version = "3.2",
+            Owners =
+            [
+                new ProductCatalogItemOwner { OwnerValue = "Team Blue" }
+            ]
+        };
+
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+        await fixture.DbContext.SaveChangesAsync();
+
+        fixture.DbContext.ProductMappings.Add(new ProductMapping
+        {
+            ProductCatalogItemId = product.Id,
+            TrmDomainId = domain.Id,
+            TrmCapabilityId = capability.Id,
+            TrmComponentId = component.Id,
+            MappingStatus = MappingStatus.Complete
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var controller = fixture.CreateReportsController();
+
+        var drawIoResult = await controller.DownloadDrawIoAsync();
+        var drawIoXml = Encoding.UTF8.GetString(drawIoResult.FileContents);
+        Assert.Equal("herm-product-model.drawio", drawIoResult.FileDownloadName);
+        Assert.Contains("<mxfile", drawIoXml);
+        Assert.Contains("Product Model Poster", drawIoXml);
+        Assert.Contains("Sentinel", drawIoXml);
+
+        var archiResult = await controller.DownloadArchiXmlAsync();
+        var archiXml = Encoding.UTF8.GetString(archiResult.FileContents);
+        Assert.Equal("herm-product-model.archimate.xml", archiResult.FileDownloadName);
+        Assert.Contains("<model", archiXml);
+        Assert.Contains("HERM Product Model", archiXml);
+        Assert.Contains("Sentinel", archiXml);
+        Assert.Contains("Technology", archiXml);
+        Assert.Contains("<views>", archiXml);
     }
 
     [Fact]
@@ -209,7 +289,7 @@ public sealed class ReportsAndDashboardControllerTests
             return new TestFixture(connection, dbContext);
         }
 
-        public ReportsController CreateReportsController() => new(DbContext);
+        public ReportsController CreateReportsController() => new(DbContext, new ModelDiagramReportService(DbContext));
 
         public HomeController CreateHomeController() => new(DbContext);
 

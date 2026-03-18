@@ -3,6 +3,9 @@
 @using HERMMapperApp.Models
 @using HERMMapperApp.Services
 @using HERMMapperApp.ViewModels
+@{
+    var bodyClass = ViewData["BodyClass"] as string;
+}
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -13,7 +16,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/HERM-MAPPER-APP.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body class="@bodyClass">
     <div class="app-shell">
         <header class="shell-header">
             <div class="container-xxl">

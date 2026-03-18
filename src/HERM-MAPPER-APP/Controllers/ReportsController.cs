@@ -1,5 +1,6 @@
 using HERMMapperApp.Data;
 using HERMMapperApp.Models;
+using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.CatalogueRead)]
-public sealed class ReportsController(AppDbContext dbContext) : Controller
+public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReportService modelDiagramReportService) : Controller
 {
     public async Task<IActionResult> IndexAsync(string? lifecycleOwner = null)
     {
@@ -77,6 +78,7 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
             MappingPathCount = paths.Count,
             SelectedLifecycleOwner = lifecycleOwner,
             LifecycleProductCount = lifecycleProducts.Count,
+            ModelDiagram = await modelDiagramReportService.BuildAsync(),
             AvailableOwners = availableOwners,
             LifecycleStatuses = BuildLifecycleStatuses(lifecycleProducts),
             Owners = BuildReportsHierarchy(paths),
@@ -86,6 +88,28 @@ public sealed class ReportsController(AppDbContext dbContext) : Controller
         };
 
         return View(model);
+    }
+
+    public async Task<IActionResult> ModelDiagramAsync()
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return View("ModelDiagram", await modelDiagramReportService.BuildAsync());
+    }
+
+    public async Task<FileContentResult> DownloadDrawIoAsync()
+    {
+        var content = await modelDiagramReportService.BuildDrawIoAsync();
+        return File(content, "application/xml", "herm-product-model.drawio");
+    }
+
+    public async Task<FileContentResult> DownloadArchiXmlAsync()
+    {
+        var content = await modelDiagramReportService.BuildArchiXmlAsync();
+        return File(content, "application/xml", "herm-product-model.archimate.xml");
     }
 
     private static IEnumerable<Models.ProductCatalogItem> FilterProductsByOwner(

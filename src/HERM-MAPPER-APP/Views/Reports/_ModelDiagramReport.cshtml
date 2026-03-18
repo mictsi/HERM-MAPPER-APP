@@ -1,0 +1,88 @@
+@model ModelDiagramReportViewModel
+
+<div class="model-report-canvas">
+    @foreach (var domain in Model.Domains)
+    {
+        <article class="model-report-domain">
+            <header class="model-report-domain-header">
+                <span class="model-report-domain-code">@domain.Code</span>
+                <h3>@domain.Name</h3>
+                <span class="table-subline">@domain.CapabilityCount capability(s), @domain.ComponentCount component(s), @domain.ProductCount mapped product(s)</span>
+            </header>
+
+            @if (domain.Capabilities.Count == 0)
+            {
+                <div class="model-report-empty-card">No capabilities are available in this domain yet.</div>
+            }
+            else
+            {
+                <div class="model-report-capability-grid">
+                    @foreach (var capability in domain.Capabilities)
+                    {
+                        <section class="model-report-capability">
+                            <header class="model-report-capability-header">
+                                <strong>@capability.DisplayLabel</strong>
+                                <span class="table-subline">@capability.ComponentCount component(s), @capability.ProductCount mapped product(s)</span>
+                            </header>
+
+                            @if (capability.Components.Count == 0)
+                            {
+                                <div class="model-report-empty-card">No components are linked to this capability yet.</div>
+                            }
+                            else
+                            {
+                                <div class="model-report-component-list">
+                                    @foreach (var component in capability.Components)
+                                    {
+                                        <article class="model-report-component">
+                                            <div class="model-report-component-header">
+                                                <strong>@component.DisplayLabel</strong>
+                                                <span class="table-subline">@component.ProductCount mapped product(s)</span>
+                                            </div>
+
+                                            @if (component.Products.Count == 0)
+                                            {
+                                                <div class="table-subline">No mapped products</div>
+                                            }
+                                            else
+                                            {
+                                                <ul class="model-report-product-list">
+                                                    @foreach (var product in component.Products)
+                                                    {
+                                                        <li class="model-report-product">
+                                                            <a class="model-report-product-link" asp-controller="Products" asp-action="Details" asp-route-id="@product.ProductId">@product.Name</a>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            }
+                                        </article>
+                                    }
+                                </div>
+                            }
+                        </section>
+                    }
+                </div>
+            }
+        </article>
+    }
+
+    @if (Model.UnmappedProducts.Count > 0)
+    {
+        <article class="model-report-domain model-report-domain-unmapped">
+            <header class="model-report-domain-header">
+                <span class="model-report-domain-code">UNMAPPED</span>
+                <h3>Unmapped Products</h3>
+                <span class="table-subline">@Model.UnmappedProducts.Count product(s) still need a component placement</span>
+            </header>
+
+            <div class="model-report-unmapped-list">
+                @foreach (var product in Model.UnmappedProducts)
+                {
+                    <article class="model-report-unmapped-card">
+                        <a class="model-report-product-link" asp-controller="Products" asp-action="Details" asp-route-id="@product.ProductId">@product.Name</a>
+                    </article>
+                }
+            </div>
+        </article>
+    }
+</div>

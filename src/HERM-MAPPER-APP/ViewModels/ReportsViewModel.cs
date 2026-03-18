@@ -10,6 +10,7 @@ public sealed class ReportsViewModel
     public int MappingPathCount { get; init; }
     public string? SelectedLifecycleOwner { get; init; }
     public int LifecycleProductCount { get; init; }
+    public ModelDiagramReportViewModel ModelDiagram { get; init; } = new();
     public IReadOnlyList<string> AvailableOwners { get; init; } = [];
     public IReadOnlyList<LifecycleStatusReportRowViewModel> LifecycleStatuses { get; init; } = [];
     public IReadOnlyList<ReportsHierarchyNodeViewModel> Owners { get; init; } = [];

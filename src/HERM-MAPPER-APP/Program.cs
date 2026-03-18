@@ -245,6 +245,7 @@ public partial class Program
         services.AddScoped<ConfigurableFieldService>();
         services.AddScoped<ComponentVersioningService>();
         services.AddScoped<ConfiguredTimeZoneService>();
+        services.AddScoped<ModelDiagramReportService>();
         var authenticationBuilder = services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme);
         authenticationBuilder.AddCookie(options =>
         {
