@@ -94,7 +94,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.HasIndex(x => x.Key).IsUnique();
             entity.Property(x => x.Key).HasMaxLength(100);
-            entity.Property(x => x.Value).HasMaxLength(400);
+            entity.Property(x => x.Value).HasMaxLength(4000);
         });
 
         modelBuilder.Entity<AppUser>(entity =>

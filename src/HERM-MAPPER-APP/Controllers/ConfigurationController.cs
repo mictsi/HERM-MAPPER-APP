@@ -1,3 +1,4 @@
+using System.Globalization;
 using HERMMapperApp.Data;
 using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
@@ -16,13 +17,16 @@ public sealed class ConfigurationController(
     AppSettingsService appSettingsService,
     ConfigurableFieldService configurableFieldService,
     AuditLogService auditLogService,
+    RemoteSqlImportService remoteSqlImportService,
     TrmWorkbookImportService workbookImportService,
     SampleRelationshipImportService sampleRelationshipImportService,
     IWebHostEnvironment environment) : Controller
 {
-    public async Task<IActionResult> Index(string? expandedFieldName = null)
+    public async Task<IActionResult> Index(string? expandedFieldName = null, string? openSection = null)
     {
-        return View(await BuildViewModelAsync(expandedFieldName: expandedFieldName));
+        return View(await BuildViewModelAsync(
+            expandedFieldName: expandedFieldName,
+            openRemoteSqlImportSection: string.Equals(openSection, RemoteSqlImportService.SectionKey, StringComparison.OrdinalIgnoreCase)));
     }
 
     [HttpPost]
@@ -397,6 +401,78 @@ public sealed class ConfigurationController(
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveRemoteSqlImportConfiguration(RemoteSqlImportInputModel input)
+    {
+        var normalizedInput = NormalizeRemoteSqlImportInput(input);
+        var result = await remoteSqlImportService.SaveSettingsAsync(MapRemoteSqlImportInput(normalizedInput));
+
+        if (!result.IsSuccess)
+        {
+            return View("Index", await BuildViewModelAsync(
+                errorMessage: result.Message,
+                remoteSqlInput: normalizedInput,
+                openRemoteSqlImportSection: true));
+        }
+
+        TempData["ConfigurationStatusMessage"] = result.Message;
+        if (!string.IsNullOrWhiteSpace(result.SavedUserNameClearText))
+        {
+            TempData["RemoteSqlImportSavedUserName"] = result.SavedUserNameClearText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.SavedPasswordClearText))
+        {
+            TempData["RemoteSqlImportSavedPassword"] = result.SavedPasswordClearText;
+        }
+
+        return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TestRemoteSqlImportConnection(RemoteSqlImportInputModel input)
+    {
+        var normalizedInput = NormalizeRemoteSqlImportInput(input);
+        var result = await remoteSqlImportService.TestConnectionAsync(MapRemoteSqlImportInput(normalizedInput));
+
+        var testViewModel = new RemoteSqlImportConnectionTestViewModel
+        {
+            IsSuccess = result.IsSuccess,
+            Summary = result.Message,
+            RemoteProductCount = result.RemoteProductCount,
+            RemoteMappingCount = result.RemoteMappingCount,
+            OwnersTableAvailable = result.OwnersTableAvailable,
+            Errors = result.Errors,
+            Warnings = result.Warnings
+        };
+
+        return View("Index", await BuildViewModelAsync(
+            statusMessage: result.IsSuccess ? result.Message : null,
+            errorMessage: result.IsSuccess ? null : result.Message,
+            remoteSqlInput: normalizedInput,
+            remoteSqlTestResult: testViewModel,
+            openRemoteSqlImportSection: true));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RunRemoteSqlImportNow()
+    {
+        var result = await remoteSqlImportService.RunManualImportAsync();
+        if (result.IsSuccess)
+        {
+            TempData["ConfigurationStatusMessage"] = result.Message;
+        }
+        else
+        {
+            TempData["ConfigurationError"] = result.Message;
+        }
+
+        return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
+    }
+
     private async Task<int> GetNextSortOrderAsync(string fieldName)
     {
         var maxSortOrder = await dbContext.ConfigurableFieldOptions
@@ -438,12 +514,25 @@ public sealed class ConfigurationController(
     private async Task<ConfigurationIndexViewModel> BuildViewModelAsync(
         WorkbookImportReviewViewModel? catalogueImportReview = null,
         ProductImportReviewViewModel? productImportReview = null,
-        string? expandedFieldName = null)
+        string? expandedFieldName = null,
+        string? statusMessage = null,
+        string? errorMessage = null,
+        RemoteSqlImportInputModel? remoteSqlInput = null,
+        RemoteSqlImportConnectionTestViewModel? remoteSqlTestResult = null,
+        bool openRemoteSqlImportSection = false)
     {
         var fields = new List<ConfigurationFieldGroupViewModel>();
         var displayTimeZoneId = await appSettingsService.GetValueAsync(
             AppSettingKeys.DisplayTimeZone,
             AppSettingDefaults.DisplayTimeZone);
+        var remoteSqlSettings = await remoteSqlImportService.GetSettingsAsync();
+        var savedUserNameClearText = TempData["RemoteSqlImportSavedUserName"] as string;
+        var savedPasswordClearText = TempData["RemoteSqlImportSavedPassword"] as string;
+        var effectiveRemoteSqlInput = remoteSqlInput ?? new RemoteSqlImportInputModel
+        {
+            ConnectionString = remoteSqlSettings.ConnectionString,
+            ScheduleHours = remoteSqlSettings.ScheduleHours
+        };
 
         foreach (var field in ConfigurableFieldNames.All)
         {
@@ -457,15 +546,36 @@ public sealed class ConfigurationController(
 
         return new ConfigurationIndexViewModel
         {
-            StatusMessage = TempData["ConfigurationStatusMessage"] as string,
-            ErrorMessage = TempData["ConfigurationError"] as string,
+            StatusMessage = statusMessage ?? TempData["ConfigurationStatusMessage"] as string,
+            ErrorMessage = errorMessage ?? TempData["ConfigurationError"] as string,
             ExpandedFieldName = ConfigurableFieldNames.IsSupported(expandedFieldName)
                 ? expandedFieldName
                 : null,
+            OpenRemoteSqlImportSection = openRemoteSqlImportSection || remoteSqlTestResult is not null || !string.IsNullOrWhiteSpace(savedUserNameClearText) || !string.IsNullOrWhiteSpace(savedPasswordClearText),
             DisplayTimeZoneId = displayTimeZoneId,
             AvailableTimeZones = BuildTimeZoneOptions(displayTimeZoneId),
             CatalogueImportReview = catalogueImportReview ?? new WorkbookImportReviewViewModel(),
             ProductImportReview = productImportReview ?? new ProductImportReviewViewModel(),
+            RemoteSqlImport = new RemoteSqlImportSectionViewModel
+            {
+                Input = effectiveRemoteSqlInput,
+                ScheduleOptions = BuildRemoteSqlScheduleOptions(effectiveRemoteSqlInput.ScheduleHours),
+                ExampleConnectionString = RemoteSqlImportService.ExampleConnectionString,
+                IsConfigured = remoteSqlSettings.IsConfigured,
+                HasSavedUserName = remoteSqlSettings.HasSavedUserName,
+                HasSavedPassword = remoteSqlSettings.HasSavedPassword,
+                SavedUserNameDisplay = remoteSqlSettings.MaskedUserName,
+                SavedPasswordDisplay = remoteSqlSettings.MaskedPassword,
+                ScheduleSummary = remoteSqlSettings.ScheduleLabel,
+                StatusSummary = remoteSqlSettings.StatusLabel,
+                LastMessage = remoteSqlSettings.LastMessage,
+                LastAttemptUtc = remoteSqlSettings.LastAttemptUtc,
+                LastSuccessUtc = remoteSqlSettings.LastSuccessUtc,
+                NextScheduledRunUtc = remoteSqlSettings.NextScheduledRunUtc,
+                TestResult = remoteSqlTestResult,
+                SavedUserNameClearText = savedUserNameClearText,
+                SavedPasswordClearText = savedPasswordClearText
+            },
             Fields = fields
         };
     }
@@ -488,6 +598,16 @@ public sealed class ConfigurationController(
         var absoluteOffset = offset.Duration();
         return $"{sign}{absoluteOffset:hh\\:mm}";
     }
+
+    private static List<SelectListItem> BuildRemoteSqlScheduleOptions(int selectedScheduleHours) =>
+        RemoteSqlImportService.GetAllowedScheduleHours()
+            .Select(hours => new SelectListItem
+            {
+                Value = hours.ToString(CultureInfo.InvariantCulture),
+                Text = RemoteSqlImportService.BuildScheduleLabel(hours),
+                Selected = hours == selectedScheduleHours
+            })
+            .ToList();
 
     private static WorkbookImportReviewViewModel BuildCatalogueErrorReview(string errorMessage, string? uploadedFileName = null) =>
         new()
@@ -534,4 +654,19 @@ public sealed class ConfigurationController(
         ConfigurableFieldNames.IsSupported(expandedFieldName)
             ? RedirectToAction(nameof(Index), new { expandedFieldName })
             : RedirectToAction(nameof(Index));
+
+    private static RemoteSqlImportInputModel NormalizeRemoteSqlImportInput(RemoteSqlImportInputModel input)
+    {
+        input.ConnectionString = input.ConnectionString?.Trim() ?? string.Empty;
+        input.UserName = input.UserName?.Trim();
+        input.Password ??= string.Empty;
+        return input;
+    }
+
+    private static RemoteSqlImportConfigurationInput MapRemoteSqlImportInput(RemoteSqlImportInputModel input) =>
+        new(
+            input.ConnectionString,
+            string.IsNullOrWhiteSpace(input.UserName) ? null : input.UserName,
+            string.IsNullOrWhiteSpace(input.Password) ? null : input.Password,
+            input.ScheduleHours);
 }

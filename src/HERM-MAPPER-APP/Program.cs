@@ -199,6 +199,7 @@ public partial class Program
         services.AddSingleton(localAuthenticationOptions);
         services.AddSingleton(openIdConnectAuthenticationOptions);
         services.AddHttpContextAccessor();
+        services.AddDataProtection();
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database");
         services.AddOutputCache();
@@ -241,11 +242,15 @@ public partial class Program
         services.AddScoped<DatabaseInitializer>();
         services.AddScoped<AuditLogService>();
         services.AddScoped<AppSettingsService>();
+        services.AddScoped<ProtectedSettingsService>();
         services.AddScoped<AppAuthenticationService>();
         services.AddScoped<ConfigurableFieldService>();
         services.AddScoped<ComponentVersioningService>();
         services.AddScoped<ConfiguredTimeZoneService>();
         services.AddScoped<ModelDiagramReportService>();
+        services.AddScoped<RemoteSqlImportService>();
+        services.AddSingleton<RemoteSqlImportExecutionGate>();
+        services.AddHostedService<RemoteSqlImportHostedService>();
         var authenticationBuilder = services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme);
         authenticationBuilder.AddCookie(options =>
         {

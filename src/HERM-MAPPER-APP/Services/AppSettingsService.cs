@@ -6,7 +6,7 @@ namespace HERMMapperApp.Services;
 
 public sealed class AppSettingsService(AppDbContext dbContext)
 {
-    public async Task<string> GetValueAsync(string key, string fallback, CancellationToken cancellationToken = default)
+    public async Task<string?> GetNullableValueAsync(string key, CancellationToken cancellationToken = default)
     {
         var value = await dbContext.AppSettings
             .AsNoTracking()
@@ -14,6 +14,12 @@ public sealed class AppSettingsService(AppDbContext dbContext)
             .Select(x => x.Value)
             .SingleOrDefaultAsync(cancellationToken);
 
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    public async Task<string> GetValueAsync(string key, string fallback, CancellationToken cancellationToken = default)
+    {
+        var value = await GetNullableValueAsync(key, cancellationToken);
         return string.IsNullOrWhiteSpace(value) ? fallback : value;
     }
 
@@ -35,6 +41,18 @@ public sealed class AppSettingsService(AppDbContext dbContext)
             setting.UpdatedUtc = DateTime.UtcNow;
         }
 
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteValueAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var setting = await dbContext.AppSettings.SingleOrDefaultAsync(x => x.Key == key, cancellationToken);
+        if (setting is null)
+        {
+            return;
+        }
+
+        dbContext.AppSettings.Remove(setting);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

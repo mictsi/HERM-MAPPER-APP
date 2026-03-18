@@ -920,9 +920,25 @@ public sealed partial class DatabaseInitializer(
                     CREATE TABLE [AppSettings] (
                         [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_AppSettings] PRIMARY KEY,
                         [Key] NVARCHAR(100) NOT NULL,
-                        [Value] NVARCHAR(400) NOT NULL,
+                        [Value] NVARCHAR(4000) NOT NULL,
                         [UpdatedUtc] DATETIME2 NOT NULL
                     );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF EXISTS (
+                    SELECT 1
+                    FROM sys.columns
+                    WHERE object_id = OBJECT_ID(N'[AppSettings]')
+                      AND name = N'Value'
+                      AND max_length < 8000
+                )
+                BEGIN
+                    ALTER TABLE [AppSettings]
+                    ALTER COLUMN [Value] NVARCHAR(4000) NOT NULL;
                 END
                 """,
                 cancellationToken);
