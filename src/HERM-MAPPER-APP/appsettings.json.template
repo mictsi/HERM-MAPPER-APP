@@ -1,0 +1,84 @@
+{
+  "ConnectionStrings": {
+    "Sqlite": "Data Source=|DataDirectory|/herm-mapper.db",
+    "DefaultConnection": "Data Source=|DataDirectory|/herm-mapper.db"
+  },
+  "Database": {
+    "Provider": "Sqlite",
+    "SqliteFilePath": "|DataDirectory|/herm-mapper.db",
+    "ConnectionString": ""
+  },
+  "HermWorkbook": {
+    "Path": "",
+    "AutoImportOnFirstRun": false
+  },
+  "SampleRelationships": {
+    "Path": "",
+    "AutoImportOnFirstRun": false
+  },
+  "Security": {
+    "BootstrapAdmin": {
+      "GivenName": "System",
+      "LastName": "Administrator",
+      "Email": "admin@local",
+      "UserName": "admin",
+      "Password": ""
+    },
+    "Authentication": {
+      "SessionTimeoutMinutes": 60,
+      "MaxFailedLoginAttempts": 15,
+      "LockoutMinutes": 1,
+      "Local": {
+        "Enabled": true
+      },
+      "OpenIdConnect": {
+        "Enabled": false,
+        "EmitTokensAndClaimsToConsole": false,
+        "DisplayName": "OpenID Connect",
+        "Authority": "",
+        "MetadataAddress": "",
+        "ClientId": "",
+        "ClientSecret": "",
+        "CallbackPath": "/signin-oidc",
+        "SignedOutCallbackPath": "/signout-callback-oidc",
+        "RequireHttpsMetadata": true,
+        "GetClaimsFromUserInfoEndpoint": false,
+        "NameClaimType": "name",
+        "EmailClaimType": "email",
+        "GivenNameClaimType": "given_name",
+        "SurnameClaimType": "family_name",
+        "GroupClaimType": "groups",
+        "SubjectClaimType": "sub",
+        "Scopes": [
+          "openid",
+          "profile",
+          "email"
+        ],
+        "RoleGroupMappings": {
+          "Administrator": [],
+          "Contributor": [],
+          "Viewer": []
+        }
+      }
+    }
+  },
+  "Diagnostics": {
+    "Console": {
+      "Enabled": true,
+      "LogLevel": "Information"
+    },
+    "Sql": {
+      "Enabled": false,
+      "LogLevel": "Information",
+      "IncludeSensitiveData": false,
+      "EnableDetailedErrors": false
+    }
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Error"
+    }
+  },
+  "AllowedHosts": "*"
+}
