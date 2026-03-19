@@ -69,6 +69,39 @@ public sealed class ReportsAndDashboardControllerTests
             TrmComponentId = component.Id,
             MappingStatus = MappingStatus.Complete
         });
+        await fixture.DbContext.ServiceCatalogItems.AddRangeAsync(
+            new ServiceCatalogItem
+            {
+                Name = "Student onboarding",
+                Owner = "Team Blue",
+                LifecycleStatus = "Production",
+                ProductConnections =
+                [
+                    new ServiceCatalogItemConnection
+                    {
+                        FromProductCatalogItemId = unassignedProduct.Id,
+                        ToProductCatalogItemId = mappedProduct.Id,
+                        SortOrder = 1
+                    },
+                    new ServiceCatalogItemConnection
+                    {
+                        FromProductCatalogItemId = trialProduct.Id,
+                        ToProductCatalogItemId = mappedProduct.Id,
+                        SortOrder = 2
+                    }
+                ]
+            },
+            new ServiceCatalogItem
+            {
+                Name = "Legacy support",
+                Owner = "Team Red",
+                LifecycleStatus = "Trial",
+                ProductLinks =
+                [
+                    new ServiceCatalogItemProduct { ProductCatalogItemId = trialProduct.Id, SortOrder = 1 },
+                    new ServiceCatalogItemProduct { ProductCatalogItemId = mappedProduct.Id, SortOrder = 2 }
+                ]
+            });
         await fixture.DbContext.SaveChangesAsync();
 
         var result = await fixture.CreateReportsController().IndexAsync("Unassigned owner");
@@ -89,6 +122,15 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Equal(["Not set", "Trial"], model.LifecycleStatuses.Select(x => x.Label).ToArray());
         Assert.Equal([1, 1], model.LifecycleStatuses.Select(x => x.ProductCount).ToArray());
         Assert.All(model.LifecycleStatuses, row => Assert.Equal(50.0m, row.Percentage));
+
+        Assert.Single(model.IncomingConnections);
+        var incomingConnections = model.IncomingConnections[0];
+        Assert.Equal(mappedProduct.Id, incomingConnections.ProductId);
+        Assert.Equal("Sentinel", incomingConnections.ProductName);
+        Assert.Equal(3, incomingConnections.IncomingConnectionCount);
+        Assert.Equal(2, incomingConnections.ServiceCount);
+        Assert.Equal("Legacy support, Student onboarding", incomingConnections.ServicePreview);
+        Assert.Equal("Legacy Tool, Pilot Tool", incomingConnections.SourceProductPreview);
 
         Assert.Equal(2, model.Owners.Count);
         Assert.All(model.Owners, owner =>

@@ -52,6 +52,24 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
             .OrderBy(x => x.Name)
             .ToListAsync();
 
+        var services = await dbContext.ServiceCatalogItems
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
+            .ThenInclude(x => x.ProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.FromProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.ToProductCatalogItem)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        var incomingConnections = BuildIncomingConnectionsReport(
+            services
+                .SelectMany(BuildServiceConnections)
+                .Where(connection => !connection.ToProduct.IsDeleted)
+                .ToList());
+
         var availableOwners = products
             .SelectMany(x => x.GetOwnerValues())
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -83,6 +101,7 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
             LifecycleStatuses = BuildLifecycleStatuses(lifecycleProducts),
             Owners = BuildReportsHierarchy(paths),
             Paths = paths,
+            IncomingConnections = incomingConnections,
             SankeyNodes = BuildReportsSankeyNodes(paths),
             SankeyLinks = BuildReportsSankeyLinks(paths)
         };
@@ -400,4 +419,93 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
     }
 
     private static string BuildSankeyNodeId(string prefix, object value) => $"{prefix}:{value}";
+
+    private static List<IncomingConnectionsReportRowViewModel> BuildIncomingConnectionsReport(
+        List<ServiceProductConnectionRecord> connections) =>
+        connections
+            .GroupBy(connection => connection.ToProduct.Id)
+            .Select(group =>
+            {
+                var targetProduct = group.First().ToProduct;
+                var serviceNames = group
+                    .Select(connection => connection.ServiceName)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var sourceProducts = group
+                    .Select(connection => BuildConnectionProductLabel(connection.FromProduct))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new IncomingConnectionsReportRowViewModel
+                {
+                    ProductId = targetProduct.Id,
+                    ProductName = targetProduct.Name,
+                    Vendor = targetProduct.Vendor,
+                    Version = targetProduct.Version,
+                    IncomingConnectionCount = group.Count(),
+                    ServiceCount = serviceNames.Count,
+                    ServicePreview = BuildPreviewLabel(serviceNames),
+                    SourceProductPreview = BuildPreviewLabel(sourceProducts)
+                };
+            })
+            .OrderByDescending(row => row.IncomingConnectionCount)
+            .ThenByDescending(row => row.ServiceCount)
+            .ThenBy(row => row.ProductName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static IEnumerable<ServiceProductConnectionRecord> BuildServiceConnections(ServiceCatalogItem service)
+    {
+        if (service.ProductConnections.Count != 0)
+        {
+            return service.GetOrderedProductConnections()
+                .Select(connection => new ServiceProductConnectionRecord(
+                    service.Id,
+                    service.Name,
+                    connection.FromProductCatalogItem,
+                    connection.ToProductCatalogItem))
+                .ToList();
+        }
+
+        var orderedLinks = service.GetOrderedProductLinks();
+        var connections = new List<ServiceProductConnectionRecord>();
+
+        for (var index = 0; index < orderedLinks.Count - 1; index++)
+        {
+            connections.Add(new ServiceProductConnectionRecord(
+                service.Id,
+                service.Name,
+                orderedLinks[index].ProductCatalogItem,
+                orderedLinks[index + 1].ProductCatalogItem));
+        }
+
+        return connections;
+    }
+
+    private static string BuildConnectionProductLabel(ProductCatalogItem product)
+    {
+        var detailParts = new[] { product.Vendor, product.Version }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+
+        var label = detailParts.Count == 0
+            ? product.Name
+            : $"{product.Name} ({string.Join(" ", detailParts)})";
+
+        return product.IsDeleted ? $"{label} [deleted]" : label;
+    }
+
+    private static string BuildPreviewLabel(IReadOnlyList<string> values) => values.Count switch
+    {
+        0 => "-",
+        <= 3 => string.Join(", ", values),
+        _ => $"{string.Join(", ", values.Take(3))} +{values.Count - 3} more"
+    };
+
+    private sealed record ServiceProductConnectionRecord(
+        int ServiceId,
+        string ServiceName,
+        ProductCatalogItem FromProduct,
+        ProductCatalogItem ToProduct);
 }
