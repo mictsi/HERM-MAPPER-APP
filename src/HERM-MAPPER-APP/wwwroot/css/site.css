@@ -1022,6 +1022,8 @@ a {
 .service-canvas-layout {
   display: grid;
   grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
   gap: 1.1rem;
   align-items: start;
 }
@@ -1114,6 +1116,9 @@ a {
 .service-canvas-workspace {
   display: grid;
   gap: 0.9rem;
+  min-height: clamp(40rem, 76vh, 58rem);
+  width: 100%;
+  min-width: 0;
 }
 
 .service-canvas-toolbar,
@@ -1170,17 +1175,30 @@ a {
 }
 
 .service-canvas-board {
-  overflow: auto;
-  padding: 0.35rem;
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: clamp(34rem, 68vh, 54rem);
+  overflow: visible;
+  padding: 0.55rem;
   border: 1px solid rgba(31, 41, 51, 0.08);
   border-radius: 1.3rem;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(247, 243, 235, 0.94));
 }
 
+.service-canvas-stage {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 32rem;
+  overflow: visible;
+  border-radius: 1rem;
+}
+
 .service-canvas-surface {
   position: relative;
-  min-width: 100%;
-  min-height: 32rem;
   border-radius: 1rem;
   background-color: rgba(252, 250, 245, 0.96);
   background-image:
@@ -1191,12 +1209,15 @@ a {
   background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
   background-position: -1px -1px, -1px -1px, -1px -1px, -1px -1px;
   outline: none;
+  transform-origin: top left;
+  will-change: transform;
 }
 
 .service-canvas-surface.is-drag-target {
   box-shadow: inset 0 0 0 2px rgba(11, 110, 79, 0.22);
 }
 
+.service-canvas-stage.is-connector-active,
 .service-canvas-surface.is-connector-active {
   cursor: crosshair;
 }
@@ -2708,6 +2729,17 @@ a {
   .service-canvas-palette,
   .service-canvas-board {
     padding: 0.85rem;
+  }
+
+  .service-canvas-workspace {
+    min-height: auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .service-canvas-board {
+    min-height: clamp(28rem, 62vh, 42rem);
+    width: 100%;
   }
 
   .service-canvas-node {

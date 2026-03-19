@@ -714,27 +714,28 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>`;
   };
 
-  const getElementBox = (element, referenceElement, scrollHost = referenceElement) => {
+  const getElementBox = (element, referenceElement, scale = 1) => {
     if (!(element instanceof Element) || !(referenceElement instanceof Element)) {
       return null;
     }
 
     const referenceRect = referenceElement.getBoundingClientRect();
     const elementRect = element.getBoundingClientRect();
-    const scrollLeft = scrollHost instanceof HTMLElement ? scrollHost.scrollLeft : 0;
-    const scrollTop = scrollHost instanceof HTMLElement ? scrollHost.scrollTop : 0;
-    const left = elementRect.left - referenceRect.left + scrollLeft;
-    const top = elementRect.top - referenceRect.top + scrollTop;
+    const effectiveScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+    const left = (elementRect.left - referenceRect.left) / effectiveScale;
+    const top = (elementRect.top - referenceRect.top) / effectiveScale;
+    const width = elementRect.width / effectiveScale;
+    const height = elementRect.height / effectiveScale;
 
     return {
       left,
       top,
-      right: left + elementRect.width,
-      bottom: top + elementRect.height,
-      width: elementRect.width,
-      height: elementRect.height,
-      centerX: left + (elementRect.width / 2),
-      centerY: top + (elementRect.height / 2)
+      right: left + width,
+      bottom: top + height,
+      width,
+      height,
+      centerX: left + (width / 2),
+      centerY: top + (height / 2)
     };
   };
 
@@ -1017,6 +1018,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = editor.closest("form");
     const stateInput = editor.querySelector("[data-service-canvas-state-input]");
     const board = editor.querySelector("[data-service-canvas-board]");
+    const stage = editor.querySelector("[data-service-canvas-stage]");
     const surface = editor.querySelector("[data-service-canvas-surface]");
     const nodesHost = editor.querySelector("[data-service-canvas-nodes]");
     const lines = editor.querySelector("[data-service-canvas-lines]");
@@ -1037,6 +1039,7 @@ document.addEventListener("DOMContentLoaded", () => {
       !(form instanceof HTMLFormElement) ||
       !(stateInput instanceof HTMLInputElement) ||
       !(board instanceof HTMLElement) ||
+      !(stage instanceof HTMLElement) ||
       !(surface instanceof HTMLElement) ||
       !(nodesHost instanceof HTMLElement) ||
       !(lines instanceof SVGSVGElement) ||
@@ -1072,8 +1075,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const canvasNodeWidth = 220;
     const canvasNodeHeight = 124;
     const canvasPadding = 32;
-    const connectorStartGap = 3;
-    const connectorEndGap = 5;
+    const canvasColumnGap = 30;
+    const canvasRowGap = 46;
+    const canvasAutoRowGap = 56;
+    const connectorStartGap = 0;
+    const connectorEndGap = 0;
 
     const getLabel = (productId) => productsById.get(productId) ?? `Product ${productId}`;
 
@@ -1187,41 +1193,50 @@ document.addEventListener("DOMContentLoaded", () => {
       return state.nodes.get(productId);
     };
 
+    const getSurfaceWidth = () => {
+      const minimumWidth = (canvasPadding * 2) + canvasNodeWidth;
+      const stageWidth = Math.round(stage.clientWidth);
+      const boardInnerWidth = Math.max(0, Math.round(board.clientWidth - 18));
+      const surfaceWidth = Math.round(surface.clientWidth);
+      return Math.max(minimumWidth, stageWidth, boardInnerWidth, surfaceWidth);
+    };
+
+    const getCanvasColumnCapacity = () => {
+      const usableWidth = Math.max(canvasNodeWidth, getSurfaceWidth() - (canvasPadding * 2));
+      return Math.max(1, Math.floor((usableWidth + canvasColumnGap) / (canvasNodeWidth + canvasColumnGap)));
+    };
+
+    const clampNodeX = (x) => {
+      const maxX = Math.max(canvasPadding, getSurfaceWidth() - canvasNodeWidth - canvasPadding);
+      const nextX = Math.round(Number.isFinite(x) ? x : canvasPadding);
+      return Math.min(maxX, Math.max(canvasPadding, nextX));
+    };
+
+    const clampNodeY = (y) => Math.max(canvasPadding, Math.round(Number.isFinite(y) ? y : canvasPadding));
+
     const setNodePosition = (productId, x, y) => {
       const node = ensureNode(productId);
       if (node === undefined) {
         return;
       }
 
-      node.x = Math.max(canvasPadding, Math.round(Number.isFinite(x) ? x : canvasPadding));
-      node.y = Math.max(canvasPadding, Math.round(Number.isFinite(y) ? y : canvasPadding));
+      node.x = clampNodeX(x);
+      node.y = clampNodeY(y);
     };
 
     const getDefaultNodePosition = () => {
       const index = state.nodes.size;
+      const columns = getCanvasColumnCapacity();
       return {
-        x: 56 + ((index % 3) * 250),
-        y: 56 + (Math.floor(index / 3) * 168)
+        x: 56 + ((index % columns) * (canvasNodeWidth + canvasColumnGap)),
+        y: 56 + (Math.floor(index / columns) * (canvasNodeHeight + canvasRowGap))
       };
     };
 
     const getViewportPlacementPoint = () => ({
-      x: board.scrollLeft + (board.clientWidth / 2) - (canvasNodeWidth / 2),
-      y: board.scrollTop + (board.clientHeight / 2) - (canvasNodeHeight / 2)
+      x: (stage.clientWidth / 2) - (canvasNodeWidth / 2),
+      y: (stage.clientHeight / 2) - (canvasNodeHeight / 2)
     });
-
-    const revealNode = (productId) => {
-      requestAnimationFrame(() => {
-        const nodeElement = nodesHost.querySelector(`[data-service-canvas-node][data-node-id="${productId}"]`);
-        if (nodeElement instanceof HTMLElement) {
-          nodeElement.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-            inline: "center"
-          });
-        }
-      });
-    };
 
     const placeNode = (productId, point = null) => {
       const alreadyExists = state.nodes.has(productId);
@@ -1232,7 +1247,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       scheduleRender();
-      revealNode(productId);
     };
 
     const removeNode = (productId) => {
@@ -1288,13 +1302,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const productIds = orderedProductIds.length !== 0
         ? orderedProductIds.filter((productId) => state.nodes.has(productId))
         : Array.from(state.nodes.keys());
-      const columns = Math.max(1, Math.ceil(Math.sqrt(productIds.length)));
+      const columns = Math.max(1, Math.min(getCanvasColumnCapacity(), Math.ceil(Math.sqrt(productIds.length))));
 
       productIds.forEach((productId, index) => {
         setNodePosition(
           productId,
-          56 + ((index % columns) * 250),
-          56 + (Math.floor(index / columns) * 170));
+          56 + ((index % columns) * (canvasNodeWidth + canvasColumnGap)),
+          56 + (Math.floor(index / columns) * (canvasNodeHeight + canvasRowGap)));
       });
     };
 
@@ -1321,10 +1335,18 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      layout.rows.forEach((row, rowIndex) => {
+      const columnCapacity = getCanvasColumnCapacity();
+      let visualRowIndex = 0;
+      layout.rows.forEach((row) => {
         row.forEach((node, columnIndex) => {
-          setNodePosition(node.id, 72 + (columnIndex * 250), 72 + (rowIndex * 180));
+          const wrappedRowIndex = Math.floor(columnIndex / columnCapacity);
+          const wrappedColumnIndex = columnIndex % columnCapacity;
+          setNodePosition(
+            node.id,
+            72 + (wrappedColumnIndex * (canvasNodeWidth + canvasColumnGap)),
+            72 + ((visualRowIndex + wrappedRowIndex) * (canvasNodeHeight + canvasAutoRowGap)));
         });
+        visualRowIndex += Math.max(1, Math.ceil(row.length / columnCapacity));
       });
 
       scheduleRender();
@@ -1402,10 +1424,20 @@ document.addEventListener("DOMContentLoaded", () => {
         .join("");
     };
 
+    const normalizeNodePositions = () => {
+      state.nodes.forEach((node) => {
+        if (node.x === null || node.y === null) {
+          return;
+        }
+
+        node.x = clampNodeX(node.x);
+        node.y = clampNodeY(node.y);
+      });
+    };
+
     const refreshSurfaceSize = () => {
-      const minimumWidth = Math.max(board.clientWidth - 2, 880);
-      const minimumHeight = 520;
-      let width = minimumWidth;
+      const width = getSurfaceWidth();
+      const minimumHeight = Math.max(stage.clientHeight, 520);
       let height = minimumHeight;
 
       Array.from(nodesHost.querySelectorAll("[data-service-canvas-node]")).forEach((element) => {
@@ -1413,14 +1445,13 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        const left = Number.parseFloat(element.style.left) || 0;
         const top = Number.parseFloat(element.style.top) || 0;
-        width = Math.max(width, left + element.offsetWidth + 96);
         height = Math.max(height, top + element.offsetHeight + 96);
       });
 
       surface.style.width = `${Math.round(width)}px`;
       surface.style.height = `${Math.round(height)}px`;
+      surface.style.removeProperty("transform");
     };
 
     const getNodeBox = (productId) => {
@@ -1429,12 +1460,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return null;
       }
 
-      return getElementBox(nodeElement, surface, board);
+      return getElementBox(nodeElement, surface);
     };
 
     const drawConnections = () => {
-      const width = Math.max(surface.scrollWidth, surface.clientWidth);
-      const height = Math.max(surface.scrollHeight, surface.clientHeight);
+      const width = surface.clientWidth;
+      const height = surface.clientHeight;
 
       lines.setAttribute("viewBox", `0 0 ${width} ${height}`);
       lines.setAttribute("width", String(width));
@@ -1486,7 +1517,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       lines.innerHTML = `
         <defs>
-          <marker id="service-canvas-arrow" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
+          <marker id="service-canvas-arrow" markerWidth="11" markerHeight="11" refX="10" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
             <path d="M 0 0 L 11 5.5 L 0 11 z" class="service-canvas-line-arrow"></path>
           </marker>
         </defs>
@@ -1496,11 +1527,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const render = () => {
       renderQueued = false;
+      normalizeNodePositions();
       renderNodes();
       updatePaletteUsage();
       updateSummary();
       updateConnectorBanner();
       updateSelectionBanner();
+      stage.classList.toggle("is-connector-active", state.connectorSourceId !== null);
       surface.classList.toggle("is-connector-active", state.connectorSourceId !== null);
       serializeState();
 
@@ -1538,19 +1571,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const toSurfacePoint = (clientX, clientY) => {
       const rect = surface.getBoundingClientRect();
       return {
-        x: clientX - rect.left + board.scrollLeft,
-        y: clientY - rect.top + board.scrollTop
+        x: clientX - rect.left,
+        y: clientY - rect.top
       };
     };
 
     const initialState = parseServiceCanvasState(stateInput.value);
     if (initialState !== null) {
       initialState.nodes.forEach((node) => {
-        const stateNode = ensureNode(node.productId);
-        if (stateNode !== undefined) {
-          stateNode.x = node.x;
-          stateNode.y = node.y;
-        }
+        setNodePosition(node.productId, node.x, node.y);
       });
 
       initialState.connections.forEach((connection) => {
@@ -1602,18 +1631,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     filterPalette();
 
-    surface.addEventListener("dragover", (event) => {
+    stage.addEventListener("dragover", (event) => {
       if (event.dataTransfer?.types.includes("text/service-product-id")) {
         event.preventDefault();
         surface.classList.add("is-drag-target");
       }
     });
 
-    surface.addEventListener("dragleave", () => {
+    stage.addEventListener("dragleave", () => {
       surface.classList.remove("is-drag-target");
     });
 
-    surface.addEventListener("drop", (event) => {
+    stage.addEventListener("drop", (event) => {
       event.preventDefault();
       surface.classList.remove("is-drag-target");
 
@@ -1655,7 +1684,7 @@ document.addEventListener("DOMContentLoaded", () => {
       event.preventDefault();
     });
 
-    surface.addEventListener("pointermove", (event) => {
+    stage.addEventListener("pointermove", (event) => {
       const point = toSurfacePoint(event.clientX, event.clientY);
 
       if (state.connectorSourceId !== null) {
@@ -1690,10 +1719,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    surface.addEventListener("pointerup", finishDrag);
+    stage.addEventListener("pointerup", finishDrag);
     window.addEventListener("pointerup", finishDrag);
 
-    surface.addEventListener("pointerleave", () => {
+    stage.addEventListener("pointerleave", () => {
       if (state.connectorSourceId !== null) {
         state.pointer = null;
         scheduleRender();
@@ -1743,14 +1772,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    surface.addEventListener("click", (event) => {
-      if (event.target === surface || event.target === emptyState) {
+    stage.addEventListener("click", (event) => {
+      if (event.target === stage || event.target === surface || event.target === emptyState) {
         cancelConnector();
         clearSelectedConnection();
       }
     });
 
-    surface.addEventListener("keydown", (event) => {
+    stage.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         cancelConnector();
       }
@@ -1799,12 +1828,6 @@ document.addEventListener("DOMContentLoaded", () => {
       state.connections.splice(existingIndex, 1);
       state.selectedConnectionKey = null;
       scheduleRender();
-    });
-
-    board.addEventListener("scroll", () => {
-      if (state.connectorSourceId !== null) {
-        scheduleRender();
-      }
     });
 
     if (autoLayoutButton instanceof HTMLButtonElement) {
