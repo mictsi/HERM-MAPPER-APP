@@ -33,7 +33,8 @@ public sealed class ServicesControllerTests
             Name = "Security Operations",
             Description = "SOC tooling",
             Owner = " Team Blue ",
-            LifecycleStatus = " Production "
+            LifecycleStatus = " Production ",
+            AssetCriticalityScore = 5
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
@@ -45,6 +46,7 @@ public sealed class ServicesControllerTests
         Assert.Equal("Security Operations", service.Name);
         Assert.Equal("Team Blue", service.Owner);
         Assert.Equal("Production", service.LifecycleStatus);
+        Assert.Equal(5, service.AssetCriticalityScore);
         Assert.Equal(service.Id, redirect.RouteValues!["id"]);
         Assert.Equal("Create", audit.Action);
     }
@@ -62,6 +64,8 @@ public sealed class ServicesControllerTests
         var model = Assert.IsType<ServiceEditViewModel>(view.Model);
         Assert.Contains(model.OwnerOptions, option => option.Value == "Team Blue");
         Assert.Contains(model.LifecycleStatusOptions, option => option.Value == "Production");
+        Assert.Contains(model.AssetCriticalityScoreOptions, option => option.Value == "1");
+        Assert.Contains(model.AssetCriticalityScoreOptions, option => option.Value == "5");
     }
 
     [Fact]
@@ -138,6 +142,7 @@ public sealed class ServicesControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceEditViewModel>(view.Model);
         Assert.Equal(serviceId, model.Id);
+        Assert.Equal(1, model.AssetCriticalityScore);
         Assert.Contains(model.OwnerOptions, option => option.Value == "Team Blue");
     }
 
@@ -251,7 +256,8 @@ public sealed class ServicesControllerTests
             Name = "Payments Revised",
             Description = "Updated flow",
             Owner = " Team Green ",
-            LifecycleStatus = " Production "
+            LifecycleStatus = " Production ",
+            AssetCriticalityScore = 4
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
@@ -263,6 +269,7 @@ public sealed class ServicesControllerTests
         Assert.Equal("Payments Revised", updatedService.Name);
         Assert.Equal("Team Green", updatedService.Owner);
         Assert.Equal("Production", updatedService.LifecycleStatus);
+        Assert.Equal(4, updatedService.AssetCriticalityScore);
         Assert.Equal("Update", audit.Action);
     }
 

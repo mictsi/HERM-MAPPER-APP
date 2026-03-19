@@ -225,6 +225,62 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
+    public async Task ReportsExportMappingsCsvReturnsCompletedMappings()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var domain = new TrmDomain
+        {
+            Code = "TD001",
+            Name = "Technology"
+        };
+        var capability = new TrmCapability
+        {
+            Code = "TP001",
+            Name = "Observability",
+            ParentDomain = domain,
+            ParentDomainCode = domain.Code
+        };
+        var component = new TrmComponent
+        {
+            Code = "TC001",
+            Name = "Monitoring",
+            ParentCapability = capability,
+            ParentCapabilityCode = capability.Code
+        };
+        var completedProduct = new ProductCatalogItem { Name = "Sentinel" };
+        var draftProduct = new ProductCatalogItem { Name = "Draft Tool" };
+
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, completedProduct, draftProduct);
+        await fixture.DbContext.SaveChangesAsync();
+
+        await fixture.DbContext.ProductMappings.AddRangeAsync(
+            new ProductMapping
+            {
+                ProductCatalogItemId = completedProduct.Id,
+                TrmDomainId = domain.Id,
+                TrmCapabilityId = capability.Id,
+                TrmComponentId = component.Id,
+                MappingStatus = MappingStatus.Complete
+            },
+            new ProductMapping
+            {
+                ProductCatalogItemId = draftProduct.Id,
+                TrmDomainId = domain.Id,
+                TrmCapabilityId = capability.Id,
+                MappingStatus = MappingStatus.Draft
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var result = await fixture.CreateReportsController().ExportMappingsCsvAsync();
+
+        Assert.Equal("text/csv", result.ContentType);
+        var content = Encoding.UTF8.GetString(result.FileContents);
+        Assert.Contains("Sentinel", content);
+        Assert.DoesNotContain("Draft Tool", content);
+    }
+
+    [Fact]
     public async Task HomeIndexReturnsDashboardCountsAndRecentProducts()
     {
         await using var fixture = await TestFixture.CreateAsync();

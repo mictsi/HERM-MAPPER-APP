@@ -19,6 +19,12 @@ public sealed class ServicesController(
     ConfigurableFieldService configurableFieldService) : Controller
 {
     private static readonly JsonSerializerOptions CanvasStateJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly IReadOnlyList<SelectListItem> AssetCriticalityScoreOptions =
+        Enumerable.Range(1, 5)
+            .Select(score => new SelectListItem(
+                text: BuildAssetCriticalityScoreOptionText(score),
+                value: score.ToString(CultureInfo.InvariantCulture)))
+            .ToList();
 
     public async Task<IActionResult> Index(
         string? search,
@@ -108,6 +114,7 @@ public sealed class ServicesController(
             Description = NormalizeSelection(input.Description),
             Owner = input.Owner!,
             LifecycleStatus = input.LifecycleStatus!,
+            AssetCriticalityScore = input.AssetCriticalityScore,
             CreatedUtc = DateTime.UtcNow,
             UpdatedUtc = DateTime.UtcNow
         };
@@ -120,7 +127,7 @@ public sealed class ServicesController(
             nameof(ServiceCatalogItem),
             service.Id,
             $"Created service {service.Name}.",
-            $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. Connections: 0.");
+            $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. ACS: {service.AssetCriticalityScore}. Connections: 0.");
 
         TempData["ServicesStatusMessage"] = $"Created service {service.Name}. Design the connected products below.";
         return RedirectToAction(nameof(Connections), new { id = service.Id });
@@ -164,6 +171,7 @@ public sealed class ServicesController(
         service.Description = NormalizeSelection(input.Description);
         service.Owner = input.Owner!;
         service.LifecycleStatus = input.LifecycleStatus!;
+        service.AssetCriticalityScore = input.AssetCriticalityScore;
         service.UpdatedUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync();
@@ -173,7 +181,7 @@ public sealed class ServicesController(
             nameof(ServiceCatalogItem),
             service.Id,
             $"Updated service {service.Name}.",
-            $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. Connections: {service.ConnectionCount}.");
+            $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. ACS: {service.AssetCriticalityScore}. Connections: {service.ConnectionCount}.");
 
         TempData["ServicesStatusMessage"] = $"Updated service {service.Name}.";
         return RedirectToAction(nameof(Connections), new { id = service.Id });
@@ -382,6 +390,12 @@ public sealed class ServicesController(
             ConfigurableFieldNames.LifecycleStatus,
             model.LifecycleStatus,
             "Choose status");
+        model.AssetCriticalityScoreOptions = AssetCriticalityScoreOptions
+            .Select(option => new SelectListItem(
+                option.Text,
+                option.Value,
+                selected: string.Equals(option.Value, model.AssetCriticalityScore.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)))
+            .ToList();
     }
 
     private async Task<ServiceConnectionEditorViewModel> BuildConnectionEditorModelAsync(ServiceCatalogItem service)
@@ -393,6 +407,7 @@ public sealed class ServicesController(
             ServiceDescription = service.Description,
             ServiceOwner = service.Owner,
             ServiceLifecycleStatus = service.LifecycleStatus,
+            AssetCriticalityScore = service.AssetCriticalityScore,
             UsesLegacyFlow = service.ProductConnections.Count == 0 && service.ProductLinks.Count > 1,
             ConnectionRows = BuildConnectionRowsForEditor(service),
             CanvasNodes = ParseConnectionLayoutNodes(service.ConnectionLayoutJson)
@@ -481,6 +496,7 @@ public sealed class ServicesController(
             Description = service.Description,
             Owner = service.Owner,
             LifecycleStatus = service.LifecycleStatus,
+            AssetCriticalityScore = service.AssetCriticalityScore,
             UpdatedUtc = service.UpdatedUtc,
             ProductNames = productNames,
             ProductCount = productNames.Count,
@@ -846,6 +862,14 @@ public sealed class ServicesController(
             _ => services.OrderByDescending(x => x.UpdatedUtc).ThenBy(x => x.Name)
         };
 
+    private static string BuildAssetCriticalityScoreOptionText(int score) =>
+        score switch
+        {
+            1 => "1 (lowest)",
+            5 => "5 (highest)",
+            _ => score.ToString(CultureInfo.InvariantCulture)
+        };
+
     private static void NormalizeServiceInput(ServiceEditViewModel input)
     {
         input.Owner = NormalizeSelection(input.Owner);
@@ -1040,6 +1064,7 @@ public sealed class ServicesController(
         model.ServiceDescription = service.Description;
         model.ServiceOwner = service.Owner;
         model.ServiceLifecycleStatus = service.LifecycleStatus;
+        model.AssetCriticalityScore = service.AssetCriticalityScore;
         model.UsesLegacyFlow = service.ProductConnections.Count == 0 && service.ProductLinks.Count > 1;
     }
 

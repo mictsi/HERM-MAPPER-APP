@@ -12,12 +12,12 @@
     </div>
 
     <div class="row g-3">
-        <div class="col-lg-6">
+        <div class="col-lg-4">
             <label asp-for="Name" class="form-label"></label>
             <input asp-for="Name" class="form-control" />
             <span asp-validation-for="Name" class="text-danger"></span>
         </div>
-        <div class="col-lg-3">
+        <div class="col-lg-2">
             <label asp-for="Owner" class="form-label"></label>
             <select asp-for="Owner" asp-items="Model.OwnerOptions" class="form-select"></select>
             <span asp-validation-for="Owner" class="text-danger"></span>
@@ -27,10 +27,20 @@
             <select asp-for="LifecycleStatus" asp-items="Model.LifecycleStatusOptions" class="form-select"></select>
             <span asp-validation-for="LifecycleStatus" class="text-danger"></span>
         </div>
+        <div class="col-lg-3">
+            <label asp-for="AssetCriticalityScore" class="form-label"></label>
+            <select asp-for="AssetCriticalityScore" asp-items="Model.AssetCriticalityScoreOptions" class="form-select"></select>
+            <span asp-validation-for="AssetCriticalityScore" class="text-danger"></span>
+        </div>
         <div class="col-12">
             <label asp-for="Description" class="form-label"></label>
             <textarea asp-for="Description" class="form-control" rows="4"></textarea>
             <span asp-validation-for="Description" class="text-danger"></span>
+        </div>
+        <div class="col-12">
+            <div class="form-note mb-0">
+                <strong>ACS scale:</strong> Asset Criticality Score (ACS) is a user-defined score from 1 to 5 that shows how important the service is to your business. <strong>1</strong> is the lowest criticality and <strong>5</strong> is the highest criticality, such as a core production database.
+            </div>
         </div>
     </div>
 

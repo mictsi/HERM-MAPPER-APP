@@ -21,6 +21,10 @@ public sealed class ServiceCatalogItem
     [Display(Name = "Lifecycle status")]
     public string LifecycleStatus { get; set; } = string.Empty;
 
+    [Range(1, 5)]
+    [Display(Name = "Asset criticality score")]
+    public int AssetCriticalityScore { get; set; } = 1;
+
     public string? ConnectionLayoutJson { get; set; }
 
     public bool IsDeleted { get; set; }

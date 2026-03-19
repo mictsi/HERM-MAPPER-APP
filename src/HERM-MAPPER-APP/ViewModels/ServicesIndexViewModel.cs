@@ -20,6 +20,7 @@ public sealed class ServiceIndexRowViewModel
     public string? Description { get; init; }
     public string Owner { get; init; } = string.Empty;
     public string LifecycleStatus { get; init; } = string.Empty;
+    public int AssetCriticalityScore { get; init; }
     public DateTime UpdatedUtc { get; init; }
     public IReadOnlyList<string> ProductNames { get; init; } = [];
     public int ProductCount { get; init; }

@@ -47,6 +47,10 @@
                 <div>@Model.ServiceLifecycleStatus</div>
             </div>
             <div>
+                <div class="detail-label">ACS</div>
+                <div>@Model.AssetCriticalityScore / 5</div>
+            </div>
+            <div>
                 <div class="detail-label">Description</div>
                 <div>@(string.IsNullOrWhiteSpace(Model.ServiceDescription) ? "No description provided." : Model.ServiceDescription)</div>
             </div>

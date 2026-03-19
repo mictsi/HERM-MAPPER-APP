@@ -68,6 +68,7 @@ public sealed class ControllerAuthorizationTests
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponentAsync), AppPolicies.AdminOnly, 1);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponentAsync), AppPolicies.AdminOnly, 1);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.PermanentlyDeleteComponentAsync), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReportsController>(nameof(ReportsController.ExportMappingsCsvAsync), AppPolicies.AdminOnly, 0);
     }
 
     private static void AssertClassPolicy<TController>(string expectedPolicy)

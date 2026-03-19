@@ -10,6 +10,7 @@ public sealed class ServiceConnectionEditorViewModel
     public string? ServiceDescription { get; set; }
     public string ServiceOwner { get; set; } = string.Empty;
     public string ServiceLifecycleStatus { get; set; } = string.Empty;
+    public int AssetCriticalityScore { get; set; } = 1;
     public string? StatusMessage { get; set; }
     public bool UsesLegacyFlow { get; set; }
     public string? CanvasStateJson { get; set; }

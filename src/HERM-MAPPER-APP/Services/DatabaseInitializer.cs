@@ -20,6 +20,7 @@ public sealed partial class DatabaseInitializer(
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureProductSoftDeleteColumnsAsync(cancellationToken);
         await EnsureServiceSoftDeleteColumnsAsync(cancellationToken);
+        await EnsureServiceAssetCriticalityScoreColumnAsync(cancellationToken);
         await EnsureServiceConnectionLayoutColumnAsync(cancellationToken);
         await EnsureAppSettingsTableAsync(cancellationToken);
         await EnsureUsersTableAsync(cancellationToken);
@@ -381,6 +382,7 @@ public sealed partial class DatabaseInitializer(
                     "Description" TEXT NULL,
                     "Owner" TEXT NOT NULL,
                     "LifecycleStatus" TEXT NOT NULL,
+                    "AssetCriticalityScore" INTEGER NOT NULL DEFAULT 1,
                     "ConnectionLayoutJson" TEXT NULL,
                     "IsDeleted" INTEGER NOT NULL DEFAULT 0,
                     "DeletedUtc" TEXT NULL,
@@ -495,6 +497,7 @@ public sealed partial class DatabaseInitializer(
                         [Description] NVARCHAR(2000) NULL,
                         [Owner] NVARCHAR(120) NOT NULL,
                         [LifecycleStatus] NVARCHAR(80) NOT NULL,
+                        [AssetCriticalityScore] INT NOT NULL CONSTRAINT [DF_ServiceCatalogItems_AssetCriticalityScore] DEFAULT 1,
                         [ConnectionLayoutJson] NVARCHAR(MAX) NULL,
                         [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ServiceCatalogItems_IsDeleted] DEFAULT 0,
                         [DeletedUtc] DATETIME2 NULL,
@@ -841,6 +844,34 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     ALTER TABLE [ServiceCatalogItems]
                     ADD [ConnectionLayoutJson] NVARCHAR(MAX) NULL;
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureServiceAssetCriticalityScoreColumnAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            if (!await SqliteColumnExistsAsync("ServiceCatalogItems", "AssetCriticalityScore", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ServiceCatalogItems ADD COLUMN AssetCriticalityScore INTEGER NOT NULL DEFAULT 1",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ServiceCatalogItems]', N'AssetCriticalityScore') IS NULL
+                BEGIN
+                    ALTER TABLE [ServiceCatalogItems]
+                    ADD [AssetCriticalityScore] INT NOT NULL CONSTRAINT [DF_ServiceCatalogItems_AssetCriticalityScore] DEFAULT 1;
                 END
                 """,
                 cancellationToken);

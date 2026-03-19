@@ -22,8 +22,13 @@ public sealed class ServiceEditViewModel
     [Display(Name = "Lifecycle status")]
     public string? LifecycleStatus { get; set; }
 
+    [Range(1, 5)]
+    [Display(Name = "Asset criticality score")]
+    public int AssetCriticalityScore { get; set; } = 1;
+
     public IReadOnlyList<SelectListItem> OwnerOptions { get; set; } = [];
     public IReadOnlyList<SelectListItem> LifecycleStatusOptions { get; set; } = [];
+    public IReadOnlyList<SelectListItem> AssetCriticalityScoreOptions { get; set; } = [];
 
     public static ServiceEditViewModel FromService(ServiceCatalogItem service) =>
         new()
@@ -32,6 +37,7 @@ public sealed class ServiceEditViewModel
             Name = service.Name,
             Description = service.Description,
             Owner = service.Owner,
-            LifecycleStatus = service.LifecycleStatus
+            LifecycleStatus = service.LifecycleStatus,
+            AssetCriticalityScore = service.AssetCriticalityScore
         };
 }

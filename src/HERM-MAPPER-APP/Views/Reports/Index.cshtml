@@ -1,11 +1,13 @@
 @model HERMMapperApp.ViewModels.ReportsViewModel
 @using System.Text.Json
+@using System.Globalization
 @using HERMMapperApp
 @using HERMMapperApp.Models
 @using HERMMapperApp.Services
 @using HERMMapperApp.ViewModels
 @{
     ViewData["Title"] = "Reports";
+    var isAdministrator = AppRoles.IsAdministrator(User);
     var sankeyPayload = JsonSerializer.Serialize(new
     {
         paths = Model.Paths,
@@ -20,6 +22,10 @@
         <h1>Reports</h1>
         <p>Review mapping structure, model relationship flow, and product lifecycle status from one place.</p>
     </div>
+    @if (isAdministrator)
+    {
+        <a class="btn btn-primary" asp-action="ExportMappingsCsv">Export completed mappings to CSV</a>
+    }
 </section>
 
 <section class="content-card">

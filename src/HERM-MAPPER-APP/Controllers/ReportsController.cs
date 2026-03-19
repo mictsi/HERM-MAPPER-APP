@@ -5,6 +5,7 @@ using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
 
 namespace HERMMapperApp.Controllers;
 
@@ -52,23 +53,9 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
             .OrderBy(x => x.Name)
             .ToListAsync();
 
-        var services = await dbContext.ServiceCatalogItems
-            .AsNoTracking()
-            .Where(x => !x.IsDeleted)
-            .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
-            .ThenInclude(x => x.ProductCatalogItem)
-            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
-            .ThenInclude(x => x.FromProductCatalogItem)
-            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
-            .ThenInclude(x => x.ToProductCatalogItem)
-            .AsSplitQuery()
-            .ToListAsync();
+        var serviceConnections = await LoadServiceConnectionsAsync();
 
-        var incomingConnections = BuildIncomingConnectionsReport(
-            services
-                .SelectMany(BuildServiceConnections)
-                .Where(connection => !connection.ToProduct.IsDeleted)
-                .ToList());
+        var incomingConnections = BuildIncomingConnectionsReport(serviceConnections);
 
         var availableOwners = products
             .SelectMany(x => x.GetOwnerValues())
@@ -117,6 +104,25 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
         }
 
         return View("ModelDiagram", await modelDiagramReportService.BuildAsync());
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> ExportMappingsCsvAsync()
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var mappings = await BuildMappingsCsvQuery()
+            .OrderBy(x => x.TrmDomain != null ? x.TrmDomain.Name : string.Empty)
+            .ThenBy(x => x.TrmComponent != null ? x.TrmComponent.Name : string.Empty)
+            .ThenBy(x => x.ProductCatalogItem != null ? x.ProductCatalogItem.Name : string.Empty)
+            .ToListAsync();
+
+        var csv = CsvExportService.BuildProductMappingExport(mappings);
+        var fileName = $"herm-mappings-{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
+        return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
     }
 
     public async Task<FileContentResult> DownloadDrawIoAsync()
@@ -454,6 +460,42 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
             .ThenByDescending(row => row.ServiceCount)
             .ThenBy(row => row.ProductName, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private IQueryable<ProductMapping> BuildMappingsCsvQuery() =>
+        dbContext.ProductMappings
+            .AsNoTracking()
+            .Include(x => x.ProductCatalogItem)
+            .Include(x => x.TrmDomain)
+            .Include(x => x.TrmCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .Include(x => x.TrmComponent)
+            .ThenInclude(x => x!.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .Where(x =>
+                x.MappingStatus == MappingStatus.Complete &&
+                x.TrmComponentId != null &&
+                x.ProductCatalogItem != null &&
+                !x.ProductCatalogItem.IsDeleted);
+
+    private async Task<List<ServiceProductConnectionRecord>> LoadServiceConnectionsAsync()
+    {
+        var services = await dbContext.ServiceCatalogItems
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
+            .ThenInclude(x => x.ProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.FromProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.ToProductCatalogItem)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        return services
+            .SelectMany(BuildServiceConnections)
+            .Where(connection => !connection.ToProduct.IsDeleted)
+            .ToList();
+    }
 
     private static IEnumerable<ServiceProductConnectionRecord> BuildServiceConnections(ServiceCatalogItem service)
     {
