@@ -23,7 +23,6 @@ public sealed partial class RemoteSqlImportService(
     private const string StatusFailed = "Failed";
 
     public const string SectionKey = "remote-sql-import";
-    public const string ExampleConnectionString = "Server=tcp:sql.example.com,1433;Database=HERMMapper;Encrypt=True;TrustServerCertificate=False;";
 
     private static readonly int[] AllowedScheduleHours = [0, 1, 3, 6, 12, 24];
     private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> RequiredSchema = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
@@ -48,7 +47,25 @@ public sealed partial class RemoteSqlImportService(
 
     public async Task<RemoteSqlImportSettingsSnapshot> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
-        var connectionString = await appSettingsService.GetValueAsync(AppSettingKeys.RemoteSqlImportConnectionString, string.Empty, cancellationToken);
+        var legacyConnectionString = await appSettingsService.GetValueAsync(AppSettingKeys.RemoteSqlImportConnectionString, string.Empty, cancellationToken);
+        var serverName = await appSettingsService.GetNullableValueAsync(AppSettingKeys.RemoteSqlImportServerName, cancellationToken);
+        var databaseName = await appSettingsService.GetNullableValueAsync(AppSettingKeys.RemoteSqlImportDatabaseName, cancellationToken);
+        var portValue = await appSettingsService.GetValueAsync(
+            AppSettingKeys.RemoteSqlImportPort,
+            AppSettingDefaults.RemoteSqlImportPort.ToString(CultureInfo.InvariantCulture),
+            cancellationToken);
+        var encryptValue = await appSettingsService.GetValueAsync(
+            AppSettingKeys.RemoteSqlImportEncrypt,
+            AppSettingDefaults.RemoteSqlImportEncrypt.ToString(),
+            cancellationToken);
+        var trustServerCertificateValue = await appSettingsService.GetValueAsync(
+            AppSettingKeys.RemoteSqlImportTrustServerCertificate,
+            AppSettingDefaults.RemoteSqlImportTrustServerCertificate.ToString(),
+            cancellationToken);
+        var useIntegratedSecurityValue = await appSettingsService.GetValueAsync(
+            AppSettingKeys.RemoteSqlImportUseIntegratedSecurity,
+            AppSettingDefaults.RemoteSqlImportUseIntegratedSecurity.ToString(),
+            cancellationToken);
         var userName = await protectedSettingsService.GetValueAsync(AppSettingKeys.RemoteSqlImportUserName, cancellationToken);
         var password = await protectedSettingsService.GetValueAsync(AppSettingKeys.RemoteSqlImportPassword, cancellationToken);
         var scheduleHoursValue = await appSettingsService.GetValueAsync(
@@ -65,7 +82,42 @@ public sealed partial class RemoteSqlImportService(
                 ? parsedScheduleHours
                 : AppSettingDefaults.RemoteSqlImportScheduleHours;
 
-        var isConfigured = !string.IsNullOrWhiteSpace(connectionString);
+        var port = int.TryParse(portValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPort) && parsedPort is > 0 and <= 65535
+            ? parsedPort
+            : AppSettingDefaults.RemoteSqlImportPort;
+        var encrypt = bool.TryParse(encryptValue, out var parsedEncrypt)
+            ? parsedEncrypt
+            : AppSettingDefaults.RemoteSqlImportEncrypt;
+        var trustServerCertificate = bool.TryParse(trustServerCertificateValue, out var parsedTrustServerCertificate)
+            ? parsedTrustServerCertificate
+            : AppSettingDefaults.RemoteSqlImportTrustServerCertificate;
+        var useIntegratedSecurity = bool.TryParse(useIntegratedSecurityValue, out var parsedUseIntegratedSecurity)
+            ? parsedUseIntegratedSecurity
+            : AppSettingDefaults.RemoteSqlImportUseIntegratedSecurity;
+
+        if ((string.IsNullOrWhiteSpace(serverName) || string.IsNullOrWhiteSpace(databaseName)) &&
+            TryParseLegacyConnectionString(
+                legacyConnectionString,
+                out var legacyServerName,
+                out var legacyPort,
+                out var legacyDatabaseName,
+                out var legacyEncrypt,
+                out var legacyTrustServerCertificate,
+                out var legacyUseIntegratedSecurity,
+                out var legacyUserName,
+                out var legacyPassword))
+        {
+            serverName ??= legacyServerName;
+            databaseName ??= legacyDatabaseName;
+            port = legacyPort ?? port;
+            encrypt = legacyEncrypt ?? encrypt;
+            trustServerCertificate = legacyTrustServerCertificate ?? trustServerCertificate;
+            useIntegratedSecurity = legacyUseIntegratedSecurity ?? useIntegratedSecurity;
+            userName ??= legacyUserName;
+            password ??= legacyPassword;
+        }
+
+        var isConfigured = !string.IsNullOrWhiteSpace(serverName) && !string.IsNullOrWhiteSpace(databaseName);
         if (!isConfigured)
         {
             statusCode = StatusNotConfigured;
@@ -74,7 +126,12 @@ public sealed partial class RemoteSqlImportService(
 
         return new RemoteSqlImportSettingsSnapshot
         {
-            ConnectionString = connectionString,
+            ServerName = serverName?.Trim() ?? string.Empty,
+            Port = port,
+            DatabaseName = databaseName?.Trim() ?? string.Empty,
+            Encrypt = encrypt,
+            TrustServerCertificate = trustServerCertificate,
+            UseIntegratedSecurity = useIntegratedSecurity,
             UserName = userName,
             Password = password,
             ScheduleHours = scheduleHours,
@@ -113,7 +170,13 @@ public sealed partial class RemoteSqlImportService(
                 return RemoteSqlImportSaveResult.Failure(connectionTestResult.Message);
             }
 
-            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportConnectionString, resolvedInput.SanitizedConnectionString, cancellationToken);
+            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportServerName, resolvedInput.ServerName, cancellationToken);
+            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportPort, resolvedInput.Port.ToString(CultureInfo.InvariantCulture), cancellationToken);
+            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportDatabaseName, resolvedInput.DatabaseName, cancellationToken);
+            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportEncrypt, resolvedInput.Encrypt.ToString(), cancellationToken);
+            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportTrustServerCertificate, resolvedInput.TrustServerCertificate.ToString(), cancellationToken);
+            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportUseIntegratedSecurity, resolvedInput.UseIntegratedSecurity.ToString(), cancellationToken);
+            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportConnectionString, string.Empty, cancellationToken);
             await appSettingsService.SetValueAsync(
                 AppSettingKeys.RemoteSqlImportScheduleHours,
                 resolvedInput.ScheduleHours.ToString(CultureInfo.InvariantCulture),
@@ -143,12 +206,14 @@ public sealed partial class RemoteSqlImportService(
                 nameof(AppSetting),
                 null,
                 "Saved remote SQL import settings.",
-                $"Schedule: {BuildScheduleLabel(resolvedInput.ScheduleHours)}. Credentials stored: {resolvedInput.CredentialStorageMode}. {connectionTestResult.Message}");
+                $"Server: {resolvedInput.ServerName}:{resolvedInput.Port}; database: {resolvedInput.DatabaseName}; encryption: {resolvedInput.ConnectionSecurityMode}; authentication: {resolvedInput.CredentialStorageMode}; schedule: {BuildScheduleLabel(resolvedInput.ScheduleHours)}. {connectionTestResult.Message}");
 
             logger.LogInformation(
-                "Saved remote SQL import settings with schedule {ScheduleHours} and sanitized connection string {SanitizedConnectionString}.",
+                "Saved remote SQL import settings with schedule {ScheduleHours} for server {ServerName}:{Port} and database {DatabaseName}.",
                 resolvedInput.ScheduleHours,
-                MaskConnectionString(resolvedInput.SanitizedConnectionString));
+                resolvedInput.ServerName,
+                resolvedInput.Port,
+                resolvedInput.DatabaseName);
 
             return RemoteSqlImportSaveResult.Success(
                 $"Remote SQL connection validated and settings saved. Schedule: {BuildScheduleLabel(resolvedInput.ScheduleHours)}.",
@@ -437,11 +502,21 @@ public sealed partial class RemoteSqlImportService
         bool preserveStoredCredentialsWhenBlank)
     {
         var errors = new List<string>();
-        var rawConnectionString = input.ConnectionString?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(rawConnectionString))
+        var serverName = input.ServerName?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(serverName))
         {
-            errors.Add("Enter a remote SQL Server connection string.");
-            return ResolvedConnectionInput.Invalid(errors);
+            errors.Add("Enter the remote SQL Server name.");
+        }
+
+        var databaseName = input.DatabaseName?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(databaseName))
+        {
+            errors.Add("Enter the remote SQL Server database name.");
+        }
+
+        if (input.Port is <= 0 or > 65535)
+        {
+            errors.Add("Enter a valid SQL Server port.");
         }
 
         if (!AllowedScheduleHours.Contains(input.ScheduleHours))
@@ -449,40 +524,32 @@ public sealed partial class RemoteSqlImportService
             errors.Add("Choose a valid import schedule.");
         }
 
-        SqlConnectionStringBuilder builder;
-        try
-        {
-            builder = new SqlConnectionStringBuilder(rawConnectionString);
-        }
-        catch (ArgumentException exception)
-        {
-            errors.Add($"Connection string is invalid. {exception.Message}");
-            return ResolvedConnectionInput.Invalid(errors);
-        }
-
         var typedUserName = string.IsNullOrWhiteSpace(input.UserName) ? null : input.UserName.Trim();
         var typedPassword = string.IsNullOrWhiteSpace(input.Password) ? null : input.Password;
-        var embeddedUserName = string.IsNullOrWhiteSpace(builder.UserID) ? null : builder.UserID.Trim();
-        var embeddedPassword = string.IsNullOrWhiteSpace(builder.Password) ? null : builder.Password;
-        var usesIntegratedSecurity = builder.IntegratedSecurity;
+        var usesIntegratedSecurity = input.UseIntegratedSecurity;
 
         if ((typedUserName is null) != (typedPassword is null))
         {
             errors.Add("Enter both user name and password, or leave both blank.");
         }
 
-        var effectiveUserName = typedUserName ?? embeddedUserName;
-        var effectivePassword = typedPassword ?? embeddedPassword;
+        var effectiveUserName = typedUserName;
+        var effectivePassword = typedPassword;
 
-        if (!usesIntegratedSecurity && useStoredCredentialsAsFallback)
+        if (!usesIntegratedSecurity && useStoredCredentialsAsFallback && typedUserName is null && typedPassword is null)
         {
             effectiveUserName ??= currentSettings.UserName;
             effectivePassword ??= currentSettings.Password;
         }
 
-        if ((effectiveUserName is null) != (effectivePassword is null))
+        if (!usesIntegratedSecurity && (effectiveUserName is null) != (effectivePassword is null))
         {
             errors.Add("The effective credentials are incomplete. Supply both a user name and a password.");
+        }
+
+        if (!usesIntegratedSecurity && effectiveUserName is null && effectivePassword is null)
+        {
+            errors.Add("Enter a user name and password for SQL login, or choose integrated security.");
         }
 
         if (errors.Count > 0)
@@ -490,85 +557,178 @@ public sealed partial class RemoteSqlImportService
             return ResolvedConnectionInput.Invalid(errors);
         }
 
-        builder.Remove("User ID");
-        builder.Remove("UID");
-        builder.Remove("Password");
-        builder.Remove("Pwd");
+        var clearStoredCredentials = usesIntegratedSecurity;
 
-        if (!string.IsNullOrWhiteSpace(effectiveUserName))
+        if (!usesIntegratedSecurity && !clearStoredCredentials && preserveStoredCredentialsWhenBlank)
         {
-            builder.IntegratedSecurity = false;
-        }
-
-        var clearStoredCredentials = usesIntegratedSecurity &&
-            typedUserName is null &&
-            typedPassword is null &&
-            embeddedUserName is null &&
-            embeddedPassword is null;
-
-        if (!clearStoredCredentials && preserveStoredCredentialsWhenBlank)
-        {
-            if (typedUserName is null && typedPassword is null && embeddedUserName is null && embeddedPassword is null)
+            if (typedUserName is null && typedPassword is null)
             {
                 effectiveUserName ??= currentSettings.UserName;
                 effectivePassword ??= currentSettings.Password;
             }
         }
 
-        var sanitizedConnectionString = builder.ConnectionString;
-        var effectiveConnectionBuilder = new SqlConnectionStringBuilder(sanitizedConnectionString);
-
-        if (!string.IsNullOrWhiteSpace(effectiveUserName) && !string.IsNullOrWhiteSpace(effectivePassword))
-        {
-            effectiveConnectionBuilder.UserID = effectiveUserName;
-            effectiveConnectionBuilder.Password = effectivePassword;
-            effectiveConnectionBuilder.IntegratedSecurity = false;
-        }
+        var effectiveConnectionString = BuildRemoteConnectionString(
+            serverName,
+            input.Port,
+            databaseName,
+            input.Encrypt,
+            input.TrustServerCertificate,
+            usesIntegratedSecurity,
+            effectiveUserName,
+            effectivePassword);
 
         return ResolvedConnectionInput.Valid(
-            sanitizedConnectionString,
-            effectiveConnectionBuilder.ConnectionString,
+            serverName,
+            input.Port,
+            databaseName,
+            input.Encrypt,
+            input.TrustServerCertificate,
+            usesIntegratedSecurity,
             effectiveUserName,
             effectivePassword,
+            effectiveConnectionString,
             input.ScheduleHours,
             clearStoredCredentials,
-            typedUserName ?? embeddedUserName,
-            typedPassword ?? embeddedPassword,
-            typedUserName is not null || embeddedUserName is not null || clearStoredCredentials,
-            typedPassword is not null || embeddedPassword is not null || clearStoredCredentials);
-    }
-
-    private static string MaskConnectionString(string connectionString)
-    {
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            return string.Empty;
-        }
-
-        try
-        {
-            var builder = new SqlConnectionStringBuilder(connectionString);
-            builder.Remove("Password");
-            builder.Remove("Pwd");
-            builder.Remove("User ID");
-            builder.Remove("UID");
-
-            if (!string.IsNullOrWhiteSpace(builder.DataSource))
-            {
-                builder.DataSource = builder.DataSource.Split(',')[0];
-            }
-
-            return builder.ConnectionString;
-        }
-        catch
-        {
-            return "<invalid>";
-        }
+            usesIntegratedSecurity ? null : typedUserName,
+            usesIntegratedSecurity ? null : typedPassword,
+            typedUserName is not null || clearStoredCredentials,
+            typedPassword is not null || clearStoredCredentials);
     }
 }
 
 public sealed partial class RemoteSqlImportService
 {
+    internal static string BuildRemoteConnectionString(
+        string serverName,
+        int port,
+        string databaseName,
+        bool encrypt,
+        bool trustServerCertificate,
+        bool useIntegratedSecurity,
+        string? userName,
+        string? password)
+    {
+        var builder = new SqlConnectionStringBuilder
+        {
+            DataSource = BuildDataSource(serverName, port),
+            InitialCatalog = databaseName,
+            Encrypt = encrypt,
+            TrustServerCertificate = trustServerCertificate,
+            IntegratedSecurity = useIntegratedSecurity
+        };
+
+        if (!useIntegratedSecurity && !string.IsNullOrWhiteSpace(userName) && !string.IsNullOrWhiteSpace(password))
+        {
+            builder.UserID = userName;
+            builder.Password = password;
+            builder.IntegratedSecurity = false;
+        }
+
+        return builder.ConnectionString;
+    }
+
+    private static bool TryParseLegacyConnectionString(
+        string? connectionString,
+        out string? serverName,
+        out int? port,
+        out string? databaseName,
+        out bool? encrypt,
+        out bool? trustServerCertificate,
+        out bool? useIntegratedSecurity,
+        out string? userName,
+        out string? password)
+    {
+        serverName = null;
+        port = null;
+        databaseName = null;
+        encrypt = null;
+        trustServerCertificate = null;
+        useIntegratedSecurity = null;
+        userName = null;
+        password = null;
+
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return false;
+        }
+
+        try
+        {
+            var builder = new SqlConnectionStringBuilder(connectionString);
+            serverName = ExtractServerName(builder.DataSource);
+            port = ExtractPort(builder.DataSource);
+            databaseName = string.IsNullOrWhiteSpace(builder.InitialCatalog) ? null : builder.InitialCatalog.Trim();
+            encrypt = builder.Encrypt;
+            trustServerCertificate = builder.TrustServerCertificate;
+            useIntegratedSecurity = builder.IntegratedSecurity;
+            userName = string.IsNullOrWhiteSpace(builder.UserID) ? null : builder.UserID.Trim();
+            password = string.IsNullOrWhiteSpace(builder.Password) ? null : builder.Password;
+            return !string.IsNullOrWhiteSpace(serverName) || !string.IsNullOrWhiteSpace(databaseName);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string BuildDataSource(string serverName, int port)
+    {
+        var normalizedServerName = serverName.Trim();
+        if (normalizedServerName.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedServerName = normalizedServerName[4..];
+        }
+
+        return $"tcp:{normalizedServerName},{port}";
+    }
+
+    private static string? ExtractServerName(string? dataSource)
+    {
+        if (string.IsNullOrWhiteSpace(dataSource))
+        {
+            return null;
+        }
+
+        var normalizedDataSource = dataSource.Trim();
+        if (normalizedDataSource.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedDataSource = normalizedDataSource[4..];
+        }
+
+        var commaIndex = normalizedDataSource.LastIndexOf(',');
+        if (commaIndex <= 0)
+        {
+            return normalizedDataSource;
+        }
+
+        return normalizedDataSource[..commaIndex].Trim();
+    }
+
+    private static int? ExtractPort(string? dataSource)
+    {
+        if (string.IsNullOrWhiteSpace(dataSource))
+        {
+            return null;
+        }
+
+        var normalizedDataSource = dataSource.Trim();
+        if (normalizedDataSource.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase))
+        {
+            normalizedDataSource = normalizedDataSource[4..];
+        }
+
+        var commaIndex = normalizedDataSource.LastIndexOf(',');
+        if (commaIndex <= 0 || commaIndex == normalizedDataSource.Length - 1)
+        {
+            return null;
+        }
+
+        return int.TryParse(normalizedDataSource[(commaIndex + 1)..], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPort)
+            ? parsedPort
+            : null;
+    }
+
     private static string BuildQualifiedTableName(IReadOnlyDictionary<string, string> tableSchemas, string tableName) =>
         $"[{tableSchemas[tableName]}].[{tableName}]";
 
@@ -638,14 +798,24 @@ public sealed partial class RemoteSqlImportService
 }
 
 public sealed record RemoteSqlImportConfigurationInput(
-    string ConnectionString,
+    string ServerName,
+    int Port,
+    string DatabaseName,
+    bool Encrypt,
+    bool TrustServerCertificate,
+    bool UseIntegratedSecurity,
     string? UserName,
     string? Password,
     int ScheduleHours);
 
 public sealed class RemoteSqlImportSettingsSnapshot
 {
-    public string ConnectionString { get; init; } = string.Empty;
+    public string ServerName { get; init; } = string.Empty;
+    public int Port { get; init; } = AppSettingDefaults.RemoteSqlImportPort;
+    public string DatabaseName { get; init; } = string.Empty;
+    public bool Encrypt { get; init; } = AppSettingDefaults.RemoteSqlImportEncrypt;
+    public bool TrustServerCertificate { get; init; } = AppSettingDefaults.RemoteSqlImportTrustServerCertificate;
+    public bool UseIntegratedSecurity { get; init; } = AppSettingDefaults.RemoteSqlImportUseIntegratedSecurity;
     public string? UserName { get; init; }
     public string? Password { get; init; }
     public int ScheduleHours { get; init; }
@@ -676,15 +846,15 @@ public sealed class RemoteSqlImportSettingsSnapshot
     {
         get
         {
-            var builder = new SqlConnectionStringBuilder(ConnectionString);
-            if (!string.IsNullOrWhiteSpace(UserName) && !string.IsNullOrWhiteSpace(Password))
-            {
-                builder.UserID = UserName;
-                builder.Password = Password;
-                builder.IntegratedSecurity = false;
-            }
-
-            return builder.ConnectionString;
+            return RemoteSqlImportService.BuildRemoteConnectionString(
+                ServerName,
+                Port,
+                DatabaseName,
+                Encrypt,
+                TrustServerCertificate,
+                UseIntegratedSecurity,
+                UserName,
+                Password);
         }
     }
 
@@ -877,7 +1047,12 @@ internal sealed class ResolvedConnectionInput
     }
 
     public bool IsValid { get; init; }
-    public string SanitizedConnectionString { get; init; } = string.Empty;
+    public string ServerName { get; init; } = string.Empty;
+    public int Port { get; init; } = AppSettingDefaults.RemoteSqlImportPort;
+    public string DatabaseName { get; init; } = string.Empty;
+    public bool Encrypt { get; init; }
+    public bool TrustServerCertificate { get; init; }
+    public bool UseIntegratedSecurity { get; init; }
     public string EffectiveConnectionString { get; init; } = string.Empty;
     public string? EffectiveUserName { get; init; }
     public string? EffectivePassword { get; init; }
@@ -890,11 +1065,14 @@ internal sealed class ResolvedConnectionInput
     public IReadOnlyList<string> Errors { get; init; } = [];
 
     public string CredentialStorageMode =>
-        ClearStoredCredentials
+        UseIntegratedSecurity || ClearStoredCredentials
             ? "integrated security only"
             : !string.IsNullOrWhiteSpace(EffectiveUserName) && !string.IsNullOrWhiteSpace(EffectivePassword)
                 ? "stored SQL credentials"
-                : "connection string authentication";
+                : "no credentials stored";
+
+    public string ConnectionSecurityMode =>
+        $"encrypt={(Encrypt ? "on" : "off")}, trustServerCertificate={(TrustServerCertificate ? "on" : "off")}";
 
     public static ResolvedConnectionInput Invalid(IReadOnlyList<string> errors) =>
         new()
@@ -903,10 +1081,15 @@ internal sealed class ResolvedConnectionInput
         };
 
     public static ResolvedConnectionInput Valid(
-        string sanitizedConnectionString,
-        string effectiveConnectionString,
+        string serverName,
+        int port,
+        string databaseName,
+        bool encrypt,
+        bool trustServerCertificate,
+        bool useIntegratedSecurity,
         string? effectiveUserName,
         string? effectivePassword,
+        string effectiveConnectionString,
         int scheduleHours,
         bool clearStoredCredentials,
         string? newlySavedUserName,
@@ -916,7 +1099,12 @@ internal sealed class ResolvedConnectionInput
         new()
         {
             IsValid = true,
-            SanitizedConnectionString = sanitizedConnectionString,
+            ServerName = serverName,
+            Port = port,
+            DatabaseName = databaseName,
+            Encrypt = encrypt,
+            TrustServerCertificate = trustServerCertificate,
+            UseIntegratedSecurity = useIntegratedSecurity,
             EffectiveConnectionString = effectiveConnectionString,
             EffectiveUserName = effectiveUserName,
             EffectivePassword = effectivePassword,

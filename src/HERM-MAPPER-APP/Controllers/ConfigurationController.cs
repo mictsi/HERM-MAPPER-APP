@@ -530,7 +530,12 @@ public sealed class ConfigurationController(
         var savedPasswordClearText = TempData["RemoteSqlImportSavedPassword"] as string;
         var effectiveRemoteSqlInput = remoteSqlInput ?? new RemoteSqlImportInputModel
         {
-            ConnectionString = remoteSqlSettings.ConnectionString,
+            ServerName = remoteSqlSettings.ServerName,
+            Port = remoteSqlSettings.Port,
+            DatabaseName = remoteSqlSettings.DatabaseName,
+            Encrypt = remoteSqlSettings.Encrypt,
+            TrustServerCertificate = remoteSqlSettings.TrustServerCertificate,
+            UseIntegratedSecurity = remoteSqlSettings.UseIntegratedSecurity,
             ScheduleHours = remoteSqlSettings.ScheduleHours
         };
 
@@ -560,7 +565,6 @@ public sealed class ConfigurationController(
             {
                 Input = effectiveRemoteSqlInput,
                 ScheduleOptions = BuildRemoteSqlScheduleOptions(effectiveRemoteSqlInput.ScheduleHours),
-                ExampleConnectionString = RemoteSqlImportService.ExampleConnectionString,
                 IsConfigured = remoteSqlSettings.IsConfigured,
                 HasSavedUserName = remoteSqlSettings.HasSavedUserName,
                 HasSavedPassword = remoteSqlSettings.HasSavedPassword,
@@ -657,7 +661,8 @@ public sealed class ConfigurationController(
 
     private static RemoteSqlImportInputModel NormalizeRemoteSqlImportInput(RemoteSqlImportInputModel input)
     {
-        input.ConnectionString = input.ConnectionString?.Trim() ?? string.Empty;
+        input.ServerName = input.ServerName?.Trim() ?? string.Empty;
+        input.DatabaseName = input.DatabaseName?.Trim() ?? string.Empty;
         input.UserName = input.UserName?.Trim();
         input.Password ??= string.Empty;
         return input;
@@ -665,7 +670,12 @@ public sealed class ConfigurationController(
 
     private static RemoteSqlImportConfigurationInput MapRemoteSqlImportInput(RemoteSqlImportInputModel input) =>
         new(
-            input.ConnectionString,
+            input.ServerName,
+            input.Port,
+            input.DatabaseName,
+            input.Encrypt,
+            input.TrustServerCertificate,
+            input.UseIntegratedSecurity,
             string.IsNullOrWhiteSpace(input.UserName) ? null : input.UserName,
             string.IsNullOrWhiteSpace(input.Password) ? null : input.Password,
             input.ScheduleHours);

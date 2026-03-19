@@ -23,7 +23,6 @@ public sealed class RemoteSqlImportSectionViewModel
 {
     public RemoteSqlImportInputModel Input { get; init; } = new();
     public IReadOnlyList<SelectListItem> ScheduleOptions { get; init; } = [];
-    public string ExampleConnectionString { get; init; } = string.Empty;
     public bool IsConfigured { get; init; }
     public bool HasSavedUserName { get; init; }
     public bool HasSavedPassword { get; init; }
@@ -42,9 +41,26 @@ public sealed class RemoteSqlImportSectionViewModel
 
 public sealed class RemoteSqlImportInputModel
 {
-    [Required, StringLength(2000)]
-    [Display(Name = "Connection string")]
-    public string ConnectionString { get; set; } = string.Empty;
+    [Required, StringLength(256)]
+    [Display(Name = "Server")]
+    public string ServerName { get; set; } = string.Empty;
+
+    [Range(1, 65535)]
+    [Display(Name = "Port")]
+    public int Port { get; set; } = AppSettingDefaults.RemoteSqlImportPort;
+
+    [Required, StringLength(256)]
+    [Display(Name = "Database")]
+    public string DatabaseName { get; set; } = string.Empty;
+
+    [Display(Name = "Encrypt connection")]
+    public bool Encrypt { get; set; } = AppSettingDefaults.RemoteSqlImportEncrypt;
+
+    [Display(Name = "Trust server certificate")]
+    public bool TrustServerCertificate { get; set; } = AppSettingDefaults.RemoteSqlImportTrustServerCertificate;
+
+    [Display(Name = "Use integrated security")]
+    public bool UseIntegratedSecurity { get; set; } = AppSettingDefaults.RemoteSqlImportUseIntegratedSecurity;
 
     [StringLength(256)]
     [Display(Name = "User name")]

@@ -76,7 +76,7 @@
                     <span class="admin-disclosure-meta">@remoteSqlImport.StatusSummary</span>
                 </summary>
                 <div class="admin-disclosure-body">
-                    <p class="mb-3">The connection is only saved after a successful connection and schema test. The connection string is stored in the application database. User name and password are stored separately and hidden after save. Leave the password blank to keep the currently saved secret.</p>
+                    <p class="mb-3">The connection is only saved after a successful connection and schema test. Enter the SQL Server settings as separate fields below. Credentials are stored separately and hidden after save. Leave the password blank to keep the currently saved secret.</p>
 
                     @if (!string.IsNullOrWhiteSpace(remoteSqlImport.SavedUserNameClearText) || !string.IsNullOrWhiteSpace(remoteSqlImport.SavedPasswordClearText))
                     {
@@ -134,27 +134,64 @@
 
                     <form asp-action="SaveRemoteSqlImportConfiguration" method="post" class="row g-3">
                         @Html.AntiForgeryToken()
-                        <div class="col-12">
-                            <label class="form-label" for="RemoteConnectionString">Connection string</label>
-                            <textarea class="form-control" id="RemoteConnectionString" name="ConnectionString" rows="3">@remoteSqlImport.Input.ConnectionString</textarea>
-                            <div class="form-text">Example: <code>@remoteSqlImport.ExampleConnectionString</code></div>
+                        <div class="col-lg-6">
+                            <label class="form-label" for="RemoteServerName">Server</label>
+                            <input class="form-control" id="RemoteServerName" name="ServerName" value="@remoteSqlImport.Input.ServerName" autocomplete="off" />
+                            <div class="form-text">Example: <code>sql.example.com</code></div>
+                        </div>
+                        <div class="col-lg-2">
+                            <label class="form-label" for="RemotePort">Port</label>
+                            <input class="form-control" id="RemotePort" name="Port" type="number" min="1" max="65535" value="@remoteSqlImport.Input.Port" />
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label" for="RemoteDatabaseName">Database</label>
+                            <input class="form-control" id="RemoteDatabaseName" name="DatabaseName" value="@remoteSqlImport.Input.DatabaseName" autocomplete="off" />
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label" for="RemoteEncrypt">Encrypt connection</label>
+                            <select class="form-select" id="RemoteEncrypt" name="Encrypt">
+                                <option value="true" selected="@(remoteSqlImport.Input.Encrypt ? "selected" : null)">Yes</option>
+                                <option value="false" selected="@(!remoteSqlImport.Input.Encrypt ? "selected" : null)">No</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label" for="RemoteTrustServerCertificate">Trust server certificate</label>
+                            <select class="form-select" id="RemoteTrustServerCertificate" name="TrustServerCertificate">
+                                <option value="false" selected="@(!remoteSqlImport.Input.TrustServerCertificate ? "selected" : null)">No</option>
+                                <option value="true" selected="@(remoteSqlImport.Input.TrustServerCertificate ? "selected" : null)">Yes</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-4">
+                            <label class="form-label" for="RemoteUseIntegratedSecurity">Authentication</label>
+                            <select class="form-select" id="RemoteUseIntegratedSecurity" name="UseIntegratedSecurity">
+                                <option value="false" selected="@(!remoteSqlImport.Input.UseIntegratedSecurity ? "selected" : null)">SQL login</option>
+                                <option value="true" selected="@(remoteSqlImport.Input.UseIntegratedSecurity ? "selected" : null)">Integrated security</option>
+                            </select>
+                            <div class="form-text mt-2">
+                                Required source tables and columns are listed in <code>docs/remote-sql-import-source-schema.sql</code>.
+                                Use it as the reference for the remote SQL import source schema.
+                            </div>
                         </div>
                         <div class="col-lg-6">
                             <label class="form-label" for="RemoteUserName">User name</label>
                             <input class="form-control" id="RemoteUserName" name="UserName" value="@remoteSqlImport.Input.UserName" autocomplete="off" />
                             <div class="form-text">
-                                @(remoteSqlImport.HasSavedUserName
-                                    ? $"A user name is already saved ({remoteSqlImport.SavedUserNameDisplay}). Enter a new one only to replace it."
-                                    : "Optional if your connection string already handles authentication.")
+                                @(remoteSqlImport.Input.UseIntegratedSecurity
+                                    ? "Ignored when integrated security is selected."
+                                    : remoteSqlImport.HasSavedUserName
+                                        ? $"A user name is already saved ({remoteSqlImport.SavedUserNameDisplay}). Enter a new one only to replace it."
+                                        : "Required for SQL login.")
                             </div>
                         </div>
                         <div class="col-lg-6">
                             <label class="form-label" for="RemotePassword">Password</label>
                             <input class="form-control" id="RemotePassword" name="Password" type="password" autocomplete="new-password" />
                             <div class="form-text">
-                                @(remoteSqlImport.HasSavedPassword
-                                    ? "A password is already saved. Leave this blank to keep it."
-                                    : "Optional if your connection string already handles authentication.")
+                                @(remoteSqlImport.Input.UseIntegratedSecurity
+                                    ? "Ignored when integrated security is selected."
+                                    : remoteSqlImport.HasSavedPassword
+                                        ? "A password is already saved. Leave this blank to keep it."
+                                        : "Required for SQL login.")
                             </div>
                         </div>
                         <div class="col-lg-4">
