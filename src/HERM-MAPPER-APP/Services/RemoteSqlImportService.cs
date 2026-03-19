@@ -48,6 +48,10 @@ public sealed partial class RemoteSqlImportService(
     public async Task<RemoteSqlImportSettingsSnapshot> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
         var legacyConnectionString = await appSettingsService.GetValueAsync(AppSettingKeys.RemoteSqlImportConnectionString, string.Empty, cancellationToken);
+        var isEnabledValue = await appSettingsService.GetValueAsync(
+            AppSettingKeys.RemoteSqlImportIsEnabled,
+            AppSettingDefaults.RemoteSqlImportEnabled.ToString(),
+            cancellationToken);
         var serverName = await appSettingsService.GetNullableValueAsync(AppSettingKeys.RemoteSqlImportServerName, cancellationToken);
         var databaseName = await appSettingsService.GetNullableValueAsync(AppSettingKeys.RemoteSqlImportDatabaseName, cancellationToken);
         var portValue = await appSettingsService.GetValueAsync(
@@ -94,6 +98,9 @@ public sealed partial class RemoteSqlImportService(
         var useIntegratedSecurity = bool.TryParse(useIntegratedSecurityValue, out var parsedUseIntegratedSecurity)
             ? parsedUseIntegratedSecurity
             : AppSettingDefaults.RemoteSqlImportUseIntegratedSecurity;
+        var isEnabled = bool.TryParse(isEnabledValue, out var parsedIsEnabled)
+            ? parsedIsEnabled
+            : AppSettingDefaults.RemoteSqlImportEnabled;
 
         if ((string.IsNullOrWhiteSpace(serverName) || string.IsNullOrWhiteSpace(databaseName)) &&
             TryParseLegacyConnectionString(
@@ -139,6 +146,7 @@ public sealed partial class RemoteSqlImportService(
             LastSuccessUtc = lastSuccessUtc,
             StatusCode = statusCode,
             LastMessage = lastMessage,
+            IsEnabled = isEnabled,
             IsConfigured = isConfigured
         };
     }
@@ -177,6 +185,7 @@ public sealed partial class RemoteSqlImportService(
             await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportTrustServerCertificate, resolvedInput.TrustServerCertificate.ToString(), cancellationToken);
             await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportUseIntegratedSecurity, resolvedInput.UseIntegratedSecurity.ToString(), cancellationToken);
             await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportConnectionString, string.Empty, cancellationToken);
+            await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportIsEnabled, currentSettings.IsEnabled.ToString(), cancellationToken);
             await appSettingsService.SetValueAsync(
                 AppSettingKeys.RemoteSqlImportScheduleHours,
                 resolvedInput.ScheduleHours.ToString(CultureInfo.InvariantCulture),
@@ -235,6 +244,74 @@ public sealed partial class RemoteSqlImportService(
         }
     }
 
+    public async Task<string> SetImportEnabledAsync(bool isEnabled, CancellationToken cancellationToken = default)
+    {
+        await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportIsEnabled, isEnabled.ToString(), cancellationToken);
+
+        var summary = isEnabled
+            ? "Enabled remote SQL import."
+            : "Disabled remote SQL import.";
+        var details = isEnabled
+            ? "Scheduled and manual imports are allowed again."
+            : "Scheduled and manual imports are blocked until the import is enabled again.";
+
+        await auditLogService.WriteAsync(
+            RemoteSqlImportCategory,
+            isEnabled ? "EnableImport" : "DisableImport",
+            nameof(AppSetting),
+            null,
+            summary,
+            details);
+
+        logger.LogInformation("{Summary} {Details}", summary, details);
+
+        return isEnabled
+            ? "Remote SQL import enabled."
+            : "Remote SQL import disabled. Scheduled and manual imports will be skipped until you enable it again.";
+    }
+
+    public async Task<string> ClearConfigurationAsync(CancellationToken cancellationToken = default)
+    {
+        string[] appSettingKeys =
+        [
+            AppSettingKeys.RemoteSqlImportConnectionString,
+            AppSettingKeys.RemoteSqlImportIsEnabled,
+            AppSettingKeys.RemoteSqlImportServerName,
+            AppSettingKeys.RemoteSqlImportPort,
+            AppSettingKeys.RemoteSqlImportDatabaseName,
+            AppSettingKeys.RemoteSqlImportEncrypt,
+            AppSettingKeys.RemoteSqlImportTrustServerCertificate,
+            AppSettingKeys.RemoteSqlImportUseIntegratedSecurity,
+            AppSettingKeys.RemoteSqlImportScheduleHours,
+            AppSettingKeys.RemoteSqlImportLastAttemptUtc,
+            AppSettingKeys.RemoteSqlImportLastSuccessUtc,
+            AppSettingKeys.RemoteSqlImportLastStatus,
+            AppSettingKeys.RemoteSqlImportLastMessage
+        ];
+
+        foreach (var key in appSettingKeys)
+        {
+            await appSettingsService.DeleteValueAsync(key, cancellationToken);
+        }
+
+        await protectedSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportUserName, null, cancellationToken);
+        await protectedSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportPassword, null, cancellationToken);
+
+        const string summary = "Cleared remote SQL import configuration.";
+        const string details = "Removed the saved remote SQL server settings, schedule, execution state, and stored credentials from the database.";
+
+        await auditLogService.WriteAsync(
+            RemoteSqlImportCategory,
+            "ClearConfiguration",
+            nameof(AppSetting),
+            null,
+            summary,
+            details);
+
+        logger.LogInformation("{Summary} {Details}", summary, details);
+        return "Remote SQL configuration was cleared from the database.";
+    }
+
     public async Task<RemoteSqlImportConnectionTestResult> TestConnectionAsync(
         RemoteSqlImportConfigurationInput input,
         CancellationToken cancellationToken = default)
@@ -265,7 +342,7 @@ public sealed partial class RemoteSqlImportService(
     public async Task RunScheduledImportIfDueAsync(CancellationToken cancellationToken = default)
     {
         var settings = await GetSettingsAsync(cancellationToken);
-        if (!settings.IsConfigured || settings.ScheduleHours <= 0)
+        if (!settings.IsConfigured || !settings.IsEnabled || settings.ScheduleHours <= 0)
         {
             return;
         }
@@ -284,6 +361,19 @@ public sealed partial class RemoteSqlImportService(
         RemoteSqlImportTrigger trigger,
         CancellationToken cancellationToken)
     {
+        if (!settings.IsEnabled)
+        {
+            var message = "Remote SQL import is disabled. Enable it before running an import.";
+            await auditLogService.WriteAsync(
+                RemoteSqlImportCategory,
+                trigger == RemoteSqlImportTrigger.Manual ? "ImportManual" : "ImportScheduled",
+                nameof(ProductCatalogItem),
+                null,
+                "Remote SQL import was skipped.",
+                message);
+            return RemoteSqlImportRunResult.Failure(message);
+        }
+
         if (!settings.IsConfigured)
         {
             var message = "Save the remote SQL connection settings before running an import.";
@@ -823,6 +913,7 @@ public sealed class RemoteSqlImportSettingsSnapshot
     public DateTime? LastSuccessUtc { get; init; }
     public string StatusCode { get; init; } = "NotConfigured";
     public string? LastMessage { get; init; }
+    public bool IsEnabled { get; init; } = AppSettingDefaults.RemoteSqlImportEnabled;
     public bool IsConfigured { get; init; }
 
     public bool HasSavedUserName => !string.IsNullOrWhiteSpace(UserName);
@@ -832,13 +923,14 @@ public sealed class RemoteSqlImportSettingsSnapshot
     public string ScheduleLabel => RemoteSqlImportService.BuildScheduleLabel(ScheduleHours);
     public string StatusLabel => StatusCode switch
     {
+        _ when !IsConfigured => "Not configured",
+        _ when !IsEnabled => "Import disabled",
         "Running" => "Import in progress",
         "Success" => "Last run succeeded",
         "Failed" => "Last run failed",
-        _ when !IsConfigured => "Not configured",
         _ => "Ready"
     };
-    public DateTime? NextScheduledRunUtc => ScheduleHours <= 0
+    public DateTime? NextScheduledRunUtc => !IsEnabled || ScheduleHours <= 0
         ? null
         : LastAttemptUtc?.AddHours(ScheduleHours) ?? DateTime.UtcNow;
 

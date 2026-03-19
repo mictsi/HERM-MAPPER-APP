@@ -15,6 +15,7 @@ public static class AppSettingKeys
 {
     public const string DisplayTimeZone = "DisplayTimeZone";
     public const string RemoteSqlImportConnectionString = "RemoteSqlImport.ConnectionString";
+    public const string RemoteSqlImportIsEnabled = "RemoteSqlImport.IsEnabled";
     public const string RemoteSqlImportServerName = "RemoteSqlImport.ServerName";
     public const string RemoteSqlImportPort = "RemoteSqlImport.Port";
     public const string RemoteSqlImportDatabaseName = "RemoteSqlImport.DatabaseName";
@@ -33,6 +34,7 @@ public static class AppSettingKeys
 public static class AppSettingDefaults
 {
     public const string DisplayTimeZone = "UTC";
+    public const bool RemoteSqlImportEnabled = true;
     public const int RemoteSqlImportScheduleHours = 0;
     public const int RemoteSqlImportPort = 1433;
     public const bool RemoteSqlImportEncrypt = true;

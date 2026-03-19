@@ -465,6 +465,76 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
+    public async Task SetRemoteSqlImportEnabledDisablesConfiguredImportAndWritesStatus()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.AppSettings.AddRangeAsync(
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportServerName, Value = "sql.example.com" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportDatabaseName, Value = "Herm" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = true.ToString() });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateConfigurationController();
+        var result = await controller.SetRemoteSqlImportEnabled(false);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(
+            "Remote SQL import disabled. Scheduled and manual imports will be skipped until you enable it again.",
+            controller.TempData["ConfigurationStatusMessage"]);
+        Assert.Equal(
+            false.ToString(),
+            await fixture.DbContext.AppSettings.Where(x => x.Key == AppSettingKeys.RemoteSqlImportIsEnabled).Select(x => x.Value).SingleAsync());
+        Assert.Contains(
+            await fixture.DbContext.AuditLogEntries.Select(x => x.Action).ToListAsync(),
+            action => string.Equals(action, "DisableImport", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunRemoteSqlImportNowReturnsErrorWhenImportIsDisabled()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.AppSettings.AddRangeAsync(
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportServerName, Value = "sql.example.com" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportDatabaseName, Value = "Herm" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = false.ToString() });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateConfigurationController();
+        var result = await controller.RunRemoteSqlImportNow();
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Remote SQL import is disabled. Enable it before running an import.", controller.TempData["ConfigurationError"]);
+    }
+
+    [Fact]
+    public async Task ClearRemoteSqlImportConfigurationRemovesStoredSettingsAndCredentials()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.AppSettings.AddRangeAsync(
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportServerName, Value = "sql.example.com" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportDatabaseName, Value = "Herm" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = false.ToString() },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportScheduleHours, Value = "6" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportUserName, Value = "dp:user" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportPassword, Value = "dp:password" },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportLastStatus, Value = "Failed" });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateConfigurationController();
+        var result = await controller.ClearRemoteSqlImportConfiguration();
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Remote SQL configuration was cleared from the database.", controller.TempData["ConfigurationStatusMessage"]);
+        Assert.Empty(await fixture.DbContext.AppSettings.Where(x => x.Key.StartsWith("RemoteSqlImport.")).ToListAsync());
+        Assert.Contains(
+            await fixture.DbContext.AuditLogEntries.Select(x => x.Action).ToListAsync(),
+            action => string.Equals(action, "ClearConfiguration", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task VerifyProductImportReturnsErrorReviewWhenFileExtensionIsInvalid()
     {
         await using var fixture = await TestFixture.CreateAsync();

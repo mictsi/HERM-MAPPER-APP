@@ -87,7 +87,7 @@
                     <span class="admin-disclosure-meta">@remoteSqlImport.StatusSummary</span>
                 </summary>
                 <div class="admin-disclosure-body">
-                    <p class="mb-3">The connection is only saved after a successful connection and schema test. Enter the SQL Server settings as separate fields below. Credentials are stored separately and hidden after save. Leave the password blank to keep the currently saved secret.</p>
+                    <p class="mb-3">The connection is only saved after a successful connection and schema test. Enter the SQL Server settings as separate fields below. Credentials are stored separately and hidden after save. Leave the password blank to keep the currently saved secret. Disable import to pause both scheduled and manual imports without losing the saved connection details.</p>
 
                     @if (!string.IsNullOrWhiteSpace(remoteSqlImport.SavedUserNameClearText) || !string.IsNullOrWhiteSpace(remoteSqlImport.SavedPasswordClearText))
                     {
@@ -100,10 +100,19 @@
 
                     <div class="stats-grid stats-grid-compact import-stats mb-4">
                         <article class="stat-card">
+                            <span class="stat-label">Import mode</span>
+                            <span class="stat-value">@(remoteSqlImport.IsEnabled ? "Enabled" : "Disabled")</span>
+                            <span class="stat-meta">@(remoteSqlImport.IsEnabled ? "Manual and scheduled imports are allowed" : "Manual and scheduled imports are blocked")</span>
+                        </article>
+                        <article class="stat-card">
                             <span class="stat-label">Schedule</span>
                             <span class="stat-value">@remoteSqlImport.ScheduleSummary</span>
                             <span class="stat-meta">
-                                @if (remoteSqlImport.NextScheduledRunUtc.HasValue)
+                                @if (!remoteSqlImport.IsEnabled)
+                                {
+                                    <text>Imports are currently disabled</text>
+                                }
+                                else if (remoteSqlImport.NextScheduledRunUtc.HasValue)
                                 {
                                     <text>Next run: @await TimeZoneDisplay.FormatUtcAsync(remoteSqlImport.NextScheduledRunUtc.Value)</text>
                                 }
@@ -218,9 +227,21 @@
                     <div class="d-flex gap-2 flex-wrap mt-3">
                         <form asp-action="RunRemoteSqlImportNow" method="post">
                             @Html.AntiForgeryToken()
-                            <button class="btn btn-outline-primary" type="submit" @(remoteSqlImport.IsConfigured ? null : "disabled")>Run import now</button>
+                            <button class="btn btn-outline-primary" type="submit" @(remoteSqlImport.CanRunImportNow ? null : "disabled")>Run import now</button>
+                        </form>
+                        <form asp-action="SetRemoteSqlImportEnabled" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="isEnabled" value="@(remoteSqlImport.IsEnabled ? "false" : "true")" />
+                            <button class="btn @(remoteSqlImport.IsEnabled ? "btn-outline-warning" : "btn-outline-success")" type="submit">
+                                @(remoteSqlImport.IsEnabled ? "Disable import" : "Enable import")
+                            </button>
+                        </form>
+                        <form asp-action="ClearRemoteSqlImportConfiguration" method="post">
+                            @Html.AntiForgeryToken()
+                            <button class="btn btn-outline-danger" type="submit">Clear saved SQL configuration</button>
                         </form>
                     </div>
+                    <p class="form-text mt-2 mb-0">Clearing removes the saved server, database, schedule, execution state, and stored credentials from the database.</p>
 
                     @if (remoteSqlImport.TestResult is not null)
                     {

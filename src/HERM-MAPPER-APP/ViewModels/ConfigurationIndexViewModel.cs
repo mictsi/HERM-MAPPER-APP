@@ -24,6 +24,7 @@ public sealed class RemoteSqlImportSectionViewModel
 {
     public RemoteSqlImportInputModel Input { get; init; } = new();
     public IReadOnlyList<SelectListItem> ScheduleOptions { get; init; } = [];
+    public bool IsEnabled { get; init; } = AppSettingDefaults.RemoteSqlImportEnabled;
     public bool IsConfigured { get; init; }
     public bool HasSavedUserName { get; init; }
     public bool HasSavedPassword { get; init; }
@@ -38,6 +39,7 @@ public sealed class RemoteSqlImportSectionViewModel
     public RemoteSqlImportConnectionTestViewModel? TestResult { get; init; }
     public string? SavedUserNameClearText { get; init; }
     public string? SavedPasswordClearText { get; init; }
+    public bool CanRunImportNow => IsConfigured && IsEnabled;
 }
 
 public sealed class RemoteSqlImportInputModel

@@ -496,6 +496,24 @@ public sealed class ConfigurationController(
         return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetRemoteSqlImportEnabled(bool isEnabled)
+    {
+        TempData["ConfigurationStatusMessage"] = await remoteSqlImportService.SetImportEnabledAsync(isEnabled);
+        return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ClearRemoteSqlImportConfiguration()
+    {
+        TempData.Remove("RemoteSqlImportSavedUserName");
+        TempData.Remove("RemoteSqlImportSavedPassword");
+        TempData["ConfigurationStatusMessage"] = await remoteSqlImportService.ClearConfigurationAsync();
+        return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
+    }
+
     private async Task<int> GetNextSortOrderAsync(string fieldName)
     {
         var maxSortOrder = await dbContext.ConfigurableFieldOptions
@@ -590,6 +608,7 @@ public sealed class ConfigurationController(
             {
                 Input = effectiveRemoteSqlInput,
                 ScheduleOptions = BuildRemoteSqlScheduleOptions(effectiveRemoteSqlInput.ScheduleHours),
+                IsEnabled = remoteSqlSettings.IsEnabled,
                 IsConfigured = remoteSqlSettings.IsConfigured,
                 HasSavedUserName = remoteSqlSettings.HasSavedUserName,
                 HasSavedPassword = remoteSqlSettings.HasSavedPassword,
