@@ -1193,7 +1193,7 @@ a {
   width: 100%;
   min-width: 0;
   min-height: 32rem;
-  overflow: visible;
+  overflow: auto;
   border-radius: 1rem;
 }
 

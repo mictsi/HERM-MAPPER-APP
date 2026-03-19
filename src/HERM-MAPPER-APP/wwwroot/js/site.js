@@ -1206,11 +1206,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return Math.max(1, Math.floor((usableWidth + canvasColumnGap) / (canvasNodeWidth + canvasColumnGap)));
     };
 
-    const clampNodeX = (x) => {
-      const maxX = Math.max(canvasPadding, getSurfaceWidth() - canvasNodeWidth - canvasPadding);
-      const nextX = Math.round(Number.isFinite(x) ? x : canvasPadding);
-      return Math.min(maxX, Math.max(canvasPadding, nextX));
-    };
+    const clampNodeX = (x) => Math.max(canvasPadding, Math.round(Number.isFinite(x) ? x : canvasPadding));
 
     const clampNodeY = (y) => Math.max(canvasPadding, Math.round(Number.isFinite(y) ? y : canvasPadding));
 
@@ -1436,7 +1432,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const refreshSurfaceSize = () => {
-      const width = getSurfaceWidth();
+      let width = getSurfaceWidth();
       const minimumHeight = Math.max(stage.clientHeight, 520);
       let height = minimumHeight;
 
@@ -1445,7 +1441,9 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
+        const left = Number.parseFloat(element.style.left) || 0;
         const top = Number.parseFloat(element.style.top) || 0;
+        width = Math.max(width, left + element.offsetWidth + canvasPadding);
         height = Math.max(height, top + element.offsetHeight + 96);
       });
 
