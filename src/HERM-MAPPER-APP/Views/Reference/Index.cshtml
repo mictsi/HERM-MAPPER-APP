@@ -161,14 +161,27 @@
                                 </td>
                                 <td>@(string.IsNullOrWhiteSpace(component.ProductExamples) ? "-" : component.ProductExamples)</td>
                                 <td class="text-end">
-                                    <div class="btn-group btn-group-sm">
-                                        <a class="btn btn-outline-secondary" asp-action="History" asp-route-id="@component.Id">History</a>
+                                    <div class="table-action-group">
+                                        <a class="table-action-button"
+                                           asp-action="History"
+                                           asp-route-id="@component.Id"
+                                           title="Show history for @component.DisplayLabel"
+                                           aria-label="Show history for @component.DisplayLabel">
+                                            <partial name="_ActionIcon" model="@("history")" />
+                                            <span class="visually-hidden">History</span>
+                                        </a>
                                         @if (isAdministrator)
                                         {
-                                        <form asp-action="DeleteComponent" method="post" class="d-inline">
-                                            <input type="hidden" name="id" value="@component.Id" />
-                                            <button class="btn btn-outline-danger" type="submit">Trash</button>
-                                        </form>
+                                            <form asp-action="DeleteComponent" method="post" class="table-action-form">
+                                                <input type="hidden" name="id" value="@component.Id" />
+                                                <button class="table-action-button table-action-button-danger"
+                                                        type="submit"
+                                                        title="Move @component.DisplayLabel to trash"
+                                                        aria-label="Move @component.DisplayLabel to trash">
+                                                    <partial name="_ActionIcon" model="@("trash")" />
+                                                    <span class="visually-hidden">Trash</span>
+                                                </button>
+                                            </form>
                                         }
                                     </div>
                                 </td>

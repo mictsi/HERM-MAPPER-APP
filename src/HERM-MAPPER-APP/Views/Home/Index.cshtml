@@ -107,7 +107,35 @@
                         <td>@(latestMapping?.TrmComponent is null ? $"{product.Mappings.Count} mapping(s)" : latestMapping.TrmComponent.DisplayLabel)</td>
                         <td>@await TimeZoneDisplay.FormatUtcAsync(product.UpdatedUtc)</td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary" asp-controller="Products" asp-action="Details" asp-route-id="@product.Id">Show details</a>
+                            <div class="table-action-group">
+                                <a class="table-action-button"
+                                   asp-controller="Products"
+                                   asp-action="Details"
+                                   asp-route-id="@product.Id"
+                                   title="Show details for @product.Name"
+                                   aria-label="Show details for @product.Name">
+                                    <partial name="_ActionIcon" model="@("details")" />
+                                    <span class="visually-hidden">Show details</span>
+                                </a>
+                                <a class="table-action-button"
+                                   asp-controller="Products"
+                                   asp-action="Visualize"
+                                   asp-route-id="@product.Id"
+                                   title="Visualize HERM mapping for @product.Name"
+                                   aria-label="Visualize HERM mapping for @product.Name">
+                                    <partial name="_ActionIcon" model="@("visualize")" />
+                                    <span class="visually-hidden">Visualize HERM mapping</span>
+                                </a>
+                                <a class="table-action-button"
+                                   asp-controller="Products"
+                                   asp-action="ShowDependencies"
+                                   asp-route-id="@product.Id"
+                                   title="Show dependencies for @product.Name"
+                                   aria-label="Show dependencies for @product.Name">
+                                    <partial name="_ActionIcon" model="@("dependencies")" />
+                                    <span class="visually-hidden">Show dependencies</span>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 }

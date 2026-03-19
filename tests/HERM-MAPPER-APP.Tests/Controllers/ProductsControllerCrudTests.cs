@@ -493,6 +493,121 @@ public sealed class ProductsControllerCrudTests
     }
 
     [Fact]
+    public async Task ShowDependenciesReturnsIncomingAndOutgoingDependenciesFromServiceData()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var sentinel = new ProductCatalogItem { Name = "Sentinel" };
+        var portal = new ProductCatalogItem { Name = "Portal" };
+        var broker = new ProductCatalogItem { Name = "Broker" };
+        var archive = new ProductCatalogItem { Name = "Archive", IsDeleted = true };
+
+        await fixture.DbContext.ProductCatalogItems.AddRangeAsync(sentinel, portal, broker, archive);
+        await fixture.DbContext.SaveChangesAsync();
+
+        await fixture.DbContext.ServiceCatalogItems.AddRangeAsync(
+            new ServiceCatalogItem
+            {
+                Name = "Checkout",
+                Owner = "Team Blue",
+                LifecycleStatus = "Production",
+                ProductConnections =
+                [
+                    new ServiceCatalogItemConnection
+                    {
+                        FromProductCatalogItemId = portal.Id,
+                        ToProductCatalogItemId = sentinel.Id,
+                        SortOrder = 1
+                    },
+                    new ServiceCatalogItemConnection
+                    {
+                        FromProductCatalogItemId = sentinel.Id,
+                        ToProductCatalogItemId = broker.Id,
+                        SortOrder = 2
+                    }
+                ]
+            },
+            new ServiceCatalogItem
+            {
+                Name = "Legacy handoff",
+                Owner = "Team Red",
+                LifecycleStatus = "Trial",
+                ProductLinks =
+                [
+                    new ServiceCatalogItemProduct { ProductCatalogItemId = archive.Id, SortOrder = 1 },
+                    new ServiceCatalogItemProduct { ProductCatalogItemId = sentinel.Id, SortOrder = 2 },
+                    new ServiceCatalogItemProduct { ProductCatalogItemId = portal.Id, SortOrder = 3 }
+                ]
+            },
+            new ServiceCatalogItem
+            {
+                Name = "Deleted flow",
+                Owner = "Team Green",
+                LifecycleStatus = "Production",
+                IsDeleted = true,
+                ProductConnections =
+                [
+                    new ServiceCatalogItemConnection
+                    {
+                        FromProductCatalogItemId = broker.Id,
+                        ToProductCatalogItemId = sentinel.Id,
+                        SortOrder = 1
+                    }
+                ]
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.ShowDependencies(sentinel.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductDependenciesViewModel>(view.Model);
+
+        Assert.Equal(sentinel.Id, model.Product.Id);
+        Assert.Equal(2, model.IncomingDependencies.Count);
+        Assert.Equal(2, model.OutgoingDependencies.Count);
+
+        Assert.Collection(
+            model.IncomingDependencies,
+            dependency =>
+            {
+                Assert.Equal("Checkout", dependency.ServiceName);
+                Assert.Equal("Portal", dependency.RelatedProductLabel);
+                Assert.True(dependency.CanOpenRelatedProduct);
+            },
+            dependency =>
+            {
+                Assert.Equal("Legacy handoff", dependency.ServiceName);
+                Assert.Equal("Archive [deleted]", dependency.RelatedProductLabel);
+                Assert.False(dependency.CanOpenRelatedProduct);
+            });
+
+        Assert.Collection(
+            model.OutgoingDependencies,
+            dependency =>
+            {
+                Assert.Equal("Checkout", dependency.ServiceName);
+                Assert.Equal("Broker", dependency.RelatedProductLabel);
+            },
+            dependency =>
+            {
+                Assert.Equal("Legacy handoff", dependency.ServiceName);
+                Assert.Equal("Portal", dependency.RelatedProductLabel);
+            });
+    }
+
+    [Fact]
+    public async Task ShowDependenciesReturnsNotFoundWhenProductMissing()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.ShowDependencies(999);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
     public async Task DeleteConfirmedSoftDeletesProductAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();

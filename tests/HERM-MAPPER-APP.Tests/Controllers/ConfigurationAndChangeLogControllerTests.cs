@@ -4,6 +4,7 @@ using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.Tests.TestSupport;
 using HERMMapperApp.ViewModels;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,7 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace HERMMapperApp.Tests.Controllers;
@@ -704,11 +706,25 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         public ConfigurationController CreateConfigurationController()
         {
+            var appSettingsService = new AppSettingsService(DbContext);
+            var auditLogService = new AuditLogService(DbContext);
+            var protectedSettingsService = new ProtectedSettingsService(
+                new EphemeralDataProtectionProvider(),
+                appSettingsService,
+                NullLogger<ProtectedSettingsService>.Instance);
+
             var controller = new ConfigurationController(
                 DbContext,
-                new AppSettingsService(DbContext),
+                appSettingsService,
                 new ConfigurableFieldService(DbContext),
-                new AuditLogService(DbContext),
+                auditLogService,
+                new RemoteSqlImportService(
+                    DbContext,
+                    appSettingsService,
+                    protectedSettingsService,
+                    auditLogService,
+                    new RemoteSqlImportExecutionGate(),
+                    NullLogger<RemoteSqlImportService>.Instance),
                 new TrmWorkbookImportService(DbContext, new ComponentVersioningService(DbContext), new AuditLogService(DbContext)),
                 new SampleRelationshipImportService(DbContext),
                 new TestWebHostEnvironment(contentRoot.Path));

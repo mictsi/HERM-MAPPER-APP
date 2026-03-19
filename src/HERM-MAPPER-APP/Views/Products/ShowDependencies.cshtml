@@ -1,0 +1,110 @@
+@using HERMMapperApp
+@using HERMMapperApp.ViewModels
+@model ProductDependenciesViewModel
+@{
+    ViewData["Title"] = "Show Dependencies";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var rowCount = Math.Max(Model.IncomingDependencies.Count, Model.OutgoingDependencies.Count);
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Service relationships</span>
+        <h1>@Model.Product.Name</h1>
+        <p>Incoming and outgoing product dependencies are calculated from the service catalogue, including both saved connection graphs and older linear service flows.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Product.Id">Back to product</a>
+        <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@Model.Product.Id">Visualize HERM mapping</a>
+        @if (canManageProductsAndServices)
+        {
+            <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Product.Id">Edit product</a>
+        }
+    </div>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Dependencies</span>
+            <h2>@(Model.IncomingDependencies.Count + Model.OutgoingDependencies.Count) service link(s)</h2>
+            <p>@Model.IncomingDependencies.Count incoming and @Model.OutgoingDependencies.Count outgoing.</p>
+        </div>
+    </div>
+
+    @if (!Model.HasDependencies)
+    {
+        <div class="empty-state compact">
+            <h3>No dependencies available yet</h3>
+            <p>Add this product to one or more service flows to see which products connect into it and which products it connects to.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle dependency-matrix">
+                <thead>
+                    <tr>
+                        <th>Incoming dependencies</th>
+                        <th>Outgoing dependencies</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @for (var index = 0; index < rowCount; index++)
+                {
+                    var incoming = index < Model.IncomingDependencies.Count ? Model.IncomingDependencies[index] : null;
+                    var outgoing = index < Model.OutgoingDependencies.Count ? Model.OutgoingDependencies[index] : null;
+                    <tr>
+                        <td>
+                            @if (incoming is null)
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                            else
+                            {
+                                <article class="dependency-entry">
+                                    @if (incoming.CanOpenRelatedProduct)
+                                    {
+                                        <a class="dependency-entry-title" asp-action="Details" asp-route-id="@incoming.RelatedProductId">@incoming.RelatedProductLabel</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="dependency-entry-title">@incoming.RelatedProductLabel</span>
+                                    }
+                                    <div class="dependency-entry-meta">
+                                        Via service
+                                        <a asp-controller="Services" asp-action="Visualize" asp-route-id="@incoming.ServiceId">@incoming.ServiceName</a>
+                                    </div>
+                                </article>
+                            }
+                        </td>
+                        <td>
+                            @if (outgoing is null)
+                            {
+                                <span class="text-muted">-</span>
+                            }
+                            else
+                            {
+                                <article class="dependency-entry">
+                                    @if (outgoing.CanOpenRelatedProduct)
+                                    {
+                                        <a class="dependency-entry-title" asp-action="Details" asp-route-id="@outgoing.RelatedProductId">@outgoing.RelatedProductLabel</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="dependency-entry-title">@outgoing.RelatedProductLabel</span>
+                                    }
+                                    <div class="dependency-entry-meta">
+                                        Via service
+                                        <a asp-controller="Services" asp-action="Visualize" asp-route-id="@outgoing.ServiceId">@outgoing.ServiceName</a>
+                                    </div>
+                                </article>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

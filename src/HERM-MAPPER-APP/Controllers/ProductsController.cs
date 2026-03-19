@@ -181,6 +181,62 @@ public sealed class ProductsController(
         });
     }
 
+    public async Task<IActionResult> ShowDependencies(int id)
+    {
+        var product = await dbContext.ProductCatalogItems
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var services = await dbContext.ServiceCatalogItems
+            .AsNoTracking()
+            .Where(x =>
+                !x.IsDeleted &&
+                (x.ProductConnections.Any(connection =>
+                    connection.FromProductCatalogItemId == id ||
+                    connection.ToProductCatalogItemId == id) ||
+                 x.ProductLinks.Any(link => link.ProductCatalogItemId == id)))
+            .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
+            .ThenInclude(x => x.ProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.FromProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.ToProductCatalogItem)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        var dependencies = services
+            .SelectMany(BuildServiceDependencies)
+            .ToList();
+
+        var incomingDependencies = dependencies
+            .Where(dependency => dependency.ToProductId == id)
+            .Select(dependency => BuildProductServiceDependencyViewModel(dependency.FromProduct, dependency))
+            .OrderBy(dependency => dependency.ServiceName)
+            .ThenBy(dependency => dependency.Sequence)
+            .ThenBy(dependency => dependency.RelatedProductLabel)
+            .ToList();
+
+        var outgoingDependencies = dependencies
+            .Where(dependency => dependency.FromProductId == id)
+            .Select(dependency => BuildProductServiceDependencyViewModel(dependency.ToProduct, dependency))
+            .OrderBy(dependency => dependency.ServiceName)
+            .ThenBy(dependency => dependency.Sequence)
+            .ThenBy(dependency => dependency.RelatedProductLabel)
+            .ToList();
+
+        return View(new ProductDependenciesViewModel
+        {
+            Product = product,
+            IncomingDependencies = incomingDependencies,
+            OutgoingDependencies = outgoingDependencies
+        });
+    }
+
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
@@ -652,6 +708,66 @@ public sealed class ProductsController(
         return mergedOwners;
     }
 
+    private static IEnumerable<ProductServiceDependencyRecord> BuildServiceDependencies(ServiceCatalogItem service)
+    {
+        if (service.ProductConnections.Count != 0)
+        {
+            return service.GetOrderedProductConnections()
+                .Select((connection, index) => new ProductServiceDependencyRecord(
+                    service.Id,
+                    service.Name,
+                    index + 1,
+                    connection.FromProductCatalogItemId,
+                    connection.ToProductCatalogItemId,
+                    connection.FromProductCatalogItem,
+                    connection.ToProductCatalogItem))
+                .ToList();
+        }
+
+        var orderedLinks = service.GetOrderedProductLinks();
+        var dependencies = new List<ProductServiceDependencyRecord>();
+
+        for (var index = 0; index < orderedLinks.Count - 1; index++)
+        {
+            dependencies.Add(new ProductServiceDependencyRecord(
+                service.Id,
+                service.Name,
+                index + 1,
+                orderedLinks[index].ProductCatalogItemId,
+                orderedLinks[index + 1].ProductCatalogItemId,
+                orderedLinks[index].ProductCatalogItem,
+                orderedLinks[index + 1].ProductCatalogItem));
+        }
+
+        return dependencies;
+    }
+
+    private static ProductServiceDependencyViewModel BuildProductServiceDependencyViewModel(
+        ProductCatalogItem relatedProduct,
+        ProductServiceDependencyRecord dependency) =>
+        new()
+        {
+            ServiceId = dependency.ServiceId,
+            ServiceName = dependency.ServiceName,
+            RelatedProductId = relatedProduct.Id,
+            RelatedProductLabel = BuildDependencyProductLabel(relatedProduct),
+            CanOpenRelatedProduct = !relatedProduct.IsDeleted,
+            Sequence = dependency.Sequence
+        };
+
+    private static string BuildDependencyProductLabel(ProductCatalogItem product)
+    {
+        var detailParts = new[] { product.Vendor, product.Version }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+
+        var label = detailParts.Count == 0
+            ? product.Name
+            : $"{product.Name} ({string.Join(" ", detailParts)})";
+
+        return product.IsDeleted ? $"{label} [deleted]" : label;
+    }
+
     private static List<string> NormalizeSelections(IEnumerable<string>? values)
     {
         var normalized = new List<string>();
@@ -678,4 +794,13 @@ public sealed class ProductsController(
 
         return normalized;
     }
+
+    private sealed record ProductServiceDependencyRecord(
+        int ServiceId,
+        string ServiceName,
+        int Sequence,
+        int FromProductId,
+        int ToProductId,
+        ProductCatalogItem FromProduct,
+        ProductCatalogItem ToProduct);
 }

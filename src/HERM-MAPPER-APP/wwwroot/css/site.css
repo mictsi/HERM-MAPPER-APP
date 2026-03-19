@@ -267,6 +267,69 @@ a {
   font-size: 0.88rem;
 }
 
+.table-action-group {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid rgba(31, 41, 51, 0.14);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.table-action-group > * {
+  display: flex;
+}
+
+.table-action-group > * + * {
+  border-left: 1px solid rgba(31, 41, 51, 0.14);
+}
+
+.table-action-form {
+  margin: 0;
+}
+
+.table-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.2rem;
+  min-width: 3.2rem;
+  min-height: 3rem;
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.table-action-button:hover,
+.table-action-button:focus-visible {
+  color: var(--accent-deep);
+  background: rgba(11, 110, 79, 0.08);
+}
+
+.table-action-button-danger {
+  color: #c92d39;
+}
+
+.table-action-button-danger:hover,
+.table-action-button-danger:focus-visible {
+  color: #b21f2d;
+  background: rgba(201, 45, 57, 0.08);
+}
+
+.table-action-button svg {
+  width: 1.45rem;
+  height: 1.45rem;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -574,6 +637,32 @@ a {
 .dependency-paths {
   display: grid;
   gap: 0.9rem;
+}
+
+.dependency-matrix td {
+  width: 50%;
+}
+
+.dependency-entry {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.dependency-entry-title {
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.dependency-entry-title:hover,
+.dependency-entry-title:focus-visible {
+  color: var(--accent-deep);
+  text-decoration: underline;
+}
+
+.dependency-entry-meta {
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .service-editor {

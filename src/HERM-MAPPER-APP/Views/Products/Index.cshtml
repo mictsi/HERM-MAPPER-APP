@@ -172,13 +172,49 @@
                             </td>
                             <td>@await TimeZoneDisplay.FormatUtcAsync(item.UpdatedUtc)</td>
                             <td class="text-end">
-                                <div class="btn-group btn-group-sm">
-                                    <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@item.Id">Show details</a>
-                                    <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@item.Id">Visualize</a>
+                                <div class="table-action-group">
+                                    <a class="table-action-button"
+                                       asp-action="Details"
+                                       asp-route-id="@item.Id"
+                                       title="Show details for @item.Name"
+                                       aria-label="Show details for @item.Name">
+                                        <partial name="_ActionIcon" model="@("details")" />
+                                        <span class="visually-hidden">Show details</span>
+                                    </a>
+                                    <a class="table-action-button"
+                                       asp-action="Visualize"
+                                       asp-route-id="@item.Id"
+                                       title="Visualize HERM mapping for @item.Name"
+                                       aria-label="Visualize HERM mapping for @item.Name">
+                                        <partial name="_ActionIcon" model="@("visualize")" />
+                                        <span class="visually-hidden">Visualize HERM mapping</span>
+                                    </a>
+                                    <a class="table-action-button"
+                                       asp-action="ShowDependencies"
+                                       asp-route-id="@item.Id"
+                                       title="Show dependencies for @item.Name"
+                                       aria-label="Show dependencies for @item.Name">
+                                        <partial name="_ActionIcon" model="@("dependencies")" />
+                                        <span class="visually-hidden">Show dependencies</span>
+                                    </a>
                                     @if (canManageProductsAndServices)
                                     {
-                                    <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@item.Id">Edit</a>
-                                    <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@item.Id">Trash</a>
+                                        <a class="table-action-button"
+                                           asp-action="Edit"
+                                           asp-route-id="@item.Id"
+                                           title="Edit @item.Name"
+                                           aria-label="Edit @item.Name">
+                                            <partial name="_ActionIcon" model="@("edit")" />
+                                            <span class="visually-hidden">Edit</span>
+                                        </a>
+                                        <a class="table-action-button table-action-button-danger"
+                                           asp-action="Delete"
+                                           asp-route-id="@item.Id"
+                                           title="Move @item.Name to trash"
+                                           aria-label="Move @item.Name to trash">
+                                            <partial name="_ActionIcon" model="@("trash")" />
+                                            <span class="visually-hidden">Trash</span>
+                                        </a>
                                     }
                                 </div>
                             </td>
