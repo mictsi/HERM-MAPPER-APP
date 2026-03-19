@@ -23,6 +23,7 @@ public sealed partial class DatabaseInitializer(
         await EnsureServiceConnectionLayoutColumnAsync(cancellationToken);
         await EnsureAppSettingsTableAsync(cancellationToken);
         await EnsureUsersTableAsync(cancellationToken);
+        await EnsureAuditLogUserColumnAsync(cancellationToken);
         await EnsureRoleNormalizationAsync(cancellationToken);
         await EnsureConfigurableFieldOptionsTableAsync(cancellationToken);
         await EnsureDefaultAppSettingsAsync(cancellationToken);
@@ -224,6 +225,7 @@ public sealed partial class DatabaseInitializer(
                     "Action" TEXT NOT NULL,
                     "EntityType" TEXT NULL,
                     "EntityId" INTEGER NULL,
+                    "ActorUserName" TEXT NULL,
                     "Summary" TEXT NOT NULL,
                     "Details" TEXT NULL,
                     "OccurredUtc" TEXT NOT NULL
@@ -659,6 +661,34 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     CREATE INDEX [IX_ServiceCatalogItems_LifecycleStatus]
                     ON [ServiceCatalogItems] ([LifecycleStatus]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureAuditLogUserColumnAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            if (!await SqliteColumnExistsAsync("AuditLogEntries", "ActorUserName", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AuditLogEntries ADD COLUMN ActorUserName TEXT NULL",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[AuditLogEntries]', N'ActorUserName') IS NULL
+                BEGIN
+                    ALTER TABLE [AuditLogEntries]
+                    ADD [ActorUserName] NVARCHAR(200) NULL;
                 END
                 """,
                 cancellationToken);

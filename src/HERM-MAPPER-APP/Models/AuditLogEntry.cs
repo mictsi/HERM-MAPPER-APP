@@ -17,6 +17,9 @@ public sealed class AuditLogEntry
 
     public int? EntityId { get; set; }
 
+    [StringLength(200)]
+    public string? ActorUserName { get; set; }
+
     [Required, StringLength(400)]
     public string Summary { get; set; } = string.Empty;
 

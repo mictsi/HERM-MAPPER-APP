@@ -24,6 +24,7 @@ public sealed class ChangeLogController(AppDbContext dbContext) : Controller
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(x =>
+                (x.ActorUserName != null && x.ActorUserName.Contains(search)) ||
                 x.Category.Contains(search) ||
                 x.Action.Contains(search) ||
                 (x.EntityType != null && x.EntityType.Contains(search)) ||

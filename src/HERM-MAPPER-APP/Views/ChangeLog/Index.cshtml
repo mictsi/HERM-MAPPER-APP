@@ -19,7 +19,7 @@
     <form method="get" class="row g-3 align-items-end">
         <div class="col-lg-10">
             <label class="form-label" for="search">Search</label>
-            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Category, action, entity, summary, or details" />
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="User, category, action, entity, summary, or details" />
         </div>
         <div class="col-lg-2 d-grid">
             <button class="btn btn-primary" type="submit">Search</button>
@@ -42,6 +42,7 @@
                 <thead>
                     <tr>
                         <th>When</th>
+                        <th>User</th>
                         <th>Category</th>
                         <th>Action</th>
                         <th>Entity</th>
@@ -53,6 +54,7 @@
                 {
                     <tr>
                         <td>@await TimeZoneDisplay.FormatUtcAsync(entry.OccurredUtc)</td>
+                        <td>@(string.IsNullOrWhiteSpace(entry.ActorUserName) ? "-" : entry.ActorUserName)</td>
                         <td>@entry.Category</td>
                         <td>@entry.Action</td>
                         <td>@(entry.EntityType is null ? "-" : $"{entry.EntityType} #{entry.EntityId}")</td>

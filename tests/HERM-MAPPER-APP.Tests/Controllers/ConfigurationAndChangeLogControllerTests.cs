@@ -26,6 +26,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.AuditLogEntries.AddRangeAsync(
             new AuditLogEntry
             {
+                ActorUserName = "import.service",
                 Category = "Configuration",
                 Action = "Import",
                 EntityType = "TrmWorkbook",
@@ -35,6 +36,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
             },
             new AuditLogEntry
             {
+                ActorUserName = "ada",
                 Category = "Product",
                 Action = "Create",
                 EntityType = nameof(ProductCatalogItem),
@@ -43,6 +45,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
             },
             new AuditLogEntry
             {
+                ActorUserName = "sam",
                 Category = "Configuration",
                 Action = "VerifyProductImport",
                 EntityType = nameof(ProductCatalogItem),
@@ -62,6 +65,40 @@ public sealed class ConfigurationAndChangeLogControllerTests
         Assert.Equal(2, model.Entries.Count);
         Assert.Equal("VerifyProductImport", model.Entries[0].Action);
         Assert.Equal("Create", model.Entries[1].Action);
+    }
+
+    [Fact]
+    public async Task ChangeLogIndexFiltersByActorUserName()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.AuditLogEntries.AddRangeAsync(
+            new AuditLogEntry
+            {
+                ActorUserName = "ada",
+                Category = "Product",
+                Action = "Create",
+                Summary = "Created Sentinel",
+                OccurredUtc = new DateTime(2026, 3, 3, 9, 0, 0, DateTimeKind.Utc)
+            },
+            new AuditLogEntry
+            {
+                ActorUserName = "sam",
+                Category = "Configuration",
+                Action = "Import",
+                Summary = "Imported workbook",
+                OccurredUtc = new DateTime(2026, 3, 4, 9, 0, 0, DateTimeKind.Utc)
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateChangeLogController();
+        var result = await controller.IndexAsync("ada");
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ChangeLogIndexViewModel>(view.Model);
+
+        var entry = Assert.Single(model.Entries);
+        Assert.Equal("ada", entry.ActorUserName);
+        Assert.Equal("Create", entry.Action);
     }
 
     [Fact]

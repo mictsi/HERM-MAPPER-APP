@@ -99,13 +99,14 @@ public sealed class AccountController(
 
                 if (userWasLockedOut)
                 {
-                    await auditLogService.WriteAsync(
+                    await auditLogService.WriteAsActorAsync(
                         "Authentication",
                         "Lockout",
                         nameof(AppUser),
                         user.Id,
                         $"User '{user.UserName}' was locked out after repeated failed logins.",
-                        $"Lockout until {lockoutEndUtc}.");
+                        actorUserName: user.UserName,
+                        details: $"Lockout until {lockoutEndUtc}.");
 
                     ModelState.AddModelError(string.Empty, $"Account is temporarily locked. Try again in {authenticationSecurityOptions.LockoutMinutes} minute(s).");
                     return View(input);
@@ -128,12 +129,13 @@ public sealed class AccountController(
             AppAuthenticationService.CreatePrincipal(user),
             appAuthenticationService.CreateProperties());
 
-        await auditLogService.WriteAsync(
+        await auditLogService.WriteAsActorAsync(
             "Authentication",
             "Login",
             nameof(AppUser),
             user.Id,
-            $"User '{user.UserName}' signed in.");
+            $"User '{user.UserName}' signed in.",
+            actorUserName: user.UserName);
 
         if (!string.IsNullOrWhiteSpace(input.ReturnUrl) && Url.IsLocalUrl(input.ReturnUrl))
         {
@@ -179,21 +181,23 @@ public sealed class AccountController(
 
         if (user is not null)
         {
-            await auditLogService.WriteAsync(
+            await auditLogService.WriteAsActorAsync(
                 "Authentication",
                 "Logout",
                 nameof(AppUser),
                 user.Id,
-                $"User '{user.UserName}' signed out.");
+                $"User '{user.UserName}' signed out.",
+                actorUserName: user.UserName);
         }
         else if (isOpenIdConnectUser && !string.IsNullOrWhiteSpace(externalUserName))
         {
-            await auditLogService.WriteAsync(
+            await auditLogService.WriteAsActorAsync(
                 "Authentication",
                 "Logout",
                 "ExternalUser",
                 null,
-                $"OpenID Connect user '{externalUserName}' signed out.");
+                $"OpenID Connect user '{externalUserName}' signed out.",
+                actorUserName: externalUserName);
         }
 
         if (isOpenIdConnectUser && openIdConnectAuthenticationOptions.Enabled)
@@ -276,12 +280,13 @@ public sealed class AccountController(
         user.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
 
-        await auditLogService.WriteAsync(
+        await auditLogService.WriteAsActorAsync(
             "Users",
             "SelfServicePasswordReset",
             nameof(AppUser),
             user.Id,
-            $"User '{user.UserName}' changed their password.");
+            $"User '{user.UserName}' changed their password.",
+            actorUserName: user.UserName);
 
         TempData["ProfileStatusMessage"] = "Password updated.";
         return RedirectToAction("Profile");

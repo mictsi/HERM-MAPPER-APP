@@ -87,6 +87,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Category).HasMaxLength(80);
             entity.Property(x => x.Action).HasMaxLength(80);
             entity.Property(x => x.EntityType).HasMaxLength(80);
+            entity.Property(x => x.ActorUserName).HasMaxLength(200);
             entity.Property(x => x.Summary).HasMaxLength(400);
         });
 

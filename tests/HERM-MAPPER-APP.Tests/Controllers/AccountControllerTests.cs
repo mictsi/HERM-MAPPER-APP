@@ -208,6 +208,7 @@ public sealed class AccountControllerTests
 
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
         Assert.Equal("Login", audit.Action);
+        Assert.Equal("ada", audit.ActorUserName);
         Assert.Contains("ada", audit.Summary, StringComparison.Ordinal);
     }
 
@@ -286,6 +287,7 @@ public sealed class AccountControllerTests
 
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
         Assert.Equal("Logout", audit.Action);
+        Assert.Equal("external.user@example.com", audit.ActorUserName);
         Assert.Equal("ExternalUser", audit.EntityType);
     }
 
@@ -309,7 +311,9 @@ public sealed class AccountControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(AccountController.Login), redirect.ActionName);
-        Assert.Equal("Logout", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+        var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
+        Assert.Equal("Logout", audit.Action);
+        Assert.Equal("ada", audit.ActorUserName);
     }
 
     [Fact]
