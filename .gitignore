@@ -8,3 +8,4 @@ output/
 src/HERM-MAPPER-APP/App_Data/herm-mapper.db-wal
 src/HERM-MAPPER-APP/App_Data/herm-mapper.db-shm
 src/HERM-MAPPER-APP/App_Data/herm-mapper.db
+src/HERM-MAPPER-APP/App_Data/herm-mapper.db

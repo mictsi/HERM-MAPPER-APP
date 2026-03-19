@@ -12,6 +12,9 @@
     var openCatalogueImport = Model.CatalogueImportReview.HasReview;
     var openProductImport = Model.ProductImportReview.HasReview;
     var openRemoteSqlImport = Model.OpenRemoteSqlImportSection;
+    bool showErrorForSection(string sectionKey) =>
+        !string.IsNullOrWhiteSpace(Model.ErrorMessage) &&
+        string.Equals(Model.ErrorSectionKey, sectionKey, StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="admin-shell">
@@ -32,7 +35,7 @@
             </section>
         }
 
-        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage) && string.IsNullOrWhiteSpace(Model.ErrorSectionKey))
         {
             <section class="content-card">
                 <div class="alert alert-danger mb-0">@Model.ErrorMessage</div>
@@ -40,6 +43,10 @@
         }
 
         <section class="content-card">
+            @if (showErrorForSection("display-time-zone"))
+            {
+                <div class="alert alert-danger mb-3">@Model.ErrorMessage</div>
+            }
             <details class="admin-disclosure">
                 <summary class="admin-disclosure-summary">
                     <div>
@@ -66,6 +73,10 @@
         </section>
 
         <section class="content-card">
+            @if (showErrorForSection(RemoteSqlImportService.SectionKey))
+            {
+                <div class="alert alert-danger mb-3">@Model.ErrorMessage</div>
+            }
             <details class="admin-disclosure" @(openRemoteSqlImport ? "open" : null)>
                 <summary class="admin-disclosure-summary">
                     <div>
@@ -272,6 +283,10 @@
         </section>
 
         <section class="content-card">
+            @if (showErrorForSection("catalogue-import"))
+            {
+                <div class="alert alert-danger mb-3">@Model.ErrorMessage</div>
+            }
             <details class="admin-disclosure" @(openCatalogueImport ? "open" : null)>
                 <summary class="admin-disclosure-summary">
                     <div>
@@ -381,6 +396,10 @@
         </section>
 
         <section class="content-card">
+            @if (showErrorForSection("product-import"))
+            {
+                <div class="alert alert-danger mb-3">@Model.ErrorMessage</div>
+            }
             <details class="admin-disclosure" @(openProductImport ? "open" : null)>
                 <summary class="admin-disclosure-summary">
                     <div>
@@ -533,7 +552,12 @@
         @foreach (var field in Model.Fields)
         {
             var isExpandedField = string.Equals(Model.ExpandedFieldName, field.FieldName, StringComparison.OrdinalIgnoreCase);
+            var fieldSectionKey = $"field:{field.FieldName}";
             <section class="content-card">
+                @if (showErrorForSection(fieldSectionKey))
+                {
+                    <div class="alert alert-danger mb-3">@Model.ErrorMessage</div>
+                }
                 <details class="admin-disclosure" @(isExpandedField ? "open" : null)>
                     <summary class="admin-disclosure-summary">
                         <div>

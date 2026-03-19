@@ -22,10 +22,14 @@ public sealed class ConfigurationController(
     SampleRelationshipImportService sampleRelationshipImportService,
     IWebHostEnvironment environment) : Controller
 {
+    private const string DisplayTimeZoneSectionKey = "display-time-zone";
+    private const string CatalogueImportSectionKey = "catalogue-import";
+    private const string ProductImportSectionKey = "product-import";
+
     public async Task<IActionResult> Index(string? expandedFieldName = null, string? openSection = null)
     {
         return View(await BuildViewModelAsync(
-            expandedFieldName: expandedFieldName,
+            expandedFieldName: NormalizeExpandedFieldName(expandedFieldName),
             openRemoteSqlImportSection: string.Equals(openSection, RemoteSqlImportService.SectionKey, StringComparison.OrdinalIgnoreCase)));
     }
 
@@ -36,13 +40,15 @@ public sealed class ConfigurationController(
         if (workbook is null || workbook.Length == 0)
         {
             return View("Index", await BuildViewModelAsync(
-                catalogueImportReview: BuildCatalogueErrorReview("Choose an .xlsx workbook before verifying the import.")));
+                catalogueImportReview: BuildCatalogueErrorReview("Choose an .xlsx workbook before verifying the import."),
+                errorSectionKey: CatalogueImportSectionKey));
         }
 
         if (!string.Equals(Path.GetExtension(workbook.FileName), ".xlsx", StringComparison.OrdinalIgnoreCase))
         {
             return View("Index", await BuildViewModelAsync(
-                catalogueImportReview: BuildCatalogueErrorReview("Only Excel .xlsx workbooks are supported.", workbook.FileName)));
+                catalogueImportReview: BuildCatalogueErrorReview("Only Excel .xlsx workbooks are supported.", workbook.FileName),
+                errorSectionKey: CatalogueImportSectionKey));
         }
 
         var pendingImportToken = Guid.NewGuid().ToString("N");
@@ -83,6 +89,7 @@ public sealed class ConfigurationController(
         if (string.IsNullOrWhiteSpace(pendingImportToken))
         {
             TempData["ConfigurationError"] = "Verify a catalogue workbook before importing it.";
+            TempData["ConfigurationErrorSection"] = CatalogueImportSectionKey;
             return RedirectToAction(nameof(Index));
         }
 
@@ -90,6 +97,7 @@ public sealed class ConfigurationController(
         if (!System.IO.File.Exists(pendingPath))
         {
             TempData["ConfigurationError"] = "The verified catalogue workbook is no longer available. Upload it again.";
+            TempData["ConfigurationErrorSection"] = CatalogueImportSectionKey;
             return RedirectToAction(nameof(Index));
         }
 
@@ -101,7 +109,8 @@ public sealed class ConfigurationController(
                 catalogueImportReview: new WorkbookImportReviewViewModel
                 {
                     Verification = verification
-                }));
+                },
+                errorSectionKey: CatalogueImportSectionKey));
         }
 
         var summary = await workbookImportService.ImportAsync(pendingPath);
@@ -145,13 +154,15 @@ public sealed class ConfigurationController(
         if (csvFile is null || csvFile.Length == 0)
         {
             return View("Index", await BuildViewModelAsync(
-                productImportReview: BuildProductErrorReview("Choose a CSV file before verifying the import.")));
+                productImportReview: BuildProductErrorReview("Choose a CSV file before verifying the import."),
+                errorSectionKey: ProductImportSectionKey));
         }
 
         if (!string.Equals(Path.GetExtension(csvFile.FileName), ".csv", StringComparison.OrdinalIgnoreCase))
         {
             return View("Index", await BuildViewModelAsync(
-                productImportReview: BuildProductErrorReview("Only .csv files are supported for product import.", csvFile.FileName)));
+                productImportReview: BuildProductErrorReview("Only .csv files are supported for product import.", csvFile.FileName),
+                errorSectionKey: ProductImportSectionKey));
         }
 
         var pendingImportToken = Guid.NewGuid().ToString("N");
@@ -192,6 +203,7 @@ public sealed class ConfigurationController(
         if (string.IsNullOrWhiteSpace(pendingImportToken))
         {
             TempData["ConfigurationError"] = "Verify a product CSV before importing it.";
+            TempData["ConfigurationErrorSection"] = ProductImportSectionKey;
             return RedirectToAction(nameof(Index));
         }
 
@@ -199,6 +211,7 @@ public sealed class ConfigurationController(
         if (!System.IO.File.Exists(pendingPath))
         {
             TempData["ConfigurationError"] = "The verified product CSV is no longer available. Upload it again.";
+            TempData["ConfigurationErrorSection"] = ProductImportSectionKey;
             return RedirectToAction(nameof(Index));
         }
 
@@ -210,7 +223,8 @@ public sealed class ConfigurationController(
                 productImportReview: new ProductImportReviewViewModel
                 {
                     Verification = verification
-                }));
+                },
+                errorSectionKey: ProductImportSectionKey));
         }
 
         var summary = await sampleRelationshipImportService.ImportAsync(pendingPath);
@@ -256,12 +270,14 @@ public sealed class ConfigurationController(
         if (!ConfigurableFieldNames.IsSupported(input.FieldName))
         {
             TempData["ConfigurationError"] = "That field is not supported.";
+            TempData["ConfigurationErrorSection"] = BuildFieldSectionKey(input.FieldName);
             return RedirectToIndex();
         }
 
         if (string.IsNullOrWhiteSpace(input.Value))
         {
             TempData["ConfigurationError"] = "Enter a value before saving.";
+            TempData["ConfigurationErrorSection"] = BuildFieldSectionKey(input.FieldName);
             return RedirectToIndex(input.FieldName);
         }
 
@@ -274,6 +290,7 @@ public sealed class ConfigurationController(
         if (exists)
         {
             TempData["ConfigurationError"] = $"{ConfigurableFieldNames.GetLabel(input.FieldName)} value '{input.Value}' already exists.";
+            TempData["ConfigurationErrorSection"] = BuildFieldSectionKey(input.FieldName);
             return RedirectToIndex(input.FieldName);
         }
 
@@ -371,6 +388,7 @@ public sealed class ConfigurationController(
         if (string.IsNullOrWhiteSpace(input.TimeZoneId))
         {
             TempData["ConfigurationError"] = "Choose a time zone before saving.";
+            TempData["ConfigurationErrorSection"] = DisplayTimeZoneSectionKey;
             return RedirectToAction(nameof(Index));
         }
 
@@ -381,11 +399,13 @@ public sealed class ConfigurationController(
         catch (TimeZoneNotFoundException)
         {
             TempData["ConfigurationError"] = $"The time zone '{input.TimeZoneId}' is not available on this server.";
+            TempData["ConfigurationErrorSection"] = DisplayTimeZoneSectionKey;
             return RedirectToAction(nameof(Index));
         }
         catch (InvalidTimeZoneException)
         {
             TempData["ConfigurationError"] = $"The time zone '{input.TimeZoneId}' is invalid on this server.";
+            TempData["ConfigurationErrorSection"] = DisplayTimeZoneSectionKey;
             return RedirectToAction(nameof(Index));
         }
 
@@ -412,6 +432,7 @@ public sealed class ConfigurationController(
         {
             return View("Index", await BuildViewModelAsync(
                 errorMessage: result.Message,
+                errorSectionKey: RemoteSqlImportService.SectionKey,
                 remoteSqlInput: normalizedInput,
                 openRemoteSqlImportSection: true));
         }
@@ -451,6 +472,7 @@ public sealed class ConfigurationController(
         return View("Index", await BuildViewModelAsync(
             statusMessage: result.IsSuccess ? result.Message : null,
             errorMessage: result.IsSuccess ? null : result.Message,
+            errorSectionKey: result.IsSuccess ? null : RemoteSqlImportService.SectionKey,
             remoteSqlInput: normalizedInput,
             remoteSqlTestResult: testViewModel,
             openRemoteSqlImportSection: true));
@@ -468,6 +490,7 @@ public sealed class ConfigurationController(
         else
         {
             TempData["ConfigurationError"] = result.Message;
+            TempData["ConfigurationErrorSection"] = RemoteSqlImportService.SectionKey;
         }
 
         return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
@@ -517,6 +540,7 @@ public sealed class ConfigurationController(
         string? expandedFieldName = null,
         string? statusMessage = null,
         string? errorMessage = null,
+        string? errorSectionKey = null,
         RemoteSqlImportInputModel? remoteSqlInput = null,
         RemoteSqlImportConnectionTestViewModel? remoteSqlTestResult = null,
         bool openRemoteSqlImportSection = false)
@@ -553,6 +577,7 @@ public sealed class ConfigurationController(
         {
             StatusMessage = statusMessage ?? TempData["ConfigurationStatusMessage"] as string,
             ErrorMessage = errorMessage ?? TempData["ConfigurationError"] as string,
+            ErrorSectionKey = NormalizeSectionKey(errorSectionKey ?? TempData["ConfigurationErrorSection"] as string),
             ExpandedFieldName = ConfigurableFieldNames.IsSupported(expandedFieldName)
                 ? expandedFieldName
                 : null,
@@ -655,9 +680,22 @@ public sealed class ConfigurationController(
     }
 
     private RedirectToActionResult RedirectToIndex(string? expandedFieldName = null) =>
-        ConfigurableFieldNames.IsSupported(expandedFieldName)
-            ? RedirectToAction(nameof(Index), new { expandedFieldName })
+        ConfigurableFieldNames.IsSupported(NormalizeExpandedFieldName(expandedFieldName))
+            ? RedirectToAction(nameof(Index), new { expandedFieldName = NormalizeExpandedFieldName(expandedFieldName) })
             : RedirectToAction(nameof(Index));
+
+    private static string? NormalizeExpandedFieldName(string? expandedFieldName) =>
+        string.IsNullOrWhiteSpace(expandedFieldName)
+            ? null
+            : expandedFieldName.Trim();
+
+    private static string BuildFieldSectionKey(string? fieldName) =>
+        $"field:{fieldName?.Trim()}";
+
+    private static string? NormalizeSectionKey(string? sectionKey) =>
+        string.IsNullOrWhiteSpace(sectionKey)
+            ? null
+            : sectionKey.Trim();
 
     private static RemoteSqlImportInputModel NormalizeRemoteSqlImportInput(RemoteSqlImportInputModel input)
     {
