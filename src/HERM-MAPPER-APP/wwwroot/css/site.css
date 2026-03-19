@@ -223,6 +223,39 @@ a {
   padding: 1.2rem 1.3rem;
 }
 
+.import-status-card-warning {
+  background: rgba(236, 179, 0, 0.14);
+  border: 1px solid rgba(236, 179, 0, 0.28);
+}
+
+.import-status-card-warning .stat-value,
+.import-status-card-warning .stat-label,
+.import-status-card-warning .stat-meta {
+  color: #7c5b00;
+}
+
+.import-status-card-success {
+  background: rgba(11, 110, 79, 0.12);
+  border: 1px solid rgba(11, 110, 79, 0.24);
+}
+
+.import-status-card-success .stat-value,
+.import-status-card-success .stat-label,
+.import-status-card-success .stat-meta {
+  color: var(--accent-deep);
+}
+
+.import-status-card-danger {
+  background: rgba(201, 45, 57, 0.12);
+  border: 1px solid rgba(201, 45, 57, 0.24);
+}
+
+.import-status-card-danger .stat-value,
+.import-status-card-danger .stat-label,
+.import-status-card-danger .stat-meta {
+  color: #8f2d37;
+}
+
 .stat-label {
   color: var(--muted);
 }

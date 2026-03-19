@@ -12,6 +12,27 @@
     var openCatalogueImport = Model.CatalogueImportReview.HasReview;
     var openProductImport = Model.ProductImportReview.HasReview;
     var openRemoteSqlImport = Model.OpenRemoteSqlImportSection;
+    var importModeCardClass = !remoteSqlImport.IsEnabled
+        ? "import-status-card-danger"
+        : remoteSqlImport.Input.ScheduleHours > 0
+            ? "import-status-card-success"
+            : "import-status-card-warning";
+    var importModeLabel = !remoteSqlImport.IsEnabled
+        ? "Disabled"
+        : remoteSqlImport.Input.ScheduleHours > 0
+            ? "Scheduled"
+            : "Manual";
+    var storedCredentialsCardClass = remoteSqlImport.HasSavedUserName && remoteSqlImport.HasSavedPassword
+        ? "import-status-card-success"
+        : string.Empty;
+    var lastRunCardClass = remoteSqlImport.StatusSummary switch
+    {
+        "Last run succeeded" => "import-status-card-success",
+        "Last run failed" => "import-status-card-danger",
+        "Import in progress" => "import-status-card-warning",
+        _ when remoteSqlImport.IsEnabled && remoteSqlImport.NextScheduledRunUtc.HasValue => "import-status-card-warning",
+        _ => string.Empty
+    };
     bool showErrorForSection(string sectionKey) =>
         !string.IsNullOrWhiteSpace(Model.ErrorMessage) &&
         string.Equals(Model.ErrorSectionKey, sectionKey, StringComparison.OrdinalIgnoreCase);
@@ -99,12 +120,25 @@
                     }
 
                     <div class="stats-grid stats-grid-compact import-stats mb-4">
-                        <article class="stat-card">
+                        <article class="stat-card @importModeCardClass">
                             <span class="stat-label">Import mode</span>
-                            <span class="stat-value">@(remoteSqlImport.IsEnabled ? "Enabled" : "Disabled")</span>
-                            <span class="stat-meta">@(remoteSqlImport.IsEnabled ? "Manual and scheduled imports are allowed" : "Manual and scheduled imports are blocked")</span>
+                            <span class="stat-value">@importModeLabel</span>
+                            <span class="stat-meta">
+                                @if (!remoteSqlImport.IsEnabled)
+                                {
+                                    <text>Manual and scheduled imports are blocked</text>
+                                }
+                                else if (remoteSqlImport.Input.ScheduleHours > 0)
+                                {
+                                    <text>Automatic import schedule is active</text>
+                                }
+                                else
+                                {
+                                    <text>Imports run only when started manually</text>
+                                }
+                            </span>
                         </article>
-                        <article class="stat-card">
+                        <article class="stat-card @importModeCardClass">
                             <span class="stat-label">Schedule</span>
                             <span class="stat-value">@remoteSqlImport.ScheduleSummary</span>
                             <span class="stat-meta">
@@ -122,12 +156,12 @@
                                 }
                             </span>
                         </article>
-                        <article class="stat-card">
+                        <article class="stat-card @storedCredentialsCardClass">
                             <span class="stat-label">Stored credentials</span>
                             <span class="stat-value">@remoteSqlImport.SavedUserNameDisplay</span>
                             <span class="stat-meta">Password: @remoteSqlImport.SavedPasswordDisplay</span>
                         </article>
-                        <article class="stat-card">
+                        <article class="stat-card @lastRunCardClass">
                             <span class="stat-label">Last run</span>
                             <span class="stat-value">@remoteSqlImport.StatusSummary</span>
                             <span class="stat-meta">
