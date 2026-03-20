@@ -5,11 +5,8 @@
 
 <section class="hero-panel">
     <div>
-        <span class="eyebrow">Reference-guided technology mapping</span>
         <h1>Welcome to HERM Mapper</h1>
-        <p class="hero-copy">
-            Keep a working catalogue of products, browse the HERM technology reference hierarchy, and export completed mappings to CSV.
-        </p>
+
         <div class="d-flex flex-wrap gap-3 mt-4">
             <a class="btn btn-primary btn-lg" asp-controller="Products" asp-action="Create">Add product</a>
             <a class="btn btn-outline-light btn-lg" asp-controller="Mappings" asp-action="Index">Open mapping board</a>
@@ -27,7 +24,7 @@
     <article class="stat-card">
         <span class="stat-label">Products</span>
         <span class="stat-value">@Model.ProductCount</span>
-        <span class="stat-meta">Catalogue items tracked in SQLite</span>
+        <span class="stat-meta">Catalogue items tracked</span>
     </article>
     <article class="stat-card">
         <span class="stat-label">Completed mappings</span>
