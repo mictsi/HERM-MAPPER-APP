@@ -3,6 +3,7 @@ using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Xunit;
 
 namespace HERMMapperApp.Tests.Services;
@@ -67,15 +68,73 @@ public sealed class ConfigurableFieldServiceTests
         Assert.False(items[0].Selected);
     }
 
+    [Fact]
+    public async Task InvalidateOptionsCausesNextReadToReloadFromDatabase()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.ConfigurableFieldOptions.AddAsync(new ConfigurableFieldOption
+        {
+            FieldName = ConfigurableFieldNames.Owner,
+            Value = "Platform Team",
+            SortOrder = 1
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        Assert.Equal(["Platform Team"], (await fixture.Service.GetOptionsAsync(ConfigurableFieldNames.Owner)).Select(x => x.Value).ToArray());
+
+        await fixture.DbContext.ConfigurableFieldOptions.AddAsync(new ConfigurableFieldOption
+        {
+            FieldName = ConfigurableFieldNames.Owner,
+            Value = "Finance Team",
+            SortOrder = 2
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        Assert.Equal(["Platform Team"], (await fixture.Service.GetOptionsAsync(ConfigurableFieldNames.Owner)).Select(x => x.Value).ToArray());
+
+        fixture.Service.InvalidateOptions(ConfigurableFieldNames.Owner);
+
+        Assert.Equal(["Platform Team", "Finance Team"], (await fixture.Service.GetOptionsAsync(ConfigurableFieldNames.Owner)).Select(x => x.Value).ToArray());
+    }
+
+    [Fact]
+    public async Task RefreshCachedOptionsAsyncReloadsUpdatedFieldOptions()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.ConfigurableFieldOptions.AddAsync(new ConfigurableFieldOption
+        {
+            FieldName = ConfigurableFieldNames.LifecycleStatus,
+            Value = "Production",
+            SortOrder = 1
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        Assert.Equal(["Production"], (await fixture.Service.GetOptionsAsync(ConfigurableFieldNames.LifecycleStatus)).Select(x => x.Value).ToArray());
+
+        await fixture.DbContext.ConfigurableFieldOptions.AddAsync(new ConfigurableFieldOption
+        {
+            FieldName = ConfigurableFieldNames.LifecycleStatus,
+            Value = "Trial",
+            SortOrder = 2
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        await fixture.Service.RefreshCachedOptionsAsync(ConfigurableFieldNames.LifecycleStatus);
+
+        Assert.Equal(["Production", "Trial"], (await fixture.Service.GetOptionsAsync(ConfigurableFieldNames.LifecycleStatus)).Select(x => x.Value).ToArray());
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
+        private readonly MemoryCache memoryCache;
 
-        private TestFixture(SqliteConnection connection, AppDbContext dbContext)
+        private TestFixture(SqliteConnection connection, AppDbContext dbContext, MemoryCache memoryCache)
         {
             this.connection = connection;
+            this.memoryCache = memoryCache;
             DbContext = dbContext;
-            Service = new ConfigurableFieldService(dbContext);
+            Service = new ConfigurableFieldService(dbContext, new ApplicationLookupCache(memoryCache));
         }
 
         public AppDbContext DbContext { get; }
@@ -94,13 +153,16 @@ public sealed class ConfigurableFieldServiceTests
             var dbContext = new AppDbContext(options);
             await dbContext.Database.EnsureCreatedAsync();
 
-            return new TestFixture(connection, dbContext);
+            var memoryCache = new MemoryCache(new MemoryCacheOptions());
+
+            return new TestFixture(connection, dbContext, memoryCache);
         }
 
         public async ValueTask DisposeAsync()
         {
             await DbContext.DisposeAsync();
             await connection.DisposeAsync();
+            memoryCache.Dispose();
         }
     }
 }

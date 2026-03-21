@@ -504,6 +504,122 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
+    public async Task UpdateOptionUpdatesExistingValueAndWritesAuditLog()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.ConfigurableFieldOptions.AddAsync(
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Team Blue",
+                SortOrder = 1
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var option = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync();
+        using var controller = fixture.CreateConfigurationController();
+
+        var result = await controller.UpdateOption(new UpdateConfigurationOptionValueInputModel
+        {
+            Id = option.Id,
+            Value = " Team Azure "
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
+
+        var updated = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync();
+        var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
+
+        Assert.Equal("Team Azure", updated.Value);
+        Assert.Equal("Owner value updated to 'Team Azure'.", controller.TempData["ConfigurationStatusMessage"]);
+        Assert.Equal("Update", audit.Action);
+    }
+
+    [Fact]
+    public async Task UpdateOptionRejectsDuplicateValueIgnoringCase()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Team Blue",
+                SortOrder = 1
+            },
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Team Green",
+                SortOrder = 2
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var option = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync(x => x.Value == "Team Green");
+        using var controller = fixture.CreateConfigurationController();
+
+        var result = await controller.UpdateOption(new UpdateConfigurationOptionValueInputModel
+        {
+            Id = option.Id,
+            Value = "team blue"
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
+        Assert.Equal("Owner value 'team blue' already exists.", controller.TempData["ConfigurationError"]);
+    }
+
+    [Fact]
+    public async Task ReorderOptionsUsesSubmittedOrderAndRenumbersSequentially()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Team A",
+                SortOrder = 1
+            },
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Team B",
+                SortOrder = 2
+            },
+            new ConfigurableFieldOption
+            {
+                FieldName = ConfigurableFieldNames.Owner,
+                Value = "Team C",
+                SortOrder = 3
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var options = await fixture.DbContext.ConfigurableFieldOptions.OrderBy(x => x.SortOrder).ToListAsync();
+        using var controller = fixture.CreateConfigurationController();
+
+        var result = await controller.ReorderOptions(new ReorderConfigurationOptionsInputModel
+        {
+            FieldName = ConfigurableFieldNames.Owner,
+            OrderedIds = [options[2].Id, options[0].Id, options[1].Id]
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
+
+        var reordered = await fixture.DbContext.ConfigurableFieldOptions
+            .OrderBy(x => x.SortOrder)
+            .Select(x => new { x.Value, x.SortOrder })
+            .ToListAsync();
+
+        Assert.Equal(["Team C", "Team A", "Team B"], reordered.Select(x => x.Value).ToArray());
+        Assert.Equal([1, 2, 3], reordered.Select(x => x.SortOrder).ToArray());
+        Assert.Equal("Owner order was updated.", controller.TempData["ConfigurationStatusMessage"]);
+    }
+
+    [Fact]
     public async Task DeleteOptionRemovesOptionNormalizesSortOrderAndWritesAuditLog()
     {
         await using var fixture = await TestFixture.CreateAsync();

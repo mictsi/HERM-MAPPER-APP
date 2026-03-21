@@ -54,12 +54,6 @@
                     <h2>ARM to product mappings</h2>
                     <p>Select the ARM component first, then the product. If the chosen product maps to more than one TRM component, choose the correct TRM component for that product. The parent ARM and TRM layers are derived automatically from those selections.</p>
                 </div>
-                <button type="button"
-                        class="btn btn-outline-secondary btn-sm"
-                        data-collection-editor-add
-                        aria-label="Add application mapping">
-                    + Add mapping
-                </button>
             </div>
 
             <div asp-validation-for="MappingRows" class="text-danger mb-3"></div>
@@ -72,6 +66,7 @@
                             <th>ARM component</th>
                             <th>Product</th>
                             <th>TRM component</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody data-collection-editor-rows>
@@ -102,13 +97,31 @@
                                 </select>
                                 <span asp-validation-for="MappingRows[index].TrmComponentId" class="text-danger"></span>
                             </td>
+                            <td class="text-end align-top">
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Mapping row actions">
+                                    <button type="button"
+                                            class="btn btn-outline-secondary"
+                                            data-collection-editor-add
+                                            aria-label="Add application mapping below this row"
+                                            title="Add application mapping below this row">
+                                        +
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-danger"
+                                            data-collection-editor-remove
+                                            aria-label="Remove this application mapping row"
+                                            title="Remove this application mapping row">
+                                        -
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     }
                     </tbody>
                 </table>
             </div>
 
-            <div class="form-note mt-2">A product can appear in multiple mappings. If it resolves to a single TRM component, the form selects it automatically. Start with one row and use + Add mapping when you need more.</div>
+            <div class="form-note mt-2">A product can appear in multiple mappings. If it resolves to a single TRM component, the form selects it automatically. Use the + button on a row to add another mapping below it.</div>
         </div>
     </div>
     <div class="col-xl-4">

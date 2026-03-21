@@ -845,6 +845,119 @@ a {
   box-shadow: inset 0 -4px 0 rgba(11, 110, 79, 0.26);
 }
 
+.config-option-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.config-option-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.config-option-row.is-dragging {
+  opacity: 0.7;
+  border-style: dashed;
+}
+
+.config-option-row.drag-over-top {
+  border-top-color: rgba(11, 110, 79, 0.7);
+  box-shadow: inset 0 4px 0 rgba(11, 110, 79, 0.26);
+}
+
+.config-option-row.drag-over-bottom {
+  border-bottom-color: rgba(11, 110, 79, 0.7);
+  box-shadow: inset 0 -4px 0 rgba(11, 110, 79, 0.26);
+}
+
+.config-option-handle {
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  min-height: 2.35rem;
+  border-radius: 0.8rem;
+  border: 1px dashed rgba(31, 41, 51, 0.18);
+  background: rgba(247, 243, 235, 0.72);
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+  font-size: 1rem;
+}
+
+.config-option-order {
+  display: grid;
+  place-items: center;
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(11, 110, 79, 0.1);
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+.config-option-main {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.config-option-edit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.config-option-edit-form {
+  min-width: 0;
+}
+
+.config-option-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.config-option-actions {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.config-option-order-form {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767.98px) {
+  .config-option-row {
+    grid-template-columns: auto auto 1fr;
+  }
+
+  .config-option-main,
+  .config-option-actions {
+    grid-column: 1 / -1;
+  }
+
+  .config-option-edit-row {
+    grid-template-columns: 1fr;
+  }
+
+  .config-option-actions {
+    justify-content: start;
+  }
+}
+
 .service-action-button {
   min-width: 3.25rem;
 }

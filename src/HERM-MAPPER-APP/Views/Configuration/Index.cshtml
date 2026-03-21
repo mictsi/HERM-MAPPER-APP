@@ -647,41 +647,43 @@
                                 }
                                 else
                                 {
-                                    <div class="table-responsive">
-                                        <table class="table align-middle">
-                                            <thead>
-                                                <tr>
-                                                    <th>Order</th>
-                                                    <th>Value</th>
-                                                    <th>Created</th>
-                                                    <th></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            @foreach (var option in field.Options)
-                                            {
-                                                <tr>
-                                                    <td>
-                                                        <form asp-action="UpdateOptionOrder" method="post" class="d-flex gap-2 align-items-center">
+                                    <div class="config-option-editor" data-config-option-editor>
+                                        <div class="config-option-list" data-config-option-list>
+                                        @foreach (var option in field.Options)
+                                        {
+                                            <article class="config-option-row" data-config-option-row data-config-option-id="@option.Id" draggable="true">
+                                                <div class="config-option-handle" data-config-option-handle title="Drag to reorder" aria-hidden="true">&#8645;</div>
+                                                <div class="config-option-order" data-config-option-order>@option.SortOrder</div>
+                                                <div class="config-option-main">
+                                                    <div class="config-option-edit-row">
+                                                        <form asp-action="UpdateOption" method="post" class="config-option-edit-form" id="config-option-edit-@option.Id">
                                                             @Html.AntiForgeryToken()
                                                             <input type="hidden" name="Id" value="@option.Id" />
-                                                            <input class="form-control form-control-sm" type="number" name="SortOrder" value="@option.SortOrder" min="1" style="width: 5.5rem;" />
-                                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Save</button>
+                                                            <label class="visually-hidden" for="config-option-@option.Id">@field.Label value</label>
+                                                            <input class="form-control form-control-sm" id="config-option-@option.Id" type="text" name="Value" value="@option.Value" maxlength="120" />
                                                         </form>
-                                                    </td>
-                                                    <td><strong>@option.Value</strong></td>
-                                                    <td>@await TimeZoneDisplay.FormatUtcAsync(option.CreatedUtc)</td>
-                                                    <td class="text-end">
-                                                        <form asp-action="DeleteOption" method="post" class="d-inline">
-                                                            @Html.AntiForgeryToken()
-                                                            <input type="hidden" name="id" value="@option.Id" />
-                                                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
-                                                        </form>
-                                                    </td>
-                                                </tr>
-                                            }
-                                            </tbody>
-                                        </table>
+                                                        <div class="config-option-actions">
+                                                            <button type="submit" class="btn btn-sm btn-outline-secondary" form="config-option-edit-@option.Id">Save</button>
+                                                            <form asp-action="DeleteOption" method="post" class="d-inline">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@option.Id" />
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                    <div class="config-option-meta">Created @await TimeZoneDisplay.FormatUtcAsync(option.CreatedUtc)</div>
+                                                </div>
+                                            </article>
+                                        }
+                                        </div>
+
+                                        <form asp-action="ReorderOptions" method="post" class="config-option-order-form mt-3" data-config-option-order-form>
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="FieldName" value="@field.FieldName" />
+                                            <div data-config-option-order-inputs></div>
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" data-config-option-order-save disabled>Save sort order</button>
+                                            <span class="form-text mb-0">Drag rows to reorder the allowed values, then save the new order.</span>
+                                        </form>
                                     </div>
                                 }
                             </div>

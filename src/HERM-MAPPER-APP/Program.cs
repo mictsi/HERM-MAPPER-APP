@@ -63,6 +63,10 @@ public partial class Program
             MaxFailedLoginAttempts: Math.Max(1, configuration.GetValue<int?>("Security:Authentication:MaxFailedLoginAttempts") ?? 15),
             LockoutMinutes: Math.Max(1, configuration.GetValue<int?>("Security:Authentication:LockoutMinutes") ?? 1));
 
+    public static LookupCacheRefreshOptions BuildLookupCacheRefreshOptions(IConfiguration configuration) =>
+        new(
+            RefreshIntervalMinutes: Math.Max(1, configuration.GetValue<int?>("Caching:LookupRefreshIntervalMinutes") ?? 2));
+
     public static LocalAuthenticationOptions BuildLocalAuthenticationOptions(IConfiguration configuration) =>
         new()
         {
@@ -192,6 +196,7 @@ public partial class Program
     {
         services.AddSingleton(configuration);
         var authenticationSecurityOptions = BuildAuthenticationSecurityOptions(configuration);
+        var lookupCacheRefreshOptions = BuildLookupCacheRefreshOptions(configuration);
         var localAuthenticationOptions = BuildLocalAuthenticationOptions(configuration);
         var openIdConnectAuthenticationOptions = BuildOpenIdConnectAuthenticationOptions(configuration);
         var cookieSecurePolicy = BuildCookieSecurePolicy(configuration, environmentName);
@@ -205,10 +210,13 @@ public partial class Program
         }
 
         services.AddSingleton(authenticationSecurityOptions);
+    services.AddSingleton(lookupCacheRefreshOptions);
         services.AddSingleton(localAuthenticationOptions);
         services.AddSingleton(openIdConnectAuthenticationOptions);
         services.AddHttpContextAccessor();
         services.AddDataProtection();
+        services.AddMemoryCache();
+        services.AddSingleton<ApplicationLookupCache>();
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database");
         services.AddOutputCache();
@@ -267,6 +275,7 @@ public partial class Program
         services.AddScoped<ModelDiagramReportService>();
         services.AddScoped<RemoteSqlImportService>();
         services.AddSingleton<RemoteSqlImportExecutionGate>();
+        services.AddHostedService<ApplicationLookupCacheRefreshHostedService>();
         services.AddHostedService<RemoteSqlImportHostedService>();
         var authenticationBuilder = services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme);
         authenticationBuilder.AddCookie(options =>

@@ -13,7 +13,8 @@ public sealed partial class DatabaseInitializer(
     TrmWorkbookImportService workbookImportService,
     SampleRelationshipImportService sampleRelationshipImportService,
     IConfiguration configuration,
-    ILogger<DatabaseInitializer> logger)
+    ILogger<DatabaseInitializer> logger,
+    ApplicationLookupCache? lookupCache = null)
 {
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -1859,6 +1860,7 @@ public sealed partial class DatabaseInitializer(
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        lookupCache?.InvalidateAppSetting(AppSettingKeys.DisplayTimeZone);
     }
 
     private async Task EnsureDefaultConfigurableFieldOptionsAsync(CancellationToken cancellationToken)
@@ -1887,6 +1889,7 @@ public sealed partial class DatabaseInitializer(
 
         dbContext.ConfigurableFieldOptions.AddRange(missingLifecycleStatuses);
         await dbContext.SaveChangesAsync(cancellationToken);
+        lookupCache?.InvalidateConfigurableFieldOptions(ConfigurableFieldNames.LifecycleStatus);
     }
 
     [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP004:Don't ignore created IDisposable", Justification = "AppDbContext owns the relational connection lifetime.")]

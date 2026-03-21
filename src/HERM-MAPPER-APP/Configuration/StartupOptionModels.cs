@@ -19,3 +19,8 @@ public sealed record AuthenticationSecurityOptions(
 
     public TimeSpan LockoutDuration => TimeSpan.FromMinutes(LockoutMinutes);
 }
+
+public sealed record LookupCacheRefreshOptions(int RefreshIntervalMinutes)
+{
+    public TimeSpan RefreshInterval => TimeSpan.FromMinutes(Math.Max(1, RefreshIntervalMinutes));
+}

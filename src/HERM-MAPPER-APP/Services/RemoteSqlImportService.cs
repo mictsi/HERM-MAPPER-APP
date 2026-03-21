@@ -15,7 +15,8 @@ public sealed partial class RemoteSqlImportService(
     ProtectedSettingsService protectedSettingsService,
     AuditLogService auditLogService,
     RemoteSqlImportExecutionGate executionGate,
-    ILogger<RemoteSqlImportService> logger)
+    ILogger<RemoteSqlImportService> logger,
+    ApplicationLookupCache? lookupCache = null)
 {
     private const string RemoteSqlImportCategory = "RemoteSqlImport";
     private const string StatusNotConfigured = "NotConfigured";
@@ -53,6 +54,30 @@ public sealed partial class RemoteSqlImportService(
     }
 
     public async Task<RemoteSqlImportSettingsSnapshot> GetSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        if (lookupCache is null)
+        {
+            return await LoadSettingsCoreAsync(cancellationToken);
+        }
+
+        return await lookupCache.GetOrCreateRemoteSqlImportSettingsAsync(
+            LoadSettingsCoreAsync,
+            cancellationToken);
+    }
+
+    public async Task<RemoteSqlImportSettingsSnapshot> RefreshCachedSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        if (lookupCache is null)
+        {
+            return await LoadSettingsCoreAsync(cancellationToken);
+        }
+
+        return await lookupCache.RefreshRemoteSqlImportSettingsAsync(
+            LoadSettingsCoreAsync,
+            cancellationToken);
+    }
+
+    private async Task<RemoteSqlImportSettingsSnapshot> LoadSettingsCoreAsync(CancellationToken cancellationToken)
     {
         var legacyConnectionString = await appSettingsService.GetValueAsync(AppSettingKeys.RemoteSqlImportConnectionString, string.Empty, cancellationToken);
         var isEnabledValue = await appSettingsService.GetValueAsync(

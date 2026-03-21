@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HERMMapperApp.Services;
 
-public sealed class ConfigurableFieldService(AppDbContext dbContext)
+public sealed class ConfigurableFieldService(
+    AppDbContext dbContext,
+    ApplicationLookupCache? lookupCache = null)
 {
     public async Task<IReadOnlyList<SelectListItem>> GetMultiSelectListAsync(
         string fieldName,
@@ -60,6 +62,41 @@ public sealed class ConfigurableFieldService(AppDbContext dbContext)
     public async Task<IReadOnlyList<ConfigurableFieldOption>> GetOptionsAsync(
         string fieldName,
         CancellationToken cancellationToken = default)
+    {
+        if (lookupCache is null)
+        {
+            return await LoadOptionsCoreAsync(fieldName, cancellationToken);
+        }
+
+        return await lookupCache.GetOrCreateConfigurableFieldOptionsAsync(
+            fieldName,
+            token => LoadOptionsCoreAsync(fieldName, token),
+            cancellationToken);
+    }
+
+    public void InvalidateOptions(string fieldName)
+    {
+        lookupCache?.InvalidateConfigurableFieldOptions(fieldName);
+    }
+
+    public async Task<IReadOnlyList<ConfigurableFieldOption>> RefreshCachedOptionsAsync(
+        string fieldName,
+        CancellationToken cancellationToken = default)
+    {
+        if (lookupCache is null)
+        {
+            return await LoadOptionsCoreAsync(fieldName, cancellationToken);
+        }
+
+        return await lookupCache.RefreshConfigurableFieldOptionsAsync(
+            fieldName,
+            token => LoadOptionsCoreAsync(fieldName, token),
+            cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ConfigurableFieldOption>> LoadOptionsCoreAsync(
+        string fieldName,
+        CancellationToken cancellationToken)
     {
         return await dbContext.ConfigurableFieldOptions
             .AsNoTracking()

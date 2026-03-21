@@ -350,6 +350,7 @@ public sealed class ConfigurationController(
 
         dbContext.ConfigurableFieldOptions.Add(option);
         await dbContext.SaveChangesAsync();
+        configurableFieldService.InvalidateOptions(option.FieldName);
         await auditLogService.WriteAsync(
             "Configuration",
             "Create",
@@ -394,6 +395,7 @@ public sealed class ConfigurationController(
         }
 
         await dbContext.SaveChangesAsync();
+        configurableFieldService.InvalidateOptions(option.FieldName);
         await auditLogService.WriteAsync(
             "Configuration",
             "Reorder",
@@ -404,6 +406,120 @@ public sealed class ConfigurationController(
 
         TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(option.FieldName)} order was updated.";
         return RedirectToIndex(option.FieldName);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateOption(UpdateConfigurationOptionValueInputModel input)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var option = await dbContext.ConfigurableFieldOptions.FindAsync(input.Id);
+        if (option is null)
+        {
+            return RedirectToIndex();
+        }
+
+        input.Value = input.Value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(input.Value))
+        {
+            TempData["ConfigurationError"] = "Enter a value before saving.";
+            TempData["ConfigurationErrorSection"] = BuildFieldSectionKey(option.FieldName);
+            return RedirectToIndex(option.FieldName);
+        }
+
+        var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
+        var duplicateExists = await dbContext.ConfigurableFieldOptions.AnyAsync(x =>
+            x.FieldName == option.FieldName &&
+            x.Id != option.Id &&
+            EF.Functions.Collate(x.Value, caseInsensitiveCollation) == input.Value);
+
+        if (duplicateExists)
+        {
+            TempData["ConfigurationError"] = $"{ConfigurableFieldNames.GetLabel(option.FieldName)} value '{input.Value}' already exists.";
+            TempData["ConfigurationErrorSection"] = BuildFieldSectionKey(option.FieldName);
+            return RedirectToIndex(option.FieldName);
+        }
+
+        var previousValue = option.Value;
+        option.Value = input.Value;
+
+        await dbContext.SaveChangesAsync();
+        configurableFieldService.InvalidateOptions(option.FieldName);
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "Update",
+            nameof(ConfigurableFieldOption),
+            option.Id,
+            $"Updated configuration value '{previousValue}' to '{option.Value}' in {option.FieldName}.");
+
+        TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(option.FieldName)} value updated to '{option.Value}'.";
+        return RedirectToIndex(option.FieldName);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReorderOptions(ReorderConfigurationOptionsInputModel input)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        input.FieldName = input.FieldName?.Trim() ?? string.Empty;
+        if (!ConfigurableFieldNames.IsSupported(input.FieldName))
+        {
+            TempData["ConfigurationError"] = "That field is not supported.";
+            TempData["ConfigurationErrorSection"] = BuildFieldSectionKey(input.FieldName);
+            return RedirectToIndex();
+        }
+
+        var orderedIds = input.OrderedIds
+            .Distinct()
+            .ToList();
+
+        if (orderedIds.Count == 0)
+        {
+            TempData["ConfigurationError"] = "Add at least one value before saving the order.";
+            TempData["ConfigurationErrorSection"] = BuildFieldSectionKey(input.FieldName);
+            return RedirectToIndex(input.FieldName);
+        }
+
+        var options = await dbContext.ConfigurableFieldOptions
+            .Where(x => x.FieldName == input.FieldName)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedUtc)
+            .ThenBy(x => x.Id)
+            .ToListAsync();
+
+        if (options.Count != orderedIds.Count || options.Any(option => !orderedIds.Contains(option.Id)))
+        {
+            TempData["ConfigurationError"] = "The value list changed before the new order was saved. Refresh and try again.";
+            TempData["ConfigurationErrorSection"] = BuildFieldSectionKey(input.FieldName);
+            return RedirectToIndex(input.FieldName);
+        }
+
+        var optionsById = options.ToDictionary(option => option.Id);
+        for (var index = 0; index < orderedIds.Count; index++)
+        {
+            optionsById[orderedIds[index]].SortOrder = index + 1;
+        }
+
+        await dbContext.SaveChangesAsync();
+        configurableFieldService.InvalidateOptions(input.FieldName);
+        await auditLogService.WriteAsync(
+            "Configuration",
+            "Reorder",
+            nameof(ConfigurableFieldOption),
+            null,
+            $"Updated value order for {input.FieldName}.",
+            $"Order: {string.Join(", ", orderedIds)}.");
+
+        TempData["ConfigurationStatusMessage"] = $"{ConfigurableFieldNames.GetLabel(input.FieldName)} order was updated.";
+        return RedirectToIndex(input.FieldName);
     }
 
     [HttpPost]
@@ -424,6 +540,7 @@ public sealed class ConfigurationController(
         dbContext.ConfigurableFieldOptions.Remove(option);
         await dbContext.SaveChangesAsync();
         await NormalizeSortOrderAsync(option.FieldName);
+        configurableFieldService.InvalidateOptions(option.FieldName);
         await auditLogService.WriteAsync(
             "Configuration",
             "Delete",

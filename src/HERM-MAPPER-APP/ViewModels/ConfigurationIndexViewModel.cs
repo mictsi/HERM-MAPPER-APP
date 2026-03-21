@@ -119,6 +119,25 @@ public sealed class UpdateConfigurationOptionOrderInputModel
     public int? SortOrder { get; set; }
 }
 
+public sealed class UpdateConfigurationOptionValueInputModel
+{
+    [Required]
+    public int? Id { get; set; }
+
+    [Required, StringLength(120)]
+    [Display(Name = "Value")]
+    public string Value { get; set; } = string.Empty;
+}
+
+public sealed class ReorderConfigurationOptionsInputModel
+{
+    [Required]
+    public string FieldName { get; set; } = string.Empty;
+
+    [Required]
+    public List<int> OrderedIds { get; set; } = [];
+}
+
 public sealed class UpdateDisplayTimeZoneInputModel
 {
     [Required]

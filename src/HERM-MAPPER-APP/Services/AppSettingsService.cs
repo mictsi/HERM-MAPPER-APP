@@ -4,17 +4,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HERMMapperApp.Services;
 
-public sealed class AppSettingsService(AppDbContext dbContext)
+public sealed class AppSettingsService(
+    AppDbContext dbContext,
+    ApplicationLookupCache? lookupCache = null)
 {
     public async Task<string?> GetNullableValueAsync(string key, CancellationToken cancellationToken = default)
     {
-        var value = await dbContext.AppSettings
-            .AsNoTracking()
-            .Where(x => x.Key == key)
-            .Select(x => x.Value)
-            .SingleOrDefaultAsync(cancellationToken);
+        if (lookupCache is null)
+        {
+            return await LoadNullableValueCoreAsync(key, cancellationToken);
+        }
 
-        return string.IsNullOrWhiteSpace(value) ? null : value;
+        return await lookupCache.GetOrCreateAppSettingAsync(
+            key,
+            token => LoadNullableValueCoreAsync(key, token),
+            cancellationToken);
     }
 
     public async Task<string> GetValueAsync(string key, string fallback, CancellationToken cancellationToken = default)
@@ -42,6 +46,7 @@ public sealed class AppSettingsService(AppDbContext dbContext)
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        lookupCache?.InvalidateAppSetting(key);
     }
 
     public async Task DeleteValueAsync(string key, CancellationToken cancellationToken = default)
@@ -49,10 +54,36 @@ public sealed class AppSettingsService(AppDbContext dbContext)
         var setting = await dbContext.AppSettings.SingleOrDefaultAsync(x => x.Key == key, cancellationToken);
         if (setting is null)
         {
+            lookupCache?.InvalidateAppSetting(key);
             return;
         }
 
         dbContext.AppSettings.Remove(setting);
         await dbContext.SaveChangesAsync(cancellationToken);
+        lookupCache?.InvalidateAppSetting(key);
+    }
+
+    public async Task<string?> RefreshCachedValueAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (lookupCache is null)
+        {
+            return await LoadNullableValueCoreAsync(key, cancellationToken);
+        }
+
+        return await lookupCache.RefreshAppSettingAsync(
+            key,
+            token => LoadNullableValueCoreAsync(key, token),
+            cancellationToken);
+    }
+
+    private async Task<string?> LoadNullableValueCoreAsync(string key, CancellationToken cancellationToken)
+    {
+        var value = await dbContext.AppSettings
+            .AsNoTracking()
+            .Where(x => x.Key == key)
+            .Select(x => x.Value)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }

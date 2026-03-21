@@ -121,15 +121,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.querySelectorAll("[data-collection-editor]").forEach((editor) => {
     const rowsContainer = editor.querySelector("[data-collection-editor-rows]");
-    const addButton = editor.querySelector("[data-collection-editor-add]");
 
-    if (!(rowsContainer instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement)) {
+    if (!(rowsContainer instanceof HTMLElement)) {
       return;
     }
 
     const getRows = () =>
       Array.from(rowsContainer.querySelectorAll("[data-collection-editor-row]"))
         .filter((row) => row instanceof HTMLElement);
+
+    const reindexRows = () => {
+      getRows().forEach((row, index) => {
+        row.querySelectorAll("[name]").forEach((element) => updateIndexedAttribute(element, "name", index));
+        row.querySelectorAll("[id]").forEach((element) => updateIndexedAttribute(element, "id", index));
+        row.querySelectorAll("label[for]").forEach((element) => updateIndexedAttribute(element, "for", index));
+        row.querySelectorAll("[data-valmsg-for]").forEach((element) => updateIndexedAttribute(element, "data-valmsg-for", index));
+      });
+    };
 
     const updateIndexedAttribute = (element, attributeName, index) => {
       const currentValue = element.getAttribute(attributeName);
@@ -172,22 +180,36 @@ document.addEventListener("DOMContentLoaded", () => {
       element.classList.add("field-validation-valid");
     };
 
-    const appendRow = () => {
-      const sourceRow = getRows().at(-1);
+    const resetRow = (row) => {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      row
+        .querySelectorAll("select, input, textarea")
+        .forEach((field) => clearField(field));
+
+      row
+        .querySelectorAll(".field-validation-error, .field-validation-valid, [data-valmsg-for]")
+        .forEach((message) => clearValidationMessage(message));
+
+      editor.dispatchEvent(new CustomEvent("collection-editor:row-reset", {
+        bubbles: true,
+        detail: {
+          row
+        }
+      }));
+    };
+
+    const appendRow = (sourceRow) => {
       if (!(sourceRow instanceof HTMLElement)) {
         return;
       }
 
-      const newIndex = getRows().length;
       const newRow = sourceRow.cloneNode(true);
       if (!(newRow instanceof HTMLElement)) {
         return;
       }
-
-      newRow.querySelectorAll("[name]").forEach((element) => updateIndexedAttribute(element, "name", newIndex));
-      newRow.querySelectorAll("[id]").forEach((element) => updateIndexedAttribute(element, "id", newIndex));
-      newRow.querySelectorAll("label[for]").forEach((element) => updateIndexedAttribute(element, "for", newIndex));
-      newRow.querySelectorAll("[data-valmsg-for]").forEach((element) => updateIndexedAttribute(element, "data-valmsg-for", newIndex));
 
       newRow
         .querySelectorAll("select, input, textarea")
@@ -197,7 +219,8 @@ document.addEventListener("DOMContentLoaded", () => {
         .querySelectorAll(".field-validation-error, .field-validation-valid, [data-valmsg-for]")
         .forEach((message) => clearValidationMessage(message));
 
-      rowsContainer.appendChild(newRow);
+      sourceRow.insertAdjacentElement("afterend", newRow);
+      reindexRows();
 
       if (window.jQuery?.validator?.unobtrusive) {
         window.jQuery.validator.unobtrusive.parse(newRow);
@@ -216,7 +239,61 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    addButton.addEventListener("click", appendRow);
+    const removeRow = (row) => {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      const rows = getRows();
+      if (rows.length <= 1) {
+        resetRow(row);
+
+        const focusTarget = row.querySelector("select, input, textarea");
+        if (focusTarget instanceof HTMLElement) {
+          focusTarget.focus();
+        }
+
+        return;
+      }
+
+      const adjacentRow = row.nextElementSibling instanceof HTMLElement
+        ? row.nextElementSibling
+        : row.previousElementSibling instanceof HTMLElement
+          ? row.previousElementSibling
+          : null;
+
+      row.remove();
+      reindexRows();
+
+      if (adjacentRow instanceof HTMLElement) {
+        const focusTarget = adjacentRow.querySelector("select, input, textarea");
+        if (focusTarget instanceof HTMLElement) {
+          focusTarget.focus();
+        }
+      }
+    };
+
+    editor.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const addButton = target.closest("[data-collection-editor-add]");
+      if (addButton instanceof HTMLButtonElement) {
+        const sourceRow = addButton.closest("[data-collection-editor-row]");
+        appendRow(sourceRow);
+        return;
+      }
+
+      const removeButton = target.closest("[data-collection-editor-remove]");
+      if (!(removeButton instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      const sourceRow = removeButton.closest("[data-collection-editor-row]");
+      removeRow(sourceRow);
+    });
   });
 
   document.querySelectorAll("[data-application-mapping-editor]").forEach((editor) => {
@@ -321,6 +398,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     editor.addEventListener("collection-editor:row-added", (event) => {
+      syncRow(event.detail?.row ?? null);
+    });
+
+    editor.addEventListener("collection-editor:row-reset", (event) => {
       syncRow(event.detail?.row ?? null);
     });
 
@@ -433,7 +514,147 @@ document.addEventListener("DOMContentLoaded", () => {
       syncRow(event.detail?.row ?? null);
     });
 
+    editor.addEventListener("collection-editor:row-reset", (event) => {
+      syncRow(event.detail?.row ?? null);
+    });
+
     syncAllRows();
+  });
+
+  document.querySelectorAll("[data-config-option-editor]").forEach((editor) => {
+    const list = editor.querySelector("[data-config-option-list]");
+    const orderInputs = editor.querySelector("[data-config-option-order-inputs]");
+    const saveButton = editor.querySelector("[data-config-option-order-save]");
+    let draggedRow = null;
+    let initialSignature = "";
+
+    if (!(list instanceof HTMLElement) || !(orderInputs instanceof HTMLElement)) {
+      return;
+    }
+
+    const getRows = () =>
+      Array.from(list.querySelectorAll("[data-config-option-row]"))
+        .filter((row) => row instanceof HTMLElement);
+
+    const clearDragState = () => {
+      getRows().forEach((row) => {
+        row.classList.remove("is-dragging", "drag-over-top", "drag-over-bottom");
+      });
+    };
+
+    const buildSignature = () =>
+      getRows()
+        .map((row) => row.getAttribute("data-config-option-id") ?? "")
+        .join(",");
+
+    const syncOrderState = () => {
+      const ids = [];
+
+      getRows().forEach((row, index) => {
+        const id = row.getAttribute("data-config-option-id") ?? "";
+        if (id !== "") {
+          ids.push(id);
+        }
+
+        const order = row.querySelector("[data-config-option-order]");
+        if (order instanceof HTMLElement) {
+          order.textContent = String(index + 1);
+        }
+      });
+
+      orderInputs.innerHTML = "";
+      ids.forEach((id) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "OrderedIds";
+        input.value = id;
+        orderInputs.appendChild(input);
+      });
+
+      if (saveButton instanceof HTMLButtonElement) {
+        saveButton.disabled = buildSignature() === initialSignature;
+      }
+    };
+
+    list.addEventListener("dragstart", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const row = target.closest("[data-config-option-row]");
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      draggedRow = row;
+      clearDragState();
+      row.classList.add("is-dragging");
+
+      if (event.dataTransfer !== null) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", row.getAttribute("data-config-option-id") ?? "");
+      }
+    });
+
+    list.addEventListener("dragover", (event) => {
+      if (!(draggedRow instanceof HTMLElement)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) {
+        return;
+      }
+
+      const row = target.closest("[data-config-option-row]");
+      clearDragState();
+      draggedRow.classList.add("is-dragging");
+
+      if (!(row instanceof HTMLElement) || row === draggedRow) {
+        list.appendChild(draggedRow);
+        syncOrderState();
+        return;
+      }
+
+      const bounds = row.getBoundingClientRect();
+      const insertBefore = event.clientY < bounds.top + (bounds.height / 2);
+
+      row.classList.add(insertBefore ? "drag-over-top" : "drag-over-bottom");
+
+      if (insertBefore) {
+        list.insertBefore(draggedRow, row);
+      } else {
+        list.insertBefore(draggedRow, row.nextElementSibling);
+      }
+
+      syncOrderState();
+    });
+
+    list.addEventListener("drop", (event) => {
+      if (draggedRow instanceof HTMLElement) {
+        event.preventDefault();
+        syncOrderState();
+      }
+    });
+
+    list.addEventListener("dragend", () => {
+      clearDragState();
+      draggedRow = null;
+      syncOrderState();
+    });
+
+    list.addEventListener("dragleave", (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target === list) {
+        clearDragState();
+      }
+    });
+
+    initialSignature = buildSignature();
+    syncOrderState();
   });
 
   document.querySelectorAll("[data-service-editor]").forEach((editor) => {
