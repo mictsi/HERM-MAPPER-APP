@@ -75,10 +75,13 @@ public sealed class ReferenceControllerTests
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Restore", view.ViewName);
         var model = Assert.IsType<ReferenceRestoreViewModel>(view.Model);
+        Assert.Equal(ReferenceModelKind.Trm, model.ModelKind);
+        Assert.Equal("Restore TRM model objects", model.PageTitle);
         Assert.Equal("Ready", model.StatusMessage);
         Assert.Single(model.Components);
         Assert.DoesNotContain(model.Components, component => component.Id == activeComponent.Id);
         Assert.Equal(deletedComponent.Id, model.Components[0].Id);
+        Assert.True(model.Components[0].SupportsHistory);
     }
 
     [Fact]

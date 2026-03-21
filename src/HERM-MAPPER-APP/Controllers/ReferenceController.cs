@@ -44,21 +44,25 @@ public sealed class ReferenceController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     public async Task<IActionResult> RestoreAsync()
     {
-        var components = await dbContext.TrmComponents
-            .AsNoTracking()
-            .Include(x => x.CapabilityLinks)
-            .ThenInclude(x => x.TrmCapability)
-            .ForReferenceModel(ReferenceModelKind.Trm)
-            .Where(x => x.IsDeleted)
-            .OrderByDescending(x => x.DeletedUtc)
-            .ThenBy(x => x.Name)
-            .ToListAsync();
+        return View("Restore", await BuildRestoreViewModelAsync(
+            ReferenceModelKind.Trm,
+            TempData["ImportStatusMessage"] as string));
+    }
 
-        return View("Restore", new ReferenceRestoreViewModel
-        {
-            Components = components,
-            StatusMessage = TempData["ImportStatusMessage"] as string
-        });
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> RestoreArmAsync()
+    {
+        return View("Restore", await BuildRestoreViewModelAsync(
+            ReferenceModelKind.Arm,
+            TempData["ImportStatusMessage"] as string));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> RestoreBrmAsync()
+    {
+        return View("Restore", await BuildRestoreViewModelAsync(
+            ReferenceModelKind.Brm,
+            TempData["ImportStatusMessage"] as string));
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
@@ -204,103 +208,273 @@ public sealed class ReferenceController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteComponentAsync(int id)
+    public async Task<IActionResult> DeleteComponentAsync(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        var component = await dbContext.TrmComponents
-            .ForReferenceModel(ReferenceModelKind.Trm)
-            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-        if (component is null)
+        switch (modelKind)
         {
-            return NotFound();
+            case ReferenceModelKind.Trm:
+            {
+                var component = await dbContext.TrmComponents
+                    .ForReferenceModel(ReferenceModelKind.Trm)
+                    .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                component.IsDeleted = true;
+                component.DeletedUtc = DateTime.UtcNow;
+                component.DeletedReason = "Moved to trash from the TRM model catalogue.";
+
+                await dbContext.SaveChangesAsync();
+                await componentVersioningService.RecordVersionAsync(component.Id, "Deleted", component.DeletedReason);
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "Delete",
+                    nameof(TrmComponent),
+                    component.Id,
+                    $"Moved TRM component {component.DisplayLabel} to trash.",
+                    component.DeletedReason);
+
+                TempData["ImportStatusMessage"] = $"Moved TRM component {component.DisplayLabel} to trash.";
+                break;
+            }
+            case ReferenceModelKind.Arm:
+            {
+                var component = await dbContext.ArmComponents
+                    .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                component.IsDeleted = true;
+                component.DeletedUtc = DateTime.UtcNow;
+                component.DeletedReason = "Moved to trash from the ARM model catalogue.";
+
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "Delete",
+                    nameof(ArmComponent),
+                    component.Id,
+                    $"Moved ARM component {component.DisplayLabel} to trash.",
+                    component.DeletedReason);
+
+                TempData["ImportStatusMessage"] = $"Moved ARM component {component.DisplayLabel} to trash.";
+                break;
+            }
+            case ReferenceModelKind.Brm:
+            {
+                var component = await dbContext.BrmComponents
+                    .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                component.IsDeleted = true;
+                component.DeletedUtc = DateTime.UtcNow;
+                component.DeletedReason = "Moved to trash from the BRM model catalogue.";
+
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "Delete",
+                    nameof(BrmComponent),
+                    component.Id,
+                    $"Moved BRM component {component.DisplayLabel} to trash.",
+                    component.DeletedReason);
+
+                TempData["ImportStatusMessage"] = $"Moved BRM component {component.DisplayLabel} to trash.";
+                break;
+            }
+            default:
+                return BadRequest();
         }
 
-        component.IsDeleted = true;
-        component.DeletedUtc = DateTime.UtcNow;
-        component.DeletedReason = "Moved to trash from the reference catalogue.";
-
-        await dbContext.SaveChangesAsync();
-        await componentVersioningService.RecordVersionAsync(component.Id, "Deleted", component.DeletedReason);
-        await auditLogService.WriteAsync(
-            "Component",
-            "Delete",
-            nameof(TrmComponent),
-            component.Id,
-            $"Moved component {component.DisplayLabel} to trash.",
-            component.DeletedReason);
-
-        TempData["ImportStatusMessage"] = $"Moved component {component.DisplayLabel} to trash.";
         return RedirectToAction("Index");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RestoreComponentAsync(int id)
+    public async Task<IActionResult> RestoreComponentAsync(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        var component = await dbContext.TrmComponents
-            .ForReferenceModel(ReferenceModelKind.Trm)
-            .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
-        if (component is null)
+        switch (modelKind)
         {
-            return NotFound();
+            case ReferenceModelKind.Trm:
+            {
+                var component = await dbContext.TrmComponents
+                    .ForReferenceModel(ReferenceModelKind.Trm)
+                    .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                component.IsDeleted = false;
+                component.DeletedUtc = null;
+                component.DeletedReason = null;
+
+                await dbContext.SaveChangesAsync();
+                await componentVersioningService.RecordVersionAsync(component.Id, "Restored", "Restored from trash.");
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "Restore",
+                    nameof(TrmComponent),
+                    component.Id,
+                    $"Restored TRM component {component.DisplayLabel} from trash.");
+
+                TempData["ImportStatusMessage"] = $"Restored TRM component {component.DisplayLabel}.";
+                break;
+            }
+            case ReferenceModelKind.Arm:
+            {
+                var component = await dbContext.ArmComponents
+                    .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                component.IsDeleted = false;
+                component.DeletedUtc = null;
+                component.DeletedReason = null;
+
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "Restore",
+                    nameof(ArmComponent),
+                    component.Id,
+                    $"Restored ARM component {component.DisplayLabel} from trash.");
+
+                TempData["ImportStatusMessage"] = $"Restored ARM component {component.DisplayLabel}.";
+                break;
+            }
+            case ReferenceModelKind.Brm:
+            {
+                var component = await dbContext.BrmComponents
+                    .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                component.IsDeleted = false;
+                component.DeletedUtc = null;
+                component.DeletedReason = null;
+
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "Restore",
+                    nameof(BrmComponent),
+                    component.Id,
+                    $"Restored BRM component {component.DisplayLabel} from trash.");
+
+                TempData["ImportStatusMessage"] = $"Restored BRM component {component.DisplayLabel}.";
+                break;
+            }
+            default:
+                return BadRequest();
         }
 
-        component.IsDeleted = false;
-        component.DeletedUtc = null;
-        component.DeletedReason = null;
-
-        await dbContext.SaveChangesAsync();
-        await componentVersioningService.RecordVersionAsync(component.Id, "Restored", "Restored from trash.");
-        await auditLogService.WriteAsync(
-            "Component",
-            "Restore",
-            nameof(TrmComponent),
-            component.Id,
-            $"Restored component {component.DisplayLabel} from trash.");
-
-        TempData["ImportStatusMessage"] = $"Restored component {component.DisplayLabel}.";
-        return RedirectToAction("Restore");
+        return RedirectToAction(GetRestoreActionName(modelKind));
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PermanentlyDeleteComponentAsync(int id)
+    public async Task<IActionResult> PermanentlyDeleteComponentAsync(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        var component = await dbContext.TrmComponents
-            .ForReferenceModel(ReferenceModelKind.Trm)
-            .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
-        if (component is null)
+        switch (modelKind)
         {
-            return NotFound();
+            case ReferenceModelKind.Trm:
+            {
+                var component = await dbContext.TrmComponents
+                    .ForReferenceModel(ReferenceModelKind.Trm)
+                    .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                dbContext.TrmComponents.Remove(component);
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "PermanentDelete",
+                    nameof(TrmComponent),
+                    component.Id,
+                    $"Permanently deleted TRM component {component.DisplayLabel}.");
+
+                TempData["ImportStatusMessage"] = $"Permanently deleted TRM component {component.DisplayLabel}.";
+                break;
+            }
+            case ReferenceModelKind.Arm:
+            {
+                var component = await dbContext.ArmComponents
+                    .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                dbContext.ArmComponents.Remove(component);
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "PermanentDelete",
+                    nameof(ArmComponent),
+                    component.Id,
+                    $"Permanently deleted ARM component {component.DisplayLabel}.");
+
+                TempData["ImportStatusMessage"] = $"Permanently deleted ARM component {component.DisplayLabel}.";
+                break;
+            }
+            case ReferenceModelKind.Brm:
+            {
+                var component = await dbContext.BrmComponents
+                    .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+                if (component is null)
+                {
+                    return NotFound();
+                }
+
+                dbContext.BrmComponents.Remove(component);
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "PermanentDelete",
+                    nameof(BrmComponent),
+                    component.Id,
+                    $"Permanently deleted BRM component {component.DisplayLabel}.");
+
+                TempData["ImportStatusMessage"] = $"Permanently deleted BRM component {component.DisplayLabel}.";
+                break;
+            }
+            default:
+                return BadRequest();
         }
 
-        dbContext.TrmComponents.Remove(component);
-        await dbContext.SaveChangesAsync();
-        await auditLogService.WriteAsync(
-            "Component",
-            "PermanentDelete",
-            nameof(TrmComponent),
-            component.Id,
-            $"Permanently deleted component {component.DisplayLabel}.");
-
-        TempData["ImportStatusMessage"] = $"Permanently deleted component {component.DisplayLabel}.";
-        return RedirectToAction("Restore");
+        return RedirectToAction(GetRestoreActionName(modelKind));
     }
 
     public async Task<IActionResult> HistoryAsync(int id)
@@ -379,6 +553,7 @@ public sealed class ReferenceController(
             .Include(x => x.CapabilityLinks)
             .ThenInclude(x => x.ArmCapability)
             .ThenInclude(x => x!.ParentDomain)
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Code)
             .ToListAsync();
 
@@ -395,6 +570,7 @@ public sealed class ReferenceController(
             .AsNoTracking()
             .Include(x => x.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Code)
             .ToListAsync();
 
@@ -621,6 +797,7 @@ public sealed class ReferenceController(
                     Description = component.Description,
                     ProductExamples = component.ProductExamples,
                     TypeLabel = "Model",
+                    SupportsDelete = true,
                     Capabilities = capabilities,
                     Domains = domains
                 };
@@ -663,6 +840,7 @@ public sealed class ReferenceController(
                     Description = component.Description,
                     ProductExamples = component.ProductExamples,
                     TypeLabel = "Model",
+                    SupportsDelete = true,
                     Capabilities = capabilities,
                     Domains = domains
                 };
@@ -913,6 +1091,93 @@ public sealed class ReferenceController(
             ? "."
             : $" with search \"{normalizedSearch}\".";
 
+    private async Task<ReferenceRestoreViewModel> BuildRestoreViewModelAsync(
+        ReferenceModelKind modelKind,
+        string? statusMessage)
+    {
+        var items = modelKind switch
+        {
+            ReferenceModelKind.Trm => (await dbContext.TrmComponents
+                    .AsNoTracking()
+                    .Include(x => x.CapabilityLinks)
+                    .ThenInclude(x => x.TrmCapability)
+                    .ForReferenceModel(ReferenceModelKind.Trm)
+                    .Where(x => x.IsDeleted)
+                    .OrderByDescending(x => x.DeletedUtc)
+                    .ThenBy(x => x.Name)
+                    .ToListAsync())
+                .Select(component => new ReferenceRestoreItemViewModel
+                {
+                    ModelKind = ReferenceModelKind.Trm,
+                    Id = component.Id,
+                    DisplayLabel = component.DisplayLabel,
+                    CapabilitiesText = BuildCapabilitiesText(component.CapabilityLinks
+                        .Where(link => link.TrmCapability != null)
+                        .Select(link => $"{link.TrmCapability!.Code} {link.TrmCapability.Name}")),
+                    DeletedUtc = component.DeletedUtc,
+                    DeletedReason = component.DeletedReason,
+                    SupportsHistory = true
+                })
+                .ToList(),
+            ReferenceModelKind.Arm => (await dbContext.ArmComponents
+                    .AsNoTracking()
+                    .Include(x => x.CapabilityLinks)
+                    .ThenInclude(x => x.ArmCapability)
+                    .Where(x => x.IsDeleted)
+                    .OrderByDescending(x => x.DeletedUtc)
+                    .ThenBy(x => x.Name)
+                    .ToListAsync())
+                .Select(component => new ReferenceRestoreItemViewModel
+                {
+                    ModelKind = ReferenceModelKind.Arm,
+                    Id = component.Id,
+                    DisplayLabel = component.DisplayLabel,
+                    CapabilitiesText = BuildCapabilitiesText(component.CapabilityLinks
+                        .Where(link => link.ArmCapability != null)
+                        .Select(link => $"{link.ArmCapability!.Code} {link.ArmCapability.Name}")),
+                    DeletedUtc = component.DeletedUtc,
+                    DeletedReason = component.DeletedReason
+                })
+                .ToList(),
+            ReferenceModelKind.Brm => (await dbContext.BrmComponents
+                    .AsNoTracking()
+                    .Include(x => x.ParentCapability)
+                    .Where(x => x.IsDeleted)
+                    .OrderByDescending(x => x.DeletedUtc)
+                    .ThenBy(x => x.Name)
+                    .ToListAsync())
+                .Select(component => new ReferenceRestoreItemViewModel
+                {
+                    ModelKind = ReferenceModelKind.Brm,
+                    Id = component.Id,
+                    DisplayLabel = component.DisplayLabel,
+                    CapabilitiesText = component.ParentCapability != null
+                        ? $"{component.ParentCapability.Code} {component.ParentCapability.Name}"
+                        : "-",
+                    DeletedUtc = component.DeletedUtc,
+                    DeletedReason = component.DeletedReason
+                })
+                .ToList(),
+            _ => []
+        };
+
+        var shortName = ReferenceModelCatalog.GetShortName(modelKind);
+
+        return new ReferenceRestoreViewModel
+        {
+            ModelKind = modelKind,
+            PageTitle = $"Restore {shortName} model objects",
+            Eyebrow = $"Deleted HERM {shortName} model objects",
+            Heading = $"Restore {shortName} model objects",
+            Description = "Restore model objects back into the catalogue or permanently delete them.",
+            EmptyHeading = $"No deleted {shortName} model objects",
+            EmptyDescription = $"The {shortName} model trash is empty.",
+            AdminNavKey = GetAdminNavKey(modelKind),
+            Components = items,
+            StatusMessage = statusMessage
+        };
+    }
+
     private static string BuildAnchorId(BrowserSelection selection)
     {
         if (!selection.ModelKind.HasValue)
@@ -933,6 +1198,30 @@ public sealed class ReferenceController(
         }
 
         return $"{domainAnchor}-capability-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(selection.CapabilityCode)}";
+    }
+
+    private static string GetRestoreActionName(ReferenceModelKind modelKind) => modelKind switch
+    {
+        ReferenceModelKind.Arm => nameof(RestoreArmAsync).Replace("Async", string.Empty, StringComparison.Ordinal),
+        ReferenceModelKind.Brm => nameof(RestoreBrmAsync).Replace("Async", string.Empty, StringComparison.Ordinal),
+        _ => nameof(RestoreAsync).Replace("Async", string.Empty, StringComparison.Ordinal)
+    };
+
+    private static string GetAdminNavKey(ReferenceModelKind modelKind) => modelKind switch
+    {
+        ReferenceModelKind.Arm => "RestoreArmModelObjects",
+        ReferenceModelKind.Brm => "RestoreBrmModelObjects",
+        _ => "RestoreTrmModelObjects"
+    };
+
+    private static string BuildCapabilitiesText(IEnumerable<string> values)
+    {
+        var formattedValues = values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .OrderBy(value => value)
+            .ToList();
+
+        return formattedValues.Count == 0 ? "-" : string.Join(", ", formattedValues);
     }
 
     private string EnsurePendingImportDirectory()

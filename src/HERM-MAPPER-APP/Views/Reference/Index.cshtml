@@ -266,6 +266,7 @@
                                         {
                                             <form asp-action="DeleteComponent" method="post" class="table-action-form">
                                                 <input type="hidden" name="id" value="@component.NativeId" />
+                                                <input type="hidden" name="modelKind" value="@component.ModelKind" />
                                                 <button class="table-action-button table-action-button-danger"
                                                         type="submit"
                                                         title="Move @component.DisplayLabel to trash"

@@ -110,15 +110,7 @@ public sealed partial class DatabaseInitializer(
 
         try
         {
-            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            await using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA table_info('TrmComponents')";
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                columns.Add(reader.GetString(1));
-            }
+            var columns = await GetSqliteTableColumnsAsync(connection, "TrmComponents", cancellationToken);
 
             if (!columns.Contains("TechnologyComponentCode"))
             {
@@ -153,6 +145,58 @@ public sealed partial class DatabaseInitializer(
                 await dbContext.Database.ExecuteSqlRawAsync(
                     "ALTER TABLE TrmComponents ADD COLUMN DeletedReason TEXT NULL",
                     cancellationToken);
+            }
+
+            columns = await GetSqliteTableColumnsAsync(connection, "ArmComponents", cancellationToken);
+
+            if (columns.Count > 0)
+            {
+                if (!columns.Contains("IsDeleted"))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE ArmComponents ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0",
+                        cancellationToken);
+                }
+
+                if (!columns.Contains("DeletedUtc"))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE ArmComponents ADD COLUMN DeletedUtc TEXT NULL",
+                        cancellationToken);
+                }
+
+                if (!columns.Contains("DeletedReason"))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE ArmComponents ADD COLUMN DeletedReason TEXT NULL",
+                        cancellationToken);
+                }
+            }
+
+            columns = await GetSqliteTableColumnsAsync(connection, "BrmComponents", cancellationToken);
+
+            if (columns.Count > 0)
+            {
+                if (!columns.Contains("IsDeleted"))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE BrmComponents ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0",
+                        cancellationToken);
+                }
+
+                if (!columns.Contains("DeletedUtc"))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE BrmComponents ADD COLUMN DeletedUtc TEXT NULL",
+                        cancellationToken);
+                }
+
+                if (!columns.Contains("DeletedReason"))
+                {
+                    await dbContext.Database.ExecuteSqlRawAsync(
+                        "ALTER TABLE BrmComponents ADD COLUMN DeletedReason TEXT NULL",
+                        cancellationToken);
+                }
             }
 
             await dbContext.Database.ExecuteSqlRawAsync(
@@ -256,6 +300,24 @@ public sealed partial class DatabaseInitializer(
                 await connection.CloseAsync();
             }
         }
+    }
+
+    private static async Task<HashSet<string>> GetSqliteTableColumnsAsync(
+        System.Data.Common.DbConnection connection,
+        string tableName,
+        CancellationToken cancellationToken)
+    {
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info('{tableName}')";
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        return columns;
     }
 
     private async Task EnsureProductOwnerTableAsync(CancellationToken cancellationToken)
@@ -1431,6 +1493,9 @@ public sealed partial class DatabaseInitializer(
                 "Description" TEXT NULL,
                 "Comments" TEXT NULL,
                 "ProductExamples" TEXT NULL,
+                "IsDeleted" INTEGER NOT NULL DEFAULT 0,
+                "DeletedUtc" TEXT NULL,
+                "DeletedReason" TEXT NULL,
                 CONSTRAINT "FK_ArmComponents_ArmCapabilities_ParentCapabilityId" FOREIGN KEY ("ParentCapabilityId") REFERENCES "ArmCapabilities" ("Id") ON DELETE CASCADE
             )
             """,
@@ -1535,6 +1600,9 @@ public sealed partial class DatabaseInitializer(
                 "Description" TEXT NULL,
                 "Comments" TEXT NULL,
                 "ProductExamples" TEXT NULL,
+                "IsDeleted" INTEGER NOT NULL DEFAULT 0,
+                "DeletedUtc" TEXT NULL,
+                "DeletedReason" TEXT NULL,
                 CONSTRAINT "FK_BrmComponents_BrmCapabilities_ParentCapabilityId" FOREIGN KEY ("ParentCapabilityId") REFERENCES "BrmCapabilities" ("Id") ON DELETE CASCADE
             )
             """,

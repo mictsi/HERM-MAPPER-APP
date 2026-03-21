@@ -65,6 +65,8 @@ public sealed class ControllerAuthorizationTests
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.VerifyImportAsync), AppPolicies.AdminOnly, 1);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.ImportVerifiedAsync), AppPolicies.AdminOnly, 1);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreAsync), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreArmAsync), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreBrmAsync), AppPolicies.AdminOnly, 0);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponentAsync), AppPolicies.AdminOnly, 1);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponentAsync), AppPolicies.AdminOnly, 1);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.PermanentlyDeleteComponentAsync), AppPolicies.AdminOnly, 1);

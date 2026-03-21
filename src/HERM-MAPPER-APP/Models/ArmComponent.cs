@@ -31,6 +31,13 @@ public sealed class ArmComponent
     [StringLength(4000)]
     public string? ProductExamples { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedUtc { get; set; }
+
+    [StringLength(400)]
+    public string? DeletedReason { get; set; }
+
     public ICollection<ArmComponentCapabilityLink> CapabilityLinks { get; set; } = new List<ArmComponentCapabilityLink>();
 
     [NotMapped]

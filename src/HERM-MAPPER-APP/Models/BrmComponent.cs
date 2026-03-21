@@ -31,6 +31,13 @@ public sealed class BrmComponent
     [StringLength(4000)]
     public string? ProductExamples { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedUtc { get; set; }
+
+    [StringLength(400)]
+    public string? DeletedReason { get; set; }
+
     [NotMapped]
     public string DisplayLabel => string.IsNullOrWhiteSpace(Code)
         ? Name

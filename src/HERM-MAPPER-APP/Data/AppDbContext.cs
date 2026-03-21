@@ -119,6 +119,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(x => x.Code).IsUnique();
             entity.Property(x => x.Code).HasMaxLength(32);
             entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
             entity.HasOne(x => x.ParentCapability)
                 .WithMany(x => x.Components)
                 .HasForeignKey(x => x.ParentCapabilityId)
@@ -165,6 +166,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(x => x.Code).IsUnique();
             entity.Property(x => x.Code).HasMaxLength(32);
             entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
             entity.HasOne(x => x.ParentCapability)
                 .WithMany(x => x.Components)
                 .HasForeignKey(x => x.ParentCapabilityId)
