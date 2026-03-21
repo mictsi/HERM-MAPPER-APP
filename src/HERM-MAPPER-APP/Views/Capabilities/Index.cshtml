@@ -1,0 +1,106 @@
+@using HERMMapperApp
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
+@model CapabilitiesIndexViewModel
+@{
+    ViewData["Title"] = "Capabilities";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>Capabilities</h1>
+        <p>Define business capabilities from the BRM model and connect them to the ARM layer for future drilldown into applications, products, and TRM mappings.</p>
+    </div>
+    @if (canManageProductsAndServices)
+    {
+        <a class="btn btn-primary" asp-action="Create">Add capability</a>
+    }
+</section>
+
+<section class="content-card">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-lg-10">
+            <label class="form-label" for="search">Search capabilities</label>
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Capability, BRM capability, ARM component" />
+        </div>
+        <div class="col-lg-2 d-grid">
+            <button class="btn btn-primary" type="submit">Go</button>
+        </div>
+    </form>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Catalogue</span>
+            <h2>@Model.Capabilities.Count capability record(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.Capabilities.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No capabilities yet</h3>
+            <p>Create the first capability and connect BRM capabilities to ARM components.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Capability</th>
+                        <th>BRM</th>
+                        <th>ARM</th>
+                        <th>Applications</th>
+                        <th>Products</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var capability in Model.Capabilities)
+                {
+                    <tr>
+                        <td>
+                            <strong>@capability.Name</strong>
+                            <div class="table-subline">@(string.IsNullOrWhiteSpace(capability.Description) ? "No description provided." : capability.Description)</div>
+                        </td>
+                        <td>@capability.BrmCapabilityCount mapping(s)</td>
+                        <td>@capability.ArmComponentCount component(s)</td>
+                        <td>@capability.ApplicationCount</td>
+                        <td>@capability.ProductCount</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(capability.UpdatedUtc)</td>
+                        <td class="text-end">
+                            <div class="table-action-group">
+                                <a class="table-action-button"
+                                   asp-action="Details"
+                                   asp-route-id="@capability.Id"
+                                   title="Show details for @capability.Name"
+                                   aria-label="Show details for @capability.Name">
+                                    <partial name="_ActionIcon" model="@("details")" />
+                                    <span class="visually-hidden">Show details</span>
+                                </a>
+                                @if (canManageProductsAndServices)
+                                {
+                                    <a class="table-action-button"
+                                       asp-action="Edit"
+                                       asp-route-id="@capability.Id"
+                                       title="Edit @capability.Name"
+                                       aria-label="Edit @capability.Name">
+                                        <partial name="_ActionIcon" model="@("edit")" />
+                                        <span class="visually-hidden">Edit</span>
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

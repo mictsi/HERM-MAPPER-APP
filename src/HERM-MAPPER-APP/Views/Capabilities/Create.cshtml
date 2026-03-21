@@ -1,0 +1,20 @@
+@model CapabilityEditViewModel
+@{
+    ViewData["Title"] = "Add Capability";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>Add a capability</h1>
+        <p>Create the capability record, then connect BRM capabilities to the ARM components that support them.</p>
+    </div>
+</section>
+
+<form asp-action="Create" method="post">
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

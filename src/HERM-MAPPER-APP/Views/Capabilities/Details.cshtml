@@ -1,0 +1,144 @@
+@using HERMMapperApp
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
+@model CapabilityDetailsViewModel
+@{
+    ViewData["Title"] = "Capability Details";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var statusMessage = ViewData["StatusMessage"] as string;
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>@Model.Name</h1>
+        <p>@(string.IsNullOrWhiteSpace(Model.Description) ? "No description provided." : Model.Description)</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index">Back to capabilities</a>
+        @if (canManageProductsAndServices)
+        {
+            <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">Edit capability</a>
+        }
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert alert-success" role="status">@statusMessage</div>
+}
+
+<section class="content-card mb-4">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Summary</span>
+            <h2>Capability overview</h2>
+        </div>
+    </div>
+    <dl class="detail-grid">
+        <dt>BRM capabilities</dt>
+        <dd>@Model.BrmCapabilityCount</dd>
+        <dt>ARM components</dt>
+        <dd>@Model.ArmComponentCount</dd>
+        <dt>Applications</dt>
+        <dd>@Model.ApplicationCount</dd>
+        <dt>Products</dt>
+        <dd>@Model.ProductCount</dd>
+        <dt>Last updated</dt>
+        <dd>@await TimeZoneDisplay.FormatUtcAsync(Model.UpdatedUtc)</dd>
+        <dt>Notes</dt>
+        <dd>@(string.IsNullOrWhiteSpace(Model.Notes) ? "-" : Model.Notes)</dd>
+    </dl>
+</section>
+
+<section class="content-card mb-4">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Links</span>
+            <h2>@Model.MappingRows.Count BRM/ARM mapping(s)</h2>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>BRM group</th>
+                    <th>BRM capability</th>
+                    <th>BRM level 2</th>
+                    <th>ARM component</th>
+                    <th>Primary</th>
+                    <th>Linked applications</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var mapping in Model.MappingRows)
+            {
+                <tr>
+                    <td>@mapping.BrmDomainLabel</td>
+                    <td>@mapping.BrmCapabilityLabel</td>
+                    <td>@mapping.BrmComponentLabel</td>
+                    <td>@mapping.ArmComponentLabel</td>
+                    <td>@(mapping.IsPrimary ? "Yes" : "No")</td>
+                    <td>@mapping.LinkedApplicationCount</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Resolved drilldown</span>
+            <h2>BRM to TRM product path</h2>
+        </div>
+    </div>
+
+    @if (!Model.HasResolvedPaths)
+    {
+        <div class="empty-state compact">
+            <h3>No resolved paths yet</h3>
+            <p>Add BRM to ARM mappings first, then connect applications to ARM components and TRM products to see the full drilldown.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>BRM group</th>
+                        <th>BRM capability</th>
+                        <th>BRM level 2</th>
+                        <th>ARM component</th>
+                        <th>Application</th>
+                        <th>Product</th>
+                        <th>TRM domain</th>
+                        <th>TRM capability</th>
+                        <th>TRM component</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var path in Model.ResolvedPaths)
+                {
+                    <tr>
+                        <td>@path.BrmDomainLabel</td>
+                        <td>@path.BrmCapabilityLabel</td>
+                        <td>@path.BrmComponentLabel</td>
+                        <td>@path.ArmComponentLabel</td>
+                        <td>@path.ApplicationName</td>
+                        <td>@path.ProductLabel</td>
+                        <td>@path.TrmDomainLabel</td>
+                        <td>@path.TrmCapabilityLabel</td>
+                        <td>@path.TrmComponentLabel</td>
+                        <td>@path.MappingStatus</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

@@ -27,6 +27,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ServiceCatalogItem> ServiceCatalogItems => Set<ServiceCatalogItem>();
     public DbSet<ServiceCatalogItemProduct> ServiceCatalogItemProducts => Set<ServiceCatalogItemProduct>();
     public DbSet<ServiceCatalogItemConnection> ServiceCatalogItemConnections => Set<ServiceCatalogItemConnection>();
+    public DbSet<ApplicationCatalogItem> ApplicationCatalogItems => Set<ApplicationCatalogItem>();
+    public DbSet<ApplicationCatalogItemMapping> ApplicationCatalogItemMappings => Set<ApplicationCatalogItemMapping>();
+    public DbSet<BusinessCapabilityCatalogItem> BusinessCapabilityCatalogItems => Set<BusinessCapabilityCatalogItem>();
+    public DbSet<BusinessCapabilityCatalogItemMapping> BusinessCapabilityCatalogItemMappings => Set<BusinessCapabilityCatalogItemMapping>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -300,6 +304,66 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.ToProductCatalogItem)
                 .WithMany()
                 .HasForeignKey(x => x.ToProductCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ApplicationCatalogItem>(entity =>
+        {
+            entity.ToTable("ApplicationCatalogItems");
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.Notes).HasMaxLength(4000);
+        });
+
+        modelBuilder.Entity<ApplicationCatalogItemMapping>(entity =>
+        {
+            entity.ToTable("ApplicationCatalogItemMappings");
+            entity.HasIndex(x => new { x.ApplicationCatalogItemId, x.ArmComponentId, x.ProductCatalogItemId }).IsUnique();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+
+            entity.HasOne(x => x.ApplicationCatalogItem)
+                .WithMany(x => x.Mappings)
+                .HasForeignKey(x => x.ApplicationCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ArmComponent)
+                .WithMany()
+                .HasForeignKey(x => x.ArmComponentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ProductCatalogItem)
+                .WithMany()
+                .HasForeignKey(x => x.ProductCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BusinessCapabilityCatalogItem>(entity =>
+        {
+            entity.ToTable("BusinessCapabilityCatalogItems");
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.Notes).HasMaxLength(4000);
+        });
+
+        modelBuilder.Entity<BusinessCapabilityCatalogItemMapping>(entity =>
+        {
+            entity.ToTable("BusinessCapabilityCatalogItemMappings");
+            entity.HasIndex(x => new { x.BusinessCapabilityCatalogItemId, x.BrmComponentId, x.ArmComponentId }).IsUnique();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+
+            entity.HasOne(x => x.BusinessCapabilityCatalogItem)
+                .WithMany(x => x.Mappings)
+                .HasForeignKey(x => x.BusinessCapabilityCatalogItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.BrmComponent)
+                .WithMany()
+                .HasForeignKey(x => x.BrmComponentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ArmComponent)
+                .WithMany()
+                .HasForeignKey(x => x.ArmComponentId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

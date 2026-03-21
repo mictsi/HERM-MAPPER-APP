@@ -14,6 +14,8 @@ public sealed class ControllerAuthorizationTests
         AssertClassPolicy<HomeController>(AppPolicies.CatalogueRead);
         AssertClassPolicy<ProductsController>(AppPolicies.CatalogueRead);
         AssertClassPolicy<ServicesController>(AppPolicies.CatalogueRead);
+        AssertClassPolicy<ApplicationsController>(AppPolicies.CatalogueRead);
+        AssertClassPolicy<CapabilitiesController>(AppPolicies.CatalogueRead);
         AssertClassPolicy<ReferenceController>(AppPolicies.CatalogueRead);
         AssertClassPolicy<ReportsController>(AppPolicies.CatalogueRead);
     }
@@ -60,6 +62,20 @@ public sealed class ControllerAuthorizationTests
     }
 
     [Fact]
+    public void ApplicationAndCapabilityWriteActionsRequireProductsAndServicesWritePolicy()
+    {
+        AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Create), AppPolicies.ProductsAndServicesWrite, 0);
+        AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Create), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
+
+        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Create), AppPolicies.ProductsAndServicesWrite, 0);
+        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Create), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
+    }
+
+    [Fact]
     public void ReferenceWriteActionsRequireAdminOnlyPolicy()
     {
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.VerifyImportAsync), AppPolicies.AdminOnly, 1);
@@ -67,9 +83,9 @@ public sealed class ControllerAuthorizationTests
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreAsync), AppPolicies.AdminOnly, 0);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreArmAsync), AppPolicies.AdminOnly, 0);
         AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreBrmAsync), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponentAsync), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponentAsync), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.PermanentlyDeleteComponentAsync), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponentAsync), AppPolicies.AdminOnly, 2);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponentAsync), AppPolicies.AdminOnly, 2);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.PermanentlyDeleteComponentAsync), AppPolicies.AdminOnly, 2);
         AssertMethodPolicy<ReportsController>(nameof(ReportsController.ExportMappingsCsvAsync), AppPolicies.AdminOnly, 0);
     }
 

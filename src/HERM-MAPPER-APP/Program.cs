@@ -247,6 +247,7 @@ public partial class Program
         services.AddScoped<ConfigurableFieldService>();
         services.AddScoped<ComponentVersioningService>();
         services.AddScoped<ConfiguredTimeZoneService>();
+        services.AddScoped<HermDrilldownService>();
         services.AddScoped<ModelDiagramReportService>();
         services.AddScoped<RemoteSqlImportService>();
         services.AddSingleton<RemoteSqlImportExecutionGate>();

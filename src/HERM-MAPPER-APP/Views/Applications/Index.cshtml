@@ -1,0 +1,104 @@
+@using HERMMapperApp
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
+@model ApplicationsIndexViewModel
+@{
+    ViewData["Title"] = "Applications";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Application Layer</span>
+        <h1>Applications</h1>
+        <p>Define applications from the ARM model and link each ARM component to the supporting TRM products already mapped in the catalogue.</p>
+    </div>
+    @if (canManageProductsAndServices)
+    {
+        <a class="btn btn-primary" asp-action="Create">Add application</a>
+    }
+</section>
+
+<section class="content-card">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-lg-10">
+            <label class="form-label" for="search">Search applications</label>
+            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Application, ARM component, product" />
+        </div>
+        <div class="col-lg-2 d-grid">
+            <button class="btn btn-primary" type="submit">Go</button>
+        </div>
+    </form>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Catalogue</span>
+            <h2>@Model.Applications.Count application(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.Applications.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No applications yet</h3>
+            <p>Create the first application and connect it to ARM components and TRM products.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Application</th>
+                        <th>ARM</th>
+                        <th>Products</th>
+                        <th>Resolved paths</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var application in Model.Applications)
+                {
+                    <tr>
+                        <td>
+                            <strong>@application.Name</strong>
+                            <div class="table-subline">@(string.IsNullOrWhiteSpace(application.Description) ? "No description provided." : application.Description)</div>
+                        </td>
+                        <td>@application.ArmComponentCount component(s)</td>
+                        <td>@application.ProductCount product(s)</td>
+                        <td>@application.ResolvedPathCount path(s)</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(application.UpdatedUtc)</td>
+                        <td class="text-end">
+                            <div class="table-action-group">
+                                <a class="table-action-button"
+                                   asp-action="Details"
+                                   asp-route-id="@application.Id"
+                                   title="Show details for @application.Name"
+                                   aria-label="Show details for @application.Name">
+                                    <partial name="_ActionIcon" model="@("details")" />
+                                    <span class="visually-hidden">Show details</span>
+                                </a>
+                                @if (canManageProductsAndServices)
+                                {
+                                    <a class="table-action-button"
+                                       asp-action="Edit"
+                                       asp-route-id="@application.Id"
+                                       title="Edit @application.Name"
+                                       aria-label="Edit @application.Name">
+                                        <partial name="_ActionIcon" model="@("edit")" />
+                                        <span class="visually-hidden">Edit</span>
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

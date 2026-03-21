@@ -1,0 +1,20 @@
+@model ApplicationEditViewModel
+@{
+    ViewData["Title"] = "Add Application";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Application Layer</span>
+        <h1>Add an application</h1>
+        <p>Create the application record, then link each ARM component to the supporting TRM products.</p>
+    </div>
+</section>
+
+<form asp-action="Create" method="post">
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

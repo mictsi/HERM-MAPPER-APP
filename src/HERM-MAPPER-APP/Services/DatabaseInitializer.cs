@@ -18,6 +18,8 @@ public sealed partial class DatabaseInitializer(
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureServiceTablesAsync(cancellationToken);
+        await EnsureApplicationTablesAsync(cancellationToken);
+        await EnsureBusinessCapabilityTablesAsync(cancellationToken);
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureProductSoftDeleteColumnsAsync(cancellationToken);
         await EnsureServiceSoftDeleteColumnsAsync(cancellationToken);
@@ -734,6 +736,304 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     CREATE INDEX [IX_ServiceCatalogItems_LifecycleStatus]
                     ON [ServiceCatalogItems] ([LifecycleStatus]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureApplicationTablesAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "ApplicationCatalogItems" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_ApplicationCatalogItems" PRIMARY KEY AUTOINCREMENT,
+                    "Name" TEXT NOT NULL,
+                    "Description" TEXT NULL,
+                    "Notes" TEXT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "ApplicationCatalogItemMappings" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_ApplicationCatalogItemMappings" PRIMARY KEY AUTOINCREMENT,
+                    "ApplicationCatalogItemId" INTEGER NOT NULL,
+                    "ArmComponentId" INTEGER NOT NULL,
+                    "ProductCatalogItemId" INTEGER NOT NULL,
+                    "IsPrimary" INTEGER NOT NULL DEFAULT 0,
+                    "Notes" TEXT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    CONSTRAINT "FK_ApplicationCatalogItemMappings_ApplicationCatalogItems_ApplicationCatalogItemId"
+                        FOREIGN KEY ("ApplicationCatalogItemId") REFERENCES "ApplicationCatalogItems" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_ApplicationCatalogItemMappings_ArmComponents_ArmComponentId"
+                        FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_ApplicationCatalogItemMappings_ProductCatalogItems_ProductCatalogItemId"
+                        FOREIGN KEY ("ProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductCatalogItemId"
+                ON "ApplicationCatalogItemMappings" ("ApplicationCatalogItemId", "ArmComponentId", "ProductCatalogItemId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ApplicationCatalogItemMappings_ArmComponentId"
+                ON "ApplicationCatalogItemMappings" ("ArmComponentId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ApplicationCatalogItemMappings_ProductCatalogItemId"
+                ON "ApplicationCatalogItemMappings" ("ProductCatalogItemId")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[ApplicationCatalogItems]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [ApplicationCatalogItems] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ApplicationCatalogItems] PRIMARY KEY,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [Description] NVARCHAR(2000) NULL,
+                        [Notes] NVARCHAR(4000) NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[ApplicationCatalogItemMappings]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [ApplicationCatalogItemMappings] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ApplicationCatalogItemMappings] PRIMARY KEY,
+                        [ApplicationCatalogItemId] INT NOT NULL,
+                        [ArmComponentId] INT NOT NULL,
+                        [ProductCatalogItemId] INT NOT NULL,
+                        [IsPrimary] BIT NOT NULL CONSTRAINT [DF_ApplicationCatalogItemMappings_IsPrimary] DEFAULT 0,
+                        [Notes] NVARCHAR(1000) NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        CONSTRAINT [FK_ApplicationCatalogItemMappings_ApplicationCatalogItems_ApplicationCatalogItemId]
+                            FOREIGN KEY ([ApplicationCatalogItemId]) REFERENCES [ApplicationCatalogItems] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_ApplicationCatalogItemMappings_ArmComponents_ArmComponentId]
+                            FOREIGN KEY ([ArmComponentId]) REFERENCES [ArmComponents] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_ApplicationCatalogItemMappings_ProductCatalogItems_ProductCatalogItemId]
+                            FOREIGN KEY ([ProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductCatalogItemId'
+                      AND object_id = OBJECT_ID(N'[ApplicationCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductCatalogItemId]
+                    ON [ApplicationCatalogItemMappings] ([ApplicationCatalogItemId], [ArmComponentId], [ProductCatalogItemId]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ApplicationCatalogItemMappings_ArmComponentId'
+                      AND object_id = OBJECT_ID(N'[ApplicationCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ApplicationCatalogItemMappings_ArmComponentId]
+                    ON [ApplicationCatalogItemMappings] ([ArmComponentId]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ApplicationCatalogItemMappings_ProductCatalogItemId'
+                      AND object_id = OBJECT_ID(N'[ApplicationCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ApplicationCatalogItemMappings_ProductCatalogItemId]
+                    ON [ApplicationCatalogItemMappings] ([ProductCatalogItemId]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureBusinessCapabilityTablesAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "BusinessCapabilityCatalogItems" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_BusinessCapabilityCatalogItems" PRIMARY KEY AUTOINCREMENT,
+                    "Name" TEXT NOT NULL,
+                    "Description" TEXT NULL,
+                    "Notes" TEXT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "BusinessCapabilityCatalogItemMappings" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_BusinessCapabilityCatalogItemMappings" PRIMARY KEY AUTOINCREMENT,
+                    "BusinessCapabilityCatalogItemId" INTEGER NOT NULL,
+                    "BrmComponentId" INTEGER NOT NULL,
+                    "ArmComponentId" INTEGER NOT NULL,
+                    "IsPrimary" INTEGER NOT NULL DEFAULT 0,
+                    "Notes" TEXT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    CONSTRAINT "FK_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItems_BusinessCapabilityCatalogItemId"
+                        FOREIGN KEY ("BusinessCapabilityCatalogItemId") REFERENCES "BusinessCapabilityCatalogItems" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_BusinessCapabilityCatalogItemMappings_BrmComponents_BrmComponentId"
+                        FOREIGN KEY ("BrmComponentId") REFERENCES "BrmComponents" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_BusinessCapabilityCatalogItemMappings_ArmComponents_ArmComponentId"
+                        FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId"
+                ON "BusinessCapabilityCatalogItemMappings" ("BusinessCapabilityCatalogItemId", "BrmComponentId", "ArmComponentId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_BusinessCapabilityCatalogItemMappings_BrmComponentId"
+                ON "BusinessCapabilityCatalogItemMappings" ("BrmComponentId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_BusinessCapabilityCatalogItemMappings_ArmComponentId"
+                ON "BusinessCapabilityCatalogItemMappings" ("ArmComponentId")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[BusinessCapabilityCatalogItems]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [BusinessCapabilityCatalogItems] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_BusinessCapabilityCatalogItems] PRIMARY KEY,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [Description] NVARCHAR(2000) NULL,
+                        [Notes] NVARCHAR(4000) NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[BusinessCapabilityCatalogItemMappings]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [BusinessCapabilityCatalogItemMappings] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_BusinessCapabilityCatalogItemMappings] PRIMARY KEY,
+                        [BusinessCapabilityCatalogItemId] INT NOT NULL,
+                        [BrmComponentId] INT NOT NULL,
+                        [ArmComponentId] INT NOT NULL,
+                        [IsPrimary] BIT NOT NULL CONSTRAINT [DF_BusinessCapabilityCatalogItemMappings_IsPrimary] DEFAULT 0,
+                        [Notes] NVARCHAR(1000) NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        CONSTRAINT [FK_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItems_BusinessCapabilityCatalogItemId]
+                            FOREIGN KEY ([BusinessCapabilityCatalogItemId]) REFERENCES [BusinessCapabilityCatalogItems] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_BusinessCapabilityCatalogItemMappings_BrmComponents_BrmComponentId]
+                            FOREIGN KEY ([BrmComponentId]) REFERENCES [BrmComponents] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_BusinessCapabilityCatalogItemMappings_ArmComponents_ArmComponentId]
+                            FOREIGN KEY ([ArmComponentId]) REFERENCES [ArmComponents] ([Id]) ON DELETE CASCADE
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId'
+                      AND object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId]
+                    ON [BusinessCapabilityCatalogItemMappings] ([BusinessCapabilityCatalogItemId], [BrmComponentId], [ArmComponentId]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_BusinessCapabilityCatalogItemMappings_BrmComponentId'
+                      AND object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_BusinessCapabilityCatalogItemMappings_BrmComponentId]
+                    ON [BusinessCapabilityCatalogItemMappings] ([BrmComponentId]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_BusinessCapabilityCatalogItemMappings_ArmComponentId'
+                      AND object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_BusinessCapabilityCatalogItemMappings_ArmComponentId]
+                    ON [BusinessCapabilityCatalogItemMappings] ([ArmComponentId]);
                 END
                 """,
                 cancellationToken);

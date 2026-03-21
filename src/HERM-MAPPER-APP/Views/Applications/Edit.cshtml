@@ -1,0 +1,20 @@
+@model ApplicationEditViewModel
+@{
+    ViewData["Title"] = "Edit Application";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Application Layer</span>
+        <h1>Edit @Model.Name</h1>
+        <p>Update the ARM and TRM-product links without losing the resolved drilldown paths.</p>
+    </div>
+</section>
+
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
