@@ -170,6 +170,22 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
+    public async Task VerifyCatalogueImportKeepsSelectedModelInErrorReview()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateConfigurationController();
+
+        var result = await controller.VerifyCatalogueImport(null, ReferenceModelKind.Brm);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Index", view.ViewName);
+        var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
+        Assert.Equal(ReferenceModelKind.Brm, model.CatalogueImportModelKind);
+        Assert.Equal(ReferenceModelKind.Brm, model.CatalogueImportReview.ModelKind);
+        Assert.Equal(ReferenceModelKind.Brm, model.CatalogueImportReview.Verification!.ModelKind);
+    }
+
+    [Fact]
     public async Task VerifyCatalogueImportReturnsErrorReviewWhenExtensionInvalid()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -281,7 +297,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
-            "Catalogue imported. Domains +1/0 updated, capabilities +1/0 updated, components +1/0 updated.",
+            "TRM catalogue imported. Domains +1/0 updated, capabilities +1/0 updated, components +1/0 updated.",
             controller.TempData["ConfigurationStatusMessage"]);
         Assert.Equal(1, await fixture.DbContext.TrmDomains.CountAsync());
         Assert.Equal(1, await fixture.DbContext.TrmCapabilities.CountAsync());
@@ -289,6 +305,77 @@ public sealed class ConfigurationAndChangeLogControllerTests
         Assert.Contains(
             await fixture.DbContext.AuditLogEntries.Select(entry => entry.Action).ToListAsync(),
             action => string.Equals(action, "ImportCatalogue", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ImportVerifiedCatalogueImportsArmWorkbookWhenModelSelected()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var pendingPath = Path.Combine(fixture.ContentRootPath, "App_Data", "PendingImports", "catalogue", "arm-token.xlsx");
+        WorkbookTestFileFactory.WriteWorkbook(
+            pendingPath,
+            new WorkbookSheet(
+                "ARM Domain",
+                [
+                    ["Source", "Code", "Name", "Description", "Comments"],
+                    ["Workbook", "AD001", "Business Apps", "Domain description", "Domain comments"]
+                ]),
+            new WorkbookSheet(
+                "ARM Capability",
+                [
+                    ["Source", "Code", "Name", "Parent Domain", "Description", "Comments"],
+                    ["Workbook", "AP001", "Case Management", "AD001 Business Apps", "Capability description", "Capability comments"]
+                ]),
+            new WorkbookSheet(
+                "ARM Component",
+                [
+                    ["Source", "Code", "Name", "Parent Capability", "Description", "Comments", "Product examples"],
+                    ["Workbook", "AC001", "Workflow Engine", "AP001 Case Management", "Component description", "Component comments", "Contoso Workflow"]
+                ]));
+
+        using var controller = fixture.CreateConfigurationController();
+        var result = await controller.ImportVerifiedCatalogue("arm-token", ReferenceModelKind.Arm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.False(File.Exists(pendingPath));
+        Assert.Equal(
+            "ARM catalogue imported. Domains +1/0 updated, capabilities +1/0 updated, components +1/0 updated.",
+            controller.TempData["ConfigurationStatusMessage"]);
+        Assert.Equal(1, await fixture.DbContext.ArmDomains.CountAsync(x => x.Code == "AD001"));
+        Assert.Equal(1, await fixture.DbContext.ArmCapabilities.CountAsync(x => x.Code == "AP001"));
+        Assert.Equal(1, await fixture.DbContext.ArmComponents.CountAsync(x => x.Code == "AC001"));
+        Assert.Equal(0, await fixture.DbContext.TrmDomains.CountAsync(x => x.Code == "AD001"));
+    }
+
+    [Fact]
+    public async Task ImportVerifiedCatalogueImportsBrmWorkbookWhenModelSelected()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var pendingPath = Path.Combine(fixture.ContentRootPath, "App_Data", "PendingImports", "catalogue", "brm-token.xlsx");
+        WorkbookTestFileFactory.WriteWorkbook(
+            pendingPath,
+            new WorkbookSheet(
+                "BRM",
+                [
+                    ["Title", "Capability Type", "Capability Level", "Value Chain", "Value Chain Segment", "Capability Code", "Capability Name", "Parent Capability", "Capability Description", "Capability Notes", "Capability Assessment", "Display Sequence"],
+                    ["Business Capability", "Primary", "1", "Operations", "Fulfilment", "BC001", "Order Handling", "", "Level 1 description", "Level 1 notes", "High", "10"],
+                    ["Business Capability", "Primary", "2", "Operations", "Fulfilment", "BC002", "Order Capture", "BC001 Order Handling", "Level 2 description", "Level 2 notes", "Medium", "20"]
+                ]));
+
+        using var controller = fixture.CreateConfigurationController();
+        var result = await controller.ImportVerifiedCatalogue("brm-token", ReferenceModelKind.Brm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.False(File.Exists(pendingPath));
+        Assert.Equal(
+            "BRM catalogue imported. Groups +1/0 updated, level 1 capabilities +1/0 updated, level 2 capabilities +1/0 updated.",
+            controller.TempData["ConfigurationStatusMessage"]);
+        Assert.Equal(1, await fixture.DbContext.BrmDomains.CountAsync());
+        Assert.Equal(1, await fixture.DbContext.BrmCapabilities.CountAsync(x => x.Code == "BC001"));
+        Assert.Equal(1, await fixture.DbContext.BrmComponents.CountAsync(x => x.Code == "BC002"));
+        Assert.Equal(0, await fixture.DbContext.TrmComponents.CountAsync(x => x.Code == "BC002"));
     }
 
     [Fact]
@@ -306,7 +393,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
-        Assert.Equal("Catalogue import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
+        Assert.Equal("TRM catalogue import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
     }
 
     [Fact]
@@ -319,7 +406,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
-        Assert.Equal("Catalogue import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
+        Assert.Equal("TRM catalogue import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
     }
 
     [Fact]
@@ -659,7 +746,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Cybersecurity" };
-        var capability = new TrmCapability { Code = "TCAP001", Name = "Capability A", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var capability = new TrmCapability { Code = "TP001", Name = "Capability A", ParentDomain = domain, ParentDomainCode = domain.Code };
         var component = new TrmComponent { Code = "TC002", Name = "Monitoring & Alerting", ParentCapability = capability, ParentCapabilityCode = capability.Code };
         await fixture.DbContext.AddRangeAsync(domain, capability, component);
         await fixture.DbContext.SaveChangesAsync();
@@ -668,7 +755,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         Directory.CreateDirectory(Path.GetDirectoryName(pendingPath)!);
         await File.WriteAllTextAsync(
             pendingPath,
-            "MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT\nHERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog");
+            "MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT\nHERM;TD001 Cybersecurity;TP001 Capability A;TC002 Monitoring & Alerting;Graylog");
 
         using var controller = fixture.CreateConfigurationController();
         var result = await controller.ImportVerifiedProducts("good-token");

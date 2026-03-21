@@ -273,9 +273,10 @@ public sealed class ReportsAndDashboardControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         var result = await fixture.CreateReportsController().ExportMappingsCsvAsync();
+        var file = Assert.IsType<FileContentResult>(result);
 
-        Assert.Equal("text/csv", result.ContentType);
-        var content = Encoding.UTF8.GetString(result.FileContents);
+        Assert.Equal("text/csv", file.ContentType);
+        var content = Encoding.UTF8.GetString(file.FileContents);
         Assert.Contains("Sentinel", content);
         Assert.DoesNotContain("Draft Tool", content);
     }

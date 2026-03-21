@@ -35,19 +35,21 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerifyCatalogueImport(IFormFile? workbook)
+    public async Task<IActionResult> VerifyCatalogueImport(IFormFile? workbook, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (workbook is null || workbook.Length == 0)
         {
             return View("Index", await BuildViewModelAsync(
-                catalogueImportReview: BuildCatalogueErrorReview("Choose an .xlsx workbook before verifying the import."),
+                catalogueImportReview: BuildCatalogueErrorReview("Choose an .xlsx workbook before verifying the import.", modelKind: modelKind),
+                catalogueImportModelKind: modelKind,
                 errorSectionKey: CatalogueImportSectionKey));
         }
 
         if (!string.Equals(Path.GetExtension(workbook.FileName), ".xlsx", StringComparison.OrdinalIgnoreCase))
         {
             return View("Index", await BuildViewModelAsync(
-                catalogueImportReview: BuildCatalogueErrorReview("Only Excel .xlsx workbooks are supported.", workbook.FileName),
+                catalogueImportReview: BuildCatalogueErrorReview("Only Excel .xlsx workbooks are supported.", workbook.FileName, modelKind),
+                catalogueImportModelKind: modelKind,
                 errorSectionKey: CatalogueImportSectionKey));
         }
 
@@ -59,7 +61,7 @@ public sealed class ConfigurationController(
             await workbook.CopyToAsync(stream);
         }
 
-        var verification = await workbookImportService.VerifyAsync(pendingPath);
+        var verification = await workbookImportService.VerifyAsync(pendingPath, modelKind);
         if (!verification.IsValid)
         {
             System.IO.File.Delete(pendingPath);
@@ -74,8 +76,10 @@ public sealed class ConfigurationController(
             verification.IsValid ? "Verification passed." : string.Join(" | ", verification.Errors));
 
         return View("Index", await BuildViewModelAsync(
+            catalogueImportModelKind: modelKind,
             catalogueImportReview: new WorkbookImportReviewViewModel
             {
+                ModelKind = modelKind,
                 PendingImportToken = verification.IsValid ? pendingImportToken : null,
                 UploadedFileName = workbook.FileName,
                 Verification = verification
@@ -84,7 +88,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ImportVerifiedCatalogue(string pendingImportToken)
+    public async Task<IActionResult> ImportVerifiedCatalogue(string pendingImportToken, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (string.IsNullOrWhiteSpace(pendingImportToken))
         {
@@ -101,19 +105,21 @@ public sealed class ConfigurationController(
             return RedirectToAction(nameof(Index));
         }
 
-        var verification = await workbookImportService.VerifyAsync(pendingPath);
+        var verification = await workbookImportService.VerifyAsync(pendingPath, modelKind);
         if (!verification.IsValid)
         {
             System.IO.File.Delete(pendingPath);
             return View("Index", await BuildViewModelAsync(
+                catalogueImportModelKind: modelKind,
                 catalogueImportReview: new WorkbookImportReviewViewModel
                 {
+                    ModelKind = modelKind,
                     Verification = verification
                 },
                 errorSectionKey: CatalogueImportSectionKey));
         }
 
-        var summary = await workbookImportService.ImportAsync(pendingPath);
+        var summary = await workbookImportService.ImportAsync(pendingPath, modelKind);
         System.IO.File.Delete(pendingPath);
 
         await auditLogService.WriteAsync(
@@ -121,20 +127,20 @@ public sealed class ConfigurationController(
             "ImportCatalogue",
             "TrmWorkbook",
             null,
-            "Imported verified catalogue workbook.",
-            $"Domains +{summary.DomainsAdded}/{summary.DomainsUpdated}, capabilities +{summary.CapabilitiesAdded}/{summary.CapabilitiesUpdated}, components +{summary.ComponentsAdded}/{summary.ComponentsUpdated}.");
+            $"Imported verified {summary.ModelDisplayName} workbook.",
+            $"{summary.DomainLabel} +{summary.DomainsAdded}/{summary.DomainsUpdated}, {summary.CapabilityLabel.ToLowerInvariant()} +{summary.CapabilitiesAdded}/{summary.CapabilitiesUpdated}, {summary.ComponentLabel.ToLowerInvariant()} +{summary.ComponentsAdded}/{summary.ComponentsUpdated}.");
 
         TempData["ConfigurationStatusMessage"] =
-            $"Catalogue imported. Domains +{summary.DomainsAdded}/{summary.DomainsUpdated} updated, " +
-            $"capabilities +{summary.CapabilitiesAdded}/{summary.CapabilitiesUpdated} updated, " +
-            $"components +{summary.ComponentsAdded}/{summary.ComponentsUpdated} updated.";
+            $"{ReferenceModelCatalog.GetShortName(modelKind)} catalogue imported. {summary.DomainLabel} +{summary.DomainsAdded}/{summary.DomainsUpdated} updated, " +
+            $"{summary.CapabilityLabel.ToLowerInvariant()} +{summary.CapabilitiesAdded}/{summary.CapabilitiesUpdated} updated, " +
+            $"{summary.ComponentLabel.ToLowerInvariant()} +{summary.ComponentsAdded}/{summary.ComponentsUpdated} updated.";
 
         return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AbortCatalogueImport(string pendingImportToken)
+    public async Task<IActionResult> AbortCatalogueImport(string pendingImportToken, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         DeletePendingImport("catalogue", pendingImportToken, ".xlsx");
         await auditLogService.WriteAsync(
@@ -142,8 +148,8 @@ public sealed class ConfigurationController(
             "AbortCatalogueImport",
             "TrmWorkbook",
             null,
-            "Aborted pending catalogue import.");
-        TempData["ConfigurationStatusMessage"] = "Catalogue import was aborted.";
+            $"Aborted pending {ReferenceModelCatalog.GetShortName(modelKind)} catalogue import.");
+        TempData["ConfigurationStatusMessage"] = $"{ReferenceModelCatalog.GetShortName(modelKind)} catalogue import was aborted.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -556,6 +562,7 @@ public sealed class ConfigurationController(
         WorkbookImportReviewViewModel? catalogueImportReview = null,
         ProductImportReviewViewModel? productImportReview = null,
         string? expandedFieldName = null,
+        ReferenceModelKind catalogueImportModelKind = ReferenceModelKind.Trm,
         string? statusMessage = null,
         string? errorMessage = null,
         string? errorSectionKey = null,
@@ -602,6 +609,8 @@ public sealed class ConfigurationController(
             OpenRemoteSqlImportSection = openRemoteSqlImportSection || remoteSqlTestResult is not null || !string.IsNullOrWhiteSpace(savedUserNameClearText) || !string.IsNullOrWhiteSpace(savedPasswordClearText),
             DisplayTimeZoneId = displayTimeZoneId,
             AvailableTimeZones = BuildTimeZoneOptions(displayTimeZoneId),
+            CatalogueImportModelKind = catalogueImportModelKind,
+            CatalogueImportModelOptions = BuildCatalogueImportModelOptions(catalogueImportModelKind),
             CatalogueImportReview = catalogueImportReview ?? new WorkbookImportReviewViewModel(),
             ProductImportReview = productImportReview ?? new ProductImportReviewViewModel(),
             RemoteSqlImport = new RemoteSqlImportSectionViewModel
@@ -640,6 +649,16 @@ public sealed class ConfigurationController(
             })
             .ToList();
 
+    private static List<SelectListItem> BuildCatalogueImportModelOptions(ReferenceModelKind selectedModelKind) =>
+        ReferenceModelCatalog.All
+            .Select(modelKind => new SelectListItem
+            {
+                Value = modelKind.ToString(),
+                Text = $"{ReferenceModelCatalog.GetShortName(modelKind)} - {ReferenceModelCatalog.GetDisplayName(modelKind)}",
+                Selected = modelKind == selectedModelKind
+            })
+            .ToList();
+
     private static string FormatOffset(TimeSpan offset)
     {
         var sign = offset < TimeSpan.Zero ? "-" : "+";
@@ -657,12 +676,14 @@ public sealed class ConfigurationController(
             })
             .ToList();
 
-    private static WorkbookImportReviewViewModel BuildCatalogueErrorReview(string errorMessage, string? uploadedFileName = null) =>
+    private static WorkbookImportReviewViewModel BuildCatalogueErrorReview(string errorMessage, string? uploadedFileName = null, ReferenceModelKind modelKind = ReferenceModelKind.Trm) =>
         new()
         {
+            ModelKind = modelKind,
             UploadedFileName = uploadedFileName,
             Verification = new TrmWorkbookVerificationResult
             {
+                ModelKind = modelKind,
                 Errors = [errorMessage]
             }
         };

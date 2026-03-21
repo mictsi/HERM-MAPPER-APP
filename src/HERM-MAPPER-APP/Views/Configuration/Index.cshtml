@@ -361,14 +361,18 @@
                     }
                 </summary>
                 <div class="admin-disclosure-body">
-                    <p class="mb-3">Upload the HERM workbook here to review the proposed domain, capability, and component changes before applying them.</p>
+                    <p class="mb-3">Use one workflow for TRM, ARM, or BRM imports. Validation and row counts adapt to the selected model.</p>
                     <form asp-action="VerifyCatalogueImport" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
                         @Html.AntiForgeryToken()
-                        <div class="col-lg-8">
+                        <div class="col-lg-4">
+                            <label class="form-label" for="modelKind">Model</label>
+                            <select class="form-select" id="modelKind" name="modelKind" asp-items="Model.CatalogueImportModelOptions"></select>
+                        </div>
+                        <div class="col-lg-5">
                             <label class="form-label" for="workbook">Workbook</label>
                             <input class="form-control" id="workbook" name="workbook" type="file" accept=".xlsx" />
                         </div>
-                        <div class="col-lg-4 d-grid">
+                        <div class="col-lg-3 d-grid">
                             <button class="btn btn-primary" type="submit">Verify workbook</button>
                         </div>
                     </form>
@@ -380,6 +384,7 @@
                                 <div>
                                     <span class="eyebrow">Verification result</span>
                                     <h3>@(Model.CatalogueImportReview.UploadedFileName ?? "Uploaded workbook")</h3>
+                                    <p class="mb-0 text-muted">@catalogueReview.ModelDisplayName</p>
                                 </div>
                                 <span class="status-pill @(catalogueReview.IsValid ? "status-complete" : "status-outofscope")">
                                     @(catalogueReview.IsValid ? "Ready to import" : "Verification failed")
@@ -387,21 +392,14 @@
                             </div>
 
                             <div class="stats-grid stats-grid-compact import-stats">
-                                <article class="stat-card">
-                                    <span class="stat-label">Domains</span>
-                                    <span class="stat-value">@catalogueReview.DomainRowCount</span>
-                                    <span class="stat-meta">+@catalogueReview.DomainsToAdd new, @catalogueReview.DomainsToUpdate update</span>
-                                </article>
-                                <article class="stat-card">
-                                    <span class="stat-label">Capabilities</span>
-                                    <span class="stat-value">@catalogueReview.CapabilityRowCount</span>
-                                    <span class="stat-meta">+@catalogueReview.CapabilitiesToAdd new, @catalogueReview.CapabilitiesToUpdate update</span>
-                                </article>
-                                <article class="stat-card">
-                                    <span class="stat-label">Components</span>
-                                    <span class="stat-value">@catalogueReview.ComponentRowCount</span>
-                                    <span class="stat-meta">+@catalogueReview.ComponentsToAdd new, @catalogueReview.ComponentsToUpdate update</span>
-                                </article>
+                                @foreach (var layer in catalogueReview.LayerSummaries)
+                                {
+                                    <article class="stat-card">
+                                        <span class="stat-label">@layer.Label</span>
+                                        <span class="stat-value">@layer.RowCount</span>
+                                        <span class="stat-meta">+@layer.ToAdd new, @layer.ToUpdate update</span>
+                                    </article>
+                                }
                             </div>
 
                             @if (catalogueReview.Errors.Count > 0)
@@ -435,11 +433,13 @@
                                     <form asp-action="ImportVerifiedCatalogue" method="post">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="pendingImportToken" value="@Model.CatalogueImportReview.PendingImportToken" />
+                                        <input type="hidden" name="modelKind" value="@Model.CatalogueImportReview.ModelKind" />
                                         <button class="btn btn-primary" type="submit">Import verified workbook</button>
                                     </form>
                                     <form asp-action="AbortCatalogueImport" method="post">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="pendingImportToken" value="@Model.CatalogueImportReview.PendingImportToken" />
+                                        <input type="hidden" name="modelKind" value="@Model.CatalogueImportReview.ModelKind" />
                                         <button class="btn btn-outline-secondary" type="submit">Abort</button>
                                     </form>
                                 </div>

@@ -68,7 +68,11 @@ public sealed class MappingsController(
             InReviewCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.InReview && x.ProductCatalogItem != null && !x.ProductCatalogItem.IsDeleted),
             CompleteCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.Complete && x.ProductCatalogItem != null && !x.ProductCatalogItem.IsDeleted),
             OutOfScopeCount = await dbContext.ProductMappings.CountAsync(x => x.MappingStatus == MappingStatus.OutOfScope && x.ProductCatalogItem != null && !x.ProductCatalogItem.IsDeleted),
-            Domains = await dbContext.TrmDomains.AsNoTracking().OrderBy(x => x.Code).ToListAsync(),
+            Domains = await dbContext.TrmDomains
+                .AsNoTracking()
+                .ForReferenceModel(ReferenceModelKind.Trm)
+                .OrderBy(x => x.Code)
+                .ToListAsync(),
             Capabilities = await BuildCapabilityFilter(domainId),
             Products = await productsQuery.OrderBy(x => x.Name).ToListAsync()
         };
@@ -219,7 +223,10 @@ public sealed class MappingsController(
     [HttpGet]
     public async Task<IActionResult> Capabilities(int? domainId)
     {
-        var query = dbContext.TrmCapabilities.AsNoTracking().AsQueryable();
+        var query = dbContext.TrmCapabilities
+            .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .AsQueryable();
         if (domainId.HasValue)
         {
             query = query.Where(x => x.ParentDomainId == domainId);
@@ -236,7 +243,10 @@ public sealed class MappingsController(
     [HttpGet]
     public async Task<IActionResult> Components(int? capabilityId)
     {
-        var query = dbContext.TrmComponents.AsNoTracking().AsQueryable();
+        var query = dbContext.TrmComponents
+            .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .AsQueryable();
         if (capabilityId.HasValue)
         {
             query = query.Where(x => !x.IsDeleted && x.ParentCapabilityId == capabilityId);
@@ -345,6 +355,7 @@ public sealed class MappingsController(
             {
                 capability = await dbContext.TrmCapabilities
                     .Include(x => x.ParentDomain)
+                    .ForReferenceModel(ReferenceModelKind.Trm)
                     .FirstOrDefaultAsync(x => x.Id == model.SelectedCapabilityId.Value);
 
                 if (capability is null)
@@ -372,6 +383,7 @@ public sealed class MappingsController(
             component = await dbContext.TrmComponents
                 .Include(x => x.ParentCapability)
                 .ThenInclude(x => x!.ParentDomain)
+                .ForReferenceModel(ReferenceModelKind.Trm)
                 .FirstOrDefaultAsync(x => x.Id == model.SelectedComponentId.Value && !x.IsDeleted);
 
             if (component is null)
@@ -398,6 +410,7 @@ public sealed class MappingsController(
         {
             capability = await dbContext.TrmCapabilities
                 .Include(x => x.ParentDomain)
+                .ForReferenceModel(ReferenceModelKind.Trm)
                 .FirstOrDefaultAsync(x => x.Id == model.SelectedCapabilityId.Value);
 
             if (capability is null)
@@ -411,7 +424,9 @@ public sealed class MappingsController(
         }
         else if (model.SelectedDomainId.HasValue)
         {
-            domain = await dbContext.TrmDomains.FirstOrDefaultAsync(x => x.Id == model.SelectedDomainId.Value);
+            domain = await dbContext.TrmDomains
+                .ForReferenceModel(ReferenceModelKind.Trm)
+                .FirstOrDefaultAsync(x => x.Id == model.SelectedDomainId.Value);
             if (domain is null)
             {
                 ModelState.AddModelError(nameof(model.SelectedDomainId), "Choose a valid HERM TRM domain.");
@@ -456,7 +471,10 @@ public sealed class MappingsController(
 
     private async Task<IReadOnlyList<TrmCapability>> BuildCapabilityFilter(int? domainId)
     {
-        var query = dbContext.TrmCapabilities.AsNoTracking().AsQueryable();
+        var query = dbContext.TrmCapabilities
+            .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .AsQueryable();
         if (domainId.HasValue)
         {
             query = query.Where(x => x.ParentDomainId == domainId);
@@ -473,11 +491,16 @@ public sealed class MappingsController(
 
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .OrderBy(x => x.Code)
             .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
-        var capabilitiesQuery = dbContext.TrmCapabilities.AsNoTracking().OrderBy(x => x.Code).AsQueryable();
+        var capabilitiesQuery = dbContext.TrmCapabilities
+            .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .OrderBy(x => x.Code)
+            .AsQueryable();
         if (selectedDomainId.HasValue)
         {
             capabilitiesQuery = capabilitiesQuery.Where(x => x.ParentDomainId == selectedDomainId);
@@ -489,6 +512,7 @@ public sealed class MappingsController(
 
         var componentsQuery = dbContext.TrmComponents
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Code)
             .AsQueryable();
@@ -529,11 +553,16 @@ public sealed class MappingsController(
     {
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .OrderBy(x => x.Code)
             .Select(x => new SelectListItem($"{x.Code} {x.Name}", x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
-        var capabilitiesQuery = dbContext.TrmCapabilities.AsNoTracking().OrderBy(x => x.Code).AsQueryable();
+        var capabilitiesQuery = dbContext.TrmCapabilities
+            .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .OrderBy(x => x.Code)
+            .AsQueryable();
         if (postedModel.SelectedDomainId.HasValue)
         {
             capabilitiesQuery = capabilitiesQuery.Where(x => x.ParentDomainId == postedModel.SelectedDomainId);
@@ -545,6 +574,7 @@ public sealed class MappingsController(
 
         var componentsQuery = dbContext.TrmComponents
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Code)
             .AsQueryable();
@@ -590,8 +620,9 @@ public sealed class MappingsController(
     {
         var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
 
-        var modelCodeExists = await dbContext.TrmComponents.AnyAsync(x =>
-            !x.IsCustom && EF.Functions.Collate(x.Code, caseInsensitiveCollation) == technologyComponentCode);
+        var modelCodeExists = await dbContext.TrmComponents
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .AnyAsync(x => !x.IsCustom && EF.Functions.Collate(x.Code, caseInsensitiveCollation) == technologyComponentCode);
 
         if (modelCodeExists)
         {

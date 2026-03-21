@@ -4,6 +4,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
 using HERMMapperApp.ViewModels;
 using Microsoft.EntityFrameworkCore;
@@ -94,12 +95,14 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
     {
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .OrderBy(x => x.Code)
             .ThenBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
         var capabilities = await dbContext.TrmCapabilities
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .OrderBy(x => x.ParentDomainId)
             .ThenBy(x => x.Code)
             .ThenBy(x => x.Name)
@@ -107,6 +110,7 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
 
         var components = await dbContext.TrmComponents
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .Where(x => !x.IsDeleted)
             .OrderBy(x => x.ParentCapabilityId)
             .ThenBy(x => x.TechnologyComponentCode ?? x.Code)

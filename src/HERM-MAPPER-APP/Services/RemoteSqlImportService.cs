@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -1229,15 +1230,18 @@ public sealed partial class RemoteSqlImportService
 
         var localDomains = await dbContext.TrmDomains
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
         var localCapabilities = await dbContext.TrmCapabilities
             .AsNoTracking()
             .Include(x => x.ParentDomain)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
         var localComponents = await dbContext.TrmComponents
             .AsNoTracking()
             .Include(x => x.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
 
         var existingProducts = await dbContext.ProductCatalogItems

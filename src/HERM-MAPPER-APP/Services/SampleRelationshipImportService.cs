@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -54,17 +55,20 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
 
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
 
         var capabilities = await dbContext.TrmCapabilities
             .AsNoTracking()
             .Include(x => x.ParentDomain)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
 
         var components = await dbContext.TrmComponents
             .AsNoTracking()
             .Include(x => x.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
 
         var existingProductNames = await dbContext.ProductCatalogItems
@@ -256,17 +260,20 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
 
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
 
         var capabilities = await dbContext.TrmCapabilities
             .AsNoTracking()
             .Include(x => x.ParentDomain)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
 
         var components = await dbContext.TrmComponents
             .AsNoTracking()
             .Include(x => x.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .ToListAsync(cancellationToken);
 
         var products = await dbContext.ProductCatalogItems
@@ -405,9 +412,10 @@ public sealed partial class SampleRelationshipImportService(AppDbContext dbConte
         resolutionMessage = string.Empty;
 
         if (!string.IsNullOrWhiteSpace(modelName) &&
-            !string.Equals(modelName, "HERM", StringComparison.OrdinalIgnoreCase))
+            !string.Equals(modelName, "HERM", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(modelName, "TRM", StringComparison.OrdinalIgnoreCase))
         {
-            resolutionMessage = $"MODEL '{modelName}' is not supported. Expected 'HERM'.";
+            resolutionMessage = $"MODEL '{modelName}' is not supported. Expected 'HERM' or 'TRM'.";
             return false;
         }
 

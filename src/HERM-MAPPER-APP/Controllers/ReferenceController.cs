@@ -34,6 +34,7 @@ public sealed class ReferenceController(
             .AsNoTracking()
             .Include(x => x.CapabilityLinks)
             .ThenInclude(x => x.TrmCapability)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .Where(x => x.IsDeleted)
             .OrderByDescending(x => x.DeletedUtc)
             .ThenBy(x => x.Name)
@@ -98,7 +99,7 @@ public sealed class ReferenceController(
             await workbook.CopyToAsync(stream);
         }
 
-        var verification = await workbookImportService.VerifyAsync(pendingPath);
+        var verification = await workbookImportService.VerifyAsync(pendingPath, ReferenceModelKind.Trm);
         if (!verification.IsValid)
         {
             System.IO.File.Delete(pendingPath);
@@ -148,7 +149,7 @@ public sealed class ReferenceController(
             return RedirectToAction("Index");
         }
 
-        var verification = await workbookImportService.VerifyAsync(pendingPath);
+        var verification = await workbookImportService.VerifyAsync(pendingPath, ReferenceModelKind.Trm);
         if (!verification.IsValid)
         {
             System.IO.File.Delete(pendingPath);
@@ -163,7 +164,7 @@ public sealed class ReferenceController(
                 null));
         }
 
-        var summary = await workbookImportService.ImportAsync(pendingPath);
+        var summary = await workbookImportService.ImportAsync(pendingPath, ReferenceModelKind.Trm);
         System.IO.File.Delete(pendingPath);
 
         TempData["ImportStatusMessage"] =
@@ -184,7 +185,9 @@ public sealed class ReferenceController(
             return BadRequest(ModelState);
         }
 
-        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        var component = await dbContext.TrmComponents
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (component is null)
         {
             return NotFound();
@@ -218,7 +221,9 @@ public sealed class ReferenceController(
             return BadRequest(ModelState);
         }
 
-        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+        var component = await dbContext.TrmComponents
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (component is null)
         {
             return NotFound();
@@ -251,7 +256,9 @@ public sealed class ReferenceController(
             return BadRequest(ModelState);
         }
 
-        var component = await dbContext.TrmComponents.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+        var component = await dbContext.TrmComponents
+            .ForReferenceModel(ReferenceModelKind.Trm)
+            .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (component is null)
         {
             return NotFound();
@@ -281,6 +288,7 @@ public sealed class ReferenceController(
             .AsNoTracking()
             .Include(x => x.CapabilityLinks)
             .ThenInclude(x => x.TrmCapability)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .FirstOrDefaultAsync(x => x.Id == id);
         if (component is null)
         {
@@ -309,12 +317,14 @@ public sealed class ReferenceController(
     {
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .OrderBy(x => x.Code)
             .ToListAsync();
 
         var capabilitiesQuery = dbContext.TrmCapabilities
             .AsNoTracking()
             .Include(x => x.ParentDomain)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .AsQueryable();
 
         if (domainId.HasValue)
@@ -331,6 +341,7 @@ public sealed class ReferenceController(
             .Include(x => x.CapabilityLinks)
             .ThenInclude(x => x.TrmCapability)
             .ThenInclude(x => x!.ParentDomain)
+            .ForReferenceModel(ReferenceModelKind.Trm)
             .Where(x => !x.IsDeleted)
             .AsQueryable();
 

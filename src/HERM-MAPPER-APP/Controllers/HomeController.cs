@@ -1,4 +1,5 @@
 using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
 using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
@@ -24,10 +25,18 @@ public sealed class HomeController(AppDbContext dbContext) : Controller
                 x.MappingStatus == MappingStatus.Complete &&
                 x.ProductCatalogItem != null &&
                 !x.ProductCatalogItem.IsDeleted),
-            ReferenceComponentCount = await dbContext.TrmComponents.CountAsync(x => !x.IsDeleted),
-            DomainCount = await dbContext.TrmDomains.CountAsync(),
-            CapabilityCount = await dbContext.TrmCapabilities.CountAsync(),
-            HasReferenceModel = await dbContext.TrmDomains.AnyAsync(),
+            ReferenceComponentCount = await dbContext.TrmComponents
+                .ForReferenceModel(ReferenceModelKind.Trm)
+                .CountAsync(x => !x.IsDeleted),
+            DomainCount = await dbContext.TrmDomains
+                .ForReferenceModel(ReferenceModelKind.Trm)
+                .CountAsync(),
+            CapabilityCount = await dbContext.TrmCapabilities
+                .ForReferenceModel(ReferenceModelKind.Trm)
+                .CountAsync(),
+            HasReferenceModel = await dbContext.TrmDomains
+                .ForReferenceModel(ReferenceModelKind.Trm)
+                .AnyAsync(),
             RecentProducts = await dbContext.ProductCatalogItems
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted)

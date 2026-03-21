@@ -14,6 +14,8 @@ public sealed class ConfigurationIndexViewModel
     public bool OpenRemoteSqlImportSection { get; init; }
     public string DisplayTimeZoneId { get; init; } = AppSettingDefaults.DisplayTimeZone;
     public IReadOnlyList<SelectListItem> AvailableTimeZones { get; init; } = [];
+    public ReferenceModelKind CatalogueImportModelKind { get; init; } = ReferenceModelKind.Trm;
+    public IReadOnlyList<SelectListItem> CatalogueImportModelOptions { get; init; } = [];
     public WorkbookImportReviewViewModel CatalogueImportReview { get; init; } = new();
     public ProductImportReviewViewModel ProductImportReview { get; init; } = new();
     public RemoteSqlImportSectionViewModel RemoteSqlImport { get; init; } = new();
