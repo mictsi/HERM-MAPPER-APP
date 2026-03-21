@@ -1,0 +1,34 @@
+@model HERMMapperApp.ViewModels.ApplicationHierarchyNodeViewModel
+@{
+    var hasChildren = Model.Children.Count != 0;
+    var childListClass = Model.Children.Count > 1
+        ? "application-hierarchy-children multi-child"
+        : "application-hierarchy-children single-child";
+}
+
+<li class="application-hierarchy-node application-hierarchy-@Model.CssType @(hasChildren ? "has-children" : "is-leaf")">
+    <div class="application-hierarchy-card">
+        <span class="application-hierarchy-card-accent" aria-hidden="true"></span>
+        <div class="application-hierarchy-card-copy">
+            @if (Model.ProductId.HasValue)
+            {
+                <a class="application-hierarchy-title" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId.Value">@Model.Label</a>
+            }
+            else
+            {
+                <span class="application-hierarchy-title">@Model.Label</span>
+            }
+            <span class="application-hierarchy-meta">@Model.NodeType</span>
+        </div>
+    </div>
+
+    @if (hasChildren)
+    {
+        <ul class="@childListClass">
+            @foreach (var child in Model.Children)
+            {
+                <partial name="~/Views/Applications/_HierarchyNode.cshtml" model="child" />
+            }
+        </ul>
+    }
+</li>

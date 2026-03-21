@@ -119,6 +119,323 @@ document.addEventListener("DOMContentLoaded", () => {
     syncSection();
   });
 
+  document.querySelectorAll("[data-collection-editor]").forEach((editor) => {
+    const rowsContainer = editor.querySelector("[data-collection-editor-rows]");
+    const addButton = editor.querySelector("[data-collection-editor-add]");
+
+    if (!(rowsContainer instanceof HTMLElement) || !(addButton instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const getRows = () =>
+      Array.from(rowsContainer.querySelectorAll("[data-collection-editor-row]"))
+        .filter((row) => row instanceof HTMLElement);
+
+    const updateIndexedAttribute = (element, attributeName, index) => {
+      const currentValue = element.getAttribute(attributeName);
+      if (currentValue === null || currentValue === "") {
+        return;
+      }
+
+      const updatedValue = currentValue
+        .replace(/\[\d+\]/g, `[${index}]`)
+        .replace(/_\d+__/g, `_${index}__`);
+
+      element.setAttribute(attributeName, updatedValue);
+    };
+
+    const clearField = (field) => {
+      if (field instanceof HTMLSelectElement) {
+        field.value = "";
+      } else if (field instanceof HTMLInputElement) {
+        if (field.type === "checkbox" || field.type === "radio") {
+          field.checked = false;
+        } else {
+          field.value = "";
+        }
+      } else if (field instanceof HTMLTextAreaElement) {
+        field.value = "";
+      }
+
+      field.classList.remove("input-validation-error");
+      field.removeAttribute("aria-invalid");
+      field.removeAttribute("aria-describedby");
+    };
+
+    const clearValidationMessage = (element) => {
+      if (!(element instanceof HTMLElement)) {
+        return;
+      }
+
+      element.textContent = "";
+      element.classList.remove("field-validation-error");
+      element.classList.add("field-validation-valid");
+    };
+
+    const appendRow = () => {
+      const sourceRow = getRows().at(-1);
+      if (!(sourceRow instanceof HTMLElement)) {
+        return;
+      }
+
+      const newIndex = getRows().length;
+      const newRow = sourceRow.cloneNode(true);
+      if (!(newRow instanceof HTMLElement)) {
+        return;
+      }
+
+      newRow.querySelectorAll("[name]").forEach((element) => updateIndexedAttribute(element, "name", newIndex));
+      newRow.querySelectorAll("[id]").forEach((element) => updateIndexedAttribute(element, "id", newIndex));
+      newRow.querySelectorAll("label[for]").forEach((element) => updateIndexedAttribute(element, "for", newIndex));
+      newRow.querySelectorAll("[data-valmsg-for]").forEach((element) => updateIndexedAttribute(element, "data-valmsg-for", newIndex));
+
+      newRow
+        .querySelectorAll("select, input, textarea")
+        .forEach((field) => clearField(field));
+
+      newRow
+        .querySelectorAll(".field-validation-error, .field-validation-valid, [data-valmsg-for]")
+        .forEach((message) => clearValidationMessage(message));
+
+      rowsContainer.appendChild(newRow);
+
+      if (window.jQuery?.validator?.unobtrusive) {
+        window.jQuery.validator.unobtrusive.parse(newRow);
+      }
+
+      editor.dispatchEvent(new CustomEvent("collection-editor:row-added", {
+        bubbles: true,
+        detail: {
+          row: newRow
+        }
+      }));
+
+      const focusTarget = newRow.querySelector("select, input, textarea");
+      if (focusTarget instanceof HTMLElement) {
+        focusTarget.focus();
+      }
+    };
+
+    addButton.addEventListener("click", appendRow);
+  });
+
+  document.querySelectorAll("[data-application-mapping-editor]").forEach((editor) => {
+    const optionsScript = editor.querySelector("[data-application-product-trm-options]");
+    if (!(optionsScript instanceof HTMLScriptElement)) {
+      return;
+    }
+
+    let parsedOptions;
+    try {
+      parsedOptions = JSON.parse(optionsScript.textContent ?? "[]");
+    } catch (error) {
+      console.error("Unable to parse application product/TRM options", error);
+      return;
+    }
+
+    const normalizedOptions = Array.isArray(parsedOptions)
+      ? parsedOptions
+        .filter((option) => option !== null && typeof option === "object")
+        .map((option) => ({
+          productCatalogItemId: String(option.productCatalogItemId ?? option.ProductCatalogItemId ?? ""),
+          trmComponentId: String(option.trmComponentId ?? option.TrmComponentId ?? ""),
+          trmComponentLabel: String(option.trmComponentLabel ?? option.TrmComponentLabel ?? "")
+        }))
+        .filter((option) => option.productCatalogItemId !== "" && option.trmComponentId !== "" && option.trmComponentLabel !== "")
+      : [];
+
+    const optionsByProductId = new Map();
+    normalizedOptions.forEach((option) => {
+      const key = option.productCatalogItemId;
+      if (!optionsByProductId.has(key)) {
+        optionsByProductId.set(key, []);
+      }
+
+      const items = optionsByProductId.get(key);
+      if (Array.isArray(items) && !items.some((item) => item.trmComponentId === option.trmComponentId)) {
+        items.push(option);
+      }
+    });
+
+    optionsByProductId.forEach((items) => {
+      items.sort((left, right) => left.trmComponentLabel.localeCompare(right.trmComponentLabel));
+    });
+
+    const syncRow = (row) => {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      const productSelect = row.querySelector("[data-application-product-select]");
+      const trmComponentSelect = row.querySelector("[data-application-trm-component-select]");
+
+      if (!(productSelect instanceof HTMLSelectElement) || !(trmComponentSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+
+      const currentValue = trmComponentSelect.value;
+      const productId = productSelect.value;
+      const matchingOptions = optionsByProductId.get(productId) ?? [];
+      const placeholder = productId === ""
+        ? "Choose a product first"
+        : matchingOptions.length > 1
+          ? "Choose a TRM component"
+          : matchingOptions.length === 1
+            ? "TRM component resolved automatically"
+            : "No TRM components available";
+
+      trmComponentSelect.innerHTML = "";
+
+      const placeholderOption = document.createElement("option");
+      placeholderOption.value = "";
+      placeholderOption.textContent = placeholder;
+      trmComponentSelect.appendChild(placeholderOption);
+
+      matchingOptions.forEach((option) => {
+        const element = document.createElement("option");
+        element.value = option.trmComponentId;
+        element.textContent = option.trmComponentLabel;
+        trmComponentSelect.appendChild(element);
+      });
+
+      if (matchingOptions.length === 1) {
+        trmComponentSelect.value = matchingOptions[0].trmComponentId;
+      } else if (matchingOptions.some((option) => option.trmComponentId === currentValue)) {
+        trmComponentSelect.value = currentValue;
+      } else {
+        trmComponentSelect.value = "";
+      }
+
+      trmComponentSelect.disabled = productId === "" || matchingOptions.length === 0;
+    };
+
+    const syncAllRows = () => {
+      editor.querySelectorAll("[data-collection-editor-row]").forEach((row) => syncRow(row));
+    };
+
+    editor.addEventListener("change", (event) => {
+      const target = event.target;
+      if (target instanceof HTMLSelectElement && target.hasAttribute("data-application-product-select")) {
+        syncRow(target.closest("[data-collection-editor-row]"));
+      }
+    });
+
+    editor.addEventListener("collection-editor:row-added", (event) => {
+      syncRow(event.detail?.row ?? null);
+    });
+
+    syncAllRows();
+  });
+
+  document.querySelectorAll("[data-capability-mapping-editor]").forEach((editor) => {
+    const optionsScript = editor.querySelector("[data-capability-arm-component-options]");
+    if (!(optionsScript instanceof HTMLScriptElement)) {
+      return;
+    }
+
+    let parsedOptions;
+    try {
+      parsedOptions = JSON.parse(optionsScript.textContent ?? "[]");
+    } catch (error) {
+      console.error("Unable to parse capability ARM component options", error);
+      return;
+    }
+
+    const componentLookup = new Map();
+    if (Array.isArray(parsedOptions)) {
+      parsedOptions
+        .filter((option) => option !== null && typeof option === "object")
+        .forEach((option) => {
+          const componentId = String(option.armComponentId ?? option.ArmComponentId ?? "");
+          if (componentId === "") {
+            return;
+          }
+
+          componentLookup.set(componentId, {
+            armComponentLabel: String(option.armComponentLabel ?? option.ArmComponentLabel ?? ""),
+            capabilityOptions: Array.isArray(option.capabilityOptions ?? option.CapabilityOptions)
+              ? (option.capabilityOptions ?? option.CapabilityOptions)
+                .filter((capability) => capability !== null && typeof capability === "object")
+                .map((capability) => ({
+                  armCapabilityId: String(capability.armCapabilityId ?? capability.ArmCapabilityId ?? ""),
+                  armDomainLabel: String(capability.armDomainLabel ?? capability.ArmDomainLabel ?? ""),
+                  armCapabilityLabel: String(capability.armCapabilityLabel ?? capability.ArmCapabilityLabel ?? ""),
+                  connectionLabel: String(capability.connectionLabel ?? capability.ConnectionLabel ?? "")
+                }))
+                .filter((capability) => capability.armCapabilityId !== "")
+              : []
+          });
+        });
+    }
+
+    const syncRow = (row) => {
+      if (!(row instanceof HTMLElement)) {
+        return;
+      }
+
+      const componentSelect = row.querySelector("[data-capability-arm-component-select]");
+      const capabilitySelect = row.querySelector("[data-capability-arm-capability-select]");
+
+      if (!(componentSelect instanceof HTMLSelectElement) ||
+        !(capabilitySelect instanceof HTMLSelectElement)) {
+        return;
+      }
+
+      const selected = componentLookup.get(componentSelect.value);
+      const options = Array.isArray(selected?.capabilityOptions) ? selected.capabilityOptions : [];
+      const previousCapabilityId = capabilitySelect.value;
+
+      capabilitySelect.innerHTML = "";
+
+      const placeholderOption = document.createElement("option");
+      placeholderOption.value = "";
+      placeholderOption.textContent = componentSelect.value === ""
+        ? "Choose an ARM component first"
+        : options.length > 1
+          ? "Choose an ARM capability connection"
+          : options.length === 1
+            ? "ARM capability resolved automatically"
+            : "No ARM capability connections available";
+      capabilitySelect.appendChild(placeholderOption);
+
+      options.forEach((option) => {
+        const element = document.createElement("option");
+        element.value = option.armCapabilityId;
+        element.textContent = option.connectionLabel || option.armCapabilityLabel;
+        capabilitySelect.appendChild(element);
+      });
+
+      if (options.length === 1) {
+        capabilitySelect.value = options[0].armCapabilityId;
+      } else if (options.some((option) => option.armCapabilityId === previousCapabilityId)) {
+        capabilitySelect.value = previousCapabilityId;
+      } else {
+        capabilitySelect.value = "";
+      }
+
+      capabilitySelect.disabled = componentSelect.value === "" || options.length === 0;
+    };
+
+    const syncAllRows = () => {
+      editor.querySelectorAll("[data-collection-editor-row]").forEach((row) => syncRow(row));
+    };
+
+    editor.addEventListener("change", (event) => {
+      const target = event.target;
+      if (target instanceof HTMLSelectElement && (
+        target.hasAttribute("data-capability-arm-component-select") ||
+        target.hasAttribute("data-capability-arm-capability-select"))) {
+        syncRow(target.closest("[data-collection-editor-row]"));
+      }
+    });
+
+    editor.addEventListener("collection-editor:row-added", (event) => {
+      syncRow(event.detail?.row ?? null);
+    });
+
+    syncAllRows();
+  });
+
   document.querySelectorAll("[data-service-editor]").forEach((editor) => {
     const rowsContainer = editor.querySelector("[data-service-rows]");
     const rowTemplate = editor.querySelector("[data-service-row-template]");
@@ -927,10 +1244,14 @@ document.addEventListener("DOMContentLoaded", () => {
     requestAnimationFrame(() => drawGraphLines(preview, connections));
   };
 
-  document.querySelectorAll("[data-service-graph-preview]").forEach((preview) => {
-    const graphHost = preview.closest("[data-service-graph-host]");
+  const initializeServiceGraphHost = (graphHost) => {
+    if (!(graphHost instanceof HTMLElement)) {
+      return;
+    }
+
+    const preview = graphHost.querySelector("[data-service-graph-preview]");
     const connectionsPanel = graphHost?.querySelector("[data-service-graph-connections]");
-    const dataScript = preview.querySelector("[data-service-graph-data]");
+    const dataScript = graphHost.querySelector("[data-service-graph-data]");
     if (!(dataScript instanceof HTMLScriptElement)) {
       return;
     }
@@ -945,11 +1266,18 @@ document.addEventListener("DOMContentLoaded", () => {
         : [];
       const analysis = analyzeGraph(connections);
 
-      renderGraphPreview(preview, connections, analysis);
+      if (preview instanceof HTMLElement) {
+        renderGraphPreview(preview, connections, analysis);
+      }
+
       renderGraphConnectionsPanel(connectionsPanel, connections, analysis);
     } catch (error) {
       console.error("Unable to render service graph preview", error);
     }
+  };
+
+  document.querySelectorAll("[data-service-graph-host]").forEach((graphHost) => {
+    initializeServiceGraphHost(graphHost);
   });
 
   const normalizeCanvasNode = (node) => {

@@ -16,7 +16,7 @@ public sealed class ApplicationsController(
     AuditLogService auditLogService,
     HermDrilldownService drilldownService) : Controller
 {
-    private const int MinimumMappingRowCount = 8;
+    private const int MinimumMappingRowCount = 1;
 
     public async Task<IActionResult> Index(string? search)
     {
@@ -25,7 +25,11 @@ public sealed class ApplicationsController(
             .Include(x => x.Mappings)
             .ThenInclude(x => x.ArmComponent)
             .Include(x => x.Mappings)
-            .ThenInclude(x => x.ProductCatalogItem)
+            .ThenInclude(x => x.ProductMapping)
+            .ThenInclude(x => x!.ProductCatalogItem)
+            .Include(x => x.Mappings)
+            .ThenInclude(x => x.ProductMapping)
+            .ThenInclude(x => x!.TrmComponent)
             .AsSplitQuery()
             .AsQueryable();
 
@@ -39,8 +43,13 @@ public sealed class ApplicationsController(
                 x.Mappings.Any(mapping =>
                     EF.Functions.Like(mapping.ArmComponent!.Code, likePattern) ||
                     EF.Functions.Like(mapping.ArmComponent.Name, likePattern) ||
-                    EF.Functions.Like(mapping.ProductCatalogItem!.Name, likePattern) ||
-                    (mapping.ProductCatalogItem.Vendor != null && EF.Functions.Like(mapping.ProductCatalogItem.Vendor, likePattern))));
+                    (mapping.ProductMapping != null &&
+                        (EF.Functions.Like(mapping.ProductMapping.ProductCatalogItem!.Name, likePattern) ||
+                         (mapping.ProductMapping.ProductCatalogItem.Vendor != null &&
+                          EF.Functions.Like(mapping.ProductMapping.ProductCatalogItem.Vendor, likePattern)) ||
+                         (mapping.ProductMapping.TrmComponent != null &&
+                            (EF.Functions.Like(mapping.ProductMapping.TrmComponent.Code, likePattern) ||
+                             EF.Functions.Like(mapping.ProductMapping.TrmComponent.Name, likePattern)))))));
         }
 
         var applications = await query
@@ -93,9 +102,8 @@ public sealed class ApplicationsController(
             application.Mappings.Add(new ApplicationCatalogItemMapping
             {
                 ArmComponentId = mapping.ArmComponentId,
+                ProductMappingId = mapping.ProductMappingId,
                 ProductCatalogItemId = mapping.ProductCatalogItemId,
-                IsPrimary = mapping.IsPrimary,
-                Notes = mapping.Notes,
                 CreatedUtc = DateTime.UtcNow
             });
         }
@@ -126,13 +134,32 @@ public sealed class ApplicationsController(
         return View(model);
     }
 
+    public async Task<IActionResult> AllDependencies(CancellationToken cancellationToken)
+    {
+        var model = new HierarchyDiagramPageViewModel
+        {
+            Title = "All applications",
+            Eyebrow = "Hierarchy",
+            Heading = "All application dependencies",
+            Description = "Explore the full application dependency tree across ARM and TRM with the same left-to-right view used on each application page.",
+            BackLabel = "Back to applications",
+            BackAction = nameof(Index),
+            HierarchyRoot = await drilldownService.BuildAllApplicationsHierarchyAsync(cancellationToken),
+            EmptyTitle = "No application dependency map yet",
+            EmptyBody = "Create applications and connect them to ARM components and TRM product mappings to generate the full dependency tree.",
+            Note = "Drag to pan and use the mouse wheel to zoom. The tree reads from left to right, while product endpoints stay out of the diagram to keep it readable."
+        };
+
+        return View("~/Views/Shared/HierarchyDiagramPage.cshtml", model);
+    }
+
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
         var application = await dbContext.ApplicationCatalogItems
             .AsNoTracking()
             .Include(x => x.Mappings)
-            .OrderBy(x => x.Id)
+            .ThenInclude(x => x.ProductMapping)
             .FirstOrDefaultAsync(x => x.Id == id);
         if (application is null)
         {
@@ -146,14 +173,12 @@ public sealed class ApplicationsController(
             Description = application.Description,
             Notes = application.Notes,
             MappingRows = application.Mappings
-                .OrderByDescending(x => x.IsPrimary)
-                .ThenBy(x => x.Id)
+                .OrderBy(x => x.Id)
                 .Select(x => new ApplicationMappingRowInputViewModel
                 {
                     ArmComponentId = x.ArmComponentId,
                     ProductCatalogItemId = x.ProductCatalogItemId,
-                    IsPrimary = x.IsPrimary,
-                    Notes = x.Notes
+                    TrmComponentId = x.ProductMapping?.TrmComponentId
                 })
                 .ToList()
         };
@@ -199,9 +224,8 @@ public sealed class ApplicationsController(
             application.Mappings.Add(new ApplicationCatalogItemMapping
             {
                 ArmComponentId = mapping.ArmComponentId,
+                ProductMappingId = mapping.ProductMappingId,
                 ProductCatalogItemId = mapping.ProductCatalogItemId,
-                IsPrimary = mapping.IsPrimary,
-                Notes = mapping.Notes,
                 CreatedUtc = DateTime.UtcNow
             });
         }
@@ -232,14 +256,54 @@ public sealed class ApplicationsController(
                 x.Id.ToString()))
             .ToListAsync();
 
-        model.ProductOptions = await dbContext.ProductCatalogItems
+        var productMappings = await dbContext.ProductMappings
             .AsNoTracking()
-            .Where(x => !x.IsDeleted)
-            .OrderBy(x => x.Name)
-            .Select(x => new SelectListItem(
-                string.IsNullOrWhiteSpace(x.Vendor) ? x.Name : $"{x.Name} ({x.Vendor})",
-                x.Id.ToString()))
+            .Where(x =>
+                x.ProductCatalogItem != null &&
+                !x.ProductCatalogItem.IsDeleted &&
+                x.TrmComponentId != null)
+            .Include(x => x.ProductCatalogItem)
+            .Include(x => x.TrmComponent)
+            .ThenInclude(x => x!.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .OrderBy(x => x.ProductCatalogItem!.Name)
+            .ThenBy(x => x.TrmComponent!.Code)
             .ToListAsync();
+
+        model.ProductOptions = productMappings
+            .GroupBy(x => new
+            {
+                x.ProductCatalogItemId,
+                Label = string.IsNullOrWhiteSpace(x.ProductCatalogItem!.Vendor)
+                    ? x.ProductCatalogItem.Name
+                    : $"{x.ProductCatalogItem.Name} ({x.ProductCatalogItem.Vendor})"
+            })
+            .OrderBy(group => group.Key.Label)
+            .Select(group => new SelectListItem(group.Key.Label, group.Key.ProductCatalogItemId.ToString()))
+            .ToList();
+
+        model.TrmComponentOptions = productMappings
+            .GroupBy(x => new
+            {
+                TrmComponentId = x.TrmComponentId!.Value,
+                Label = $"{x.TrmComponent!.Code} {x.TrmComponent.Name}"
+            })
+            .OrderBy(group => group.Key.Label)
+            .Select(group => new SelectListItem(group.Key.Label, group.Key.TrmComponentId.ToString()))
+            .ToList();
+
+        model.ProductTrmMappingOptions = productMappings
+            .Select(x => new ApplicationProductTrmMappingOptionViewModel
+            {
+                ProductCatalogItemId = x.ProductCatalogItemId,
+                ProductLabel = string.IsNullOrWhiteSpace(x.ProductCatalogItem!.Vendor)
+                    ? x.ProductCatalogItem.Name
+                    : $"{x.ProductCatalogItem.Name} ({x.ProductCatalogItem.Vendor})",
+                TrmComponentId = x.TrmComponentId!.Value,
+                TrmComponentLabel = $"{x.TrmComponent!.Code} {x.TrmComponent.Name}",
+                ProductMappingId = x.Id
+            })
+            .ToList();
     }
 
     private async Task<List<NormalizedApplicationMappingRow>?> ValidateMappingsAsync(ApplicationEditViewModel input)
@@ -249,11 +313,11 @@ public sealed class ApplicationsController(
         for (var index = 0; index < input.MappingRows.Count; index++)
         {
             var row = input.MappingRows[index];
-            row.Notes = NormalizeSelection(row.Notes);
 
             var hasArmComponent = row.ArmComponentId.HasValue;
             var hasProduct = row.ProductCatalogItemId.HasValue;
-            if (!hasArmComponent && !hasProduct && string.IsNullOrWhiteSpace(row.Notes) && !row.IsPrimary)
+            var hasTrmComponent = row.TrmComponentId.HasValue;
+            if (!hasArmComponent && !hasProduct && !hasTrmComponent)
             {
                 continue;
             }
@@ -274,15 +338,15 @@ public sealed class ApplicationsController(
             }
 
             normalizedRows.Add(new NormalizedApplicationMappingRow(
+                index,
                 row.ArmComponentId!.Value,
                 row.ProductCatalogItemId!.Value,
-                row.IsPrimary,
-                row.Notes));
+                row.TrmComponentId));
         }
 
         if (normalizedRows.Count == 0)
         {
-            ModelState.AddModelError(nameof(input.MappingRows), "Add at least one ARM component to product mapping.");
+            ModelState.AddModelError(nameof(input.MappingRows), "Add at least one ARM component to TRM product mapping.");
             return null;
         }
 
@@ -294,10 +358,19 @@ public sealed class ApplicationsController(
             .ToListAsync();
 
         var productIds = normalizedRows.Select(x => x.ProductCatalogItemId).Distinct().ToList();
-        var validProductIds = await dbContext.ProductCatalogItems
+        var productMappings = await dbContext.ProductMappings
             .AsNoTracking()
-            .Where(x => !x.IsDeleted && productIds.Contains(x.Id))
-            .Select(x => x.Id)
+            .Where(x =>
+                productIds.Contains(x.ProductCatalogItemId) &&
+                x.ProductCatalogItem != null &&
+                !x.ProductCatalogItem.IsDeleted &&
+                x.TrmComponentId != null)
+            .Select(x => new
+            {
+                x.Id,
+                x.ProductCatalogItemId,
+                TrmComponentId = x.TrmComponentId!.Value
+            })
             .ToListAsync();
 
         foreach (var invalidArmComponentId in armComponentIds.Except(validArmComponentIds))
@@ -305,22 +378,73 @@ public sealed class ApplicationsController(
             ModelState.AddModelError(nameof(input.MappingRows), $"ARM component {invalidArmComponentId} could not be found.");
         }
 
-        foreach (var invalidProductId in productIds.Except(validProductIds))
+        foreach (var invalidProductId in productIds.Except(productMappings.Select(x => x.ProductCatalogItemId).Distinct()))
         {
-            ModelState.AddModelError(nameof(input.MappingRows), $"Product {invalidProductId} could not be found.");
+            ModelState.AddModelError(nameof(input.MappingRows), $"Product {invalidProductId} could not be resolved to a TRM mapping.");
+        }
+
+        for (var index = 0; index < normalizedRows.Count; index++)
+        {
+            var row = normalizedRows[index];
+            var matchingMappings = productMappings
+                .Where(x => x.ProductCatalogItemId == row.ProductCatalogItemId)
+                .ToList();
+
+            if (matchingMappings.Count == 0)
+            {
+                continue;
+            }
+
+            var selectedMapping = row.TrmComponentId.HasValue
+                ? matchingMappings.FirstOrDefault(x => x.TrmComponentId == row.TrmComponentId.Value)
+                : matchingMappings.Count == 1
+                    ? matchingMappings[0]
+                    : null;
+
+            if (row.TrmComponentId.HasValue && selectedMapping is null)
+            {
+                ModelState.AddModelError(
+                    $"MappingRows[{row.RowIndex}].TrmComponentId",
+                    "Choose a TRM component that matches the selected product.");
+                continue;
+            }
+
+            if (!row.TrmComponentId.HasValue && matchingMappings.Count > 1)
+            {
+                ModelState.AddModelError(
+                    $"MappingRows[{row.RowIndex}].TrmComponentId",
+                    "Choose the TRM component for the selected product.");
+                continue;
+            }
+
+            if (selectedMapping is not null)
+            {
+                normalizedRows[index] = row with
+                {
+                    TrmComponentId = selectedMapping.TrmComponentId,
+                    ProductMappingId = selectedMapping.Id
+                };
+            }
         }
 
         var duplicateMappings = normalizedRows
-            .GroupBy(x => new { x.ArmComponentId, x.ProductCatalogItemId })
+            .Where(x => x.ProductMappingId.HasValue)
+            .GroupBy(x => new { x.ArmComponentId, ProductMappingId = x.ProductMappingId!.Value })
             .Where(group => group.Count() > 1)
             .ToList();
 
         if (duplicateMappings.Count != 0)
         {
-            ModelState.AddModelError(nameof(input.MappingRows), "Duplicate ARM component and product combinations are not allowed.");
+            ModelState.AddModelError(nameof(input.MappingRows), "Duplicate ARM component, product, and TRM component combinations are not allowed.");
         }
 
-        return ModelState.IsValid ? normalizedRows : null;
+        if (!ModelState.IsValid)
+        {
+            return null;
+        }
+
+        return normalizedRows
+            .ToList();
     }
 
     private static void NormalizeInput(ApplicationEditViewModel input)
@@ -358,14 +482,16 @@ public sealed class ApplicationsController(
                 .Select(x => x.ProductCatalogItemId)
                 .Distinct()
                 .Count(),
-            ResolvedPathCount = application.Mappings
-                .Sum(x => Math.Max(1, x.ProductCatalogItem?.Mappings.Count ?? 0)),
+            ResolvedPathCount = application.Mappings.Count,
             UpdatedUtc = application.UpdatedUtc
         };
 
     private sealed record NormalizedApplicationMappingRow(
+        int RowIndex,
         int ArmComponentId,
         int ProductCatalogItemId,
-        bool IsPrimary,
-        string? Notes);
+        int? TrmComponentId)
+    {
+        public int? ProductMappingId { get; init; }
+    }
 }

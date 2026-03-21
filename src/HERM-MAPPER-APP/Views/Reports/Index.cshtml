@@ -1,6 +1,7 @@
 @model HERMMapperApp.ViewModels.ReportsViewModel
 @using System.Text.Json
 @using System.Globalization
+@using System.Linq
 @using HERMMapperApp
 @using HERMMapperApp.Models
 @using HERMMapperApp.Services
@@ -14,6 +15,7 @@
         nodes = Model.SankeyNodes,
         links = Model.SankeyLinks
     });
+    var incomingConnectionsHeatmapPayload = JsonSerializer.Serialize(Model.IncomingConnectionsHeatmap);
 }
 
 <section class="page-header" id="report-top">
@@ -39,6 +41,7 @@
         <a class="owner-jump-chip" href="#report-product-model">TRM Model diagram</a>
         <a class="owner-jump-chip" href="#report-mapping-by-owner">TRM Mapping by owner</a>
         <a class="owner-jump-chip" href="#report-sankey-relationships">TRM Sankey view</a>
+        <a class="owner-jump-chip" href="#report-incoming-connections-heatmap">TRM Products with most incoming service connections Heatmap</a>
         <a class="owner-jump-chip" href="#report-incoming-connections">TRM Products with most incoming service connections</a>
         <a class="owner-jump-chip" href="#report-lifecycle-status">TRM Lifecycle status</a>
     </div>
@@ -224,6 +227,43 @@
     </div>
 </details>
 
+<details class="content-card report-panel" id="report-incoming-connections-heatmap">
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Service connections</span>
+            <h2>TRM Products with most incoming service connections Heatmap</h2>
+            <p>Treemap sized by the total number of incoming service connections per product, so the busiest destinations stand out immediately.</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" href="#report-top">Back to top</a>
+        </div>
+
+        @if (Model.IncomingConnectionsHeatmap.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No incoming service connections available</h3>
+                <p>Add connected products to services to populate this heatmap.</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.IncomingConnectionsHeatmap.Count</strong> products</span>
+                <span class="report-summary-chip"><strong>@Model.IncomingConnectionsHeatmap.Sum(x => x.IncomingConnectionCount)</strong> incoming connections</span>
+                <span class="report-summary-chip"><strong>@Model.IncomingConnectionsHeatmap.Max(x => x.IncomingConnectionCount)</strong> top product load</span>
+            </div>
+
+            <div class="reports-treemap-shell">
+                <div class="reports-treemap-frame" data-incoming-connections-treemap></div>
+                <script type="application/json" data-incoming-connections-treemap-payload>@Html.Raw(incomingConnectionsHeatmapPayload)</script>
+            </div>
+        }
+    </div>
+</details>
+
 <details class="content-card report-panel" id="report-incoming-connections">
     <summary class="report-panel-summary">
         <div>
@@ -371,5 +411,7 @@
 </details>
 
 @section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
     <script src="~/js/owner-visualization.js" asp-append-version="true"></script>
+    <script src="~/js/reports-incoming-connections-treemap.js" asp-append-version="true"></script>
 }

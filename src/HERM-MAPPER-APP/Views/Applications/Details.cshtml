@@ -1,3 +1,4 @@
+@using System.Text.Json
 @using HERMMapperApp
 @using HERMMapperApp.Services
 @using HERMMapperApp.ViewModels
@@ -6,6 +7,12 @@
     ViewData["Title"] = "Application Details";
     var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
     var statusMessage = ViewData["StatusMessage"] as string;
+    var hierarchyData = JsonSerializer.Serialize(
+        Model.HierarchyRoot,
+        new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
 }
 
 <section class="page-header">
@@ -64,9 +71,11 @@
                     <th>ARM domain</th>
                     <th>ARM capability</th>
                     <th>ARM component</th>
+                    <th>TRM domain</th>
+                    <th>TRM capability</th>
+                    <th>TRM component</th>
                     <th>Product</th>
-                    <th>Primary</th>
-                    <th>Resolved TRM paths</th>
+                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -76,9 +85,11 @@
                     <td>@mapping.ArmDomainLabel</td>
                     <td>@mapping.ArmCapabilityLabel</td>
                     <td>@mapping.ArmComponentLabel</td>
+                    <td>@mapping.TrmDomainLabel</td>
+                    <td>@mapping.TrmCapabilityLabel</td>
+                    <td>@mapping.TrmComponentLabel</td>
                     <td>@mapping.ProductLabel</td>
-                    <td>@(mapping.IsPrimary ? "Yes" : "No")</td>
-                    <td>@mapping.ResolvedTrmPathCount</td>
+                    <td>@mapping.MappingStatus</td>
                 </tr>
             }
             </tbody>
@@ -89,50 +100,32 @@
 <section class="content-card">
     <div class="section-heading">
         <div>
-            <span class="eyebrow">Resolved drilldown</span>
-            <h2>ARM to TRM product dependencies</h2>
+            <span class="eyebrow">Hierarchy</span>
+            <h2>Application dependency map</h2>
         </div>
     </div>
 
     @if (!Model.HasResolvedPaths)
     {
         <div class="empty-state compact">
-            <h3>No resolved paths yet</h3>
-            <p>Add application mappings first, then complete the TRM product mappings to see the dependency chain.</p>
+            <h3>No dependency tree yet</h3>
+            <p>Add application mappings first, then complete the TRM product mappings to see the top-down hierarchy.</p>
         </div>
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>ARM domain</th>
-                        <th>ARM capability</th>
-                        <th>ARM component</th>
-                        <th>Product</th>
-                        <th>TRM domain</th>
-                        <th>TRM capability</th>
-                        <th>TRM component</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var path in Model.ResolvedPaths)
-                {
-                    <tr>
-                        <td>@path.ArmDomainLabel</td>
-                        <td>@path.ArmCapabilityLabel</td>
-                        <td>@path.ArmComponentLabel</td>
-                        <td>@path.ProductLabel</td>
-                        <td>@path.TrmDomainLabel</td>
-                        <td>@path.TrmCapabilityLabel</td>
-                        <td>@path.TrmComponentLabel</td>
-                        <td>@path.MappingStatus</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
+        <div class="application-radial-tree-shell">
+            <script type="application/json" data-application-radial-tree-data>@Html.Raw(hierarchyData)</script>
+            <div class="application-radial-tree"
+                 data-application-radial-tree
+                 data-empty-title="No dependency map yet"
+                 data-empty-body="Add application mappings first, then complete the TRM product mappings to see the dependency graph."></div>
+            <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The tree now reads from left to right, while product endpoints stay in the mapping table above to keep the diagram readable.</p>
         </div>
     }
 </section>
+
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/js/application-radial-tree.js" asp-append-version="true"></script>
+}

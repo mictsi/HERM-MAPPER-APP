@@ -132,6 +132,13 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Equal("Legacy support, Student onboarding", incomingConnections.ServicePreview);
         Assert.Equal("Legacy Tool, Pilot Tool", incomingConnections.SourceProductPreview);
 
+        Assert.Single(model.IncomingConnectionsHeatmap);
+        var incomingConnectionsHeatmap = model.IncomingConnectionsHeatmap[0];
+        Assert.Equal(mappedProduct.Id, incomingConnectionsHeatmap.ProductId);
+        Assert.Equal("Sentinel", incomingConnectionsHeatmap.ProductName);
+        Assert.Equal(3, incomingConnectionsHeatmap.IncomingConnectionCount);
+        Assert.Equal(2, incomingConnectionsHeatmap.ServiceCount);
+
         Assert.Equal(2, model.Owners.Count);
         Assert.All(model.Owners, owner =>
         {

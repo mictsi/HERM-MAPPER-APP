@@ -13,10 +13,13 @@
         <h1>Applications</h1>
         <p>Define applications from the ARM model and link each ARM component to the supporting TRM products already mapped in the catalogue.</p>
     </div>
-    @if (canManageProductsAndServices)
-    {
-        <a class="btn btn-primary" asp-action="Create">Add application</a>
-    }
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="AllDependencies">Show all applications</a>
+        @if (canManageProductsAndServices)
+        {
+            <a class="btn btn-primary" asp-action="Create">Add application</a>
+        }
+    </div>
 </section>
 
 <section class="content-card">

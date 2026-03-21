@@ -13,10 +13,13 @@
         <h1>Capabilities</h1>
         <p>Define business capabilities from the BRM model and connect them to the ARM layer for future drilldown into applications, products, and TRM mappings.</p>
     </div>
-    @if (canManageProductsAndServices)
-    {
-        <a class="btn btn-primary" asp-action="Create">Add capability</a>
-    }
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="AllDependencies">Show all capabilities</a>
+        @if (canManageProductsAndServices)
+        {
+            <a class="btn btn-primary" asp-action="Create">Add capability</a>
+        }
+    </div>
 </section>
 
 <section class="content-card">

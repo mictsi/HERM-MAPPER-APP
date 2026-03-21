@@ -16,6 +16,7 @@ public sealed class ReportsViewModel
     public IReadOnlyList<ReportsHierarchyNodeViewModel> Owners { get; init; } = [];
     public IReadOnlyList<ReportsPathViewModel> Paths { get; init; } = [];
     public IReadOnlyList<IncomingConnectionsReportRowViewModel> IncomingConnections { get; init; } = [];
+    public IReadOnlyList<IncomingConnectionsHeatmapNodeViewModel> IncomingConnectionsHeatmap { get; init; } = [];
     public IReadOnlyList<ReportsSankeyNodeViewModel> SankeyNodes { get; init; } = [];
     public IReadOnlyList<ReportsSankeyLinkViewModel> SankeyLinks { get; init; } = [];
 }
@@ -30,6 +31,17 @@ public sealed class IncomingConnectionsReportRowViewModel
     public int ServiceCount { get; init; }
     public string ServicePreview { get; init; } = "-";
     public string SourceProductPreview { get; init; } = "-";
+}
+
+public sealed class IncomingConnectionsHeatmapNodeViewModel
+{
+    public int ProductId { get; init; }
+    public string ProductName { get; init; } = string.Empty;
+    public string DisplayLabel { get; init; } = string.Empty;
+    public string? Vendor { get; init; }
+    public string? Version { get; init; }
+    public int IncomingConnectionCount { get; init; }
+    public int ServiceCount { get; init; }
 }
 
 public sealed class LifecycleStatusReportRowViewModel

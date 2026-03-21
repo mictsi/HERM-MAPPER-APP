@@ -15,7 +15,7 @@ public sealed class CapabilitiesController(
     AuditLogService auditLogService,
     HermDrilldownService drilldownService) : Controller
 {
-    private const int MinimumMappingRowCount = 8;
+    private const int MinimumMappingRowCount = 1;
 
     public async Task<IActionResult> Index(string? search)
     {
@@ -23,6 +23,8 @@ public sealed class CapabilitiesController(
             .AsNoTracking()
             .Include(x => x.Mappings)
             .ThenInclude(x => x.BrmComponent)
+            .Include(x => x.Mappings)
+            .ThenInclude(x => x.ArmCapability)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.ArmComponent)
             .AsSplitQuery()
@@ -38,6 +40,9 @@ public sealed class CapabilitiesController(
                 x.Mappings.Any(mapping =>
                     EF.Functions.Like(mapping.BrmComponent!.Code, likePattern) ||
                     EF.Functions.Like(mapping.BrmComponent.Name, likePattern) ||
+                    (mapping.ArmCapability != null && (
+                        EF.Functions.Like(mapping.ArmCapability.Code, likePattern) ||
+                        EF.Functions.Like(mapping.ArmCapability.Name, likePattern))) ||
                     EF.Functions.Like(mapping.ArmComponent!.Code, likePattern) ||
                     EF.Functions.Like(mapping.ArmComponent.Name, likePattern)));
         }
@@ -117,9 +122,13 @@ public sealed class CapabilitiesController(
             return View(input);
         }
 
+        var brmComponent = await dbContext.BrmComponents
+            .AsNoTracking()
+            .FirstAsync(x => x.Id == input.SelectedBrmComponentId!.Value);
+
         var capability = new BusinessCapabilityCatalogItem
         {
-            Name = input.Name,
+            Name = BuildBrmComponentLabel(brmComponent),
             Description = NormalizeSelection(input.Description),
             Notes = NormalizeSelection(input.Notes),
             CreatedUtc = DateTime.UtcNow,
@@ -130,10 +139,9 @@ public sealed class CapabilitiesController(
         {
             capability.Mappings.Add(new BusinessCapabilityCatalogItemMapping
             {
-                BrmComponentId = mapping.BrmComponentId,
+                BrmComponentId = input.SelectedBrmComponentId!.Value,
                 ArmComponentId = mapping.ArmComponentId,
-                IsPrimary = mapping.IsPrimary,
-                Notes = mapping.Notes,
+                ArmCapabilityId = mapping.ArmCapabilityId,
                 CreatedUtc = DateTime.UtcNow
             });
         }
@@ -164,13 +172,32 @@ public sealed class CapabilitiesController(
         return View(model);
     }
 
+    public async Task<IActionResult> AllDependencies(CancellationToken cancellationToken)
+    {
+        var model = new HierarchyDiagramPageViewModel
+        {
+            Title = "All capabilities",
+            Eyebrow = "Hierarchy",
+            Heading = "All capability dependencies",
+            Description = "Explore the full capability drilldown from BRM into ARM, applications, and TRM with the same dependency map settings used on each capability page.",
+            BackLabel = "Back to capabilities",
+            BackAction = nameof(Index),
+            HierarchyRoot = await drilldownService.BuildAllCapabilitiesHierarchyAsync(cancellationToken),
+            EmptyTitle = "No capability dependency map yet",
+            EmptyBody = "Create capabilities and connect them to ARM components, applications, and TRM mappings to generate the full dependency tree.",
+            Note = "Drag to pan and use the mouse wheel to zoom. The tree reads from left to right and now includes connected products where they exist.",
+            IncludeProducts = true
+        };
+
+        return View("~/Views/Shared/HierarchyDiagramPage.cshtml", model);
+    }
+
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
         var capability = await dbContext.BusinessCapabilityCatalogItems
             .AsNoTracking()
             .Include(x => x.Mappings)
-            .OrderBy(x => x.Id)
             .FirstOrDefaultAsync(x => x.Id == id);
         if (capability is null)
         {
@@ -180,18 +207,18 @@ public sealed class CapabilitiesController(
         var model = new CapabilityEditViewModel
         {
             Id = capability.Id,
-            Name = capability.Name,
+            SelectedBrmComponentId = capability.Mappings
+                .Select(x => (int?)x.BrmComponentId)
+                .Distinct()
+                .FirstOrDefault(),
             Description = capability.Description,
             Notes = capability.Notes,
             MappingRows = capability.Mappings
-                .OrderByDescending(x => x.IsPrimary)
-                .ThenBy(x => x.Id)
+                .OrderBy(x => x.Id)
                 .Select(x => new CapabilityMappingRowInputViewModel
                 {
-                    BrmComponentId = x.BrmComponentId,
                     ArmComponentId = x.ArmComponentId,
-                    IsPrimary = x.IsPrimary,
-                    Notes = x.Notes
+                    ArmCapabilityId = x.ArmCapabilityId
                 })
                 .ToList()
         };
@@ -224,7 +251,11 @@ public sealed class CapabilitiesController(
             return View(input);
         }
 
-        capability.Name = input.Name;
+        var brmComponent = await dbContext.BrmComponents
+            .AsNoTracking()
+            .FirstAsync(x => x.Id == input.SelectedBrmComponentId!.Value);
+
+        capability.Name = BuildBrmComponentLabel(brmComponent);
         capability.Description = NormalizeSelection(input.Description);
         capability.Notes = NormalizeSelection(input.Notes);
         capability.UpdatedUtc = DateTime.UtcNow;
@@ -236,10 +267,9 @@ public sealed class CapabilitiesController(
         {
             capability.Mappings.Add(new BusinessCapabilityCatalogItemMapping
             {
-                BrmComponentId = mapping.BrmComponentId,
+                BrmComponentId = input.SelectedBrmComponentId!.Value,
                 ArmComponentId = mapping.ArmComponentId,
-                IsPrimary = mapping.IsPrimary,
-                Notes = mapping.Notes,
+                ArmCapabilityId = mapping.ArmCapabilityId,
                 CreatedUtc = DateTime.UtcNow
             });
         }
@@ -270,94 +300,132 @@ public sealed class CapabilitiesController(
                 x.Id.ToString()))
             .ToListAsync();
 
-        model.ArmComponentOptions = await dbContext.ArmComponents
+        var armComponents = await dbContext.ArmComponents
             .AsNoTracking()
             .Where(x => !x.IsDeleted)
+            .Include(x => x.CapabilityLinks)
+            .ThenInclude(x => x.ArmCapability)
+            .ThenInclude(x => x!.ParentDomain)
             .Include(x => x.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
             .OrderBy(x => x.Code)
-            .Select(x => new SelectListItem(
-                $"{x.Code} {x.Name} ({x.ParentCapability!.ParentDomain!.Code}/{x.ParentCapability.Code})",
-                x.Id.ToString()))
             .ToListAsync();
+
+        model.ArmComponentOptions = armComponents
+            .Select(x => new SelectListItem(
+                $"{x.Code} {x.Name}",
+                x.Id.ToString()))
+            .ToList();
+
+        model.ArmCapabilityOptions = armComponents
+            .SelectMany(BuildArmCapabilityConnections)
+            .GroupBy(x => x.ArmCapabilityId)
+            .OrderBy(group => group.First().ArmCapabilityLabel, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new SelectListItem(
+                group.First().ConnectionLabel,
+                group.Key.ToString()))
+            .ToList();
+
+        model.ArmComponentLookupOptions = armComponents
+            .Select(x => new CapabilityArmComponentOptionViewModel
+            {
+                ArmComponentId = x.Id,
+                ArmComponentLabel = $"{x.Code} {x.Name}",
+                CapabilityOptions = BuildArmCapabilityConnections(x)
+            })
+            .ToList();
     }
 
     private async Task<List<NormalizedCapabilityMappingRow>?> ValidateMappingsAsync(CapabilityEditViewModel input)
     {
         var normalizedRows = new List<NormalizedCapabilityMappingRow>();
 
+        if (!input.SelectedBrmComponentId.HasValue)
+        {
+            ModelState.AddModelError(nameof(input.SelectedBrmComponentId), "Choose a BRM capability.");
+        }
+
         for (var index = 0; index < input.MappingRows.Count; index++)
         {
             var row = input.MappingRows[index];
-            row.Notes = NormalizeSelection(row.Notes);
-
-            var hasBrmComponent = row.BrmComponentId.HasValue;
-            var hasArmComponent = row.ArmComponentId.HasValue;
-            if (!hasBrmComponent && !hasArmComponent && string.IsNullOrWhiteSpace(row.Notes) && !row.IsPrimary)
+            if (!row.ArmComponentId.HasValue)
             {
                 continue;
             }
 
-            if (!hasBrmComponent)
-            {
-                ModelState.AddModelError($"MappingRows[{index}].BrmComponentId", "Choose a BRM capability.");
-            }
+            var armComponent = await dbContext.ArmComponents
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted && x.Id == row.ArmComponentId.Value)
+                .Include(x => x.CapabilityLinks)
+                .ThenInclude(x => x.ArmCapability)
+                .ThenInclude(x => x!.ParentDomain)
+                .Include(x => x.ParentCapability)
+                .ThenInclude(x => x!.ParentDomain)
+                .FirstOrDefaultAsync();
 
-            if (!hasArmComponent)
+            if (armComponent is null)
             {
-                ModelState.AddModelError($"MappingRows[{index}].ArmComponentId", "Choose a supporting ARM component.");
-            }
-
-            if (!hasBrmComponent || !hasArmComponent)
-            {
+                ModelState.AddModelError($"MappingRows[{index}].ArmComponentId", $"ARM component {row.ArmComponentId.Value} could not be found.");
                 continue;
             }
 
-            normalizedRows.Add(new NormalizedCapabilityMappingRow(
-                row.BrmComponentId!.Value,
-                row.ArmComponentId!.Value,
-                row.IsPrimary,
-                row.Notes));
+            var capabilityOptions = BuildArmCapabilityConnections(armComponent);
+            if (capabilityOptions.Count == 0)
+            {
+                ModelState.AddModelError($"MappingRows[{index}].ArmComponentId", $"ARM component {armComponent.Code} {armComponent.Name} does not have any ARM capability connections.");
+                continue;
+            }
+
+            var selectedArmCapabilityId = row.ArmCapabilityId;
+            if (!selectedArmCapabilityId.HasValue)
+            {
+                if (capabilityOptions.Count == 1)
+                {
+                    selectedArmCapabilityId = capabilityOptions[0].ArmCapabilityId;
+                    row.ArmCapabilityId = selectedArmCapabilityId;
+                }
+                else
+                {
+                    ModelState.AddModelError($"MappingRows[{index}].ArmCapabilityId", "Choose the ARM capability connection for this ARM component.");
+                    continue;
+                }
+            }
+
+            if (!capabilityOptions.Any(x => x.ArmCapabilityId == selectedArmCapabilityId.Value))
+            {
+                ModelState.AddModelError($"MappingRows[{index}].ArmCapabilityId", "The selected ARM capability is not linked to the chosen ARM component.");
+                continue;
+            }
+
+            normalizedRows.Add(new NormalizedCapabilityMappingRow(row.ArmComponentId.Value, selectedArmCapabilityId.Value));
         }
 
         if (normalizedRows.Count == 0)
         {
-            ModelState.AddModelError(nameof(input.MappingRows), "Add at least one BRM to ARM mapping.");
+            ModelState.AddModelError(nameof(input.MappingRows), "Add at least one supporting ARM component.");
             return null;
         }
 
-        var brmComponentIds = normalizedRows.Select(x => x.BrmComponentId).Distinct().ToList();
-        var validBrmComponentIds = await dbContext.BrmComponents
-            .AsNoTracking()
-            .Where(x => !x.IsDeleted && brmComponentIds.Contains(x.Id))
-            .Select(x => x.Id)
-            .ToListAsync();
-
-        var armComponentIds = normalizedRows.Select(x => x.ArmComponentId).Distinct().ToList();
-        var validArmComponentIds = await dbContext.ArmComponents
-            .AsNoTracking()
-            .Where(x => !x.IsDeleted && armComponentIds.Contains(x.Id))
-            .Select(x => x.Id)
-            .ToListAsync();
-
-        foreach (var invalidBrmComponentId in brmComponentIds.Except(validBrmComponentIds))
+        if (input.SelectedBrmComponentId.HasValue)
         {
-            ModelState.AddModelError(nameof(input.MappingRows), $"BRM capability {invalidBrmComponentId} could not be found.");
-        }
+            var brmExists = await dbContext.BrmComponents
+                .AsNoTracking()
+                .AnyAsync(x => !x.IsDeleted && x.Id == input.SelectedBrmComponentId.Value);
 
-        foreach (var invalidArmComponentId in armComponentIds.Except(validArmComponentIds))
-        {
-            ModelState.AddModelError(nameof(input.MappingRows), $"ARM component {invalidArmComponentId} could not be found.");
+            if (!brmExists)
+            {
+                ModelState.AddModelError(nameof(input.SelectedBrmComponentId), "The selected BRM capability could not be found.");
+            }
         }
 
         var duplicateMappings = normalizedRows
-            .GroupBy(x => new { x.BrmComponentId, x.ArmComponentId })
+            .GroupBy(x => new { x.ArmComponentId, x.ArmCapabilityId })
             .Where(group => group.Count() > 1)
             .ToList();
 
         if (duplicateMappings.Count != 0)
         {
-            ModelState.AddModelError(nameof(input.MappingRows), "Duplicate BRM and ARM combinations are not allowed.");
+            ModelState.AddModelError(nameof(input.MappingRows), "Duplicate ARM component and capability connections are not allowed.");
         }
 
         return ModelState.IsValid ? normalizedRows : null;
@@ -384,6 +452,30 @@ public sealed class CapabilitiesController(
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
 
+    private static string BuildBrmComponentLabel(BrmComponent component) => $"{component.Code} {component.Name}";
+
+    private static IReadOnlyList<CapabilityArmCapabilityOptionViewModel> BuildArmCapabilityConnections(ArmComponent component)
+    {
+        var capabilityOptions = component.CapabilityLinks
+            .Where(x => x.ArmCapability?.ParentDomain is not null)
+            .Select(x => x.ArmCapability!)
+            .Append(component.ParentCapability)
+            .Where(x => x?.ParentDomain is not null)
+            .Select(x => new CapabilityArmCapabilityOptionViewModel
+            {
+                ArmCapabilityId = x!.Id,
+                ArmDomainLabel = $"{x.ParentDomain!.Code} {x.ParentDomain.Name}",
+                ArmCapabilityLabel = $"{x.Code} {x.Name}",
+                ConnectionLabel = $"{x.Code} {x.Name} ({x.ParentDomain!.Code} {x.ParentDomain.Name})"
+            })
+            .GroupBy(x => x.ArmCapabilityId)
+            .Select(group => group.First())
+            .OrderBy(x => x.ArmCapabilityLabel, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return capabilityOptions;
+    }
+
     private static CapabilityIndexRowViewModel BuildIndexRow(BusinessCapabilityCatalogItem capability, int applicationCount, int productCount) =>
         new()
         {
@@ -403,9 +495,5 @@ public sealed class CapabilitiesController(
             UpdatedUtc = capability.UpdatedUtc
         };
 
-    private sealed record NormalizedCapabilityMappingRow(
-        int BrmComponentId,
-        int ArmComponentId,
-        bool IsPrimary,
-        string? Notes);
+    private sealed record NormalizedCapabilityMappingRow(int ArmComponentId, int ArmCapabilityId);
 }

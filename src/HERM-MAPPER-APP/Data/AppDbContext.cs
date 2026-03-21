@@ -318,7 +318,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<ApplicationCatalogItemMapping>(entity =>
         {
             entity.ToTable("ApplicationCatalogItemMappings");
-            entity.HasIndex(x => new { x.ApplicationCatalogItemId, x.ArmComponentId, x.ProductCatalogItemId }).IsUnique();
+            entity.HasIndex(x => new { x.ApplicationCatalogItemId, x.ArmComponentId, x.ProductMappingId }).IsUnique();
             entity.Property(x => x.Notes).HasMaxLength(1000);
 
             entity.HasOne(x => x.ApplicationCatalogItem)
@@ -329,6 +329,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.ArmComponent)
                 .WithMany()
                 .HasForeignKey(x => x.ArmComponentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ProductMapping)
+                .WithMany()
+                .HasForeignKey(x => x.ProductMappingId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(x => x.ProductCatalogItem)
@@ -348,7 +353,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<BusinessCapabilityCatalogItemMapping>(entity =>
         {
             entity.ToTable("BusinessCapabilityCatalogItemMappings");
-            entity.HasIndex(x => new { x.BusinessCapabilityCatalogItemId, x.BrmComponentId, x.ArmComponentId }).IsUnique();
+            entity.HasIndex(x => new { x.BusinessCapabilityCatalogItemId, x.BrmComponentId, x.ArmComponentId, x.ArmCapabilityId }).IsUnique();
             entity.Property(x => x.Notes).HasMaxLength(1000);
 
             entity.HasOne(x => x.BusinessCapabilityCatalogItem)
@@ -365,6 +370,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.ArmComponentId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ArmCapability)
+                .WithMany()
+                .HasForeignKey(x => x.ArmCapabilityId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

@@ -26,9 +26,9 @@ public sealed class CapabilityEditViewModel
 {
     public int Id { get; set; }
 
-    [Required, StringLength(200)]
-    [Display(Name = "Capability name")]
-    public string Name { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Choose a BRM capability.")]
+    [Display(Name = "BRM capability")]
+    public int? SelectedBrmComponentId { get; set; }
 
     [StringLength(2000)]
     public string? Description { get; set; }
@@ -41,21 +41,19 @@ public sealed class CapabilityEditViewModel
     public IReadOnlyList<SelectListItem> BrmComponentOptions { get; set; } = [];
 
     public IReadOnlyList<SelectListItem> ArmComponentOptions { get; set; } = [];
+
+    public IReadOnlyList<SelectListItem> ArmCapabilityOptions { get; set; } = [];
+
+    public IReadOnlyList<CapabilityArmComponentOptionViewModel> ArmComponentLookupOptions { get; set; } = [];
 }
 
 public sealed class CapabilityMappingRowInputViewModel
 {
-    [Display(Name = "BRM capability")]
-    public int? BrmComponentId { get; set; }
-
     [Display(Name = "Supporting ARM component")]
     public int? ArmComponentId { get; set; }
 
-    [Display(Name = "Primary mapping")]
-    public bool IsPrimary { get; set; }
-
-    [StringLength(1000)]
-    public string? Notes { get; set; }
+    [Display(Name = "ARM capability connection")]
+    public int? ArmCapabilityId { get; set; }
 }
 
 public sealed class CapabilityDetailsViewModel
@@ -70,12 +68,29 @@ public sealed class CapabilityDetailsViewModel
 
     public IReadOnlyList<CapabilityResolvedPathViewModel> ResolvedPaths { get; init; } = [];
 
+    public ApplicationHierarchyNodeViewModel HierarchyRoot { get; init; } = new();
+
     public int BrmCapabilityCount { get; init; }
     public int ArmComponentCount { get; init; }
     public int ApplicationCount { get; init; }
     public int ProductCount { get; init; }
 
     public bool HasResolvedPaths => ResolvedPaths.Count != 0;
+}
+
+public sealed class CapabilityArmComponentOptionViewModel
+{
+    public int ArmComponentId { get; init; }
+    public string ArmComponentLabel { get; init; } = string.Empty;
+    public IReadOnlyList<CapabilityArmCapabilityOptionViewModel> CapabilityOptions { get; init; } = [];
+}
+
+public sealed class CapabilityArmCapabilityOptionViewModel
+{
+    public int ArmCapabilityId { get; init; }
+    public string ArmDomainLabel { get; init; } = string.Empty;
+    public string ArmCapabilityLabel { get; init; } = string.Empty;
+    public string ConnectionLabel { get; init; } = string.Empty;
 }
 
 public sealed class CapabilityMappingRowViewModel
@@ -86,8 +101,6 @@ public sealed class CapabilityMappingRowViewModel
     public string ArmDomainLabel { get; init; } = "-";
     public string ArmCapabilityLabel { get; init; } = "-";
     public string ArmComponentLabel { get; init; } = "-";
-    public bool IsPrimary { get; init; }
-    public string? Notes { get; init; }
     public int LinkedApplicationCount { get; init; }
 }
 

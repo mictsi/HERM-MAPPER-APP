@@ -1462,6 +1462,67 @@ a {
   stroke-linecap: round;
 }
 
+.application-graph-preview:has(.service-graph-canvas) {
+  display: block;
+}
+
+.application-graph-preview .service-graph-canvas {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.85rem 0.5rem 1rem;
+  overflow: hidden;
+}
+
+.application-graph-preview .service-graph-rows {
+  width: 100%;
+  gap: 1.6rem;
+  justify-items: stretch;
+}
+
+.application-graph-preview .service-graph-row {
+  width: 100%;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 1rem;
+  justify-content: stretch;
+  justify-items: center;
+}
+
+.application-graph-preview .service-graph-node {
+  width: min(100%, 13rem);
+  min-width: 0;
+  max-width: 13rem;
+  padding: 0.85rem 0.95rem;
+  text-align: left;
+  word-break: break-word;
+}
+
+.application-radial-tree-shell {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.1);
+  border-radius: 1.35rem;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.92), rgba(246, 240, 230, 0.98));
+  overflow: hidden;
+}
+
+.application-radial-tree {
+  width: 100%;
+  min-height: 42rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1.1rem;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.96), rgba(249, 246, 239, 0.94));
+}
+
+.application-radial-tree-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.93rem;
+}
+
 .service-graph-connections {
   display: grid;
   gap: 1rem;
@@ -1786,9 +1847,19 @@ a {
   background: linear-gradient(135deg, rgba(11, 110, 79, 0.16), rgba(11, 110, 79, 0.08));
 }
 
+.owner-tree-application > .owner-tree-details > .owner-tree-summary,
+.owner-tree-application.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: linear-gradient(135deg, rgba(22, 74, 124, 0.16), rgba(22, 74, 124, 0.08));
+}
+
 .owner-tree-domain > .owner-tree-details > .owner-tree-summary,
 .owner-tree-domain.owner-tree-item-leaf .owner-tree-leaf-row {
   background: rgba(43, 111, 119, 0.08);
+}
+
+.owner-tree-arm-domain > .owner-tree-details > .owner-tree-summary,
+.owner-tree-arm-domain.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(18, 120, 86, 0.08);
 }
 
 .owner-tree-capability > .owner-tree-details > .owner-tree-summary,
@@ -1796,13 +1867,206 @@ a {
   background: rgba(92, 124, 53, 0.08);
 }
 
+.owner-tree-arm-capability > .owner-tree-details > .owner-tree-summary,
+.owner-tree-arm-capability.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(78, 129, 63, 0.08);
+}
+
 .owner-tree-component > .owner-tree-details > .owner-tree-summary,
 .owner-tree-component.owner-tree-item-leaf .owner-tree-leaf-row {
   background: rgba(139, 94, 52, 0.08);
 }
 
+.owner-tree-arm-component > .owner-tree-details > .owner-tree-summary,
+.owner-tree-arm-component.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(152, 108, 46, 0.08);
+}
+
+.owner-tree-trm-domain > .owner-tree-details > .owner-tree-summary,
+.owner-tree-trm-domain.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(43, 111, 119, 0.08);
+}
+
+.owner-tree-trm-capability > .owner-tree-details > .owner-tree-summary,
+.owner-tree-trm-capability.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(119, 82, 43, 0.08);
+}
+
+.owner-tree-trm-component > .owner-tree-details > .owner-tree-summary,
+.owner-tree-trm-component.owner-tree-item-leaf .owner-tree-leaf-row {
+  background: rgba(97, 63, 138, 0.08);
+}
+
 .owner-tree-product .owner-tree-leaf-row {
   background: rgba(123, 63, 97, 0.06);
+}
+
+.application-hierarchy-canvas {
+  overflow: auto;
+  padding: 1rem 0.25rem 1.25rem;
+}
+
+.application-hierarchy-panel {
+  min-width: max-content;
+  padding: 0.35rem 0.5rem 0.75rem;
+}
+
+.application-hierarchy-root,
+.application-hierarchy-children {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.application-hierarchy-root {
+  align-items: flex-start;
+}
+
+.application-hierarchy-node {
+  --node-accent: #54708c;
+  --node-accent-soft: rgba(84, 112, 140, 0.14);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.application-hierarchy-children {
+  position: relative;
+  align-items: flex-start;
+  padding-top: 1.65rem;
+}
+
+.application-hierarchy-children::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 1rem;
+  margin-left: -1px;
+  border-radius: 999px;
+  background: #324558;
+}
+
+.application-hierarchy-children.multi-child::after {
+  content: "";
+  position: absolute;
+  top: 1rem;
+  left: 8.5rem;
+  right: 8.5rem;
+  height: 2px;
+  border-radius: 999px;
+  background: #324558;
+}
+
+.application-hierarchy-children > .application-hierarchy-node::before {
+  content: "";
+  position: absolute;
+  top: -1.65rem;
+  left: 50%;
+  width: 2px;
+  height: 1.65rem;
+  margin-left: -1px;
+  border-radius: 999px;
+  background: #324558;
+}
+
+.application-hierarchy-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 17rem;
+  min-height: 5.4rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #d7e1ea;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.application-hierarchy-card-accent {
+  flex: 0 0 auto;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  background: var(--node-accent);
+  box-shadow: 0 0 0 0.45rem var(--node-accent-soft);
+}
+
+.application-hierarchy-card-copy {
+  min-width: 0;
+}
+
+.application-hierarchy-title {
+  display: block;
+  color: #172b3f;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.application-hierarchy-title:hover,
+.application-hierarchy-title:focus {
+  color: #0a627a;
+  text-decoration: none;
+}
+
+.application-hierarchy-meta {
+  display: block;
+  margin-top: 0.22rem;
+  color: #6b7b89;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.application-hierarchy-application {
+  --node-accent: #214f54;
+  --node-accent-soft: rgba(33, 79, 84, 0.16);
+}
+
+.application-hierarchy-arm-domain {
+  --node-accent: #0e8b74;
+  --node-accent-soft: rgba(14, 139, 116, 0.16);
+}
+
+.application-hierarchy-arm-capability {
+  --node-accent: #1f9fb0;
+  --node-accent-soft: rgba(31, 159, 176, 0.16);
+}
+
+.application-hierarchy-arm-component {
+  --node-accent: #2674d8;
+  --node-accent-soft: rgba(38, 116, 216, 0.16);
+}
+
+.application-hierarchy-trm-domain {
+  --node-accent: #6d57b6;
+  --node-accent-soft: rgba(109, 87, 182, 0.16);
+}
+
+.application-hierarchy-trm-capability {
+  --node-accent: #8e65c9;
+  --node-accent-soft: rgba(142, 101, 201, 0.16);
+}
+
+.application-hierarchy-trm-component {
+  --node-accent: #aa62d6;
+  --node-accent-soft: rgba(170, 98, 214, 0.16);
+}
+
+.application-hierarchy-product {
+  --node-accent: #db8b41;
+  --node-accent-soft: rgba(219, 139, 65, 0.18);
 }
 
 .owner-sankey-shell {
@@ -2298,6 +2562,19 @@ a {
   border-radius: 1.2rem;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 243, 235, 0.95));
+}
+
+.reports-treemap-shell {
+  padding: 1rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  border-radius: 1.2rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(247, 243, 235, 0.95));
+}
+
+.reports-treemap-frame {
+  width: 100%;
+  min-height: 32rem;
 }
 
 .owner-sankey-svg {
@@ -2981,6 +3258,34 @@ a {
     margin-left: 0;
     width: 100%;
     justify-content: space-between;
+  }
+
+  .application-hierarchy-panel {
+    min-width: 100%;
+    padding: 0;
+  }
+
+  .application-hierarchy-root,
+  .application-hierarchy-children {
+    display: grid;
+    justify-content: stretch;
+  }
+
+  .application-hierarchy-card {
+    width: min(100%, 22rem);
+  }
+
+  .application-hierarchy-children {
+    gap: 0.9rem;
+    padding-top: 0.9rem;
+    padding-left: 1rem;
+    justify-content: stretch;
+  }
+
+  .application-hierarchy-children::before,
+  .application-hierarchy-children::after,
+  .application-hierarchy-children > .application-hierarchy-node::before {
+    display: none;
   }
 
   .owner-sankey-filters {

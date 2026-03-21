@@ -89,6 +89,7 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
             Owners = BuildReportsHierarchy(paths),
             Paths = paths,
             IncomingConnections = incomingConnections,
+            IncomingConnectionsHeatmap = BuildIncomingConnectionsHeatmap(incomingConnections),
             SankeyNodes = BuildReportsSankeyNodes(paths),
             SankeyLinks = BuildReportsSankeyLinks(paths)
         };
@@ -461,6 +462,24 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
             .ThenBy(row => row.ProductName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+    private static List<IncomingConnectionsHeatmapNodeViewModel> BuildIncomingConnectionsHeatmap(
+        IReadOnlyList<IncomingConnectionsReportRowViewModel> rows) =>
+        rows
+            .Select(row => new IncomingConnectionsHeatmapNodeViewModel
+            {
+                ProductId = row.ProductId,
+                ProductName = row.ProductName,
+                DisplayLabel = BuildIncomingConnectionsHeatmapLabel(row.ProductName, row.Vendor, row.Version),
+                Vendor = row.Vendor,
+                Version = row.Version,
+                IncomingConnectionCount = row.IncomingConnectionCount,
+                ServiceCount = row.ServiceCount
+            })
+            .OrderByDescending(row => row.IncomingConnectionCount)
+            .ThenByDescending(row => row.ServiceCount)
+            .ThenBy(row => row.ProductName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
     private IQueryable<ProductMapping> BuildMappingsCsvQuery() =>
         dbContext.ProductMappings
             .AsNoTracking()
@@ -544,6 +563,14 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
         <= 3 => string.Join(", ", values),
         _ => $"{string.Join(", ", values.Take(3))} +{values.Count - 3} more"
     };
+
+    private static string BuildIncomingConnectionsHeatmapLabel(string productName, string? vendor, string? version)
+    {
+        var detail = string.Join(" ", new[] { vendor, version }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        return string.IsNullOrWhiteSpace(detail)
+            ? productName
+            : $"{productName}\n{detail}";
+    }
 
     private sealed record ServiceProductConnectionRecord(
         int ServiceId,

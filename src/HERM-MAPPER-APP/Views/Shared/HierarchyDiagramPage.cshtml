@@ -1,0 +1,57 @@
+@using System.Text.Json
+@using HERMMapperApp.ViewModels
+@model HierarchyDiagramPageViewModel
+@{
+    ViewData["Title"] = Model.Title;
+    var hierarchyData = JsonSerializer.Serialize(
+        Model.HierarchyRoot,
+        new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">@Model.Eyebrow</span>
+        <h1>@Model.Heading</h1>
+        <p>@Model.Description</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="@Model.BackAction">@Model.BackLabel</a>
+    </div>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Hierarchy</span>
+            <h2>@Model.Heading</h2>
+        </div>
+    </div>
+
+    @if (Model.HierarchyRoot.Children.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>@Model.EmptyTitle</h3>
+            <p>@Model.EmptyBody</p>
+        </div>
+    }
+    else
+    {
+        <div class="application-radial-tree-shell">
+            <script type="application/json" data-application-radial-tree-data>@Html.Raw(hierarchyData)</script>
+            <div class="application-radial-tree"
+                 data-application-radial-tree
+                 data-include-products="@Model.IncludeProducts.ToString().ToLowerInvariant()"
+                 data-empty-title="@Model.EmptyTitle"
+                 data-empty-body="@Model.EmptyBody"></div>
+            <p class="application-radial-tree-note">@Model.Note</p>
+        </div>
+    }
+</section>
+
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/js/application-radial-tree.js" asp-append-version="true"></script>
+}

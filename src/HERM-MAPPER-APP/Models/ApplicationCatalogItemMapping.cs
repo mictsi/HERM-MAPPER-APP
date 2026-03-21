@@ -13,6 +13,10 @@ public sealed class ApplicationCatalogItemMapping
     public int ArmComponentId { get; set; }
     public ArmComponent? ArmComponent { get; set; }
 
+    [Display(Name = "Supporting TRM mapping")]
+    public int? ProductMappingId { get; set; }
+    public ProductMapping? ProductMapping { get; set; }
+
     [Display(Name = "Supporting product")]
     public int ProductCatalogItemId { get; set; }
     public ProductCatalogItem? ProductCatalogItem { get; set; }

@@ -17,6 +17,10 @@ public sealed class BusinessCapabilityCatalogItemMapping
     public int ArmComponentId { get; set; }
     public ArmComponent? ArmComponent { get; set; }
 
+    [Display(Name = "ARM capability")]
+    public int? ArmCapabilityId { get; set; }
+    public ArmCapability? ArmCapability { get; set; }
+
     public bool IsPrimary { get; set; }
 
     [StringLength(1000)]

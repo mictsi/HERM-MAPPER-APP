@@ -765,6 +765,7 @@ public sealed partial class DatabaseInitializer(
                     "Id" INTEGER NOT NULL CONSTRAINT "PK_ApplicationCatalogItemMappings" PRIMARY KEY AUTOINCREMENT,
                     "ApplicationCatalogItemId" INTEGER NOT NULL,
                     "ArmComponentId" INTEGER NOT NULL,
+                    "ProductMappingId" INTEGER NULL,
                     "ProductCatalogItemId" INTEGER NOT NULL,
                     "IsPrimary" INTEGER NOT NULL DEFAULT 0,
                     "Notes" TEXT NULL,
@@ -773,16 +774,45 @@ public sealed partial class DatabaseInitializer(
                         FOREIGN KEY ("ApplicationCatalogItemId") REFERENCES "ApplicationCatalogItems" ("Id") ON DELETE CASCADE,
                     CONSTRAINT "FK_ApplicationCatalogItemMappings_ArmComponents_ArmComponentId"
                         FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_ApplicationCatalogItemMappings_ProductMappings_ProductMappingId"
+                        FOREIGN KEY ("ProductMappingId") REFERENCES "ProductMappings" ("Id") ON DELETE CASCADE,
                     CONSTRAINT "FK_ApplicationCatalogItemMappings_ProductCatalogItems_ProductCatalogItemId"
                         FOREIGN KEY ("ProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE
                 )
                 """,
                 cancellationToken);
 
+            if (!await SqliteColumnExistsAsync("ApplicationCatalogItemMappings", "ProductMappingId", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ApplicationCatalogItemMappings ADD COLUMN ProductMappingId INTEGER NULL",
+                    cancellationToken);
+            }
+
             await dbContext.Database.ExecuteSqlRawAsync(
                 """
-                CREATE UNIQUE INDEX IF NOT EXISTS "IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductCatalogItemId"
-                ON "ApplicationCatalogItemMappings" ("ApplicationCatalogItemId", "ArmComponentId", "ProductCatalogItemId")
+                UPDATE "ApplicationCatalogItemMappings"
+                SET "ProductMappingId" = (
+                    SELECT MIN(pm."Id")
+                    FROM "ProductMappings" pm
+                    WHERE pm."ProductCatalogItemId" = "ApplicationCatalogItemMappings"."ProductCatalogItemId"
+                    GROUP BY pm."ProductCatalogItemId"
+                    HAVING COUNT(*) = 1
+                )
+                WHERE "ProductMappingId" IS NULL
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                DROP INDEX IF EXISTS "IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductCatalogItemId"
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductMappingId"
+                ON "ApplicationCatalogItemMappings" ("ApplicationCatalogItemId", "ArmComponentId", "ProductMappingId")
                 """,
                 cancellationToken);
 
@@ -797,6 +827,13 @@ public sealed partial class DatabaseInitializer(
                 """
                 CREATE INDEX IF NOT EXISTS "IX_ApplicationCatalogItemMappings_ProductCatalogItemId"
                 ON "ApplicationCatalogItemMappings" ("ProductCatalogItemId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_ApplicationCatalogItemMappings_ProductMappingId"
+                ON "ApplicationCatalogItemMappings" ("ProductMappingId")
                 """,
                 cancellationToken);
 
@@ -829,6 +866,7 @@ public sealed partial class DatabaseInitializer(
                         [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_ApplicationCatalogItemMappings] PRIMARY KEY,
                         [ApplicationCatalogItemId] INT NOT NULL,
                         [ArmComponentId] INT NOT NULL,
+                        [ProductMappingId] INT NULL,
                         [ProductCatalogItemId] INT NOT NULL,
                         [IsPrimary] BIT NOT NULL CONSTRAINT [DF_ApplicationCatalogItemMappings_IsPrimary] DEFAULT 0,
                         [Notes] NVARCHAR(1000) NULL,
@@ -837,6 +875,8 @@ public sealed partial class DatabaseInitializer(
                             FOREIGN KEY ([ApplicationCatalogItemId]) REFERENCES [ApplicationCatalogItems] ([Id]) ON DELETE CASCADE,
                         CONSTRAINT [FK_ApplicationCatalogItemMappings_ArmComponents_ArmComponentId]
                             FOREIGN KEY ([ArmComponentId]) REFERENCES [ArmComponents] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_ApplicationCatalogItemMappings_ProductMappings_ProductMappingId]
+                            FOREIGN KEY ([ProductMappingId]) REFERENCES [ProductMappings] ([Id]) ON DELETE CASCADE,
                         CONSTRAINT [FK_ApplicationCatalogItemMappings_ProductCatalogItems_ProductCatalogItemId]
                             FOREIGN KEY ([ProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE
                     );
@@ -846,15 +886,71 @@ public sealed partial class DatabaseInitializer(
 
             await dbContext.Database.ExecuteSqlRawAsync(
                 """
+                IF COL_LENGTH(N'[ApplicationCatalogItemMappings]', N'ProductMappingId') IS NULL
+                BEGIN
+                    ALTER TABLE [ApplicationCatalogItemMappings]
+                    ADD [ProductMappingId] INT NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
                 IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.foreign_keys
+                    WHERE name = N'FK_ApplicationCatalogItemMappings_ProductMappings_ProductMappingId'
+                )
+                BEGIN
+                    ALTER TABLE [ApplicationCatalogItemMappings]
+                    ADD CONSTRAINT [FK_ApplicationCatalogItemMappings_ProductMappings_ProductMappingId]
+                    FOREIGN KEY ([ProductMappingId]) REFERENCES [ProductMappings] ([Id]) ON DELETE CASCADE;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                ;WITH SingleProductMappings AS (
+                    SELECT pm.[ProductCatalogItemId], MIN(pm.[Id]) AS [ProductMappingId]
+                    FROM [ProductMappings] pm
+                    GROUP BY pm.[ProductCatalogItemId]
+                    HAVING COUNT(*) = 1
+                )
+                UPDATE a
+                SET [ProductMappingId] = spm.[ProductMappingId]
+                FROM [ApplicationCatalogItemMappings] a
+                INNER JOIN SingleProductMappings spm ON spm.[ProductCatalogItemId] = a.[ProductCatalogItemId]
+                WHERE a.[ProductMappingId] IS NULL;
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF EXISTS (
                     SELECT 1
                     FROM sys.indexes
                     WHERE name = N'IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductCatalogItemId'
                       AND object_id = OBJECT_ID(N'[ApplicationCatalogItemMappings]')
                 )
                 BEGIN
-                    CREATE UNIQUE INDEX [IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductCatalogItemId]
-                    ON [ApplicationCatalogItemMappings] ([ApplicationCatalogItemId], [ArmComponentId], [ProductCatalogItemId]);
+                    DROP INDEX [IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductCatalogItemId]
+                    ON [ApplicationCatalogItemMappings];
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductMappingId'
+                      AND object_id = OBJECT_ID(N'[ApplicationCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE UNIQUE INDEX [IX_ApplicationCatalogItemMappings_ApplicationCatalogItemId_ArmComponentId_ProductMappingId]
+                    ON [ApplicationCatalogItemMappings] ([ApplicationCatalogItemId], [ArmComponentId], [ProductMappingId]);
                 END
                 """,
                 cancellationToken);
@@ -888,6 +984,21 @@ public sealed partial class DatabaseInitializer(
                 END
                 """,
                 cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_ApplicationCatalogItemMappings_ProductMappingId'
+                      AND object_id = OBJECT_ID(N'[ApplicationCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_ApplicationCatalogItemMappings_ProductMappingId]
+                    ON [ApplicationCatalogItemMappings] ([ProductMappingId]);
+                END
+                """,
+                cancellationToken);
         }
     }
 
@@ -915,6 +1026,7 @@ public sealed partial class DatabaseInitializer(
                     "BusinessCapabilityCatalogItemId" INTEGER NOT NULL,
                     "BrmComponentId" INTEGER NOT NULL,
                     "ArmComponentId" INTEGER NOT NULL,
+                    "ArmCapabilityId" INTEGER NULL,
                     "IsPrimary" INTEGER NOT NULL DEFAULT 0,
                     "Notes" TEXT NULL,
                     "CreatedUtc" TEXT NOT NULL,
@@ -923,15 +1035,49 @@ public sealed partial class DatabaseInitializer(
                     CONSTRAINT "FK_BusinessCapabilityCatalogItemMappings_BrmComponents_BrmComponentId"
                         FOREIGN KEY ("BrmComponentId") REFERENCES "BrmComponents" ("Id") ON DELETE CASCADE,
                     CONSTRAINT "FK_BusinessCapabilityCatalogItemMappings_ArmComponents_ArmComponentId"
-                        FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE CASCADE
+                        FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_BusinessCapabilityCatalogItemMappings_ArmCapabilities_ArmCapabilityId"
+                        FOREIGN KEY ("ArmCapabilityId") REFERENCES "ArmCapabilities" ("Id") ON DELETE NO ACTION
                 )
+                """,
+                cancellationToken);
+
+            if (!await SqliteColumnExistsAsync("BusinessCapabilityCatalogItemMappings", "ArmCapabilityId", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE BusinessCapabilityCatalogItemMappings ADD COLUMN ArmCapabilityId INTEGER NULL",
+                    cancellationToken);
+            }
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                UPDATE "BusinessCapabilityCatalogItemMappings"
+                SET "ArmCapabilityId" = COALESCE(
+                    (
+                        SELECT MIN(link."ArmCapabilityId")
+                        FROM "ArmComponentCapabilityLinks" link
+                        WHERE link."ArmComponentId" = "BusinessCapabilityCatalogItemMappings"."ArmComponentId"
+                    ),
+                    (
+                        SELECT component."ParentCapabilityId"
+                        FROM "ArmComponents" component
+                        WHERE component."Id" = "BusinessCapabilityCatalogItemMappings"."ArmComponentId"
+                    )
+                )
+                WHERE "ArmCapabilityId" IS NULL
                 """,
                 cancellationToken);
 
             await dbContext.Database.ExecuteSqlRawAsync(
                 """
-                CREATE UNIQUE INDEX IF NOT EXISTS "IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId"
-                ON "BusinessCapabilityCatalogItemMappings" ("BusinessCapabilityCatalogItemId", "BrmComponentId", "ArmComponentId")
+                DROP INDEX IF EXISTS "IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId"
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId_ArmCapabilityId"
+                ON "BusinessCapabilityCatalogItemMappings" ("BusinessCapabilityCatalogItemId", "BrmComponentId", "ArmComponentId", "ArmCapabilityId")
                 """,
                 cancellationToken);
 
@@ -946,6 +1092,13 @@ public sealed partial class DatabaseInitializer(
                 """
                 CREATE INDEX IF NOT EXISTS "IX_BusinessCapabilityCatalogItemMappings_ArmComponentId"
                 ON "BusinessCapabilityCatalogItemMappings" ("ArmComponentId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_BusinessCapabilityCatalogItemMappings_ArmCapabilityId"
+                ON "BusinessCapabilityCatalogItemMappings" ("ArmCapabilityId")
                 """,
                 cancellationToken);
 
@@ -979,6 +1132,7 @@ public sealed partial class DatabaseInitializer(
                         [BusinessCapabilityCatalogItemId] INT NOT NULL,
                         [BrmComponentId] INT NOT NULL,
                         [ArmComponentId] INT NOT NULL,
+                        [ArmCapabilityId] INT NULL,
                         [IsPrimary] BIT NOT NULL CONSTRAINT [DF_BusinessCapabilityCatalogItemMappings_IsPrimary] DEFAULT 0,
                         [Notes] NVARCHAR(1000) NULL,
                         [CreatedUtc] DATETIME2 NOT NULL,
@@ -987,8 +1141,69 @@ public sealed partial class DatabaseInitializer(
                         CONSTRAINT [FK_BusinessCapabilityCatalogItemMappings_BrmComponents_BrmComponentId]
                             FOREIGN KEY ([BrmComponentId]) REFERENCES [BrmComponents] ([Id]) ON DELETE CASCADE,
                         CONSTRAINT [FK_BusinessCapabilityCatalogItemMappings_ArmComponents_ArmComponentId]
-                            FOREIGN KEY ([ArmComponentId]) REFERENCES [ArmComponents] ([Id]) ON DELETE CASCADE
+                            FOREIGN KEY ([ArmComponentId]) REFERENCES [ArmComponents] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_BusinessCapabilityCatalogItemMappings_ArmCapabilities_ArmCapabilityId]
+                            FOREIGN KEY ([ArmCapabilityId]) REFERENCES [ArmCapabilities] ([Id])
                     );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[BusinessCapabilityCatalogItemMappings]', N'ArmCapabilityId') IS NULL
+                BEGIN
+                    ALTER TABLE [BusinessCapabilityCatalogItemMappings]
+                    ADD [ArmCapabilityId] INT NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                UPDATE mapping
+                SET [ArmCapabilityId] = COALESCE(
+                    links.[ArmCapabilityId],
+                    component.[ParentCapabilityId]
+                )
+                FROM [BusinessCapabilityCatalogItemMappings] mapping
+                OUTER APPLY (
+                    SELECT MIN([ArmCapabilityId]) AS [ArmCapabilityId]
+                    FROM [ArmComponentCapabilityLinks]
+                    WHERE [ArmComponentId] = mapping.[ArmComponentId]
+                ) links
+                LEFT JOIN [ArmComponents] component ON component.[Id] = mapping.[ArmComponentId]
+                WHERE mapping.[ArmCapabilityId] IS NULL;
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.foreign_keys
+                    WHERE name = N'FK_BusinessCapabilityCatalogItemMappings_ArmCapabilities_ArmCapabilityId'
+                      AND parent_object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItemMappings]')
+                )
+                BEGIN
+                    ALTER TABLE [BusinessCapabilityCatalogItemMappings]
+                    ADD CONSTRAINT [FK_BusinessCapabilityCatalogItemMappings_ArmCapabilities_ArmCapabilityId]
+                        FOREIGN KEY ([ArmCapabilityId]) REFERENCES [ArmCapabilities] ([Id]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId'
+                      AND object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItemMappings]')
+                )
+                BEGIN
+                    DROP INDEX [IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId]
+                    ON [BusinessCapabilityCatalogItemMappings];
                 END
                 """,
                 cancellationToken);
@@ -998,12 +1213,12 @@ public sealed partial class DatabaseInitializer(
                 IF NOT EXISTS (
                     SELECT 1
                     FROM sys.indexes
-                    WHERE name = N'IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId'
+                    WHERE name = N'IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId_ArmCapabilityId'
                       AND object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItemMappings]')
                 )
                 BEGIN
-                    CREATE UNIQUE INDEX [IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId]
-                    ON [BusinessCapabilityCatalogItemMappings] ([BusinessCapabilityCatalogItemId], [BrmComponentId], [ArmComponentId]);
+                    CREATE UNIQUE INDEX [IX_BusinessCapabilityCatalogItemMappings_BusinessCapabilityCatalogItemId_BrmComponentId_ArmComponentId_ArmCapabilityId]
+                    ON [BusinessCapabilityCatalogItemMappings] ([BusinessCapabilityCatalogItemId], [BrmComponentId], [ArmComponentId], [ArmCapabilityId]);
                 END
                 """,
                 cancellationToken);
@@ -1034,6 +1249,21 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     CREATE INDEX [IX_BusinessCapabilityCatalogItemMappings_ArmComponentId]
                     ON [BusinessCapabilityCatalogItemMappings] ([ArmComponentId]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_BusinessCapabilityCatalogItemMappings_ArmCapabilityId'
+                      AND object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItemMappings]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_BusinessCapabilityCatalogItemMappings_ArmCapabilityId]
+                    ON [BusinessCapabilityCatalogItemMappings] ([ArmCapabilityId]);
                 END
                 """,
                 cancellationToken);
