@@ -47,11 +47,15 @@ public sealed class ReferenceControllerTests
         Assert.Equal("custom", model.Search);
         Assert.Equal(domainB.Id, model.DomainId);
         Assert.Equal(capabilityB.Id, model.CapabilityId);
+        Assert.Equal(ReferenceModelKind.Trm, model.SelectedModelKind);
+        Assert.Equal(domainB.Code, model.SelectedDomainCode);
+        Assert.Equal(capabilityB.Code, model.SelectedCapabilityCode);
+        Assert.Equal("browser-model-trm-domain-td002-capability-tp002", model.ActiveTreeAnchorId);
         Assert.Equal("Import complete", model.ImportStatusMessage);
         Assert.Single(model.Components);
-        Assert.Equal(componentB.Id, model.Components[0].Id);
-        Assert.Contains(model.Domains, domain => domain.Id == domainA.Id);
-        Assert.DoesNotContain(model.Components, component => component.Id == componentA.Id);
+        Assert.Equal(componentB.Id, model.Components[0].NativeId);
+        Assert.Contains(model.ModelGroups.SelectMany(group => group.Domains), domain => string.Equals(domain.Code, domainA.Code, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(model.Components, component => component.NativeId == componentA.Id);
     }
 
     [Fact]

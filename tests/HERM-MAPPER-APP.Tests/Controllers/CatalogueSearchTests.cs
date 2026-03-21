@@ -192,6 +192,111 @@ public sealed class CatalogueSearchTests
         Assert.Collection(domainModel.Components, component => Assert.Equal("Ledger Hub", component.Name));
     }
 
+    [Fact]
+    public async Task ReferenceIndexSearchAndSelectionIncludeArmAndBrmModels()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var armDomain = new ArmDomain
+        {
+            Code = "AD001",
+            Name = "Applications"
+        };
+        var armCapability = new ArmCapability
+        {
+            Code = "AP001",
+            Name = "Case Management",
+            ParentDomain = armDomain,
+            ParentDomainCode = armDomain.Code
+        };
+        var armComponent = new ArmComponent
+        {
+            Code = "AC001",
+            Name = "Workflow Engine",
+            ParentCapability = armCapability,
+            ParentCapabilityCode = armCapability.Code,
+            ProductExamples = "Flow Suite"
+        };
+        armComponent.CapabilityLinks.Add(new ArmComponentCapabilityLink
+        {
+            ArmComponent = armComponent,
+            ArmCapability = armCapability
+        });
+
+        var brmDomain = new BrmDomain
+        {
+            Code = "BD001",
+            Name = "Operations"
+        };
+        var brmCapability = new BrmCapability
+        {
+            Code = "BC001",
+            Name = "Order Handling",
+            ParentDomain = brmDomain,
+            ParentDomainCode = brmDomain.Code
+        };
+        var brmComponent = new BrmComponent
+        {
+            Code = "BC002",
+            Name = "Order Capture",
+            ParentCapability = brmCapability,
+            ParentCapabilityCode = brmCapability.Code,
+            ProductExamples = "Capture Cloud"
+        };
+
+        await fixture.DbContext.AddRangeAsync(armDomain, armCapability, armComponent, brmDomain, brmCapability, brmComponent);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateReferenceController();
+
+        var searchResult = await controller.IndexAsync("arm workflow", null, null);
+        var searchModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(searchResult).Model);
+        var searchComponent = Assert.Single(searchModel.Components);
+        Assert.Equal("Workflow Engine", searchComponent.Name);
+        Assert.Equal(ReferenceModelKind.Arm, searchComponent.ModelKind);
+        var searchGroup = Assert.Single(searchModel.ModelGroups);
+        Assert.Equal(ReferenceModelKind.Arm, searchGroup.ModelKind);
+        Assert.True(searchGroup.IsExpanded);
+
+        var selectionResult = await controller.IndexAsync(null, null, null, ReferenceModelKind.Brm, "BD001", "BC001");
+        var selectionModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(selectionResult).Model);
+        var selectedComponent = Assert.Single(selectionModel.Components);
+        Assert.Equal("Order Capture", selectedComponent.Name);
+        Assert.Equal(ReferenceModelKind.Brm, selectionModel.SelectedModelKind);
+        Assert.Equal("BD001", selectionModel.SelectedDomainCode);
+        Assert.Equal("BC001", selectionModel.SelectedCapabilityCode);
+        Assert.Equal("browser-model-brm-domain-bd001-capability-bc001", selectionModel.ActiveTreeAnchorId);
+        Assert.Contains(selectionModel.ModelGroups, group => group.ModelKind == ReferenceModelKind.Brm && group.IsExpanded);
+        Assert.Contains(selectionModel.ModelGroups, group => group.ModelKind == ReferenceModelKind.Arm && !group.IsExpanded);
+    }
+
+    [Fact]
+    public async Task ReferenceIndexDefaultsToCollapsedAllModelsTree()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        await fixture.DbContext.AddRangeAsync(
+            new ArmDomain
+            {
+                Code = "AD001",
+                Name = "Applications"
+            },
+            new BrmDomain
+            {
+                Code = "BD001",
+                Name = "Business"
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateReferenceController();
+
+        var result = await controller.IndexAsync(null, null, null);
+
+        var model = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal("browser-navigation", model.ActiveTreeAnchorId);
+        Assert.All(model.ModelGroups, group => Assert.False(group.IsExpanded));
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
