@@ -1,6 +1,8 @@
+@using HERMMapperApp
 @model HomeDashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
 }
 
 <section class="hero-panel">
@@ -8,14 +10,19 @@
         <h1>Welcome to HERM Mapper</h1>
 
         <div class="d-flex flex-wrap gap-3 mt-4">
-            <a class="btn btn-primary btn-lg" asp-controller="Products" asp-action="Create">Add product</a>
             <a class="btn btn-outline-light btn-lg" asp-controller="Mappings" asp-action="Index">Open mapping board</a>
+            @if (canManageProductsAndServices)
+            {
+                <a class="btn btn-primary btn-lg" asp-controller="Products" asp-action="Create">Add product</a>
+                <a class="btn btn-outline-light btn-lg" asp-controller="Applications" asp-action="Create">Add application</a>
+                <a class="btn btn-outline-light btn-lg" asp-controller="Capabilities" asp-action="Create">Add capability</a>
+            }
         </div>
     </div>
     <div class="hero-side">
         <div class="hero-metric">
             <span class="metric-label">Reference model</span>
-            <span class="metric-value small">@(Model.HasReferenceModel ? "Imported and ready for mapping." : "No TRM model imported yet.")</span>
+            <span class="metric-value small">@Model.ReferenceModelStatus</span>
         </div>
     </div>
 </section>
@@ -32,19 +39,19 @@
         <span class="stat-meta">Ready for CSV export</span>
     </article>
     <article class="stat-card">
-        <span class="stat-label">TRM domains</span>
-        <span class="stat-value">@Model.DomainCount</span>
-        <span class="stat-meta">Imported reference domains</span>
+        <span class="stat-label">BRM model</span>
+        <span class="stat-value">@Model.BrmComponentCount</span>
+        <span class="stat-meta">@Model.BrmDomainCount domain(s), @Model.BrmCapabilityCount capability node(s), @Model.BrmComponentCount component(s)</span>
     </article>
     <article class="stat-card">
-        <span class="stat-label">TRM capabilities</span>
-        <span class="stat-value">@Model.CapabilityCount</span>
-        <span class="stat-meta">Imported capability nodes</span>
+        <span class="stat-label">ARM model</span>
+        <span class="stat-value">@Model.ArmComponentCount</span>
+        <span class="stat-meta">@Model.ArmDomainCount domain(s), @Model.ArmCapabilityCount capability node(s), @Model.ArmComponentCount component(s)</span>
     </article>
     <article class="stat-card">
-        <span class="stat-label">TRM components</span>
-        <span class="stat-value">@Model.ReferenceComponentCount</span>
-        <span class="stat-meta">Searchable component catalogue</span>
+        <span class="stat-label">TRM model</span>
+        <span class="stat-value">@Model.TrmComponentCount</span>
+        <span class="stat-meta">@Model.TrmDomainCount domain(s), @Model.TrmCapabilityCount capability node(s), @Model.TrmComponentCount component(s)</span>
     </article>
 </section>
 

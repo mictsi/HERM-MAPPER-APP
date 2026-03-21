@@ -25,18 +25,21 @@ public sealed class HomeController(AppDbContext dbContext) : Controller
                 x.MappingStatus == MappingStatus.Complete &&
                 x.ProductCatalogItem != null &&
                 !x.ProductCatalogItem.IsDeleted),
-            ReferenceComponentCount = await dbContext.TrmComponents
+            TrmComponentCount = await dbContext.TrmComponents
                 .ForReferenceModel(ReferenceModelKind.Trm)
                 .CountAsync(x => !x.IsDeleted),
-            DomainCount = await dbContext.TrmDomains
+            TrmDomainCount = await dbContext.TrmDomains
                 .ForReferenceModel(ReferenceModelKind.Trm)
                 .CountAsync(),
-            CapabilityCount = await dbContext.TrmCapabilities
+            TrmCapabilityCount = await dbContext.TrmCapabilities
                 .ForReferenceModel(ReferenceModelKind.Trm)
                 .CountAsync(),
-            HasReferenceModel = await dbContext.TrmDomains
-                .ForReferenceModel(ReferenceModelKind.Trm)
-                .AnyAsync(),
+            ArmDomainCount = await dbContext.ArmDomains.CountAsync(),
+            ArmCapabilityCount = await dbContext.ArmCapabilities.CountAsync(),
+            ArmComponentCount = await dbContext.ArmComponents.CountAsync(x => !x.IsDeleted),
+            BrmDomainCount = await dbContext.BrmDomains.CountAsync(),
+            BrmCapabilityCount = await dbContext.BrmCapabilities.CountAsync(),
+            BrmComponentCount = await dbContext.BrmComponents.CountAsync(x => !x.IsDeleted),
             RecentProducts = await dbContext.ProductCatalogItems
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted)
