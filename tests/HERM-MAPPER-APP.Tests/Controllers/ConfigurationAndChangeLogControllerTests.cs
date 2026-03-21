@@ -56,7 +56,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateChangeLogController();
-        var result = await controller.IndexAsync("Product");
+        var result = await controller.Index("Product");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ChangeLogIndexViewModel>(view.Model);
@@ -91,7 +91,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateChangeLogController();
-        var result = await controller.IndexAsync("ada");
+        var result = await controller.Index("ada");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ChangeLogIndexViewModel>(view.Model);

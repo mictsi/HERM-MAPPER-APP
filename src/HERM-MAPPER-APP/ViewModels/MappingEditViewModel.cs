@@ -7,7 +7,9 @@ namespace HERMMapperApp.ViewModels;
 public sealed class MappingEditViewModel
 {
     public int? MappingId { get; init; }
-    public int ProductId { get; init; }
+
+    [Required]
+    public int? ProductId { get; init; }
     public string ProductName { get; init; } = string.Empty;
     public string? Vendor { get; init; }
     public string? Version { get; init; }
@@ -27,7 +29,8 @@ public sealed class MappingEditViewModel
     public int? SelectedComponentId { get; set; }
 
     [Display(Name = "Mapping status")]
-    public MappingStatus MappingStatus { get; set; }
+    [Required]
+    public MappingStatus? MappingStatus { get; set; }
 
     [StringLength(32)]
     [Display(Name = "Technology Component Code")]

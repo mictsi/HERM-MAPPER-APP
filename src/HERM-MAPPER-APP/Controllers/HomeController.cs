@@ -11,7 +11,7 @@ namespace HERMMapperApp.Controllers;
 [Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class HomeController(AppDbContext dbContext) : Controller
 {
-    public async Task<IActionResult> IndexAsync()
+    public async Task<IActionResult> Index()
     {
         if (!ModelState.IsValid)
         {

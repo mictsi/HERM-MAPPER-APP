@@ -32,6 +32,11 @@ public sealed class ServicesController(
         string? lifecycleStatus = null,
         string? sort = null)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         owner = NormalizeSelection(owner);
         lifecycleStatus = NormalizeSelection(lifecycleStatus);
         sort = NormalizeSort(sort);
@@ -90,6 +95,11 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Create()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var model = new ServiceEditViewModel();
         await PopulateServiceOptionsAsync(model);
         return View(model);
@@ -136,6 +146,11 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var service = await LoadServiceAsync(id, asNoTracking: true);
         if (service is null)
         {
@@ -190,6 +205,11 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Connections(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var service = await LoadServiceAsync(id, asNoTracking: true);
         if (service is null)
         {
@@ -247,6 +267,11 @@ public sealed class ServicesController(
 
     public async Task<IActionResult> Visualize(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var service = await LoadServiceAsync(id, asNoTracking: true);
         if (service is null)
         {
@@ -272,6 +297,11 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Delete(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var service = await LoadServiceAsync(id, asNoTracking: true);
         return service is null ? NotFound() : View(service);
     }
@@ -281,6 +311,11 @@ public sealed class ServicesController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var service = await dbContext.ServiceCatalogItems.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (service is null)
         {
@@ -308,6 +343,11 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     public async Task<IActionResult> Restore()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var services = await dbContext.ServiceCatalogItems
             .AsNoTracking()
             .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
@@ -333,6 +373,11 @@ public sealed class ServicesController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RestoreDeleted(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var service = await dbContext.ServiceCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (service is null)
         {
@@ -361,6 +406,11 @@ public sealed class ServicesController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PermanentDelete(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var service = await dbContext.ServiceCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (service is null)
         {
@@ -728,14 +778,14 @@ public sealed class ServicesController(
             .ToList();
     }
 
-    private static string BuildProductPreview(IReadOnlyList<string> productNames) => productNames.Count switch
+    private static string BuildProductPreview(List<string> productNames) => productNames.Count switch
     {
         0 => "-",
         <= 3 => string.Join(", ", productNames),
         _ => $"{string.Join(", ", productNames.Take(3))} +{productNames.Count - 3} more"
     };
 
-    private static IReadOnlyCollection<int> GetAllowedDeletedProductIds(
+    private static List<int> GetAllowedDeletedProductIds(
         ServiceCatalogItem service,
         IEnumerable<ServiceConnectionCanvasNodeInputViewModel>? canvasNodes = null) => service.ProductLinks
         .Select(link => link.ProductCatalogItemId)
@@ -748,7 +798,7 @@ public sealed class ServicesController(
         .Distinct()
         .ToList();
 
-    private static bool CanRenderAsGraph(IReadOnlyList<ServiceConnectionViewModel> connections)
+    private static bool CanRenderAsGraph(List<ServiceConnectionViewModel> connections)
     {
         if (connections.Count == 0)
         {

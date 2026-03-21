@@ -13,13 +13,13 @@ public sealed class ProductBulkEditViewModel : IValidatableObject
     public string? ReturnLifecycleStatus { get; set; }
 
     [Display(Name = "Update vendor")]
-    public bool ApplyVendor { get; set; }
+    public bool? ApplyVendor { get; set; }
 
     [StringLength(120)]
     public string? Vendor { get; set; }
 
     [Display(Name = "Update owners")]
-    public bool ApplyOwners { get; set; }
+    public bool? ApplyOwners { get; set; }
 
     [Display(Name = "Owner update mode")]
     public string OwnerUpdateMode { get; set; } = ProductBulkOwnerUpdateModes.Replace;
@@ -28,7 +28,7 @@ public sealed class ProductBulkEditViewModel : IValidatableObject
     public List<string> Owners { get; set; } = [];
 
     [Display(Name = "Update lifecycle status")]
-    public bool ApplyLifecycleStatus { get; set; }
+    public bool? ApplyLifecycleStatus { get; set; }
 
     [StringLength(80)]
     [Display(Name = "Lifecycle status")]
@@ -46,7 +46,7 @@ public sealed class ProductBulkEditViewModel : IValidatableObject
                 [nameof(SelectedProductIds)]);
         }
 
-        if (!ApplyVendor && !ApplyOwners && !ApplyLifecycleStatus)
+        if (ApplyVendor != true && ApplyOwners != true && ApplyLifecycleStatus != true)
         {
             yield return new ValidationResult(
                 "Choose at least one field to update.",

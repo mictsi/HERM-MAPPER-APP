@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using HERMMapperApp.Models;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace HERMMapperApp.ViewModels;
 
@@ -16,16 +17,19 @@ public sealed class LoginViewModel
 
     public string? ReturnUrl { get; set; }
 
+    [BindNever]
     public bool LocalLoginEnabled { get; init; } = true;
 
+    [BindNever]
     public bool OpenIdConnectEnabled { get; init; }
 
+    [BindNever]
     public string OpenIdConnectDisplayName { get; init; } = "OpenID Connect";
 }
 
 public sealed class PasswordSelfServiceViewModel
 {
-    public int Id { get; init; }
+    public int? Id { get; init; }
 
     public string GivenName { get; init; } = string.Empty;
 

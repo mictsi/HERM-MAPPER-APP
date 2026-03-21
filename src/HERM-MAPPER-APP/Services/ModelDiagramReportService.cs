@@ -46,11 +46,6 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
         "fontColor=default;align=left;spacingTop=4.5;spacing=0;verticalAlign=top;strokeOpacity=100;" +
         "fillOpacity=100;rounded=1;absoluteArcSize=1;arcSize=7.5;fillColor=#e5e5e5;strokeWidth=1.5;" +
         "spacingLeft=7.874;container=0;recursiveResize=0;";
-    private const string ComponentStyle =
-        "html=1;overflow=block;blockSpacing=1;whiteSpace=wrap;fontSize=16;fontFamily=Open Sans;" +
-        "fontColor=default;spacingTop=1.9685;align=left;spacing=0;verticalAlign=top;strokeOpacity=100;" +
-        "fillOpacity=100;rounded=1;absoluteArcSize=1;arcSize=16;fillColor=#ffffff;spacingLeft=5.9055;" +
-        "container=0;";
     private const string ComponentContainerStyle =
         "html=1;overflow=block;blockSpacing=1;whiteSpace=wrap;fontSize=16;fontFamily=Open Sans;" +
         "fontColor=default;spacingTop=1.9685;align=left;spacing=0;verticalAlign=top;strokeOpacity=100;" +
@@ -292,7 +287,7 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
             product.Version,
             product.OwnerDisplay);
 
-    private static string ResolveFallbackStatus(IReadOnlyList<ProductMapping> mappings) =>
+    private static string ResolveFallbackStatus(List<ProductMapping> mappings) =>
         mappings.Count == 0
             ? "Not mapped"
             : GetStatusLabel(mappings[0].MappingStatus);
@@ -511,22 +506,22 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
             var words = segment.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var currentWidth = 0;
 
-            foreach (var word in words)
+            foreach (var wordLength in words.Select(word => word.Length))
             {
                 if (currentWidth == 0)
                 {
-                    currentWidth = word.Length;
+                    currentWidth = wordLength;
                     continue;
                 }
 
-                if (currentWidth + 1 + word.Length > widthChars)
+                if (currentWidth + 1 + wordLength > widthChars)
                 {
                     lineCount++;
-                    currentWidth = word.Length;
+                    currentWidth = wordLength;
                 }
                 else
                 {
-                    currentWidth += 1 + word.Length;
+                    currentWidth += 1 + wordLength;
                 }
             }
 
@@ -598,7 +593,7 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
                         0,
                         component.Width,
                         component.Component.IsProductProxy ? component.Height : component.HeaderHeight,
-                        component.Component.IsProductProxy ? ComponentTitleStyle : ComponentTitleStyle,
+                        ComponentTitleStyle,
                         WebUtility.HtmlEncode(component.Component.DisplayLabel));
 
                     if (includeProducts && !component.Component.IsProductProxy)
@@ -717,18 +712,15 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
 
         foreach (var component in data.Domains.SelectMany(x => x.Capabilities).SelectMany(x => x.Components))
         {
-            foreach (var product in component.Products)
-            {
-                relationships.Add(BuildArchiRelationship(
-                    archimate,
-                    xsi,
-                    xml,
-                    GetComponentProductRelationshipId(component.ComponentId, product.ProductId),
-                    "Association",
-                    GetComponentElementId(component.ComponentId),
-                    GetProductElementId(product.ProductId),
-                    "Mapped product"));
-            }
+            relationships.Add(component.Products.Select(product => BuildArchiRelationship(
+                archimate,
+                xsi,
+                xml,
+                GetComponentProductRelationshipId(component.ComponentId, product.ProductId),
+                "Association",
+                GetComponentElementId(component.ComponentId),
+                GetProductElementId(product.ProductId),
+                "Mapped product")));
         }
 
         if (data.UnmappedProducts.Count > 0)
@@ -745,18 +737,15 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
                 "element-capability-unmapped",
                 "Contains"));
 
-            foreach (var product in data.UnmappedProducts)
-            {
-                relationships.Add(BuildArchiRelationship(
-                    archimate,
-                    xsi,
-                    xml,
-                    $"relationship-capability-unmapped-product-{product.ProductId}",
-                    "Association",
-                    "element-capability-unmapped",
-                    GetProductElementId(product.ProductId),
-                    "Pending product"));
-            }
+            relationships.Add(data.UnmappedProducts.Select(product => BuildArchiRelationship(
+                archimate,
+                xsi,
+                xml,
+                $"relationship-capability-unmapped-product-{product.ProductId}",
+                "Association",
+                "element-capability-unmapped",
+                GetProductElementId(product.ProductId),
+                "Pending product")));
         }
 
         organizations.Add(BuildOrganizationFolder(
@@ -1067,8 +1056,6 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
 
     private static string GetComponentProductRelationshipId(int componentId, int productId) => $"relationship-component-{componentId}-product-{productId}";
 
-    private static string FormatNumber(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
-
     private sealed class DrawIoBuilder
     {
         private readonly XElement root =
@@ -1079,6 +1066,8 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
         private int nextId = 2;
 
         public XElement Root => root;
+
+        private static string FormatNumber(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
 
         public string AddGroup(string parent, double x, double y, double width, double height, string style)
         {

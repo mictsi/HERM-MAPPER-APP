@@ -290,7 +290,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             .AsSplitQuery();
 
     private async Task<List<ApplicationCatalogItemMapping>> LoadApplicationMappingsForArmComponentsAsync(
-        IReadOnlyCollection<int> armComponentIds,
+        List<int> armComponentIds,
         CancellationToken cancellationToken)
     {
         if (armComponentIds.Count == 0)
@@ -426,7 +426,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
 
     private static ApplicationHierarchyNodeViewModel BuildCapabilityHierarchy(
         BusinessCapabilityCatalogItem capability,
-        IReadOnlyList<CapabilityResolvedPathViewModel> resolvedPaths) =>
+        List<CapabilityResolvedPathViewModel> resolvedPaths) =>
         new()
         {
             Key = $"capability-{capability.Id}",
@@ -442,7 +442,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             Children = BuildCapabilityHierarchyNodes(resolvedPaths, 0, $"capability-{capability.Id}")
         };
 
-    private static IReadOnlyList<ProductMapping> GetResolvedProductMappings(ApplicationCatalogItemMapping mapping)
+    private static List<ProductMapping> GetResolvedProductMappings(ApplicationCatalogItemMapping mapping)
     {
         if (mapping.ProductMapping is not null)
         {
@@ -457,7 +457,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
 
     private static ApplicationHierarchyNodeViewModel BuildApplicationHierarchy(
         ApplicationCatalogItem application,
-        IReadOnlyList<ApplicationResolvedPathViewModel> resolvedPaths) =>
+        List<ApplicationResolvedPathViewModel> resolvedPaths) =>
         new()
         {
             Key = $"application-{application.Id}",
@@ -470,9 +470,9 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             Children = BuildApplicationHierarchyNodes(resolvedPaths, 0, $"application-{application.Id}")
         };
 
-    private static IReadOnlyList<ApplicationGraphConnectionViewModel> BuildApplicationGraphConnections(
+    private static List<ApplicationGraphConnectionViewModel> BuildApplicationGraphConnections(
         ApplicationCatalogItem application,
-        IReadOnlyList<ApplicationResolvedPathViewModel> resolvedPaths)
+        List<ApplicationResolvedPathViewModel> resolvedPaths)
     {
         if (resolvedPaths.Count == 0)
         {
@@ -543,8 +543,8 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
         return connections;
     }
 
-    private static IReadOnlyList<ApplicationHierarchyNodeViewModel> BuildApplicationHierarchyNodes(
-        IReadOnlyList<ApplicationResolvedPathViewModel> paths,
+    private static List<ApplicationHierarchyNodeViewModel> BuildApplicationHierarchyNodes(
+        List<ApplicationResolvedPathViewModel> paths,
         int level,
         string keyPrefix)
     {
@@ -642,8 +642,8 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             .ToList();
     }
 
-    private static IReadOnlyList<ApplicationHierarchyNodeViewModel> BuildCapabilityHierarchyNodes(
-        IReadOnlyList<CapabilityResolvedPathViewModel> paths,
+    private static List<ApplicationHierarchyNodeViewModel> BuildCapabilityHierarchyNodes(
+        List<CapabilityResolvedPathViewModel> paths,
         int level,
         string keyPrefix)
     {
@@ -762,12 +762,20 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
 
     private readonly record struct ApplicationGraphNode(string Id, string Label);
 
-    private static string BuildProductLabel(ProductCatalogItem? product) =>
-        product is null
-            ? "-"
-            : string.IsNullOrWhiteSpace(product.Vendor)
-                ? product.Name
-                : $"{product.Name} ({product.Vendor})";
+    private static string BuildProductLabel(ProductCatalogItem? product)
+    {
+        if (product is null)
+        {
+            return "-";
+        }
+
+        if (string.IsNullOrWhiteSpace(product.Vendor))
+        {
+            return product.Name;
+        }
+
+        return $"{product.Name} ({product.Vendor})";
+    }
 
     private static string BuildArmDomainLabel(ArmComponent? component) =>
         component?.ParentCapability?.ParentDomain is null

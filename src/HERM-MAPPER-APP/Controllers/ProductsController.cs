@@ -17,6 +17,11 @@ public sealed class ProductsController(
 {
     public async Task<IActionResult> Index(string? search, string[]? owners = null, string? lifecycleStatus = null)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var query = dbContext.ProductCatalogItems
             .AsNoTracking()
             .Where(x => !x.IsDeleted)
@@ -69,6 +74,11 @@ public sealed class ProductsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Create()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var model = new ProductEditViewModel();
         await PopulateFormOptionsAsync(model);
         return View(model);
@@ -116,6 +126,11 @@ public sealed class ProductsController(
 
     public async Task<IActionResult> Details(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Owners)
@@ -136,6 +151,11 @@ public sealed class ProductsController(
 
     public async Task<IActionResult> Visualize(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Mappings)
@@ -183,6 +203,11 @@ public sealed class ProductsController(
 
     public async Task<IActionResult> ShowDependencies(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
@@ -240,6 +265,11 @@ public sealed class ProductsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Owners)
@@ -251,37 +281,6 @@ public sealed class ProductsController(
 
         var model = ProductEditViewModel.FromProduct(product);
         await PopulateFormOptionsAsync(model);
-        return View(model);
-    }
-
-    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> BulkEdit(int[]? selectedIds, string? returnSearch = null, string[]? returnOwners = null, string? returnLifecycleStatus = null)
-    {
-        var normalizedProductIds = NormalizeIds(selectedIds);
-        var normalizedReturnOwners = NormalizeSelections(returnOwners);
-        var normalizedReturnLifecycleStatus = NormalizeSelection(returnLifecycleStatus);
-
-        if (normalizedProductIds.Count == 0)
-        {
-            TempData["ProductsErrorMessage"] = "Select one or more products before opening bulk edit.";
-            return Redirect(BuildIndexUrl(returnSearch, normalizedReturnOwners, normalizedReturnLifecycleStatus));
-        }
-
-        var model = new ProductBulkEditViewModel
-        {
-            SelectedProductIds = normalizedProductIds,
-            ReturnSearch = returnSearch,
-            ReturnOwners = normalizedReturnOwners,
-            ReturnLifecycleStatus = normalizedReturnLifecycleStatus
-        };
-
-        await PopulateBulkEditModelAsync(model);
-        if (model.SelectedProducts.Count == 0)
-        {
-            TempData["ProductsErrorMessage"] = "The selected products could not be found.";
-            return Redirect(BuildIndexUrl(model.ReturnSearch, model.ReturnOwners, model.ReturnLifecycleStatus));
-        }
-
         return View(model);
     }
 
@@ -328,13 +327,57 @@ public sealed class ProductsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    public async Task<IActionResult> BulkEdit(int[]? selectedIds, string? returnSearch = null, string[]? returnOwners = null, string? returnLifecycleStatus = null)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var normalizedProductIds = NormalizeIds(selectedIds);
+        var normalizedReturnOwners = NormalizeSelections(returnOwners);
+        var normalizedReturnLifecycleStatus = NormalizeSelection(returnLifecycleStatus);
+
+        if (normalizedProductIds.Count == 0)
+        {
+            TempData["ProductsErrorMessage"] = "Select one or more products before opening bulk edit.";
+            return Redirect(BuildIndexUrl(returnSearch, normalizedReturnOwners, normalizedReturnLifecycleStatus));
+        }
+
+        var model = new ProductBulkEditViewModel
+        {
+            SelectedProductIds = normalizedProductIds,
+            ReturnSearch = returnSearch,
+            ReturnOwners = normalizedReturnOwners,
+            ReturnLifecycleStatus = normalizedReturnLifecycleStatus
+        };
+
+        await PopulateBulkEditModelAsync(model);
+        if (model.SelectedProducts.Count == 0)
+        {
+            TempData["ProductsErrorMessage"] = "The selected products could not be found.";
+            return Redirect(BuildIndexUrl(model.ReturnSearch, model.ReturnOwners, model.ReturnLifecycleStatus));
+        }
+
+        return View(model);
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> BulkEdit(ProductBulkEditViewModel input)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         input.SelectedProductIds = NormalizeIds(input.SelectedProductIds);
         input.ReturnOwners = NormalizeSelections(input.ReturnOwners);
         input.Owners = NormalizeSelections(input.Owners);
+        input.ApplyVendor ??= false;
+        input.ApplyOwners ??= false;
+        input.ApplyLifecycleStatus ??= false;
         input.OwnerUpdateMode = NormalizeOwnerUpdateMode(input.OwnerUpdateMode);
         input.Vendor = NormalizeSelection(input.Vendor);
         input.ReturnLifecycleStatus = NormalizeSelection(input.ReturnLifecycleStatus);
@@ -371,20 +414,20 @@ public sealed class ProductsController(
         {
             var changed = false;
 
-            if (input.ApplyVendor && !string.Equals(productToUpdate.Vendor, input.Vendor, StringComparison.Ordinal))
+            if (input.ApplyVendor == true && !string.Equals(productToUpdate.Vendor, input.Vendor, StringComparison.Ordinal))
             {
                 productToUpdate.Vendor = input.Vendor;
                 changed = true;
             }
 
-            if (input.ApplyLifecycleStatus &&
+            if (input.ApplyLifecycleStatus == true &&
                 !string.Equals(productToUpdate.LifecycleStatus, input.LifecycleStatus, StringComparison.Ordinal))
             {
                 productToUpdate.LifecycleStatus = input.LifecycleStatus;
                 changed = true;
             }
 
-            if (input.ApplyOwners)
+            if (input.ApplyOwners == true)
             {
                 var targetOwners = ResolveBulkOwnerSelection(productToUpdate, input);
                 if (!OwnerSelectionsMatch(productToUpdate, targetOwners))
@@ -419,6 +462,11 @@ public sealed class ProductsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Delete(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Owners)
@@ -434,6 +482,11 @@ public sealed class ProductsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (product is null)
         {
@@ -460,6 +513,11 @@ public sealed class ProductsController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     public async Task<IActionResult> Restore()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var products = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Owners)
@@ -481,6 +539,11 @@ public sealed class ProductsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RestoreDeleted(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (product is null)
         {
@@ -509,6 +572,11 @@ public sealed class ProductsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PermanentDelete(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
         if (product is null)
         {
@@ -656,19 +724,19 @@ public sealed class ProductsController(
     private static List<string> BuildAppliedFieldList(ProductBulkEditViewModel input)
     {
         var appliedFields = new List<string>();
-        if (input.ApplyVendor)
+        if (input.ApplyVendor == true)
         {
             appliedFields.Add("Vendor");
         }
 
-        if (input.ApplyOwners)
+        if (input.ApplyOwners == true)
         {
             appliedFields.Add(input.OwnerUpdateMode == ProductBulkOwnerUpdateModes.Append
                 ? "Owners (append)"
                 : "Owners (replace)");
         }
 
-        if (input.ApplyLifecycleStatus)
+        if (input.ApplyLifecycleStatus == true)
         {
             appliedFields.Add("Lifecycle status");
         }

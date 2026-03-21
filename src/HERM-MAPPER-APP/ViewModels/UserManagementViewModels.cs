@@ -72,7 +72,7 @@ public sealed class UserEditViewModel
 public sealed class UserUpdateViewModel
 {
     [Required]
-    public int Id { get; set; }
+    public int? Id { get; set; }
 
     [Required, StringLength(100)]
     [Display(Name = "Given name")]
@@ -114,7 +114,8 @@ public sealed class UserDeleteViewModel
 
 public sealed class UserResetPasswordViewModel
 {
-    public int Id { get; init; }
+    [Required]
+    public int? Id { get; init; }
 
     public string DisplayName { get; init; } = string.Empty;
 

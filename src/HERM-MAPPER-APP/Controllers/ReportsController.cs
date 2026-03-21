@@ -12,7 +12,7 @@ namespace HERMMapperApp.Controllers;
 [Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReportService modelDiagramReportService) : Controller
 {
-    public async Task<IActionResult> IndexAsync(string? lifecycleOwner = null)
+    public async Task<IActionResult> Index(string? lifecycleOwner = null)
     {
         if (!ModelState.IsValid)
         {
@@ -97,7 +97,7 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
         return View(model);
     }
 
-    public async Task<IActionResult> ModelDiagramAsync()
+    public async Task<IActionResult> ModelDiagram()
     {
         if (!ModelState.IsValid)
         {
@@ -108,7 +108,7 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> ExportMappingsCsvAsync()
+    public async Task<IActionResult> ExportMappingsCsv()
     {
         if (!ModelState.IsValid)
         {
@@ -557,7 +557,7 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
         return product.IsDeleted ? $"{label} [deleted]" : label;
     }
 
-    private static string BuildPreviewLabel(IReadOnlyList<string> values) => values.Count switch
+    private static string BuildPreviewLabel(List<string> values) => values.Count switch
     {
         0 => "-",
         <= 3 => string.Join(", ", values),

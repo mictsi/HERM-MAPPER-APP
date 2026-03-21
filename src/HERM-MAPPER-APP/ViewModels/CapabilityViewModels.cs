@@ -24,7 +24,7 @@ public sealed class CapabilityIndexRowViewModel
 
 public sealed class CapabilityEditViewModel
 {
-    public int Id { get; set; }
+    public int? Id { get; set; }
 
     [Required(ErrorMessage = "Choose a BRM capability.")]
     [Display(Name = "BRM capability")]

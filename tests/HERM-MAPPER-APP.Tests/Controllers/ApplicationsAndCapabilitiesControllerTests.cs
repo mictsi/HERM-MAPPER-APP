@@ -36,6 +36,61 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
+    public async Task ApplicationIndexSearchMatchesMappedProductAndTrmLabels()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        await fixture.DbContext.AddAsync(new ApplicationCatalogItem
+        {
+            Name = "Admissions Hub",
+            Mappings =
+            [
+                new ApplicationCatalogItemMapping
+                {
+                    ArmComponentId = seeded.ArmComponent.Id,
+                    ProductMappingId = seeded.ProductMapping.Id,
+                    ProductCatalogItemId = seeded.Product.Id
+                }
+            ]
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateApplicationsController();
+        var result = await controller.Index("Integration Platform");
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ApplicationsIndexViewModel>(view.Model);
+        var row = Assert.Single(model.Applications);
+        Assert.Equal("Admissions Hub", row.Name);
+        Assert.Equal(1, row.ProductCount);
+    }
+
+    [Fact]
+    public async Task ApplicationDetailsReturnsBadRequestWhenModelStateIsInvalid()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateApplicationsController();
+        controller.ModelState.AddModelError("id", "invalid");
+
+        var result = await controller.Details(42);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task ApplicationEditReturnsBadRequestWhenModelStateIsInvalid()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateApplicationsController();
+        controller.ModelState.AddModelError("id", "invalid");
+
+        var result = await controller.Edit(42);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
     public async Task AllDependenciesPagesReturnSharedHierarchyRoots()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -362,6 +417,61 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
 
         var applicationNode = Assert.Single(Assert.Single(Assert.Single(armDomainNode.Children).Children).Children);
         Assert.Equal("Admissions Hub", applicationNode.Label);
+    }
+
+    [Fact]
+    public async Task CapabilityIndexSearchMatchesMappedArmLabels()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        await fixture.DbContext.AddAsync(new BusinessCapabilityCatalogItem
+        {
+            Name = $"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}",
+            Mappings =
+            [
+                new BusinessCapabilityCatalogItemMapping
+                {
+                    BrmComponentId = seeded.BrmComponent.Id,
+                    ArmComponentId = seeded.ArmComponent.Id,
+                    ArmCapabilityId = seeded.ArmCapability.Id
+                }
+            ]
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateCapabilitiesController();
+        var result = await controller.Index("Applicant Portal");
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CapabilitiesIndexViewModel>(view.Model);
+        var row = Assert.Single(model.Capabilities);
+        Assert.Equal("BC002 Student Recruitment", row.Name);
+        Assert.Equal(1, row.ArmComponentCount);
+    }
+
+    [Fact]
+    public async Task CapabilityDetailsReturnsBadRequestWhenModelStateIsInvalid()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateCapabilitiesController();
+        controller.ModelState.AddModelError("id", "invalid");
+
+        var result = await controller.Details(42);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task CapabilityEditReturnsBadRequestWhenModelStateIsInvalid()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateCapabilitiesController();
+        controller.ModelState.AddModelError("id", "invalid");
+
+        var result = await controller.Edit(42);
+
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]

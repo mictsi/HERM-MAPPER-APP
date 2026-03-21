@@ -21,10 +21,21 @@ public sealed class HomeDashboardViewModel
     public bool HasArmModel => ArmDomainCount != 0 || ArmCapabilityCount != 0 || ArmComponentCount != 0;
     public bool HasBrmModel => BrmDomainCount != 0 || BrmCapabilityCount != 0 || BrmComponentCount != 0;
 
-    public string ReferenceModelStatus =>
-        HasTrmModel && HasArmModel && HasBrmModel
-            ? "TRM, ARM, and BRM are imported and ready for mapping."
-            : HasTrmModel || HasArmModel || HasBrmModel
-                ? "Reference models are partially imported. Open Configuration to load the missing models."
-                : "No reference models imported yet.";
+    public string ReferenceModelStatus
+    {
+        get
+        {
+            if (HasTrmModel && HasArmModel && HasBrmModel)
+            {
+                return "TRM, ARM, and BRM are imported and ready for mapping.";
+            }
+
+            if (HasTrmModel || HasArmModel || HasBrmModel)
+            {
+                return "Reference models are partially imported. Open Configuration to load the missing models.";
+            }
+
+            return "No reference models imported yet.";
+        }
+    }
 }

@@ -26,8 +26,8 @@ public sealed class SampleRelationshipImportServiceTests
         var csvPath = fixture.WriteCsv(
             """
             MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
-            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
-            HERM;TD999 Infrastructure;TCAP001 Capability A;TC002 Monitoring & Alerting;Azure Log Analytics
+            HERM;TD001 Cybersecurity;TP001 Capability A;TC002 Monitoring & Alerting;Graylog
+            HERM;TD999 Infrastructure;TP001 Capability A;TC002 Monitoring & Alerting;Azure Log Analytics
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -82,7 +82,7 @@ public sealed class SampleRelationshipImportServiceTests
         var csvPath = fixture.WriteCsv(
             """
             MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
-            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
+            HERM;TD001 Cybersecurity;TP001 Capability A;TC002 Monitoring & Alerting;Graylog
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -110,7 +110,7 @@ public sealed class SampleRelationshipImportServiceTests
         var csvPath = fixture.WriteCsv(
             """
             MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
-            HERM;TD001 Cybersecurity;TCAP001 Capability B;TC002 Monitoring & Alerting;Graylog
+            HERM;TD001 Cybersecurity;TP001 Capability B;TC002 Monitoring & Alerting;Graylog
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -136,7 +136,7 @@ public sealed class SampleRelationshipImportServiceTests
         var csvPath = fixture.WriteCsv(
             """
             MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
-            HERM;TD999 Infrastructure;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
+            HERM;TD999 Infrastructure;TP001 Capability A;TC002 Monitoring & Alerting;Graylog
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -180,8 +180,8 @@ public sealed class SampleRelationshipImportServiceTests
         var csvPath = fixture.WriteCsv(
             """
             MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT
-            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Graylog
-            HERM;TD001 Cybersecurity;TCAP001 Capability A;TC002 Monitoring & Alerting;Azure Log Analytics
+            HERM;TD001 Cybersecurity;TP001 Capability A;TC002 Monitoring & Alerting;Graylog
+            HERM;TD001 Cybersecurity;TP001 Capability A;TC002 Monitoring & Alerting;Azure Log Analytics
             """);
 
         var service = new SampleRelationshipImportService(fixture.DbContext);
@@ -240,7 +240,7 @@ public sealed class SampleRelationshipImportServiceTests
 
             var capability = new TrmCapability
             {
-                Code = "TCAP001",
+                Code = "TP001",
                 Name = capabilityName,
                 ParentDomain = domain
             };

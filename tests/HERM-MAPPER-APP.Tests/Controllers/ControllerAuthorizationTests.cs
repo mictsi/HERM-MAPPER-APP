@@ -78,15 +78,15 @@ public sealed class ControllerAuthorizationTests
     [Fact]
     public void ReferenceWriteActionsRequireAdminOnlyPolicy()
     {
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.VerifyImportAsync), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.ImportVerifiedAsync), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreAsync), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreArmAsync), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreBrmAsync), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponentAsync), AppPolicies.AdminOnly, 2);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponentAsync), AppPolicies.AdminOnly, 2);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.PermanentlyDeleteComponentAsync), AppPolicies.AdminOnly, 2);
-        AssertMethodPolicy<ReportsController>(nameof(ReportsController.ExportMappingsCsvAsync), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.VerifyImport), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.ImportVerified), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.Restore), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreArm), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreBrm), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponent), AppPolicies.AdminOnly, 2);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponent), AppPolicies.AdminOnly, 2);
+        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.PermanentlyDeleteComponent), AppPolicies.AdminOnly, 2);
+        AssertMethodPolicy<ReportsController>(nameof(ReportsController.ExportMappingsCsv), AppPolicies.AdminOnly, 0);
     }
 
     private static void AssertClassPolicy<TController>(string expectedPolicy)

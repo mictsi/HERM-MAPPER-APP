@@ -26,7 +26,7 @@ public sealed partial class RemoteSqlImportService(
     public const string SectionKey = "remote-sql-import";
 
     private static readonly int[] AllowedScheduleHours = [0, 1, 3, 6, 12, 24];
-    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> RequiredSchema = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, IReadOnlySet<string>> RequiredSchema = new(StringComparer.OrdinalIgnoreCase)
     {
         ["ProductCatalogItems"] = new HashSet<string>(["Id", "Name", "Vendor", "Version", "LifecycleStatus", "Description", "Notes", "IsDeleted", "CreatedUtc", "UpdatedUtc"], StringComparer.OrdinalIgnoreCase),
         ["ProductMappings"] = new HashSet<string>(["Id", "ProductCatalogItemId", "TrmDomainId", "TrmCapabilityId", "TrmComponentId", "MappingStatus", "MappingRationale", "LastReviewedUtc", "CreatedUtc", "UpdatedUtc"], StringComparer.OrdinalIgnoreCase),
@@ -34,17 +34,23 @@ public sealed partial class RemoteSqlImportService(
         ["TrmCapabilities"] = new HashSet<string>(["Id", "Code", "Name", "SourceTitle", "ParentDomainId"], StringComparer.OrdinalIgnoreCase),
         ["TrmComponents"] = new HashSet<string>(["Id", "Code", "TechnologyComponentCode", "Name", "SourceTitle", "ParentCapabilityId", "IsDeleted"], StringComparer.OrdinalIgnoreCase)
     };
-    private static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> OptionalSchema = new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, IReadOnlySet<string>> OptionalSchema = new(StringComparer.OrdinalIgnoreCase)
     {
         ["ProductCatalogItemOwners"] = new HashSet<string>(["ProductCatalogItemId", "OwnerValue"], StringComparer.OrdinalIgnoreCase)
     };
 
     public static IReadOnlyList<int> GetAllowedScheduleHours() => AllowedScheduleHours;
 
-    public static string BuildScheduleLabel(int scheduleHours) =>
-        scheduleHours <= 0
-            ? "Manual only"
-            : $"Every {scheduleHours} hour{(scheduleHours == 1 ? string.Empty : "s")}";
+    public static string BuildScheduleLabel(int scheduleHours)
+    {
+        if (scheduleHours <= 0)
+        {
+            return "Manual only";
+        }
+
+        var suffix = scheduleHours == 1 ? string.Empty : "s";
+        return $"Every {scheduleHours} hour{suffix}";
+    }
 
     public async Task<RemoteSqlImportSettingsSnapshot> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
@@ -162,7 +168,7 @@ public sealed partial class RemoteSqlImportService(
         if (resolvedInput.Errors.Count > 0)
         {
             var message = string.Join(" ", resolvedInput.Errors);
-            await LogConfigurationFailureAsync("SaveConfiguration", "Failed to save remote SQL import settings.", message);
+            await LogConfigurationFailureAsync("SaveConfiguration", "Failed to save remote SQL import settings.", message, cancellationToken);
             return RemoteSqlImportSaveResult.Failure(message);
         }
 
@@ -216,10 +222,11 @@ public sealed partial class RemoteSqlImportService(
                 nameof(AppSetting),
                 null,
                 "Saved remote SQL import settings.",
-                $"Server: {resolvedInput.ServerName}:{resolvedInput.Port}; database: {resolvedInput.DatabaseName}; encryption: {resolvedInput.ConnectionSecurityMode}; authentication: {resolvedInput.CredentialStorageMode}; schedule: {BuildScheduleLabel(resolvedInput.ScheduleHours)}. {connectionTestResult.Message}");
+                $"Server: {resolvedInput.ServerName}:{resolvedInput.Port}; database: {resolvedInput.DatabaseName}; encryption: {resolvedInput.ConnectionSecurityMode}; authentication: {resolvedInput.CredentialStorageMode}; schedule: {BuildScheduleLabel(resolvedInput.ScheduleHours)}. {connectionTestResult.Message}",
+                cancellationToken);
 
-            logger.LogInformation(
-                "Saved remote SQL import settings with schedule {ScheduleHours} for server {ServerName}:{Port} and database {DatabaseName}.",
+            LogSettingsSaved(
+                logger,
                 resolvedInput.ScheduleHours,
                 resolvedInput.ServerName,
                 resolvedInput.Port,
@@ -233,14 +240,15 @@ public sealed partial class RemoteSqlImportService(
         catch (Exception exception)
         {
             const string message = "Remote SQL import settings could not be saved.";
-            logger.LogError(exception, message);
+            LogSaveConfigurationFailed(logger, exception, message);
             await auditLogService.WriteAsync(
                 RemoteSqlImportCategory,
                 "SaveConfiguration",
                 nameof(AppSetting),
                 null,
                 message,
-                exception.Message);
+                exception.Message,
+                cancellationToken);
             return RemoteSqlImportSaveResult.Failure($"{message} {exception.Message}");
         }
     }
@@ -262,9 +270,10 @@ public sealed partial class RemoteSqlImportService(
             nameof(AppSetting),
             null,
             summary,
-            details);
+            details,
+            cancellationToken);
 
-        logger.LogInformation("{Summary} {Details}", summary, details);
+        LogSummaryInformation(logger, summary, details);
 
         return isEnabled
             ? "Remote SQL import enabled."
@@ -307,9 +316,10 @@ public sealed partial class RemoteSqlImportService(
             nameof(AppSetting),
             null,
             summary,
-            details);
+            details,
+            cancellationToken);
 
-        logger.LogInformation("{Summary} {Details}", summary, details);
+        LogSummaryInformation(logger, summary, details);
         return "Remote SQL configuration was cleared from the database.";
     }
 
@@ -323,7 +333,7 @@ public sealed partial class RemoteSqlImportService(
         if (resolvedInput.Errors.Count > 0)
         {
             var message = string.Join(" ", resolvedInput.Errors);
-            await LogConfigurationFailureAsync("TestConnection", "Remote SQL connection test failed validation.", message);
+            await LogConfigurationFailureAsync("TestConnection", "Remote SQL connection test failed validation.", message, cancellationToken);
             return RemoteSqlImportConnectionTestResult.Failure(message, resolvedInput.Errors);
         }
 
@@ -371,7 +381,8 @@ public sealed partial class RemoteSqlImportService(
                 nameof(ProductCatalogItem),
                 null,
                 "Remote SQL import was skipped.",
-                message);
+                message,
+                cancellationToken);
             return RemoteSqlImportRunResult.Failure(message);
         }
 
@@ -384,7 +395,8 @@ public sealed partial class RemoteSqlImportService(
                 nameof(ProductCatalogItem),
                 null,
                 "Remote SQL import was skipped.",
-                message);
+                message,
+                cancellationToken);
             return RemoteSqlImportRunResult.Failure(message);
         }
 
@@ -412,7 +424,8 @@ public sealed partial class RemoteSqlImportService(
                     nameof(ProductCatalogItem),
                     null,
                     message,
-                    details);
+                    details,
+                    cancellationToken);
                 return RemoteSqlImportRunResult.Failure($"{message} {details}");
             }
 
@@ -440,7 +453,8 @@ public sealed partial class RemoteSqlImportService(
                 nameof(ProductCatalogItem),
                 null,
                 summaryMessage,
-                detailMessage);
+                detailMessage,
+                cancellationToken);
 
             return RemoteSqlImportRunResult.Success(summaryMessage, importSummary.Warnings);
         }
@@ -449,7 +463,7 @@ public sealed partial class RemoteSqlImportService(
             dbContext.ChangeTracker.Clear();
 
             var message = $"Remote SQL import failed. {exception.Message}";
-            logger.LogError(exception, "Remote SQL import failed during {Trigger} execution.", trigger);
+            LogImportExecutionFailed(logger, exception, trigger);
             await UpdateExecutionStatusAsync(DateTime.UtcNow, settings.LastSuccessUtc, StatusFailed, message, cancellationToken);
             await auditLogService.WriteAsync(
                 RemoteSqlImportCategory,
@@ -457,7 +471,8 @@ public sealed partial class RemoteSqlImportService(
                 nameof(ProductCatalogItem),
                 null,
                 "Remote SQL import failed.",
-                exception.Message);
+                exception.Message,
+                cancellationToken);
             return RemoteSqlImportRunResult.Failure(message);
         }
         finally
@@ -490,7 +505,8 @@ public sealed partial class RemoteSqlImportService
                     nameof(AppSetting),
                     null,
                     failureSummary,
-                    string.Join(" | ", schemaValidation.Errors));
+                    string.Join(" | ", schemaValidation.Errors),
+                    cancellationToken);
 
                 return RemoteSqlImportConnectionTestResult.Failure(
                     message,
@@ -509,7 +525,8 @@ public sealed partial class RemoteSqlImportService
                     nameof(AppSetting),
                     null,
                     "Validated remote SQL import connection.",
-                    $"{summary} Owners table present: {schemaValidation.OwnersTableAvailable}.");
+                    $"{summary} Owners table present: {schemaValidation.OwnersTableAvailable}.",
+                    cancellationToken);
             }
 
             return RemoteSqlImportConnectionTestResult.Success(
@@ -522,14 +539,15 @@ public sealed partial class RemoteSqlImportService
         catch (Exception exception)
         {
             var message = $"Remote SQL connection test failed. {exception.Message}";
-            logger.LogError(exception, "Remote SQL connection validation failed for action {AuditAction}.", auditAction);
+            LogConnectionValidationFailed(logger, exception, auditAction);
             await auditLogService.WriteAsync(
                 RemoteSqlImportCategory,
                 auditAction,
                 nameof(AppSetting),
                 null,
                 failureSummary,
-                exception.Message);
+                exception.Message,
+                cancellationToken);
             return RemoteSqlImportConnectionTestResult.Failure(message, [exception.Message]);
         }
     }
@@ -574,19 +592,20 @@ public sealed partial class RemoteSqlImportService
         await appSettingsService.SetValueAsync(AppSettingKeys.RemoteSqlImportLastMessage, message ?? string.Empty, cancellationToken);
     }
 
-    private async Task LogConfigurationFailureAsync(string action, string summary, string details)
+    private async Task LogConfigurationFailureAsync(string action, string summary, string details, CancellationToken cancellationToken)
     {
-        logger.LogWarning("{Summary} {Details}", summary, details);
+        LogSummaryWarning(logger, summary, details);
         await auditLogService.WriteAsync(
             RemoteSqlImportCategory,
             action,
             nameof(AppSetting),
             null,
             summary,
-            details);
+            details,
+            cancellationToken);
     }
 
-    private ResolvedConnectionInput ResolveInput(
+    private static ResolvedConnectionInput ResolveInput(
         RemoteSqlImportConfigurationInput input,
         RemoteSqlImportSettingsSnapshot currentSettings,
         bool useStoredCredentialsAsFallback,
@@ -650,13 +669,10 @@ public sealed partial class RemoteSqlImportService
 
         var clearStoredCredentials = usesIntegratedSecurity;
 
-        if (!usesIntegratedSecurity && !clearStoredCredentials && preserveStoredCredentialsWhenBlank)
+        if (!usesIntegratedSecurity && !clearStoredCredentials && preserveStoredCredentialsWhenBlank && typedUserName is null && typedPassword is null)
         {
-            if (typedUserName is null && typedPassword is null)
-            {
-                effectiveUserName ??= currentSettings.UserName;
-                effectivePassword ??= currentSettings.Password;
-            }
+            effectiveUserName ??= currentSettings.UserName;
+            effectivePassword ??= currentSettings.Password;
         }
 
         var effectiveConnectionString = BuildRemoteConnectionString(
@@ -1157,12 +1173,23 @@ internal sealed class ResolvedConnectionInput
     public bool PasswordChanged { get; init; }
     public IReadOnlyList<string> Errors { get; init; } = [];
 
-    public string CredentialStorageMode =>
-        UseIntegratedSecurity || ClearStoredCredentials
-            ? "integrated security only"
-            : !string.IsNullOrWhiteSpace(EffectiveUserName) && !string.IsNullOrWhiteSpace(EffectivePassword)
-                ? "stored SQL credentials"
-                : "no credentials stored";
+    public string CredentialStorageMode
+    {
+        get
+        {
+            if (UseIntegratedSecurity || ClearStoredCredentials)
+            {
+                return "integrated security only";
+            }
+
+            if (!string.IsNullOrWhiteSpace(EffectiveUserName) && !string.IsNullOrWhiteSpace(EffectivePassword))
+            {
+                return "stored SQL credentials";
+            }
+
+            return "no credentials stored";
+        }
+    }
 
     public string ConnectionSecurityMode =>
         $"encrypt={(Encrypt ? "on" : "off")}, trustServerCertificate={(TrustServerCertificate ? "on" : "off")}";
@@ -1218,6 +1245,24 @@ internal enum RemoteSqlImportTrigger
 
 public sealed partial class RemoteSqlImportService
 {
+    [LoggerMessage(Level = LogLevel.Information, Message = "Saved remote SQL import settings with schedule {ScheduleHours} for server {ServerName}:{Port} and database {DatabaseName}.")]
+    private static partial void LogSettingsSaved(ILogger logger, int scheduleHours, string serverName, int port, string databaseName);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "{Summary} {Details}")]
+    private static partial void LogSummaryInformation(ILogger logger, string summary, string details);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{Summary} {Details}")]
+    private static partial void LogSummaryWarning(ILogger logger, string summary, string details);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "{Message}")]
+    private static partial void LogSaveConfigurationFailed(ILogger logger, Exception exception, string message);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Remote SQL import failed during {Trigger} execution.")]
+    private static partial void LogImportExecutionFailed(ILogger logger, Exception exception, RemoteSqlImportTrigger trigger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Remote SQL connection validation failed for action {AuditAction}.")]
+    private static partial void LogConnectionValidationFailed(ILogger logger, Exception exception, string auditAction);
+
     private async Task<RemoteSqlImportSummary> ApplyImportSnapshotAsync(RemoteSqlSnapshot snapshot, CancellationToken cancellationToken)
     {
         var nowUtc = DateTime.UtcNow;
@@ -1496,16 +1541,19 @@ public sealed partial class RemoteSqlImportService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(owner => owner, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var existingOwners = product.Owners.Select(owner => owner.OwnerValue).ToList();
+        var desiredOwnerSet = desiredOwners.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingOwnerSet = product.Owners
+            .Select(owner => owner.OwnerValue)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var changed = false;
 
-        foreach (var owner in product.Owners.Where(owner => desiredOwners.All(value => !string.Equals(value, owner.OwnerValue, StringComparison.OrdinalIgnoreCase))).ToList())
+        foreach (var owner in product.Owners.Where(owner => !desiredOwnerSet.Contains(owner.OwnerValue)).ToList())
         {
             product.Owners.Remove(owner);
             changed = true;
         }
 
-        foreach (var desiredOwner in desiredOwners.Where(value => existingOwners.All(existingOwner => !string.Equals(existingOwner, value, StringComparison.OrdinalIgnoreCase))))
+        foreach (var desiredOwner in desiredOwners.Where(value => !existingOwnerSet.Contains(value)))
         {
             product.Owners.Add(new ProductCatalogItemOwner
             {
@@ -1520,7 +1568,7 @@ public sealed partial class RemoteSqlImportService
 
 public sealed partial class RemoteSqlImportService
 {
-    private async Task<RemoteSqlSchemaValidationResult> ValidateRemoteSchemaAsync(SqlConnection connection, CancellationToken cancellationToken)
+    private static async Task<RemoteSqlSchemaValidationResult> ValidateRemoteSchemaAsync(SqlConnection connection, CancellationToken cancellationToken)
     {
         var tablesByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var columnsByTable = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
@@ -1575,13 +1623,10 @@ public sealed partial class RemoteSqlImportService
 
             resolvedSchemas[requiredTable.Key] = schemaName;
             var columns = columnsByTable[requiredTable.Key];
-            foreach (var requiredColumn in requiredTable.Value)
-            {
-                if (!columns.Contains(requiredColumn))
-                {
-                    errors.Add($"Column '{requiredTable.Key}.{requiredColumn}' is missing.");
-                }
-            }
+            errors.AddRange(
+                requiredTable.Value
+                    .Where(requiredColumn => !columns.Contains(requiredColumn))
+                    .Select(requiredColumn => $"Column '{requiredTable.Key}.{requiredColumn}' is missing."));
         }
 
         var ownersTableAvailable = false;
@@ -1590,13 +1635,13 @@ public sealed partial class RemoteSqlImportService
             ownersTableAvailable = true;
             resolvedSchemas["ProductCatalogItemOwners"] = ownersSchema;
             var ownersColumns = columnsByTable["ProductCatalogItemOwners"];
-            foreach (var requiredColumn in OptionalSchema["ProductCatalogItemOwners"])
+            var missingOwnerColumns = OptionalSchema["ProductCatalogItemOwners"]
+                .Where(requiredColumn => !ownersColumns.Contains(requiredColumn))
+                .ToList();
+            if (missingOwnerColumns.Count > 0)
             {
-                if (!ownersColumns.Contains(requiredColumn))
-                {
-                    ownersTableAvailable = false;
-                    warnings.Add($"Owners table is present, but column 'ProductCatalogItemOwners.{requiredColumn}' is missing. Owner values will not be imported.");
-                }
+                ownersTableAvailable = false;
+                warnings.AddRange(missingOwnerColumns.Select(requiredColumn => $"Owners table is present, but column 'ProductCatalogItemOwners.{requiredColumn}' is missing. Owner values will not be imported."));
             }
         }
         else
@@ -1609,7 +1654,7 @@ public sealed partial class RemoteSqlImportService
             : RemoteSqlSchemaValidationResult.Success(resolvedSchemas, ownersTableAvailable, warnings);
     }
 
-    private async Task<RemoteSqlCounts> ReadRemoteCountsAsync(
+    private static async Task<RemoteSqlCounts> ReadRemoteCountsAsync(
         SqlConnection connection,
         IReadOnlyDictionary<string, string> tableSchemas,
         CancellationToken cancellationToken)
@@ -1632,7 +1677,7 @@ public sealed partial class RemoteSqlImportService
         return new RemoteSqlCounts(productCount, mappingCount);
     }
 
-    private async Task<RemoteSqlSnapshot> ReadRemoteSnapshotAsync(
+    private static async Task<RemoteSqlSnapshot> ReadRemoteSnapshotAsync(
         SqlConnection connection,
         RemoteSqlSchemaValidationResult schemaValidation,
         CancellationToken cancellationToken)
@@ -1646,7 +1691,7 @@ public sealed partial class RemoteSqlImportService
         return new RemoteSqlSnapshot(products, ownersByProductId, mappings, schemaValidation.OwnersTableAvailable, schemaValidation.Warnings);
     }
 
-    private async Task<List<RemoteProductRow>> ReadRemoteProductsAsync(
+    private static async Task<List<RemoteProductRow>> ReadRemoteProductsAsync(
         SqlConnection connection,
         IReadOnlyDictionary<string, string> tableSchemas,
         CancellationToken cancellationToken)
@@ -1685,7 +1730,7 @@ public sealed partial class RemoteSqlImportService
         return products;
     }
 
-    private async Task<Dictionary<int, IReadOnlyList<string>>> ReadRemoteOwnersAsync(
+    private static async Task<Dictionary<int, IReadOnlyList<string>>> ReadRemoteOwnersAsync(
         SqlConnection connection,
         IReadOnlyDictionary<string, string> tableSchemas,
         CancellationToken cancellationToken)
@@ -1727,7 +1772,7 @@ public sealed partial class RemoteSqlImportService
             pair => (IReadOnlyList<string>)pair.Value.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList());
     }
 
-    private async Task<List<RemoteMappingRow>> ReadRemoteMappingsAsync(
+    private static async Task<List<RemoteMappingRow>> ReadRemoteMappingsAsync(
         SqlConnection connection,
         IReadOnlyDictionary<string, string> tableSchemas,
         CancellationToken cancellationToken)

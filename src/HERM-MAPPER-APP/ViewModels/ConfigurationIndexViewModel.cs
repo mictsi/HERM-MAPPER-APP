@@ -111,11 +111,12 @@ public sealed class AddConfigurationOptionInputModel
 public sealed class UpdateConfigurationOptionOrderInputModel
 {
     [Required]
-    public int Id { get; set; }
+    public int? Id { get; set; }
 
+    [Required]
     [Range(1, int.MaxValue)]
     [Display(Name = "Order")]
-    public int SortOrder { get; set; }
+    public int? SortOrder { get; set; }
 }
 
 public sealed class UpdateDisplayTimeZoneInputModel

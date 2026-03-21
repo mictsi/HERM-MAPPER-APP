@@ -1,17 +1,23 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace HERMMapperApp.ViewModels;
 
 public sealed class ServiceConnectionEditorViewModel
 {
-    public int ServiceId { get; set; }
+    [Required]
+    public int? ServiceId { get; set; }
     public string ServiceName { get; set; } = string.Empty;
     public string? ServiceDescription { get; set; }
     public string ServiceOwner { get; set; } = string.Empty;
     public string ServiceLifecycleStatus { get; set; } = string.Empty;
+
+    [BindNever]
     public int AssetCriticalityScore { get; set; } = 1;
     public string? StatusMessage { get; set; }
+
+    [BindNever]
     public bool UsesLegacyFlow { get; set; }
     public string? CanvasStateJson { get; set; }
     public List<ServiceConnectionRowInputViewModel> ConnectionRows { get; set; } = [];

@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -34,6 +35,11 @@ public partial class Program
 {
     private const string AntiforgeryCookieName = "HERM.Mapper.Antiforgery";
     private const string AuthenticationCookieName = "HERM.Mapper.Auth";
+    private static readonly Action<ILogger, string, Exception?> LogOpenIdConnectDebugDetailsMessage =
+        LoggerMessage.Define<string>(
+            LogLevel.Information,
+            new EventId(1, nameof(LogOpenIdConnectDebugDetails)),
+            "{OpenIdConnectDebugDetails}");
 
     private Program()
     {
@@ -167,6 +173,9 @@ public partial class Program
                 options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
             });
             logging.AddFilter<Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider>(null, diagnosticsOptions.ConsoleLogLevel);
+            logging.AddFilter<Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider>(
+                "Microsoft.EntityFrameworkCore.Database.Command",
+                diagnosticsOptions.SqlLoggingEnabled ? diagnosticsOptions.SqlLogLevel : LogLevel.None);
         }
 
         logging.AddFilter(
@@ -221,6 +230,13 @@ public partial class Program
                 default:
                     options.UseSqlite(databaseConfiguration.ConnectionString);
                     break;
+            }
+
+            if (!diagnosticsOptions.SqlLoggingEnabled)
+            {
+                options.ConfigureWarnings(warnings => warnings
+                    .Ignore(RelationalEventId.CommandExecuting)
+                    .Ignore(RelationalEventId.CommandExecuted));
             }
 
             if (diagnosticsOptions.SqlLoggingEnabled)
@@ -445,7 +461,7 @@ public partial class Program
 
         var loggerFactory = context.HttpContext.RequestServices.GetService<ILoggerFactory>();
         var logger = loggerFactory?.CreateLogger("HERMMapperApp.OpenIdConnectDebug");
-        if (logger is null)
+        if (logger is null || !logger.IsEnabled(LogLevel.Information))
         {
             return;
         }
@@ -488,6 +504,6 @@ public partial class Program
             }
         }
 
-        logger.LogInformation("{OpenIdConnectDebugDetails}", message.ToString());
+        LogOpenIdConnectDebugDetailsMessage(logger, message.ToString(), null);
     }
 }

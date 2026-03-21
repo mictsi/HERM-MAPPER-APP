@@ -41,7 +41,7 @@ public sealed class AccountController(
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> LoginAsync(LoginViewModel input)
+    public async Task<IActionResult> Login(LoginViewModel input)
     {
         input.UserName = input.UserName?.Trim() ?? string.Empty;
         var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
@@ -168,7 +168,7 @@ public sealed class AccountController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> LogoutAsync()
+    public async Task<IActionResult> Logout()
     {
         if (!ModelState.IsValid)
         {
@@ -215,7 +215,7 @@ public sealed class AccountController(
         return RedirectToAction(nameof(Login));
     }
 
-    public async Task<IActionResult> ProfileAsync()
+    public async Task<IActionResult> Profile()
     {
         if (!ModelState.IsValid)
         {
@@ -234,12 +234,12 @@ public sealed class AccountController(
             return RedirectToAction(nameof(Login));
         }
 
-        return View("PasswordReset", BuildPasswordSelfServiceViewModel(user));
+        return View("Profile", BuildPasswordSelfServiceViewModel(user));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ProfileAsync(PasswordSelfServiceViewModel input)
+    public async Task<IActionResult> Profile(PasswordSelfServiceViewModel input)
     {
         if (!AppAuthenticationService.IsLocalUser(User))
         {
@@ -255,13 +255,13 @@ public sealed class AccountController(
 
         if (!ModelState.IsValid)
         {
-            return View("PasswordReset", BuildPasswordSelfServiceViewModel(user, input));
+            return View("Profile", BuildPasswordSelfServiceViewModel(user, input));
         }
 
         if (!PasswordHashService.VerifyPassword(input.CurrentPassword, user.PasswordHash))
         {
             ModelState.AddModelError(nameof(PasswordSelfServiceViewModel.CurrentPassword), "Current password is incorrect.");
-            return View("PasswordReset", BuildPasswordSelfServiceViewModel(user, input));
+            return View("Profile", BuildPasswordSelfServiceViewModel(user, input));
         }
 
         var passwordValidation = PasswordPolicyService.Validate(input.NewPassword);
@@ -272,7 +272,7 @@ public sealed class AccountController(
                 ModelState.AddModelError(nameof(PasswordSelfServiceViewModel.NewPassword), error);
             }
 
-            return View("PasswordReset", BuildPasswordSelfServiceViewModel(user, input));
+            return View("Profile", BuildPasswordSelfServiceViewModel(user, input));
         }
 
         user.PasswordHash = PasswordHashService.HashPassword(input.NewPassword);

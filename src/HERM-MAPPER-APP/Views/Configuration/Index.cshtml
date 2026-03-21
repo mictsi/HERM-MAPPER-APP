@@ -12,16 +12,18 @@
     var openCatalogueImport = Model.CatalogueImportReview.HasReview;
     var openProductImport = Model.ProductImportReview.HasReview;
     var openRemoteSqlImport = Model.OpenRemoteSqlImportSection;
-    var importModeCardClass = !remoteSqlImport.IsEnabled
-        ? "import-status-card-danger"
-        : remoteSqlImport.Input.ScheduleHours > 0
-            ? "import-status-card-success"
-            : "import-status-card-warning";
-    var importModeLabel = !remoteSqlImport.IsEnabled
-        ? "Disabled"
-        : remoteSqlImport.Input.ScheduleHours > 0
-            ? "Scheduled"
-            : "Manual";
+    var importModeCardClass = "import-status-card-warning";
+    var importModeLabel = "Manual";
+    if (!remoteSqlImport.IsEnabled)
+    {
+        importModeCardClass = "import-status-card-danger";
+        importModeLabel = "Disabled";
+    }
+    else if (remoteSqlImport.Input.ScheduleHours > 0)
+    {
+        importModeCardClass = "import-status-card-success";
+        importModeLabel = "Scheduled";
+    }
     var storedCredentialsCardClass = remoteSqlImport.HasSavedUserName && remoteSqlImport.HasSavedPassword
         ? "import-status-card-success"
         : string.Empty;
@@ -36,6 +38,25 @@
     bool showErrorForSection(string sectionKey) =>
         !string.IsNullOrWhiteSpace(Model.ErrorMessage) &&
         string.Equals(Model.ErrorSectionKey, sectionKey, StringComparison.OrdinalIgnoreCase);
+    var userNameHelpText = "Required for SQL login.";
+    if (remoteSqlImport.Input.UseIntegratedSecurity)
+    {
+        userNameHelpText = "Ignored when integrated security is selected.";
+    }
+    else if (remoteSqlImport.HasSavedUserName)
+    {
+        userNameHelpText = $"A user name is already saved ({remoteSqlImport.SavedUserNameDisplay}). Enter a new one only to replace it.";
+    }
+
+    var secretHelpText = "Required for SQL login.";
+    if (remoteSqlImport.Input.UseIntegratedSecurity)
+    {
+        secretHelpText = "Ignored when integrated security is selected.";
+    }
+    else if (remoteSqlImport.HasSavedPassword)
+    {
+        secretHelpText = "A password is already saved. Leave this blank to keep it.";
+    }
 }
 
 <div class="admin-shell">
@@ -230,22 +251,14 @@
                             <label class="form-label" for="RemoteUserName">User name</label>
                             <input class="form-control" id="RemoteUserName" name="UserName" value="@remoteSqlImport.Input.UserName" autocomplete="off" />
                             <div class="form-text">
-                                @(remoteSqlImport.Input.UseIntegratedSecurity
-                                    ? "Ignored when integrated security is selected."
-                                    : remoteSqlImport.HasSavedUserName
-                                        ? $"A user name is already saved ({remoteSqlImport.SavedUserNameDisplay}). Enter a new one only to replace it."
-                                        : "Required for SQL login.")
+                                @userNameHelpText
                             </div>
                         </div>
                         <div class="col-lg-6">
                             <label class="form-label" for="RemotePassword">Password</label>
                             <input class="form-control" id="RemotePassword" name="Password" type="password" autocomplete="new-password" />
                             <div class="form-text">
-                                @(remoteSqlImport.Input.UseIntegratedSecurity
-                                    ? "Ignored when integrated security is selected."
-                                    : remoteSqlImport.HasSavedPassword
-                                        ? "A password is already saved. Leave this blank to keep it."
-                                        : "Required for SQL login.")
+                                @secretHelpText
                             </div>
                         </div>
                         <div class="col-lg-4">

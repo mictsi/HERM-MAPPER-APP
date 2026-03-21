@@ -179,15 +179,15 @@ public sealed class CatalogueSearchTests
 
         using var controller = fixture.CreateReferenceController();
 
-        var typeResult = await controller.IndexAsync("cust", null, null);
+        var typeResult = await controller.Index("cust", null, null);
         var typeModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(typeResult).Model);
         Assert.Collection(typeModel.Components, component => Assert.Equal("Ledger Hub", component.Name));
 
-        var capabilityResult = await controller.IndexAsync("pay", null, null);
+        var capabilityResult = await controller.Index("pay", null, null);
         var capabilityModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(capabilityResult).Model);
         Assert.Collection(capabilityModel.Components, component => Assert.Equal("Ledger Hub", component.Name));
 
-        var domainResult = await controller.IndexAsync("fin", null, null);
+        var domainResult = await controller.Index("fin", null, null);
         var domainModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(domainResult).Model);
         Assert.Collection(domainModel.Components, component => Assert.Equal("Ledger Hub", component.Name));
     }
@@ -249,7 +249,7 @@ public sealed class CatalogueSearchTests
 
         using var controller = fixture.CreateReferenceController();
 
-        var searchResult = await controller.IndexAsync("arm workflow", null, null);
+        var searchResult = await controller.Index("arm workflow", null, null);
         var searchModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(searchResult).Model);
         var searchComponent = Assert.Single(searchModel.Components);
         Assert.Equal("Workflow Engine", searchComponent.Name);
@@ -258,7 +258,7 @@ public sealed class CatalogueSearchTests
         Assert.Equal(ReferenceModelKind.Arm, searchGroup.ModelKind);
         Assert.True(searchGroup.IsExpanded);
 
-        var selectionResult = await controller.IndexAsync(null, null, null, ReferenceModelKind.Brm, "BD001", "BC001");
+        var selectionResult = await controller.Index(null, null, null, ReferenceModelKind.Brm, "BD001", "BC001");
         var selectionModel = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(selectionResult).Model);
         var selectedComponent = Assert.Single(selectionModel.Components);
         Assert.Equal("Order Capture", selectedComponent.Name);
@@ -290,7 +290,7 @@ public sealed class CatalogueSearchTests
 
         using var controller = fixture.CreateReferenceController();
 
-        var result = await controller.IndexAsync(null, null, null);
+        var result = await controller.Index(null, null, null);
 
         var model = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(result).Model);
         Assert.Equal("browser-navigation", model.ActiveTreeAnchorId);

@@ -9,6 +9,11 @@ public sealed class ProtectedSettingsService(
     ILogger<ProtectedSettingsService> logger)
 {
     private const string ProtectedValuePrefix = "dp:";
+    private static readonly Action<ILogger, string, Exception?> LogFailedToUnprotectSetting =
+        LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(1, nameof(GetValueAsync)),
+            "Failed to unprotect app setting {AppSettingKey}.");
     private readonly IDataProtector protector = dataProtectionProvider.CreateProtector("HERMMapperApp.ProtectedSettings");
 
     public async Task<string?> GetValueAsync(string key, CancellationToken cancellationToken = default)
@@ -30,7 +35,7 @@ public sealed class ProtectedSettingsService(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Failed to unprotect app setting {AppSettingKey}.", key);
+            LogFailedToUnprotectSetting(logger, key, exception);
             return null;
         }
     }

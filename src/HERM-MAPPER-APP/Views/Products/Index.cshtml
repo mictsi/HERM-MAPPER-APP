@@ -14,6 +14,13 @@
         1 => Model.SelectedOwners[0],
         _ => $"{Model.SelectedOwners.Count} owners selected"
     };
+    var lifecycleOptions = Model.LifecycleStatuses
+        .Select(option => new
+        {
+            option.Value,
+            IsSelected = string.Equals(Model.LifecycleStatus, option.Value, StringComparison.OrdinalIgnoreCase)
+        })
+        .ToList();
 }
 
 <section class="page-header">
@@ -77,9 +84,9 @@
             <label class="form-label" for="lifecycleStatus">Lifecycle</label>
             <select class="form-select" id="lifecycleStatus" name="lifecycleStatus">
                 <option value="">All lifecycle states</option>
-                @foreach (var option in Model.LifecycleStatuses)
+                @foreach (var lifecycleOption in lifecycleOptions)
                 {
-                    <option value="@option.Value" selected="@(string.Equals(Model.LifecycleStatus, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Value</option>
+                    <option value="@lifecycleOption.Value" selected="@(lifecycleOption.IsSelected ? "selected" : null)">@lifecycleOption.Value</option>
                 }
             </select>
         </div>

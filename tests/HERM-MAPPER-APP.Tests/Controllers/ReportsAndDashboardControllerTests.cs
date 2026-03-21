@@ -104,7 +104,7 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateReportsController().IndexAsync("Unassigned owner");
+        var result = await fixture.CreateReportsController().Index("Unassigned owner");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ReportsViewModel>(view.Model);
@@ -279,7 +279,7 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateReportsController().ExportMappingsCsvAsync();
+        var result = await fixture.CreateReportsController().ExportMappingsCsv();
         var file = Assert.IsType<FileContentResult>(result);
 
         Assert.Equal("text/csv", file.ContentType);
@@ -352,17 +352,17 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateHomeController().IndexAsync();
+        var result = await fixture.CreateHomeController().Index();
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<HomeDashboardViewModel>(view.Model);
 
         Assert.Equal(7, model.ProductCount);
         Assert.Equal(1, model.CompletedMappings);
-        Assert.Equal(1, model.ReferenceComponentCount);
-        Assert.Equal(1, model.DomainCount);
-        Assert.Equal(1, model.CapabilityCount);
-        Assert.True(model.HasReferenceModel);
+            Assert.Equal(1, model.TrmComponentCount);
+            Assert.Equal(1, model.TrmDomainCount);
+            Assert.Equal(1, model.TrmCapabilityCount);
+            Assert.True(model.HasTrmModel);
         Assert.Equal(6, model.RecentProducts.Count);
         Assert.Equal("Product 7", model.RecentProducts[0].Name);
         Assert.Equal("Product 2", model.RecentProducts[^1].Name);

@@ -23,7 +23,7 @@ public sealed class ApplicationIndexRowViewModel
 
 public sealed class ApplicationEditViewModel
 {
-    public int Id { get; set; }
+    public int? Id { get; set; }
 
     [Required, StringLength(200)]
     [Display(Name = "Application name")]

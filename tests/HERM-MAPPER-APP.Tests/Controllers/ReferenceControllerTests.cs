@@ -18,19 +18,19 @@ namespace HERMMapperApp.Tests.Controllers;
 public sealed class ReferenceControllerTests
 {
     [Fact]
-    public async Task IndexAsyncReturnsBadRequestWhenModelStateInvalid()
+    public async Task IndexReturnsBadRequestWhenModelStateInvalid()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError("search", "Invalid");
-        var result = await controller.IndexAsync(null, null, null);
+        var result = await controller.Index(null, null, null);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
-    public async Task IndexAsyncBuildsFilteredCatalogueViewModel()
+    public async Task IndexBuildsFilteredCatalogueViewModel()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var (domainA, _, componentA) = await fixture.SeedComponentAsync("TD001", "Technology", "TP001", "Observability", "TC001", "Monitoring", isCustom: false);
@@ -40,7 +40,7 @@ public sealed class ReferenceControllerTests
 
         using var controller = fixture.CreateController();
         controller.TempData["ImportStatusMessage"] = "Import complete";
-        var result = await controller.IndexAsync("custom", domainB.Id, capabilityB.Id);
+        var result = await controller.Index("custom", domainB.Id, capabilityB.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ReferenceCatalogueViewModel>(view.Model);
@@ -54,12 +54,13 @@ public sealed class ReferenceControllerTests
         Assert.Equal("Import complete", model.ImportStatusMessage);
         Assert.Single(model.Components);
         Assert.Equal(componentB.Id, model.Components[0].NativeId);
-        Assert.Contains(model.ModelGroups.SelectMany(group => group.Domains), domain => string.Equals(domain.Code, domainA.Code, StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(model.ModelGroups.SelectMany(group => group.Domains), domain => string.Equals(domain.Code, domainA.Code, StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(model.ModelGroups.SelectMany(group => group.Domains), domain => string.Equals(domain.Code, domainB.Code, StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(model.Components, component => component.NativeId == componentA.Id);
     }
 
     [Fact]
-    public async Task RestoreAsyncReturnsDeletedComponents()
+    public async Task RestoreReturnsDeletedComponents()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var (_, _, activeComponent) = await fixture.SeedComponentAsync("TD001", "Technology", "TP001", "Observability", "TC001", "Monitoring", isCustom: false);
@@ -70,7 +71,7 @@ public sealed class ReferenceControllerTests
 
         using var controller = fixture.CreateController();
         controller.TempData["ImportStatusMessage"] = "Ready";
-        var result = await controller.RestoreAsync();
+        var result = await controller.Restore();
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Restore", view.ViewName);
@@ -85,12 +86,58 @@ public sealed class ReferenceControllerTests
     }
 
     [Fact]
-    public async Task VerifyImportAsyncRejectsMissingWorkbook()
+    public async Task RestoreArmReturnsDeletedComponents()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, activeComponent) = await fixture.SeedArmComponentAsync("AD001", "Applications", "AP001", "Recruitment", "AC001", "Admissions Portal");
+        var (_, _, deletedComponent) = await fixture.SeedArmComponentAsync("AD002", "Operations", "AP002", "Workflow", "AC002", "Case Manager");
+        deletedComponent.IsDeleted = true;
+        deletedComponent.DeletedUtc = new DateTime(2026, 3, 4, 0, 0, 0, DateTimeKind.Utc);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.RestoreArm();
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Restore", view.ViewName);
+        var model = Assert.IsType<ReferenceRestoreViewModel>(view.Model);
+        Assert.Equal(ReferenceModelKind.Arm, model.ModelKind);
+        Assert.Equal("Restore ARM model objects", model.PageTitle);
+        Assert.Single(model.Components);
+        Assert.DoesNotContain(model.Components, component => component.Id == activeComponent.Id);
+        Assert.Equal(deletedComponent.Id, model.Components[0].Id);
+    }
+
+    [Fact]
+    public async Task RestoreBrmReturnsDeletedComponents()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, activeComponent) = await fixture.SeedBrmComponentAsync("BD001", "Business", "BC001", "Sales", "BC010", "Lead intake");
+        var (_, _, deletedComponent) = await fixture.SeedBrmComponentAsync("BD002", "Support", "BC002", "Casework", "BC020", "Case routing");
+        deletedComponent.IsDeleted = true;
+        deletedComponent.DeletedUtc = new DateTime(2026, 3, 4, 0, 0, 0, DateTimeKind.Utc);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.RestoreBrm();
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Restore", view.ViewName);
+        var model = Assert.IsType<ReferenceRestoreViewModel>(view.Model);
+        Assert.Equal(ReferenceModelKind.Brm, model.ModelKind);
+        Assert.Equal("Restore BRM model objects", model.PageTitle);
+        Assert.Single(model.Components);
+        Assert.DoesNotContain(model.Components, component => component.Id == activeComponent.Id);
+        Assert.Equal(deletedComponent.Id, model.Components[0].Id);
+    }
+
+    [Fact]
+    public async Task VerifyImportRejectsMissingWorkbook()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.VerifyImportAsync(null);
+        var result = await controller.VerifyImport(null);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Index", view.ViewName);
@@ -106,7 +153,7 @@ public sealed class ReferenceControllerTests
         var file = new FormFile(stream, 0, stream.Length, "file", "notes.txt");
 
         using var controller = fixture.CreateController();
-        var result = await controller.VerifyImportAsync(file);
+        var result = await controller.VerifyImport(file);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Index", view.ViewName);
@@ -123,7 +170,7 @@ public sealed class ReferenceControllerTests
         var file = new FormFile(stream, 0, stream.Length, "file", "catalogue.xlsx");
 
         using var controller = fixture.CreateController();
-        var result = await controller.VerifyImportAsync(file);
+        var result = await controller.VerifyImport(file);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Index", view.ViewName);
@@ -142,7 +189,7 @@ public sealed class ReferenceControllerTests
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError("workbook", "Invalid");
-        var result = await controller.VerifyImportAsync(null);
+        var result = await controller.VerifyImport(null);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
@@ -153,7 +200,7 @@ public sealed class ReferenceControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.ImportVerifiedAsync(string.Empty);
+        var result = await controller.ImportVerified(string.Empty);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
@@ -166,7 +213,7 @@ public sealed class ReferenceControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.ImportVerifiedAsync("missing-token");
+        var result = await controller.ImportVerified("missing-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
@@ -183,7 +230,7 @@ public sealed class ReferenceControllerTests
         await File.WriteAllTextAsync(pendingPath, "not-a-valid-zip-workbook");
 
         using var controller = fixture.CreateController();
-        var result = await controller.ImportVerifiedAsync("invalid-token");
+        var result = await controller.ImportVerified("invalid-token");
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Index", view.ViewName);
@@ -219,7 +266,7 @@ public sealed class ReferenceControllerTests
                 ]));
 
         using var controller = fixture.CreateController();
-        var result = await controller.ImportVerifiedAsync("valid-token");
+        var result = await controller.ImportVerified("valid-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
@@ -239,7 +286,7 @@ public sealed class ReferenceControllerTests
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError("pendingImportToken", "Invalid");
-        var result = await controller.ImportVerifiedAsync("token");
+        var result = await controller.ImportVerified("token");
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
@@ -251,7 +298,7 @@ public sealed class ReferenceControllerTests
         var (_, _, component) = await fixture.SeedComponentAsync("TD001", "Technology", "TP001", "Observability", "TC001", "Monitoring", isCustom: false);
 
         using var controller = fixture.CreateController();
-        var result = await controller.DeleteComponentAsync(component.Id);
+        var result = await controller.DeleteComponent(component.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
@@ -259,7 +306,7 @@ public sealed class ReferenceControllerTests
         var updatedComponent = await fixture.DbContext.TrmComponents.SingleAsync();
         Assert.True(updatedComponent.IsDeleted);
         Assert.NotNull(updatedComponent.DeletedUtc);
-        Assert.Equal("Moved component TC001 Monitoring to trash.", controller.TempData["ImportStatusMessage"]);
+        Assert.Equal("Moved TRM component TC001 Monitoring to trash.", controller.TempData["ImportStatusMessage"]);
         Assert.Equal("Deleted", (await fixture.DbContext.TrmComponentVersions.SingleAsync()).ChangeType);
         Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
@@ -270,7 +317,7 @@ public sealed class ReferenceControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.DeleteComponentAsync(999);
+        var result = await controller.DeleteComponent(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -282,9 +329,45 @@ public sealed class ReferenceControllerTests
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError("id", "Invalid");
-        var result = await controller.DeleteComponentAsync(1);
+        var result = await controller.DeleteComponent(1);
 
         Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task DeleteComponentArmMarksComponentDeletedAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, component) = await fixture.SeedArmComponentAsync("AD001", "Applications", "AP001", "Recruitment", "AC001", "Admissions Portal");
+
+        using var controller = fixture.CreateController();
+        var result = await controller.DeleteComponent(component.Id, ReferenceModelKind.Arm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+
+        var updatedComponent = await fixture.DbContext.ArmComponents.SingleAsync();
+        Assert.True(updatedComponent.IsDeleted);
+        Assert.Equal("Moved ARM component AC001 Admissions Portal to trash.", controller.TempData["ImportStatusMessage"]);
+        Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task DeleteComponentBrmMarksComponentDeletedAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, component) = await fixture.SeedBrmComponentAsync("BD001", "Business", "BC001", "Sales", "BC010", "Lead intake");
+
+        using var controller = fixture.CreateController();
+        var result = await controller.DeleteComponent(component.Id, ReferenceModelKind.Brm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Index", redirect.ActionName);
+
+        var updatedComponent = await fixture.DbContext.BrmComponents.SingleAsync();
+        Assert.True(updatedComponent.IsDeleted);
+        Assert.Equal("Moved BRM component BC010 Lead intake to trash.", controller.TempData["ImportStatusMessage"]);
+        Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
 
     [Fact]
@@ -298,7 +381,7 @@ public sealed class ReferenceControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.RestoreComponentAsync(component.Id);
+        var result = await controller.RestoreComponent(component.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Restore", redirect.ActionName);
@@ -316,7 +399,7 @@ public sealed class ReferenceControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.RestoreComponentAsync(999);
+        var result = await controller.RestoreComponent(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -328,9 +411,55 @@ public sealed class ReferenceControllerTests
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError("id", "Invalid");
-        var result = await controller.RestoreComponentAsync(1);
+        var result = await controller.RestoreComponent(1);
 
         Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task RestoreComponentArmRestoresDeletedComponent()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, component) = await fixture.SeedArmComponentAsync("AD001", "Applications", "AP001", "Recruitment", "AC001", "Admissions Portal");
+        component.IsDeleted = true;
+        component.DeletedUtc = DateTime.UtcNow.AddDays(-1);
+        component.DeletedReason = "deleted";
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.RestoreComponent(component.Id, ReferenceModelKind.Arm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("RestoreArm", redirect.ActionName);
+
+        var updatedComponent = await fixture.DbContext.ArmComponents.SingleAsync();
+        Assert.False(updatedComponent.IsDeleted);
+        Assert.Null(updatedComponent.DeletedUtc);
+        Assert.Null(updatedComponent.DeletedReason);
+        Assert.Equal("Restore", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task RestoreComponentBrmRestoresDeletedComponent()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, component) = await fixture.SeedBrmComponentAsync("BD001", "Business", "BC001", "Sales", "BC010", "Lead intake");
+        component.IsDeleted = true;
+        component.DeletedUtc = DateTime.UtcNow.AddDays(-1);
+        component.DeletedReason = "deleted";
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.RestoreComponent(component.Id, ReferenceModelKind.Brm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("RestoreBrm", redirect.ActionName);
+
+        var updatedComponent = await fixture.DbContext.BrmComponents.SingleAsync();
+        Assert.False(updatedComponent.IsDeleted);
+        Assert.Null(updatedComponent.DeletedUtc);
+        Assert.Null(updatedComponent.DeletedReason);
+        Assert.Equal("Restore", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
 
     [Fact]
@@ -343,7 +472,7 @@ public sealed class ReferenceControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.PermanentlyDeleteComponentAsync(component.Id);
+        var result = await controller.PermanentlyDeleteComponent(component.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Restore", redirect.ActionName);
@@ -358,7 +487,7 @@ public sealed class ReferenceControllerTests
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError("id", "Invalid");
-        var result = await controller.PermanentlyDeleteComponentAsync(1);
+        var result = await controller.PermanentlyDeleteComponent(1);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
@@ -369,9 +498,45 @@ public sealed class ReferenceControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.PermanentlyDeleteComponentAsync(999);
+        var result = await controller.PermanentlyDeleteComponent(999);
 
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task PermanentlyDeleteComponentArmRemovesDeletedComponent()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, component) = await fixture.SeedArmComponentAsync("AD001", "Applications", "AP001", "Recruitment", "AC001", "Admissions Portal");
+        component.IsDeleted = true;
+        component.DeletedUtc = DateTime.UtcNow.AddDays(-1);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.PermanentlyDeleteComponent(component.Id, ReferenceModelKind.Arm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("RestoreArm", redirect.ActionName);
+        Assert.Equal(0, await fixture.DbContext.ArmComponents.CountAsync());
+        Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task PermanentlyDeleteComponentBrmRemovesDeletedComponent()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, component) = await fixture.SeedBrmComponentAsync("BD001", "Business", "BC001", "Sales", "BC010", "Lead intake");
+        component.IsDeleted = true;
+        component.DeletedUtc = DateTime.UtcNow.AddDays(-1);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.PermanentlyDeleteComponent(component.Id, ReferenceModelKind.Brm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("RestoreBrm", redirect.ActionName);
+        Assert.Equal(0, await fixture.DbContext.BrmComponents.CountAsync());
+        Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
 
     [Fact]
@@ -401,7 +566,7 @@ public sealed class ReferenceControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.HistoryAsync(component.Id);
+        var result = await controller.History(component.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ComponentHistoryViewModel>(view.Model);
@@ -415,7 +580,7 @@ public sealed class ReferenceControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.HistoryAsync(999);
+        var result = await controller.History(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
@@ -427,7 +592,7 @@ public sealed class ReferenceControllerTests
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError("id", "Invalid");
-        var result = await controller.HistoryAsync(1);
+        var result = await controller.History(1);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
@@ -484,6 +649,53 @@ public sealed class ReferenceControllerTests
                 IsCustom = isCustom
             };
             component.CapabilityLinks.Add(new TrmComponentCapabilityLink { TrmComponent = component, TrmCapability = capability });
+
+            await DbContext.AddRangeAsync(domain, capability, component);
+            await DbContext.SaveChangesAsync();
+            return (domain, capability, component);
+        }
+
+        public async Task<(ArmDomain Domain, ArmCapability Capability, ArmComponent Component)> SeedArmComponentAsync(
+            string domainCode,
+            string domainName,
+            string capabilityCode,
+            string capabilityName,
+            string componentCode,
+            string componentName)
+        {
+            var domain = new ArmDomain { Code = domainCode, Name = domainName };
+            var capability = new ArmCapability { Code = capabilityCode, Name = capabilityName, ParentDomain = domain, ParentDomainCode = domain.Code };
+            var component = new ArmComponent
+            {
+                Code = componentCode,
+                Name = componentName,
+                ParentCapability = capability,
+                ParentCapabilityCode = capability.Code
+            };
+            component.CapabilityLinks.Add(new ArmComponentCapabilityLink { ArmComponent = component, ArmCapability = capability });
+
+            await DbContext.AddRangeAsync(domain, capability, component);
+            await DbContext.SaveChangesAsync();
+            return (domain, capability, component);
+        }
+
+        public async Task<(BrmDomain Domain, BrmCapability Capability, BrmComponent Component)> SeedBrmComponentAsync(
+            string domainCode,
+            string domainName,
+            string capabilityCode,
+            string capabilityName,
+            string componentCode,
+            string componentName)
+        {
+            var domain = new BrmDomain { Code = domainCode, Name = domainName };
+            var capability = new BrmCapability { Code = capabilityCode, Name = capabilityName, ParentDomain = domain, ParentDomainCode = domain.Code };
+            var component = new BrmComponent
+            {
+                Code = componentCode,
+                Name = componentName,
+                ParentCapability = capability,
+                ParentCapabilityCode = capability.Code
+            };
 
             await DbContext.AddRangeAsync(domain, capability, component);
             await DbContext.SaveChangesAsync();

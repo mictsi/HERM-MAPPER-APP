@@ -9,6 +9,11 @@ public sealed class RemoteSqlImportHostedService(
     ILogger<RemoteSqlImportHostedService> logger) : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(5);
+    private static readonly Action<ILogger, Exception?> LogScheduledImportPollingFailed =
+        LoggerMessage.Define(
+            LogLevel.Error,
+            new EventId(1, nameof(RunScheduledImportAsync)),
+            "Scheduled remote SQL import polling failed.");
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -31,10 +36,11 @@ public sealed class RemoteSqlImportHostedService(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            // Expected during shutdown.
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Scheduled remote SQL import polling failed.");
+            LogScheduledImportPollingFailed(logger, exception);
         }
     }
 }

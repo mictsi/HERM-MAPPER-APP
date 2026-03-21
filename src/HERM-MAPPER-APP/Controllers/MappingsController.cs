@@ -21,6 +21,11 @@ public sealed class MappingsController(
 {
     public async Task<IActionResult> Index(string? search, MappingStatus? status, int? domainId, int? capabilityId)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var productsQuery = dbContext.ProductCatalogItems
             .AsNoTracking()
             .Where(x => !x.IsDeleted)
@@ -82,6 +87,11 @@ public sealed class MappingsController(
 
     public async Task<IActionResult> Create(int productId)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Include(x => x.Owners)
@@ -98,6 +108,11 @@ public sealed class MappingsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(MappingEditViewModel model)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems
             .Include(x => x.Owners)
             .FirstOrDefaultAsync(x => x.Id == model.ProductId && !x.IsDeleted);
@@ -133,6 +148,11 @@ public sealed class MappingsController(
 
     public async Task<IActionResult> Edit(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var mapping = await dbContext.ProductMappings
             .AsNoTracking()
             .Include(x => x.ProductCatalogItem)
@@ -151,6 +171,11 @@ public sealed class MappingsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(int id, MappingEditViewModel model)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var mapping = await dbContext.ProductMappings
             .Include(x => x.ProductCatalogItem)
             .ThenInclude(x => x!.Owners)
@@ -180,6 +205,11 @@ public sealed class MappingsController(
 
     public async Task<IActionResult> Delete(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var mapping = await dbContext.ProductMappings
             .AsNoTracking()
             .Include(x => x.ProductCatalogItem)
@@ -195,6 +225,11 @@ public sealed class MappingsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var mapping = await dbContext.ProductMappings
             .Include(x => x.ProductCatalogItem)
             .FirstOrDefaultAsync(x => x.Id == id);
@@ -223,6 +258,11 @@ public sealed class MappingsController(
     [HttpGet]
     public async Task<IActionResult> Capabilities(int? domainId)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var query = dbContext.TrmCapabilities
             .AsNoTracking()
             .ForReferenceModel(ReferenceModelKind.Trm)
@@ -243,6 +283,11 @@ public sealed class MappingsController(
     [HttpGet]
     public async Task<IActionResult> Components(int? capabilityId)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var query = dbContext.TrmComponents
             .AsNoTracking()
             .ForReferenceModel(ReferenceModelKind.Trm)
@@ -266,8 +311,13 @@ public sealed class MappingsController(
     }
 
     [HttpGet]
-    public async Task<FileResult> ExportCsv(string? search, MappingStatus? status, int? domainId, int? capabilityId, bool includeUnfinished = false)
+    public async Task<IActionResult> ExportCsv(string? search, MappingStatus? status, int? domainId, int? capabilityId, bool includeUnfinished = false)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var mappings = await BuildExportQuery(search, status, domainId, capabilityId, includeUnfinished)
             .OrderBy(x => x.TrmDomain != null ? x.TrmDomain.Name : string.Empty)
             .ThenBy(x => x.TrmComponent != null ? x.TrmComponent.Name : string.Empty)
@@ -463,7 +513,7 @@ public sealed class MappingsController(
         mapping.TrmDomain = domain;
         mapping.TrmCapability = capability;
         mapping.TrmComponent = component;
-        mapping.MappingStatus = model.MappingStatus;
+        mapping.MappingStatus = model.MappingStatus ?? MappingStatus.Draft;
         mapping.MappingRationale = model.MappingRationale;
         mapping.LastReviewedUtc = DateTime.UtcNow;
         return mappingUpdate;

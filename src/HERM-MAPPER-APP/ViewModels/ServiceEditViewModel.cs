@@ -6,7 +6,7 @@ namespace HERMMapperApp.ViewModels;
 
 public sealed class ServiceEditViewModel
 {
-    public int Id { get; set; }
+    public int? Id { get; set; }
 
     [Required, StringLength(200)]
     [Display(Name = "Service name")]

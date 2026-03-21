@@ -121,12 +121,11 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
         var normalizedGroups = new HashSet<string>(groupIds, StringComparer.OrdinalIgnoreCase);
         var matchedRoles = new List<string>();
 
-        foreach (var roleMapping in options.RoleGroupMappings)
+        foreach (var roleName in options.RoleGroupMappings
+                     .Where(roleMapping => roleMapping.Value.Any(normalizedGroups.Contains))
+                     .Select(roleMapping => roleMapping.Key))
         {
-            if (roleMapping.Value.Any(normalizedGroups.Contains))
-            {
-                matchedRoles.Add(roleMapping.Key);
-            }
+            matchedRoles.Add(roleName);
         }
 
         return matchedRoles
@@ -141,12 +140,11 @@ public sealed class AppAuthenticationService(AuthenticationSecurityOptions authe
 
         foreach (var claim in claims.Where(claim => string.Equals(claim.Type, groupClaimType, StringComparison.Ordinal)))
         {
-            foreach (var groupId in ParseClaimValues(claim.Value))
+            foreach (var groupId in ParseClaimValues(claim.Value)
+                         .Where(groupId => !string.IsNullOrWhiteSpace(groupId))
+                         .Select(groupId => groupId.Trim()))
             {
-                if (!string.IsNullOrWhiteSpace(groupId))
-                {
-                    groupIds.Add(groupId.Trim());
-                }
+                groupIds.Add(groupId);
             }
         }
 

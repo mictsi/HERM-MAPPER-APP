@@ -28,6 +28,11 @@ public sealed class ConfigurationController(
 
     public async Task<IActionResult> Index(string? expandedFieldName = null, string? openSection = null)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         return View(await BuildViewModelAsync(
             expandedFieldName: NormalizeExpandedFieldName(expandedFieldName),
             openRemoteSqlImportSection: string.Equals(openSection, RemoteSqlImportService.SectionKey, StringComparison.OrdinalIgnoreCase)));
@@ -37,6 +42,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> VerifyCatalogueImport(IFormFile? workbook, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         if (workbook is null || workbook.Length == 0)
         {
             return View("Index", await BuildViewModelAsync(
@@ -90,6 +100,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ImportVerifiedCatalogue(string pendingImportToken, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         if (string.IsNullOrWhiteSpace(pendingImportToken))
         {
             TempData["ConfigurationError"] = "Verify a catalogue workbook before importing it.";
@@ -142,6 +157,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AbortCatalogueImport(string pendingImportToken, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         DeletePendingImport("catalogue", pendingImportToken, ".xlsx");
         await auditLogService.WriteAsync(
             "Configuration",
@@ -157,6 +177,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> VerifyProductImport(IFormFile? csvFile)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         if (csvFile is null || csvFile.Length == 0)
         {
             return View("Index", await BuildViewModelAsync(
@@ -206,6 +231,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ImportVerifiedProducts(string pendingImportToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         if (string.IsNullOrWhiteSpace(pendingImportToken))
         {
             TempData["ConfigurationError"] = "Verify a product CSV before importing it.";
@@ -255,6 +285,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AbortProductImport(string pendingImportToken)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         DeletePendingImport("products", pendingImportToken, ".csv");
         await auditLogService.WriteAsync(
             "Configuration",
@@ -270,6 +305,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddOption(AddConfigurationOptionInputModel input)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         input.FieldName = input.FieldName?.Trim() ?? string.Empty;
         input.Value = input.Value?.Trim() ?? string.Empty;
 
@@ -325,6 +365,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateOptionOrder(UpdateConfigurationOptionOrderInputModel input)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var option = await dbContext.ConfigurableFieldOptions.FindAsync(input.Id);
         if (option is null)
         {
@@ -340,7 +385,7 @@ public sealed class ConfigurationController(
 
         fieldOptions.RemoveAll(x => x.Id == option.Id);
 
-        var targetIndex = Math.Clamp(input.SortOrder, 1, fieldOptions.Count + 1) - 1;
+        var targetIndex = Math.Clamp(input.SortOrder ?? 1, 1, fieldOptions.Count + 1) - 1;
         fieldOptions.Insert(targetIndex, option);
 
         for (var index = 0; index < fieldOptions.Count; index++)
@@ -365,6 +410,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteOption(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var option = await dbContext.ConfigurableFieldOptions.FindAsync(id);
         if (option is null)
         {
@@ -389,6 +439,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateDisplayTimeZone(UpdateDisplayTimeZoneInputModel input)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         input.TimeZoneId = input.TimeZoneId?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(input.TimeZoneId))
@@ -431,6 +486,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveRemoteSqlImportConfiguration(RemoteSqlImportInputModel input)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var normalizedInput = NormalizeRemoteSqlImportInput(input);
         var result = await remoteSqlImportService.SaveSettingsAsync(MapRemoteSqlImportInput(normalizedInput));
 
@@ -461,6 +521,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> TestRemoteSqlImportConnection(RemoteSqlImportInputModel input)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var normalizedInput = NormalizeRemoteSqlImportInput(input);
         var result = await remoteSqlImportService.TestConnectionAsync(MapRemoteSqlImportInput(normalizedInput));
 
@@ -488,6 +553,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RunRemoteSqlImportNow()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var result = await remoteSqlImportService.RunManualImportAsync();
         if (result.IsSuccess)
         {
@@ -506,6 +576,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetRemoteSqlImportEnabled(bool isEnabled)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         TempData["ConfigurationStatusMessage"] = await remoteSqlImportService.SetImportEnabledAsync(isEnabled);
         return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
     }
@@ -514,6 +589,11 @@ public sealed class ConfigurationController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ClearRemoteSqlImportConfiguration()
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         TempData.Remove("RemoteSqlImportSavedUserName");
         TempData.Remove("RemoteSqlImportSavedPassword");
         TempData["ConfigurationStatusMessage"] = await remoteSqlImportService.ClearConfigurationAsync();

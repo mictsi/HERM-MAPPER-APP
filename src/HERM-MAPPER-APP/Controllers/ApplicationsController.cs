@@ -1,3 +1,4 @@
+using System.Globalization;
 using HERMMapperApp.Data;
 using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
@@ -124,6 +125,11 @@ public sealed class ApplicationsController(
 
     public async Task<IActionResult> Details(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var model = await drilldownService.BuildApplicationDetailsAsync(id);
         if (model is null)
         {
@@ -156,6 +162,11 @@ public sealed class ApplicationsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var application = await dbContext.ApplicationCatalogItems
             .AsNoTracking()
             .Include(x => x.Mappings)
@@ -253,7 +264,7 @@ public sealed class ApplicationsController(
             .OrderBy(x => x.Code)
             .Select(x => new SelectListItem(
                 $"{x.Code} {x.Name} ({x.ParentCapability!.ParentDomain!.Code}/{x.ParentCapability.Code})",
-                x.Id.ToString()))
+                x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         var productMappings = await dbContext.ProductMappings
@@ -279,7 +290,7 @@ public sealed class ApplicationsController(
                     : $"{x.ProductCatalogItem.Name} ({x.ProductCatalogItem.Vendor})"
             })
             .OrderBy(group => group.Key.Label)
-            .Select(group => new SelectListItem(group.Key.Label, group.Key.ProductCatalogItemId.ToString()))
+            .Select(group => new SelectListItem(group.Key.Label, group.Key.ProductCatalogItemId.ToString(CultureInfo.InvariantCulture)))
             .ToList();
 
         model.TrmComponentOptions = productMappings
@@ -289,7 +300,7 @@ public sealed class ApplicationsController(
                 Label = $"{x.TrmComponent!.Code} {x.TrmComponent.Name}"
             })
             .OrderBy(group => group.Key.Label)
-            .Select(group => new SelectListItem(group.Key.Label, group.Key.TrmComponentId.ToString()))
+            .Select(group => new SelectListItem(group.Key.Label, group.Key.TrmComponentId.ToString(CultureInfo.InvariantCulture)))
             .ToList();
 
         model.ProductTrmMappingOptions = productMappings
@@ -395,11 +406,11 @@ public sealed class ApplicationsController(
                 continue;
             }
 
-            var selectedMapping = row.TrmComponentId.HasValue
-                ? matchingMappings.FirstOrDefault(x => x.TrmComponentId == row.TrmComponentId.Value)
-                : matchingMappings.Count == 1
-                    ? matchingMappings[0]
-                    : null;
+            var selectedMapping = matchingMappings.Count == 1 ? matchingMappings[0] : null;
+            if (row.TrmComponentId.HasValue)
+            {
+                selectedMapping = matchingMappings.FirstOrDefault(x => x.TrmComponentId == row.TrmComponentId.Value);
+            }
 
             if (row.TrmComponentId.HasValue && selectedMapping is null)
             {

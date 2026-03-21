@@ -283,7 +283,7 @@ public sealed class MappingsControllerTests
         await fixture.SeedOwnerOptionsAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
         var capability = new TrmCapability { Code = "TP001", Name = "Observability", ParentDomain = domain, ParentDomainCode = domain.Code };
-        var modelComponent = new TrmComponent { Code = "TECH-42", Name = "Monitoring", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var modelComponent = new TrmComponent { Code = "TC042", Name = "Monitoring", ParentCapability = capability, ParentCapabilityCode = capability.Code };
         var product = new ProductCatalogItem { Name = "Sentinel" };
         await fixture.DbContext.AddRangeAsync(domain, capability, modelComponent, product);
         await fixture.DbContext.SaveChangesAsync();
@@ -293,7 +293,7 @@ public sealed class MappingsControllerTests
         {
             ProductId = product.Id,
             SelectedCapabilityId = capability.Id,
-            CustomTechnologyComponentCode = "TECH-42",
+            CustomTechnologyComponentCode = "TC042",
             CustomComponentName = "Custom Monitoring",
             MappingStatus = MappingStatus.Draft
         });

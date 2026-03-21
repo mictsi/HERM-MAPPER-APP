@@ -40,7 +40,7 @@ public sealed class AccountControllerTests
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             using var controller = fixture.CreateController();
-            var result = await controller.LoginAsync(new LoginViewModel
+            var result = await controller.Login(new LoginViewModel
             {
                 UserName = "ada",
                 Password = "wrong-password"
@@ -73,7 +73,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.LoginAsync(new LoginViewModel
+        var result = await controller.Login(new LoginViewModel
         {
             UserName = "grace",
             Password = "ComplexPass!123"
@@ -84,7 +84,7 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task LoginAsyncSuccessfulAuthenticationRedirectsHomeWhenReturnUrlIsExternal()
+    public async Task LoginSuccessfulAuthenticationRedirectsHomeWhenReturnUrlIsExternal()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -99,7 +99,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.LoginAsync(new LoginViewModel
+        var result = await controller.Login(new LoginViewModel
         {
             UserName = "ada",
             Password = "ComplexPass!123",
@@ -117,7 +117,7 @@ public sealed class AccountControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController(localAuthenticationEnabled: false);
-        var result = await controller.LoginAsync(new LoginViewModel
+        var result = await controller.Login(new LoginViewModel
         {
             UserName = "ada",
             Password = "ComplexPass!123"
@@ -181,7 +181,7 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task LoginAsyncSuccessfulAuthenticationRedirectsToLocalReturnUrlAndWritesAudit()
+    public async Task LoginSuccessfulAuthenticationRedirectsToLocalReturnUrlAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -196,7 +196,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.LoginAsync(new LoginViewModel
+        var result = await controller.Login(new LoginViewModel
         {
             UserName = " ada ",
             Password = "ComplexPass!123",
@@ -213,7 +213,7 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task LoginAsyncClearsExpiredLockoutBeforeSuccessfulSignIn()
+    public async Task LoginClearsExpiredLockoutBeforeSuccessfulSignIn()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -230,7 +230,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.LoginAsync(new LoginViewModel
+        var result = await controller.Login(new LoginViewModel
         {
             UserName = "grace",
             Password = "ComplexPass!123"
@@ -243,7 +243,7 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task LoginAsyncInvalidPasswordBeforeThresholdIncrementsFailedCount()
+    public async Task LoginInvalidPasswordBeforeThresholdIncrementsFailedCount()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -258,7 +258,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.LoginAsync(new LoginViewModel
+        var result = await controller.Login(new LoginViewModel
         {
             UserName = "alan",
             Password = "wrong-password"
@@ -272,14 +272,14 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task LogoutAsyncExternalUserChallengesOpenIdConnectAndWritesAudit()
+    public async Task LogoutExternalUserChallengesOpenIdConnectAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController(
             openIdConnectEnabled: true,
             user: CreatePrincipal("external.user@example.com", AppRoles.Viewer, isLocalUser: false, authenticationType: "oidc"));
-        var result = await controller.LogoutAsync();
+        var result = await controller.Logout();
 
         var signOut = Assert.IsType<SignOutResult>(result);
         Assert.Equal([CookieAuthenticationDefaults.AuthenticationScheme, Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme], signOut.AuthenticationSchemes.ToArray());
@@ -292,7 +292,7 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task LogoutAsyncLocalUserSignsOutAndRedirectsLogin()
+    public async Task LogoutLocalUserSignsOutAndRedirectsLogin()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -307,7 +307,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController(user: CreatePrincipal("ada", AppRoles.Viewer, isLocalUser: true));
-        var result = await controller.LogoutAsync();
+        var result = await controller.Logout();
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(AccountController.Login), redirect.ActionName);
@@ -322,7 +322,7 @@ public sealed class AccountControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController(user: CreatePrincipal("external.user@example.com", AppRoles.Viewer, isLocalUser: false, authenticationType: "oidc"));
-        var result = await controller.ProfileAsync();
+        var result = await controller.Profile();
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
@@ -331,7 +331,7 @@ public sealed class AccountControllerTests
     }
 
     [Fact]
-    public async Task ProfileGetReturnsPasswordResetViewForLocalUser()
+    public async Task ProfileGetReturnsProfileViewForLocalUser()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -346,10 +346,10 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController(user: CreatePrincipal("ada", AppRoles.Viewer, isLocalUser: true));
-        var result = await controller.ProfileAsync();
+        var result = await controller.Profile();
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("PasswordReset", view.ViewName);
+        Assert.Equal("Profile", view.ViewName);
         var model = Assert.IsType<PasswordSelfServiceViewModel>(view.Model);
         Assert.Equal("ada", model.UserName);
     }
@@ -360,7 +360,7 @@ public sealed class AccountControllerTests
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController(user: CreatePrincipal("missing-user", AppRoles.Viewer, isLocalUser: true));
-        var result = await controller.ProfileAsync();
+        var result = await controller.Profile();
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(AccountController.Login), redirect.ActionName);
@@ -382,7 +382,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController(user: CreatePrincipal("ada", AppRoles.Viewer, isLocalUser: true));
-        var result = await controller.ProfileAsync(new PasswordSelfServiceViewModel
+        var result = await controller.Profile(new PasswordSelfServiceViewModel
         {
             CurrentPassword = "WrongPass!123",
             NewPassword = "UpdatedPass!123",
@@ -390,7 +390,7 @@ public sealed class AccountControllerTests
         });
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("PasswordReset", view.ViewName);
+        Assert.Equal("Profile", view.ViewName);
         Assert.Contains(controller.ModelState[nameof(PasswordSelfServiceViewModel.CurrentPassword)]!.Errors, error => error.ErrorMessage.Contains("incorrect", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -410,7 +410,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController(user: CreatePrincipal("ada", AppRoles.Viewer, isLocalUser: true));
-        var result = await controller.ProfileAsync(new PasswordSelfServiceViewModel
+        var result = await controller.Profile(new PasswordSelfServiceViewModel
         {
             CurrentPassword = "ComplexPass!123",
             NewPassword = "short",
@@ -418,7 +418,7 @@ public sealed class AccountControllerTests
         });
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("PasswordReset", view.ViewName);
+        Assert.Equal("Profile", view.ViewName);
         Assert.NotEmpty(controller.ModelState[nameof(PasswordSelfServiceViewModel.NewPassword)]!.Errors);
     }
 
@@ -438,7 +438,7 @@ public sealed class AccountControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController(user: CreatePrincipal("ada", AppRoles.Viewer, isLocalUser: true));
-        var result = await controller.ProfileAsync(new PasswordSelfServiceViewModel
+        var result = await controller.Profile(new PasswordSelfServiceViewModel
         {
             CurrentPassword = "ComplexPass!123",
             NewPassword = "UpdatedPass!123",

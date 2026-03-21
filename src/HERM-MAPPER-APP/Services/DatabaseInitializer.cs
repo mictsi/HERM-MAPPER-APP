@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using HERMMapperApp.Data;
 using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
@@ -101,18 +102,18 @@ public sealed partial class DatabaseInitializer(
     [LoggerMessage(EventId = 1004, Level = LogLevel.Information, Message = "Imported sample relationships from {sampleCsvPath}")]
     private static partial void LogImportedSampleRelationships(ILogger logger, string sampleCsvPath);
 
+    [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP004:Don't ignore created IDisposable", Justification = "AppDbContext owns the relational connection lifetime.")]
     private async Task EnsureSqliteSchemaUpToDateAsync(CancellationToken cancellationToken)
     {
-        var connection = dbContext.Database.GetDbConnection();
-        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        var shouldClose = dbContext.Database.GetDbConnection().State != System.Data.ConnectionState.Open;
         if (shouldClose)
         {
-            await connection.OpenAsync(cancellationToken);
+            await dbContext.Database.OpenConnectionAsync(cancellationToken);
         }
 
         try
         {
-            var columns = await GetSqliteTableColumnsAsync(connection, "TrmComponents", cancellationToken);
+            var columns = await GetSqliteTableColumnsAsync(dbContext.Database.GetDbConnection(), "TrmComponents", cancellationToken);
 
             if (!columns.Contains("TechnologyComponentCode"))
             {
@@ -149,7 +150,7 @@ public sealed partial class DatabaseInitializer(
                     cancellationToken);
             }
 
-            columns = await GetSqliteTableColumnsAsync(connection, "ArmComponents", cancellationToken);
+            columns = await GetSqliteTableColumnsAsync(dbContext.Database.GetDbConnection(), "ArmComponents", cancellationToken);
 
             if (columns.Count > 0)
             {
@@ -175,7 +176,7 @@ public sealed partial class DatabaseInitializer(
                 }
             }
 
-            columns = await GetSqliteTableColumnsAsync(connection, "BrmComponents", cancellationToken);
+            columns = await GetSqliteTableColumnsAsync(dbContext.Database.GetDbConnection(), "BrmComponents", cancellationToken);
 
             if (columns.Count > 0)
             {
@@ -299,7 +300,7 @@ public sealed partial class DatabaseInitializer(
         {
             if (shouldClose)
             {
-                await connection.CloseAsync();
+                await dbContext.Database.CloseConnectionAsync();
             }
         }
     }
@@ -1771,19 +1772,19 @@ public sealed partial class DatabaseInitializer(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP004:Don't ignore created IDisposable", Justification = "AppDbContext owns the relational connection lifetime.")]
     private async Task EnsureSqliteUserColumnsAsync(CancellationToken cancellationToken)
     {
-        var connection = dbContext.Database.GetDbConnection();
-        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        var shouldClose = dbContext.Database.GetDbConnection().State != System.Data.ConnectionState.Open;
         if (shouldClose)
         {
-            await connection.OpenAsync(cancellationToken);
+            await dbContext.Database.OpenConnectionAsync(cancellationToken);
         }
 
         try
         {
             var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            await using var command = connection.CreateCommand();
+            await using var command = dbContext.Database.GetDbConnection().CreateCommand();
             command.CommandText = "PRAGMA table_info('AppUsers')";
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -1810,7 +1811,7 @@ public sealed partial class DatabaseInitializer(
         {
             if (shouldClose)
             {
-                await connection.CloseAsync();
+                await dbContext.Database.CloseConnectionAsync();
             }
         }
     }
@@ -1888,19 +1889,19 @@ public sealed partial class DatabaseInitializer(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP004:Don't ignore created IDisposable", Justification = "AppDbContext owns the relational connection lifetime.")]
     private async Task EnsureSqliteConfigurableFieldOptionColumnsAsync(CancellationToken cancellationToken)
     {
-        var connection = dbContext.Database.GetDbConnection();
-        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        var shouldClose = dbContext.Database.GetDbConnection().State != System.Data.ConnectionState.Open;
         if (shouldClose)
         {
-            await connection.OpenAsync(cancellationToken);
+            await dbContext.Database.OpenConnectionAsync(cancellationToken);
         }
 
         try
         {
             var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            await using var command = connection.CreateCommand();
+            await using var command = dbContext.Database.GetDbConnection().CreateCommand();
             command.CommandText = "PRAGMA table_info('ConfigurableFieldOptions')";
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -1920,23 +1921,23 @@ public sealed partial class DatabaseInitializer(
         {
             if (shouldClose)
             {
-                await connection.CloseAsync();
+                await dbContext.Database.CloseConnectionAsync();
             }
         }
     }
 
+    [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP004:Don't ignore created IDisposable", Justification = "AppDbContext owns the relational connection lifetime.")]
     private async Task<bool> SqliteColumnExistsAsync(string tableName, string columnName, CancellationToken cancellationToken)
     {
-        var connection = dbContext.Database.GetDbConnection();
-        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        var shouldClose = dbContext.Database.GetDbConnection().State != System.Data.ConnectionState.Open;
         if (shouldClose)
         {
-            await connection.OpenAsync(cancellationToken);
+            await dbContext.Database.OpenConnectionAsync(cancellationToken);
         }
 
         try
         {
-            await using var command = connection.CreateCommand();
+            await using var command = dbContext.Database.GetDbConnection().CreateCommand();
             command.CommandText = $"PRAGMA table_info('{tableName}')";
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -1954,7 +1955,7 @@ public sealed partial class DatabaseInitializer(
         {
             if (shouldClose)
             {
-                await connection.CloseAsync();
+                await dbContext.Database.CloseConnectionAsync();
             }
         }
     }

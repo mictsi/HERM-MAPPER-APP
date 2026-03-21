@@ -1,3 +1,4 @@
+using System.Globalization;
 using HERMMapperApp.Data;
 using HERMMapperApp.Models;
 using HERMMapperApp.Services;
@@ -162,6 +163,11 @@ public sealed class CapabilitiesController(
 
     public async Task<IActionResult> Details(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var model = await drilldownService.BuildCapabilityDetailsAsync(id);
         if (model is null)
         {
@@ -195,6 +201,11 @@ public sealed class CapabilitiesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     public async Task<IActionResult> Edit(int id)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         var capability = await dbContext.BusinessCapabilityCatalogItems
             .AsNoTracking()
             .Include(x => x.Mappings)
@@ -297,7 +308,7 @@ public sealed class CapabilitiesController(
             .OrderBy(x => x.Code)
             .Select(x => new SelectListItem(
                 $"{x.Code} {x.Name} ({x.ParentCapability!.ParentDomain!.Code}/{x.ParentCapability.Code})",
-                x.Id.ToString()))
+                x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         var armComponents = await dbContext.ArmComponents
@@ -314,7 +325,7 @@ public sealed class CapabilitiesController(
         model.ArmComponentOptions = armComponents
             .Select(x => new SelectListItem(
                 $"{x.Code} {x.Name}",
-                x.Id.ToString()))
+                x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToList();
 
         model.ArmCapabilityOptions = armComponents
@@ -323,7 +334,7 @@ public sealed class CapabilitiesController(
             .OrderBy(group => group.First().ArmCapabilityLabel, StringComparer.OrdinalIgnoreCase)
             .Select(group => new SelectListItem(
                 group.First().ConnectionLabel,
-                group.Key.ToString()))
+                group.Key.ToString(CultureInfo.InvariantCulture)))
             .ToList();
 
         model.ArmComponentLookupOptions = armComponents
