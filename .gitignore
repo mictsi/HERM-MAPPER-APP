@@ -59,3 +59,4 @@ artifacts/
 output/
 src/HERM-MAPPER-APP/App_Data/
 src/HERM-MAPPER-APP/.artifacts/
+.local.data/

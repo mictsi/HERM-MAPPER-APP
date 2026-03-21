@@ -1,4 +1,5 @@
 using HERMMapperApp.Data;
+using HERMMapperApp.Infrastructure;
 using HERMMapperApp.Models;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +38,9 @@ public sealed partial class DatabaseInitializer(
             await EnsureSqliteSchemaUpToDateAsync(cancellationToken);
         }
 
-        if (!await dbContext.TrmDomains.AnyAsync(cancellationToken))
+        if (!await dbContext.TrmDomains
+                .ForReferenceModel(ReferenceModelKind.Trm)
+                .AnyAsync(cancellationToken))
         {
             var autoImport = configuration.GetValue("HermWorkbook:AutoImportOnFirstRun", true);
             var workbookPath = configuration["HermWorkbook:Path"];
@@ -54,7 +57,7 @@ public sealed partial class DatabaseInitializer(
                 return;
             }
 
-            await workbookImportService.ImportAsync(workbookPath, cancellationToken);
+            await workbookImportService.ImportAsync(workbookPath, cancellationToken: cancellationToken);
             LogImportedWorkbook(logger);
         }
 
@@ -240,6 +243,11 @@ public sealed partial class DatabaseInitializer(
                 ON "AuditLogEntries" ("OccurredUtc")
                 """,
                 cancellationToken);
+
+            await EnsureArmSqliteTablesAsync(cancellationToken);
+            await EnsureBrmSqliteTablesAsync(cancellationToken);
+            await MigrateLegacyArmRowsAsync(cancellationToken);
+            await MigrateLegacyBrmRowsAsync(cancellationToken);
         }
         finally
         {
@@ -1357,6 +1365,384 @@ public sealed partial class DatabaseInitializer(
                 await connection.CloseAsync();
             }
         }
+    }
+
+    private async Task EnsureArmSqliteTablesAsync(CancellationToken cancellationToken)
+    {
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "ArmDomains" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ArmDomains" PRIMARY KEY AUTOINCREMENT,
+                "Code" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "SourceTitle" TEXT NULL,
+                "Description" TEXT NULL,
+                "Comments" TEXT NULL
+            )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ArmDomains_Code"
+            ON "ArmDomains" ("Code")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "ArmCapabilities" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ArmCapabilities" PRIMARY KEY AUTOINCREMENT,
+                "Code" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "SourceTitle" TEXT NULL,
+                "ParentDomainCode" TEXT NULL,
+                "ParentDomainId" INTEGER NULL,
+                "Description" TEXT NULL,
+                "Comments" TEXT NULL,
+                CONSTRAINT "FK_ArmCapabilities_ArmDomains_ParentDomainId" FOREIGN KEY ("ParentDomainId") REFERENCES "ArmDomains" ("Id") ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ArmCapabilities_Code"
+            ON "ArmCapabilities" ("Code")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE INDEX IF NOT EXISTS "IX_ArmCapabilities_ParentDomainId"
+            ON "ArmCapabilities" ("ParentDomainId")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "ArmComponents" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ArmComponents" PRIMARY KEY AUTOINCREMENT,
+                "Code" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "SourceTitle" TEXT NULL,
+                "ParentCapabilityCode" TEXT NULL,
+                "ParentCapabilityId" INTEGER NULL,
+                "Description" TEXT NULL,
+                "Comments" TEXT NULL,
+                "ProductExamples" TEXT NULL,
+                CONSTRAINT "FK_ArmComponents_ArmCapabilities_ParentCapabilityId" FOREIGN KEY ("ParentCapabilityId") REFERENCES "ArmCapabilities" ("Id") ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ArmComponents_Code"
+            ON "ArmComponents" ("Code")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE INDEX IF NOT EXISTS "IX_ArmComponents_ParentCapabilityId"
+            ON "ArmComponents" ("ParentCapabilityId")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "ArmComponentCapabilityLinks" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_ArmComponentCapabilityLinks" PRIMARY KEY AUTOINCREMENT,
+                "ArmComponentId" INTEGER NOT NULL,
+                "ArmCapabilityId" INTEGER NOT NULL,
+                "CreatedUtc" TEXT NOT NULL,
+                CONSTRAINT "FK_ArmComponentCapabilityLinks_ArmCapabilities_ArmCapabilityId" FOREIGN KEY ("ArmCapabilityId") REFERENCES "ArmCapabilities" ("Id") ON DELETE CASCADE,
+                CONSTRAINT "FK_ArmComponentCapabilityLinks_ArmComponents_ArmComponentId" FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_ArmComponentCapabilityLinks_ArmComponentId_ArmCapabilityId"
+            ON "ArmComponentCapabilityLinks" ("ArmComponentId", "ArmCapabilityId")
+            """,
+            cancellationToken);
+    }
+
+    private async Task EnsureBrmSqliteTablesAsync(CancellationToken cancellationToken)
+    {
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "BrmDomains" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_BrmDomains" PRIMARY KEY AUTOINCREMENT,
+                "Code" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "SourceTitle" TEXT NULL,
+                "Description" TEXT NULL,
+                "Comments" TEXT NULL
+            )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_BrmDomains_Code"
+            ON "BrmDomains" ("Code")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "BrmCapabilities" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_BrmCapabilities" PRIMARY KEY AUTOINCREMENT,
+                "Code" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "SourceTitle" TEXT NULL,
+                "ParentDomainCode" TEXT NULL,
+                "ParentDomainId" INTEGER NULL,
+                "Description" TEXT NULL,
+                "Comments" TEXT NULL,
+                CONSTRAINT "FK_BrmCapabilities_BrmDomains_ParentDomainId" FOREIGN KEY ("ParentDomainId") REFERENCES "BrmDomains" ("Id") ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_BrmCapabilities_Code"
+            ON "BrmCapabilities" ("Code")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE INDEX IF NOT EXISTS "IX_BrmCapabilities_ParentDomainId"
+            ON "BrmCapabilities" ("ParentDomainId")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "BrmComponents" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_BrmComponents" PRIMARY KEY AUTOINCREMENT,
+                "Code" TEXT NOT NULL,
+                "Name" TEXT NOT NULL,
+                "SourceTitle" TEXT NULL,
+                "ParentCapabilityCode" TEXT NULL,
+                "ParentCapabilityId" INTEGER NULL,
+                "Description" TEXT NULL,
+                "Comments" TEXT NULL,
+                "ProductExamples" TEXT NULL,
+                CONSTRAINT "FK_BrmComponents_BrmCapabilities_ParentCapabilityId" FOREIGN KEY ("ParentCapabilityId") REFERENCES "BrmCapabilities" ("Id") ON DELETE CASCADE
+            )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_BrmComponents_Code"
+            ON "BrmComponents" ("Code")
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE INDEX IF NOT EXISTS "IX_BrmComponents_ParentCapabilityId"
+            ON "BrmComponents" ("ParentCapabilityId")
+            """,
+            cancellationToken);
+    }
+
+    private async Task MigrateLegacyArmRowsAsync(CancellationToken cancellationToken)
+    {
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO "ArmDomains" ("Code", "Name", "SourceTitle", "Description", "Comments")
+            SELECT d."Code", d."Name", d."SourceTitle", d."Description", d."Comments"
+            FROM "TrmDomains" d
+            WHERE d."Code" LIKE 'AD%'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "ArmDomains" x
+                  WHERE x."Code" = d."Code"
+              )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO "ArmCapabilities" ("Code", "Name", "SourceTitle", "ParentDomainCode", "ParentDomainId", "Description", "Comments")
+            SELECT c."Code",
+                   c."Name",
+                   c."SourceTitle",
+                   c."ParentDomainCode",
+                   d."Id",
+                   c."Description",
+                   c."Comments"
+            FROM "TrmCapabilities" c
+            LEFT JOIN "ArmDomains" d ON d."Code" = c."ParentDomainCode"
+            WHERE c."Code" LIKE 'AP%'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "ArmCapabilities" x
+                  WHERE x."Code" = c."Code"
+              )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE "ArmCapabilities"
+            SET "ParentDomainId" = (
+                SELECT d."Id"
+                FROM "ArmDomains" d
+                WHERE d."Code" = "ArmCapabilities"."ParentDomainCode"
+            )
+            WHERE "ParentDomainCode" IS NOT NULL
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO "ArmComponents" ("Code", "Name", "SourceTitle", "ParentCapabilityCode", "ParentCapabilityId", "Description", "Comments", "ProductExamples")
+            SELECT c."Code",
+                   c."Name",
+                   c."SourceTitle",
+                   c."ParentCapabilityCode",
+                   p."Id",
+                   c."Description",
+                   c."Comments",
+                   c."ProductExamples"
+            FROM "TrmComponents" c
+            LEFT JOIN "ArmCapabilities" p ON p."Code" = c."ParentCapabilityCode"
+            WHERE c."Code" LIKE 'AC%'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "ArmComponents" x
+                  WHERE x."Code" = c."Code"
+              )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE "ArmComponents"
+            SET "ParentCapabilityId" = (
+                SELECT c."Id"
+                FROM "ArmCapabilities" c
+                WHERE c."Code" = "ArmComponents"."ParentCapabilityCode"
+            )
+            WHERE "ParentCapabilityCode" IS NOT NULL
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO "ArmComponentCapabilityLinks" ("ArmComponentId", "ArmCapabilityId", "CreatedUtc")
+            SELECT ac."Id",
+                   ap."Id",
+                   COALESCE(tl."CreatedUtc", CURRENT_TIMESTAMP)
+            FROM "TrmComponentCapabilityLinks" tl
+            INNER JOIN "TrmComponents" tc ON tc."Id" = tl."TrmComponentId"
+            INNER JOIN "TrmCapabilities" tp ON tp."Id" = tl."TrmCapabilityId"
+            INNER JOIN "ArmComponents" ac ON ac."Code" = tc."Code"
+            INNER JOIN "ArmCapabilities" ap ON ap."Code" = tp."Code"
+            WHERE tc."Code" LIKE 'AC%'
+              AND tp."Code" LIKE 'AP%'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "ArmComponentCapabilityLinks" x
+                  WHERE x."ArmComponentId" = ac."Id"
+                    AND x."ArmCapabilityId" = ap."Id"
+              )
+            """,
+            cancellationToken);
+    }
+
+    private async Task MigrateLegacyBrmRowsAsync(CancellationToken cancellationToken)
+    {
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO "BrmDomains" ("Code", "Name", "SourceTitle", "Description", "Comments")
+            SELECT d."Code", d."Name", d."SourceTitle", d."Description", d."Comments"
+            FROM "TrmDomains" d
+            WHERE d."Code" LIKE 'BD%'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "BrmDomains" x
+                  WHERE x."Code" = d."Code"
+              )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO "BrmCapabilities" ("Code", "Name", "SourceTitle", "ParentDomainCode", "ParentDomainId", "Description", "Comments")
+            SELECT c."Code",
+                   c."Name",
+                   c."SourceTitle",
+                   c."ParentDomainCode",
+                   d."Id",
+                   c."Description",
+                   c."Comments"
+            FROM "TrmCapabilities" c
+            LEFT JOIN "BrmDomains" d ON d."Code" = c."ParentDomainCode"
+            WHERE c."Code" LIKE 'BC%'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "BrmCapabilities" x
+                  WHERE x."Code" = c."Code"
+              )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE "BrmCapabilities"
+            SET "ParentDomainId" = (
+                SELECT d."Id"
+                FROM "BrmDomains" d
+                WHERE d."Code" = "BrmCapabilities"."ParentDomainCode"
+            )
+            WHERE "ParentDomainCode" IS NOT NULL
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO "BrmComponents" ("Code", "Name", "SourceTitle", "ParentCapabilityCode", "ParentCapabilityId", "Description", "Comments", "ProductExamples")
+            SELECT c."Code",
+                   c."Name",
+                   c."SourceTitle",
+                   c."ParentCapabilityCode",
+                   p."Id",
+                   c."Description",
+                   c."Comments",
+                   c."ProductExamples"
+            FROM "TrmComponents" c
+            LEFT JOIN "BrmCapabilities" p ON p."Code" = c."ParentCapabilityCode"
+            WHERE c."Code" LIKE 'BC%'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM "BrmComponents" x
+                  WHERE x."Code" = c."Code"
+              )
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE "BrmComponents"
+            SET "ParentCapabilityId" = (
+                SELECT c."Id"
+                FROM "BrmCapabilities" c
+                WHERE c."Code" = "BrmComponents"."ParentCapabilityCode"
+            )
+            WHERE "ParentCapabilityCode" IS NOT NULL
+            """,
+            cancellationToken);
     }
 
     private async Task NormalizeConfigurableFieldOptionSortOrdersAsync(CancellationToken cancellationToken)

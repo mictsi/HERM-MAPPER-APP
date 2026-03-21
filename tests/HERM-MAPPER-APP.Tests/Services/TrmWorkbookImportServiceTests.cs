@@ -29,7 +29,7 @@ public sealed class TrmWorkbookImportServiceTests
                     ["Workbook", "TP001", "Observability", "TD001 Technology", "Capability description", "Capability comments"]
                 ]));
 
-        var verification = await fixture.CreateService().VerifyAsync(workbookPath);
+        var verification = await fixture.CreateService().VerifyAsync(workbookPath, ReferenceModelKind.Trm);
 
         Assert.False(verification.IsValid);
         Assert.Contains("TRM Component", Assert.Single(verification.Errors));
@@ -69,6 +69,74 @@ public sealed class TrmWorkbookImportServiceTests
         Assert.Equal(1, verification.CapabilitiesToAdd);
         Assert.Equal(1, verification.ComponentsToAdd);
         Assert.Contains("first TRM model", Assert.Single(verification.Warnings), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task VerifyAsyncReturnsCountsForArmWorkbookWhenModelSelected()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var workbookPath = fixture.WriteWorkbook(
+            new WorkbookSheet(
+                "ARM Domain",
+                [
+                    ["Source", "Code", "Name", "Description", "Comments"],
+                    ["Workbook", "AD001", "Business Apps", "Domain description", "Domain comments"]
+                ]),
+            new WorkbookSheet(
+                "ARM Capability",
+                [
+                    ["Source", "Code", "Name", "Parent Domain", "Description", "Comments"],
+                    ["Workbook", "AP008", "Governance, Risk, & Compliance", "AD001 Business Apps", "Capability description", "Capability comments"]
+                ]),
+            new WorkbookSheet(
+                "ARM Component",
+                [
+                    ["Source", "Code", "Name", "Parent Capability", "Description", "Comments", "Product examples"],
+                    ["Workbook", "AC001", "Policy Management", "AP008 Governance, Risk, & Compliance", "Component description", "Component comments", "Contoso Workflow"]
+                ]));
+
+        var verification = await fixture.CreateService().VerifyAsync(workbookPath, ReferenceModelKind.Arm);
+
+        Assert.True(verification.IsValid);
+        Assert.Equal(ReferenceModelKind.Arm, verification.ModelKind);
+        Assert.Equal(1, verification.DomainRowCount);
+        Assert.Equal(1, verification.CapabilityRowCount);
+        Assert.Equal(1, verification.ComponentRowCount);
+        Assert.Equal(1, verification.DomainsToAdd);
+        Assert.Equal(1, verification.CapabilitiesToAdd);
+        Assert.Equal(1, verification.ComponentsToAdd);
+        Assert.Contains("first ARM model", Assert.Single(verification.Warnings), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task VerifyAsyncReturnsErrorWhenWorkbookDoesNotMatchSelectedModel()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var workbookPath = fixture.WriteWorkbook(
+            new WorkbookSheet(
+                "TRM Domain",
+                [
+                    ["Source", "Code", "Name", "Description", "Comments"],
+                    ["Workbook", "TD001", "Technology", "Domain description", "Domain comments"]
+                ]),
+            new WorkbookSheet(
+                "TRM Capability",
+                [
+                    ["Source", "Code", "Name", "Parent Domain", "Description", "Comments"],
+                    ["Workbook", "TP001", "Observability", "TD001 Technology", "Capability description", "Capability comments"]
+                ]),
+            new WorkbookSheet(
+                "TRM Component",
+                [
+                    ["Source", "Code", "Name", "Parent Capability", "Description", "Comments", "Product examples"],
+                    ["Workbook", "TC001", "Monitoring", "TP001 Observability", "Component description", "Component comments", "Graylog"]
+                ]));
+
+        var verification = await fixture.CreateService().VerifyAsync(workbookPath, ReferenceModelKind.Arm);
+
+        Assert.False(verification.IsValid);
+        Assert.Equal(ReferenceModelKind.Arm, verification.ModelKind);
+        Assert.Contains("ARM Domain", Assert.Single(verification.Errors));
     }
 
     [Fact]
@@ -192,7 +260,7 @@ public sealed class TrmWorkbookImportServiceTests
                 Assert.Equal(2, version.VersionNumber);
                 Assert.Equal("TC001", version.ModelCode);
                 Assert.Equal("TP002, TP003", version.CapabilityCodes);
-                Assert.Equal("Workbook import", version.Details);
+                Assert.Equal("TRM workbook import", version.Details);
                 Assert.False(version.IsCustom);
                 Assert.Null(version.TechnologyComponentCode);
             },
@@ -201,13 +269,103 @@ public sealed class TrmWorkbookImportServiceTests
                 Assert.Equal("Imported", version.ChangeType);
                 Assert.Equal(1, version.VersionNumber);
                 Assert.Equal("TC002", version.ModelCode);
-                Assert.Equal("Workbook import", version.Details);
+                Assert.Equal("TRM workbook import", version.Details);
             });
 
         Assert.Equal("Reference", auditEntry.Category);
         Assert.Equal("Import", auditEntry.Action);
         Assert.Contains("1 components added", auditEntry.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Updated 1 domains, 1 capabilities, 1 components", auditEntry.Details, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ImportAsyncImportsBrmWorkbookIntoGroupedHierarchy()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var workbookPath = fixture.WriteWorkbook(
+            new WorkbookSheet(
+                "BRM",
+                [
+                    ["Title", "Capability Type", "Capability Level", "Value Chain", "Value Chain Segment", "Capability Code", "Capability Name", "Parent Capability", "Capability Description", "Capability Notes", "Capability Assessment", "Display Sequence"],
+                    ["Business Capability", "Primary", "1", "Operations", "Fulfilment", "BC001", "Order Handling", "", "Level 1 description", "Level 1 notes", "High", "10"],
+                    ["Business Capability", "Primary", "2", "Operations", "Fulfilment", "BC002", "Order Capture", "BC001 Order Handling", "Level 2 description", "Level 2 notes", "Medium", "20"]
+                ]));
+
+        var verification = await fixture.CreateService().VerifyAsync(workbookPath, ReferenceModelKind.Brm);
+        Assert.True(verification.IsValid);
+        Assert.Equal(ReferenceModelKind.Brm, verification.ModelKind);
+        Assert.Equal(1, verification.DomainRowCount);
+        Assert.Equal(1, verification.CapabilityRowCount);
+        Assert.Equal(1, verification.ComponentRowCount);
+
+        var summary = await fixture.CreateService().ImportAsync(workbookPath, ReferenceModelKind.Brm);
+
+        var persistedDomain = await fixture.DbContext.BrmDomains.SingleAsync();
+        var persistedCapability = await fixture.DbContext.BrmCapabilities.SingleAsync();
+        var persistedComponent = await fixture.DbContext.BrmComponents
+            .Include(x => x.ParentCapability)
+            .SingleAsync();
+
+        Assert.Equal(ReferenceModelKind.Brm, summary.ModelKind);
+        Assert.Equal(1, summary.DomainsAdded);
+        Assert.Equal(1, summary.CapabilitiesAdded);
+        Assert.Equal(1, summary.ComponentsAdded);
+        Assert.StartsWith("BD", persistedDomain.Code, StringComparison.Ordinal);
+        Assert.Equal("BC001", persistedCapability.Code);
+        Assert.Equal("BC002", persistedComponent.Code);
+        Assert.Equal(persistedDomain.Id, persistedCapability.ParentDomainId);
+        Assert.Equal(persistedCapability.Id, persistedComponent.ParentCapabilityId);
+        Assert.Equal("BC001", persistedComponent.ParentCapabilityCode);
+    }
+
+    [Fact]
+    public async Task ImportAsyncImportsArmWorkbookIntoDedicatedTables()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var workbookPath = fixture.WriteWorkbook(
+            new WorkbookSheet(
+                "ARM Domain",
+                [
+                    ["Source", "Code", "Name", "Description", "Comments"],
+                    ["Workbook", "AD001", "Business Apps", "Domain description", "Domain comments"]
+                ]),
+            new WorkbookSheet(
+                "ARM Capability",
+                [
+                    ["Source", "Code", "Name", "Parent Domain", "Description", "Comments"],
+                    ["Workbook", "AP008", "Governance, Risk, & Compliance", "AD001 Business Apps", "Capability description", "Capability comments"],
+                    ["Workbook", "AP011", "Automation", "AD001 Business Apps", "Capability two description", "Capability two comments"]
+                ]),
+            new WorkbookSheet(
+                "ARM Component",
+                [
+                    ["Source", "Code", "Name", "Parent Capability", "Description", "Comments", "Product examples"],
+                    ["Workbook", "AC012", "Policy Management", "AP008 Governance, Risk, & Compliance; AP011 Automation", "Component description", "Component comments", "Contoso Workflow"]
+                ]));
+
+        var summary = await fixture.CreateService().ImportAsync(workbookPath, ReferenceModelKind.Arm);
+
+        var persistedDomain = await fixture.DbContext.ArmDomains.SingleAsync();
+        var persistedCapabilities = await fixture.DbContext.ArmCapabilities
+            .OrderBy(x => x.Code)
+            .ToListAsync();
+        var persistedComponent = await fixture.DbContext.ArmComponents
+            .Include(x => x.CapabilityLinks)
+            .ThenInclude(x => x.ArmCapability)
+            .SingleAsync();
+
+        Assert.Equal(ReferenceModelKind.Arm, summary.ModelKind);
+        Assert.Equal(1, summary.DomainsAdded);
+        Assert.Equal(2, summary.CapabilitiesAdded);
+        Assert.Equal(1, summary.ComponentsAdded);
+        Assert.Equal("AD001", persistedDomain.Code);
+        Assert.Equal(["AP008", "AP011"], persistedCapabilities.Select(x => x.Code).ToArray());
+        Assert.Equal("AC012", persistedComponent.Code);
+        Assert.Equal("AP008", persistedComponent.ParentCapabilityCode);
+        Assert.Equal(["AP008", "AP011"], persistedComponent.CapabilityLinks.Select(x => x.ArmCapability!.Code).OrderBy(x => x).ToArray());
+        Assert.Empty(await fixture.DbContext.TrmDomains.ToListAsync());
+        Assert.Empty(await fixture.DbContext.TrmCapabilities.ToListAsync());
+        Assert.Empty(await fixture.DbContext.TrmComponents.ToListAsync());
     }
 
     private sealed class TestFixture : IAsyncDisposable

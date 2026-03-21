@@ -1,18 +1,18 @@
 @using HERMMapperApp
 @using HERMMapperApp.Models
-@using HERMMapperApp.Services
 @using HERMMapperApp.ViewModels
 @model ReferenceCatalogueViewModel
 @{
-    ViewData["Title"] = "HERM Catalogue";
+    ViewData["Title"] = "HERM Browser";
     var isAdministrator = AppRoles.IsAdministrator(User);
+    var searchFormAction = $"{Url.Action("Index", "Reference")}#{Model.ActiveTreeAnchorId}";
 }
 
 <section class="page-header">
     <div>
-        <span class="eyebrow">Imported HERM TRM reference</span>
-        <h1>Browse domains, capabilities, and components</h1>
-        <p>Review the current reference model here. Catalogue imports are verified and applied from Configuration, and deleted components are managed from Admin.</p>
+        <span class="eyebrow">HERM Browser</span>
+        <h1>Browse TRM, ARM, and BRM</h1>
+        <p>Search across imported HERM models, then drill into model, domain, and capability selections from the browser tree.</p>
     </div>
 </section>
 
@@ -24,156 +24,248 @@
 }
 
 <section class="content-card">
-    <form method="get" class="row g-3 align-items-end">
-        <div class="col-lg-5">
-            <label class="form-label" for="search">Search components</label>
-            <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Code, name, description, product examples" />
+    <form method="get" action="@searchFormAction" class="row g-3 align-items-end">
+        @if (Model.SelectedModelKind.HasValue)
+        {
+            <input type="hidden" name="modelKind" value="@Model.SelectedModelKind" />
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.SelectedDomainCode))
+        {
+            <input type="hidden" name="domainCode" value="@Model.SelectedDomainCode" />
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.SelectedCapabilityCode))
+        {
+            <input type="hidden" name="capabilityCode" value="@Model.SelectedCapabilityCode" />
+        }
+        <div class="col-lg-9">
+            <label class="form-label" for="search">Search browser</label>
+            <input class="form-control"
+                   id="search"
+                   name="search"
+                   value="@Model.Search"
+                   placeholder="Model, domain, capability, component, description, or product example" />
         </div>
-        <div class="col-lg-3">
-            <label class="form-label" for="domainId">Domain</label>
-            <select class="form-select" id="domainId" name="domainId">
-                <option value="">All domains</option>
-                @foreach (var domain in Model.Domains)
-                {
-                    <option value="@domain.Id" selected="@(Model.DomainId == domain.Id ? "selected" : null)">@domain.Code @domain.Name</option>
-                }
-            </select>
-        </div>
-        <div class="col-lg-3">
-            <label class="form-label" for="capabilityId">Capability</label>
-            <select class="form-select" id="capabilityId" name="capabilityId">
-                <option value="">All capabilities</option>
-                @foreach (var capability in Model.Capabilities)
-                {
-                    <option value="@capability.Id" selected="@(Model.CapabilityId == capability.Id ? "selected" : null)">@capability.Code @capability.Name</option>
-                }
-            </select>
-        </div>
-        <div class="col-lg-1 d-grid">
-            <button class="btn btn-primary" type="submit">Go</button>
+        <div class="col-lg-3 d-flex gap-2">
+            <button class="btn btn-primary flex-grow-1" type="submit">Search</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
         </div>
     </form>
 </section>
 
-<div class="row g-4">
-    <div class="col-xl-4">
-        <section class="content-card h-100">
-            <div class="section-heading">
-                <div>
-                    <span class="eyebrow">Domains</span>
-                    <h2>@Model.Domains.Count imported</h2>
-                </div>
+<div class="browser-shell">
+    <aside class="content-card browser-sidebar" id="browser-navigation">
+        <div class="section-heading">
+            <div>
+                <span class="eyebrow">Navigation</span>
+                <h2>Reference tree</h2>
             </div>
-            <div class="stack-list">
-                @foreach (var domain in Model.Domains)
-                {
-                    <article class="stack-item @(Model.DomainId == domain.Id ? "is-selected" : string.Empty)">
-                        <div class="stack-title">@domain.Code @domain.Name</div>
-                        <div class="stack-body">@domain.Description</div>
-                    </article>
-                }
-            </div>
-        </section>
-    </div>
-    <div class="col-xl-8">
-        <section class="content-card">
-            <div class="section-heading">
-                <div>
-                    <span class="eyebrow">Components</span>
-                    <h2>@Model.Components.Count result(s)</h2>
-                </div>
-            </div>
+        </div>
 
-            @if (Model.Components.Count == 0)
+        <a class="browser-reset-link @((Model.SelectedModelKind is null && string.IsNullOrWhiteSpace(Model.SelectedDomainCode) && string.IsNullOrWhiteSpace(Model.SelectedCapabilityCode)) ? "is-active" : null)"
+           asp-action="Index"
+           asp-route-search="@Model.Search"
+           asp-fragment="browser-navigation">
+            All models
+        </a>
+
+        @if (Model.ModelGroups.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No imported models</h3>
+                <p>Import a catalogue from Configuration to start browsing.</p>
+            </div>
+        }
+        else
+        {
+            <ul class="browser-tree-root">
+                @foreach (var group in Model.ModelGroups)
+                {
+                    var groupCss = group.ShortName.ToLowerInvariant();
+                    <li class="browser-tree-item browser-tree-model browser-tree-@groupCss" id="@group.AnchorId">
+                        <details class="browser-tree-details" @(group.IsExpanded ? "open" : null)>
+                            <summary class="browser-tree-summary">
+                                <a class="browser-tree-link browser-tree-link-strong @(group.IsSelected ? "is-active" : null)"
+                                   asp-action="Index"
+                                   asp-route-search="@Model.Search"
+                                   asp-route-modelKind="@group.ModelKind"
+                                   asp-fragment="@group.AnchorId">
+                                    @group.Label
+                                </a>
+                                <span class="browser-tree-toggle" aria-hidden="true"></span>
+                            </summary>
+
+                            <div class="browser-tree-section-label">@group.DomainLabel</div>
+
+                            <ul class="browser-tree-list">
+                                @foreach (var domain in group.Domains)
+                                {
+                                    <li class="browser-tree-item browser-tree-domain browser-tree-@groupCss" id="@domain.AnchorId">
+                                        @if (domain.Capabilities.Count == 0)
+                                        {
+                                            <div class="browser-tree-leaf-row">
+                                                <a class="browser-tree-link @(domain.IsSelected ? "is-active" : null)"
+                                                   asp-action="Index"
+                                                   asp-route-search="@Model.Search"
+                                                   asp-route-modelKind="@group.ModelKind"
+                                                   asp-route-domainCode="@domain.Code"
+                                                   asp-fragment="@domain.AnchorId">
+                                                    @domain.DisplayLabel
+                                                </a>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <details class="browser-tree-details browser-tree-subtree" @(domain.IsExpanded ? "open" : null)>
+                                                <summary class="browser-tree-summary browser-tree-summary-subtle">
+                                                    <a class="browser-tree-link @(domain.IsSelected ? "is-active" : null)"
+                                                       asp-action="Index"
+                                                       asp-route-search="@Model.Search"
+                                                       asp-route-modelKind="@group.ModelKind"
+                                                       asp-route-domainCode="@domain.Code"
+                                                       asp-fragment="@domain.AnchorId">
+                                                        @domain.DisplayLabel
+                                                    </a>
+                                                    <span class="browser-tree-toggle" aria-hidden="true"></span>
+                                                </summary>
+                                                <ul class="browser-tree-list browser-tree-list-nested">
+                                                    @foreach (var capability in domain.Capabilities)
+                                                    {
+                                                        <li class="browser-tree-item browser-tree-capability" id="@capability.AnchorId">
+                                                            <div class="browser-tree-leaf-row browser-tree-leaf-row-subtle">
+                                                                <a class="browser-tree-link @(capability.IsSelected ? "is-active" : null)"
+                                                                   asp-action="Index"
+                                                                   asp-route-search="@Model.Search"
+                                                                   asp-route-modelKind="@group.ModelKind"
+                                                                   asp-route-domainCode="@domain.Code"
+                                                                   asp-route-capabilityCode="@capability.Code"
+                                                                   asp-fragment="@capability.AnchorId">
+                                                                    @capability.DisplayLabel
+                                                                </a>
+                                                            </div>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </details>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </details>
+                    </li>
+                }
+            </ul>
+        }
+    </aside>
+
+    <section class="content-card browser-results">
+        <div class="section-heading browser-results-heading">
+            <div>
+                <span class="eyebrow">Selection</span>
+                <h2>@Model.SelectionTitle</h2>
+                <p class="browser-selection-copy">@Model.SelectionDescription</p>
+            </div>
+            @if (Model.SelectedModelKind.HasValue || !string.IsNullOrWhiteSpace(Model.SelectedDomainCode) || !string.IsNullOrWhiteSpace(Model.SelectedCapabilityCode) || !string.IsNullOrWhiteSpace(Model.Search))
             {
-                <div class="empty-state compact">
-                    <h3>No matching components</h3>
-                    <p>Try a wider search or clear the filters.</p>
-                </div>
+                <a class="btn btn-outline-secondary" asp-action="Index">Clear selection</a>
             }
-            else
-            {
-                <div class="table-responsive">
-                    <table class="table align-middle">
-                        <thead>
-                            <tr>
-                                <th>Component</th>
-                                <th>Type</th>
-                                <th>Capabilities</th>
-                                <th>Domains</th>
-                                <th>Product examples</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        @foreach (var component in Model.Components)
-                        {
-                            var linkedCapabilities = component.CapabilityLinks
-                                .Where(x => x.TrmCapability is not null)
-                                .Select(x => x.TrmCapability!)
-                                .OrderBy(x => x.Code)
-                                .ToList();
-                            var linkedDomains = linkedCapabilities
-                                .Where(x => x.ParentDomain is not null)
-                                .Select(x => x.ParentDomain!)
-                                .DistinctBy(x => x.Id)
-                                .OrderBy(x => x.Code)
-                                .ToList();
-                            <tr>
-                                <td>
-                                    <strong>@component.DisplayLabel</strong>
+        </div>
+
+        @if (Model.Components.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No matching results</h3>
+                <p>Try a wider search or select another branch in the browser tree.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Component</th>
+                            <th>Capabilities</th>
+                            <th>Domains</th>
+                            <th>Product examples</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var component in Model.Components)
+                    {
+                        var modelCss = component.ModelLabel.ToLowerInvariant();
+                        <tr>
+                            <td>
+                                <div class="browser-chip-row">
+                                    <span class="browser-model-chip browser-model-chip-@modelCss">@component.ModelLabel</span>
+                                    @if (component.IsCustom)
+                                    {
+                                        <span class="tag-pill tag-pill-custom">@component.TypeLabel</span>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                <strong>@component.DisplayLabel</strong>
+                                @if (!string.IsNullOrWhiteSpace(component.SecondaryCode))
+                                {
+                                    <div class="table-subline">@component.SecondaryCode</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(component.Description))
+                                {
                                     <div class="table-subline">@component.Description</div>
-                                </td>
-                                <td>
-                                    <span class="tag-pill @(component.IsCustom ? "tag-pill-custom" : "tag-pill-model")">
-                                        @(component.IsCustom ? "Custom" : "Model")
-                                    </span>
-                                </td>
-                                <td>
-                                    @if (linkedCapabilities.Count == 0)
-                                    {
-                                        <span>-</span>
-                                    }
-                                    else
-                                    {
-                                        <div class="mapping-chip-list">
-                                            @foreach (var capability in linkedCapabilities)
-                                            {
-                                                <span class="mapping-chip">@capability.Code @capability.Name</span>
-                                            }
-                                        </div>
-                                    }
-                                </td>
-                                <td>
-                                    @if (linkedDomains.Count == 0)
-                                    {
-                                        <span>-</span>
-                                    }
-                                    else
-                                    {
-                                        <div class="mapping-chip-list">
-                                            @foreach (var domain in linkedDomains)
-                                            {
-                                                <span class="mapping-chip">@domain.Code @domain.Name</span>
-                                            }
-                                        </div>
-                                    }
-                                </td>
-                                <td>@(string.IsNullOrWhiteSpace(component.ProductExamples) ? "-" : component.ProductExamples)</td>
-                                <td class="text-end">
+                                }
+                            </td>
+                            <td>
+                                @if (component.Capabilities.Count == 0)
+                                {
+                                    <span>-</span>
+                                }
+                                else
+                                {
+                                    <div class="mapping-chip-list">
+                                        @foreach (var capability in component.Capabilities)
+                                        {
+                                            <span class="mapping-chip">@capability.DisplayLabel</span>
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            <td>
+                                @if (component.Domains.Count == 0)
+                                {
+                                    <span>-</span>
+                                }
+                                else
+                                {
+                                    <div class="mapping-chip-list">
+                                        @foreach (var domain in component.Domains)
+                                        {
+                                            <span class="mapping-chip">@domain.DisplayLabel</span>
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            <td>@(string.IsNullOrWhiteSpace(component.ProductExamples) ? "-" : component.ProductExamples)</td>
+                            <td class="text-end">
+                                @if (component.SupportsHistory || (isAdministrator && component.SupportsDelete))
+                                {
                                     <div class="table-action-group">
-                                        <a class="table-action-button"
-                                           asp-action="History"
-                                           asp-route-id="@component.Id"
-                                           title="Show history for @component.DisplayLabel"
-                                           aria-label="Show history for @component.DisplayLabel">
-                                            <partial name="_ActionIcon" model="@("history")" />
-                                            <span class="visually-hidden">History</span>
-                                        </a>
-                                        @if (isAdministrator)
+                                        @if (component.SupportsHistory)
+                                        {
+                                            <a class="table-action-button"
+                                               asp-action="History"
+                                               asp-route-id="@component.NativeId"
+                                               title="Show history for @component.DisplayLabel"
+                                               aria-label="Show history for @component.DisplayLabel">
+                                                <partial name="_ActionIcon" model="@("history")" />
+                                                <span class="visually-hidden">History</span>
+                                            </a>
+                                        }
+                                        @if (isAdministrator && component.SupportsDelete)
                                         {
                                             <form asp-action="DeleteComponent" method="post" class="table-action-form">
-                                                <input type="hidden" name="id" value="@component.Id" />
+                                                <input type="hidden" name="id" value="@component.NativeId" />
                                                 <button class="table-action-button table-action-button-danger"
                                                         type="submit"
                                                         title="Move @component.DisplayLabel to trash"
@@ -184,14 +276,13 @@
                                             </form>
                                         }
                                     </div>
-                                </td>
-                            </tr>
-                        }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </section>
-    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
 </div>
-

@@ -10,6 +10,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<TrmComponent> TrmComponents => Set<TrmComponent>();
     public DbSet<TrmComponentCapabilityLink> TrmComponentCapabilityLinks => Set<TrmComponentCapabilityLink>();
     public DbSet<TrmComponentVersion> TrmComponentVersions => Set<TrmComponentVersion>();
+    public DbSet<ArmDomain> ArmDomains => Set<ArmDomain>();
+    public DbSet<ArmCapability> ArmCapabilities => Set<ArmCapability>();
+    public DbSet<ArmComponent> ArmComponents => Set<ArmComponent>();
+    public DbSet<ArmComponentCapabilityLink> ArmComponentCapabilityLinks => Set<ArmComponentCapabilityLink>();
+    public DbSet<BrmDomain> BrmDomains => Set<BrmDomain>();
+    public DbSet<BrmCapability> BrmCapabilities => Set<BrmCapability>();
+    public DbSet<BrmComponent> BrmComponents => Set<BrmComponent>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
@@ -27,6 +34,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<TrmDomain>(entity =>
         {
+            entity.ToTable("TrmDomains");
             entity.HasIndex(x => x.Code).IsUnique();
             entity.Property(x => x.Code).HasMaxLength(16);
             entity.Property(x => x.Name).HasMaxLength(200);
@@ -34,6 +42,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<TrmCapability>(entity =>
         {
+            entity.ToTable("TrmCapabilities");
             entity.HasIndex(x => x.Code).IsUnique();
             entity.Property(x => x.Code).HasMaxLength(16);
             entity.Property(x => x.Name).HasMaxLength(200);
@@ -45,6 +54,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<TrmComponent>(entity =>
         {
+            entity.ToTable("TrmComponents");
             entity.HasIndex(x => x.Code).IsUnique();
             entity.Property(x => x.Code).HasMaxLength(32);
             entity.Property(x => x.TechnologyComponentCode).HasMaxLength(32);
@@ -57,6 +67,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<TrmComponentCapabilityLink>(entity =>
         {
+            entity.ToTable("TrmComponentCapabilityLinks");
             entity.HasIndex(x => new { x.TrmComponentId, x.TrmCapabilityId }).IsUnique();
             entity.HasOne(x => x.TrmComponent)
                 .WithMany(x => x.CapabilityLinks)
@@ -70,6 +81,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<TrmComponentVersion>(entity =>
         {
+            entity.ToTable("TrmComponentVersions");
             entity.HasIndex(x => new { x.TrmComponentId, x.VersionNumber }).IsUnique();
             entity.Property(x => x.ChangeType).HasMaxLength(40);
             entity.Property(x => x.ModelCode).HasMaxLength(32);
@@ -78,6 +90,84 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.TrmComponent)
                 .WithMany(x => x.Versions)
                 .HasForeignKey(x => x.TrmComponentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ArmDomain>(entity =>
+        {
+            entity.ToTable("ArmDomains");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(16);
+            entity.Property(x => x.Name).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<ArmCapability>(entity =>
+        {
+            entity.ToTable("ArmCapabilities");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(16);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.HasOne(x => x.ParentDomain)
+                .WithMany(x => x.Capabilities)
+                .HasForeignKey(x => x.ParentDomainId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ArmComponent>(entity =>
+        {
+            entity.ToTable("ArmComponents");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(32);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.HasOne(x => x.ParentCapability)
+                .WithMany(x => x.Components)
+                .HasForeignKey(x => x.ParentCapabilityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ArmComponentCapabilityLink>(entity =>
+        {
+            entity.ToTable("ArmComponentCapabilityLinks");
+            entity.HasIndex(x => new { x.ArmComponentId, x.ArmCapabilityId }).IsUnique();
+            entity.HasOne(x => x.ArmComponent)
+                .WithMany(x => x.CapabilityLinks)
+                .HasForeignKey(x => x.ArmComponentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ArmCapability)
+                .WithMany(x => x.ComponentLinks)
+                .HasForeignKey(x => x.ArmCapabilityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BrmDomain>(entity =>
+        {
+            entity.ToTable("BrmDomains");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(16);
+            entity.Property(x => x.Name).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<BrmCapability>(entity =>
+        {
+            entity.ToTable("BrmCapabilities");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(16);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.HasOne(x => x.ParentDomain)
+                .WithMany(x => x.Capabilities)
+                .HasForeignKey(x => x.ParentDomainId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BrmComponent>(entity =>
+        {
+            entity.ToTable("BrmComponents");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(32);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.HasOne(x => x.ParentCapability)
+                .WithMany(x => x.Components)
+                .HasForeignKey(x => x.ParentCapabilityId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
