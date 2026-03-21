@@ -43,23 +43,23 @@
                                 <a class="nav-link" asp-controller="Home" asp-action="Index">Dashboard</a>
                             </li>
                             <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">BRM</a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" asp-controller="Capabilities" asp-action="Index">Capabilities</a></li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">ARM</a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" asp-controller="Applications" asp-action="Index">Applications</a></li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">TRM</a>
                                 <ul class="dropdown-menu">
                                     <li><a class="dropdown-item" asp-controller="Products" asp-action="Index">Products</a></li>
                                     <li><a class="dropdown-item" asp-controller="Services" asp-action="Index">Services</a></li>
                                 </ul>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Applications" asp-action="Index">Applications</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Capabilities" asp-action="Index">Capabilities</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Reference" asp-action="Index">HERM Browser</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a>
                             </li>
                             }
                             @if (isAdministrator)
@@ -67,6 +67,18 @@
                             <li class="nav-item">
                                 <a class="nav-link" asp-controller="Mappings" asp-action="Index">Mapping Board</a>
                             </li>
+                            }
+                            @if (canReadCatalogue)
+                            {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Reference" asp-action="Index">HERM Browser</a>
+                            </li>
+                            }
+                            @if (isAdministrator)
+                            {
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
                                 <ul class="dropdown-menu dropdown-menu-end">
