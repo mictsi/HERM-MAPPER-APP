@@ -1,6 +1,6 @@
 @model ModelDiagramReportViewModel
 @{
-    ViewData["Title"] = "Product model poster";
+    ViewData["Title"] = Model.PosterTitle;
     ViewData["BodyClass"] = "report-poster-mode";
 }
 
@@ -8,21 +8,27 @@
     <div class="model-report-poster-toolbar">
         <div>
             <span class="eyebrow">Reports</span>
-            <h1>Product model poster</h1>
-            <p>Full-screen poster view of the HERM model with products placed directly inside each component column.</p>
+            <h1>@Model.PosterTitle</h1>
+            <p>@Model.PosterDescription</p>
         </div>
         <div class="report-toolbar-actions">
-            <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-fragment="report-product-model">Back to reports</a>
-            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadDrawIo">Download draw.io</a>
-            <a class="btn btn-primary btn-sm" asp-action="DownloadArchiXml">Download Archi XML</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-fragment="@Model.ReportFragmentId">Back to reports</a>
+            @if (!string.IsNullOrWhiteSpace(Model.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction">Download Archi XML</a>
+            }
         </div>
     </div>
 
     @if (!Model.HasAnyContent)
     {
         <div class="empty-state compact">
-            <h3>No model content available</h3>
-            <p>Import the HERM reference model and product mappings to populate this report.</p>
+            <h3>@Model.EmptyStateTitle</h3>
+            <p>@Model.EmptyStateBody</p>
         </div>
     }
     else
@@ -31,8 +37,11 @@
             <span class="report-summary-chip"><strong>@Model.DomainCount</strong> domains</span>
             <span class="report-summary-chip"><strong>@Model.CapabilityCount</strong> capabilities</span>
             <span class="report-summary-chip"><strong>@Model.ComponentCount</strong> components</span>
-            <span class="report-summary-chip"><strong>@Model.ProductCount</strong> products</span>
-            <span class="report-summary-chip"><strong>@Model.UnmappedProductCount</strong> unmapped</span>
+            <span class="report-summary-chip"><strong>@Model.ItemCount</strong> @Model.MappedSummaryLabel</span>
+            @if (Model.ShowUnmappedItems)
+            {
+                <span class="report-summary-chip"><strong>@Model.UnmappedItemCount</strong> unmapped</span>
+            }
         </div>
 
         <div class="model-report-poster-frame">

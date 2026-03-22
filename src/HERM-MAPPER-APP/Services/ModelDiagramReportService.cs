@@ -219,12 +219,30 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
     private static ModelDiagramReportViewModel MapToViewModel(DiagramReportData data) =>
         new()
         {
+            ScopeKey = "trm",
+            ReportFragmentId = "report-product-model",
+            DiagramTitle = "TRM Model diagram",
+            DiagramDescription = "Browse the HERM structure with mapped products inside each component, open a full-screen canvas, or export the same data to draw.io and Archi XML.",
+            PosterTitle = "Product model poster",
+            PosterDescription = "Full-screen poster view of the HERM model with products placed directly inside each component column.",
+            MappedItemLabel = "mapped product(s)",
+            EmptyStateTitle = "No model content available",
+            EmptyStateBody = "Import the HERM reference model and product mappings to populate this report.",
+            ShowUnmappedItems = true,
+            ShowComponentMappedSummary = false,
+            UnmappedSectionTitle = "Unmapped Products",
+            UnmappedSummaryLabel = "product(s) still need a component placement",
+            DrawIoDownloadAction = "DownloadDrawIo",
+            ArchiDownloadAction = "DownloadArchiXml",
             DomainCount = data.Domains.Count,
             CapabilityCount = data.Domains.Sum(x => x.Capabilities.Count),
             ComponentCount = data.Domains.Sum(x => x.Capabilities.Sum(capability => capability.Components.Count)),
             ProductCount = data.ProductCount,
             MappedProductCount = data.MappedProductCount,
             UnmappedProductCount = data.UnmappedProducts.Count,
+            ItemCount = data.ProductCount,
+            MappedItemCount = data.MappedProductCount,
+            UnmappedItemCount = data.UnmappedProducts.Count,
             Domains = data.Domains.Select(MapDomain).ToList(),
             UnmappedProducts = data.UnmappedProducts.Select(MapProduct).ToList()
         };
@@ -265,7 +283,10 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
             StatusCssClass = GetStatusCssClass(product.StatusLabel),
             Vendor = product.Vendor,
             Version = product.Version,
-            OwnersLabel = product.OwnersLabel
+            OwnersLabel = product.OwnersLabel,
+            LinkController = "Products",
+            LinkAction = "Details",
+            LinkId = product.ProductId
         };
 
     private static ResolvedPlacement? ResolvePlacement(ProductMapping mapping, IReadOnlyDictionary<int, DiagramComponentNode> componentsById)

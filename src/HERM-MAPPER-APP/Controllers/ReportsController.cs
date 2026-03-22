@@ -10,7 +10,10 @@ using System.Text;
 namespace HERMMapperApp.Controllers;
 
 [Authorize(Policy = AppPolicies.CatalogueRead)]
-public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReportService modelDiagramReportService) : Controller
+public sealed class ReportsController(
+    AppDbContext dbContext,
+    ModelDiagramReportService modelDiagramReportService,
+    ReferenceModelDiagramService referenceModelDiagramService) : Controller
 {
     public async Task<IActionResult> Index(string? lifecycleOwner = null)
     {
@@ -84,6 +87,8 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
             SelectedLifecycleOwner = lifecycleOwner,
             LifecycleProductCount = lifecycleProducts.Count,
             ModelDiagram = await modelDiagramReportService.BuildAsync(),
+            ArmModelDiagram = await referenceModelDiagramService.BuildArmAsync(),
+            BrmModelDiagram = await referenceModelDiagramService.BuildBrmAsync(),
             AvailableOwners = availableOwners,
             LifecycleStatuses = BuildLifecycleStatuses(lifecycleProducts),
             Owners = BuildReportsHierarchy(paths),
@@ -97,14 +102,25 @@ public sealed class ReportsController(AppDbContext dbContext, ModelDiagramReport
         return View(model);
     }
 
-    public async Task<IActionResult> ModelDiagram()
+    public async Task<IActionResult> ModelDiagram(string? scope = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        return View("ModelDiagram", await modelDiagramReportService.BuildAsync());
+        var normalizedScope = string.IsNullOrWhiteSpace(scope)
+            ? "trm"
+            : scope.Trim().ToLowerInvariant();
+
+        var model = normalizedScope switch
+        {
+            "arm" => await referenceModelDiagramService.BuildArmAsync(),
+            "brm" => await referenceModelDiagramService.BuildBrmAsync(),
+            _ => await modelDiagramReportService.BuildAsync()
+        };
+
+        return View("ModelDiagram", model);
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]

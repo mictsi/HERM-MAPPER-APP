@@ -2699,16 +2699,16 @@ a {
   align-items: flex-start;
   justify-content: flex-start;
   width: 100%;
-  padding-top: 0.55rem;
-  border-top: 1px solid rgba(31, 41, 51, 0.08);
-}
-
-.model-report-product:first-child {
-  padding-top: 0;
-  border-top: 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(31, 41, 51, 0.1);
+  border-radius: 0.85rem;
+  background: linear-gradient(180deg, #fffdfa 0%, #f6f4ef 100%);
+  box-shadow: 0 6px 14px rgba(31, 41, 51, 0.06);
 }
 
 .model-report-product-link {
+  display: block;
+  width: 100%;
   color: var(--ink);
   font-weight: 600;
   text-decoration: none;

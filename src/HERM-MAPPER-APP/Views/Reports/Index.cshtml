@@ -39,6 +39,8 @@
     </div>
     <div class="owner-jump-list">
         <a class="owner-jump-chip" href="#report-product-model">TRM Model diagram</a>
+        <a class="owner-jump-chip" href="#report-arm-model">ARM Model diagram</a>
+        <a class="owner-jump-chip" href="#report-brm-model">BRM Model diagram</a>
         <a class="owner-jump-chip" href="#report-mapping-by-owner">TRM Mapping by owner</a>
         <a class="owner-jump-chip" href="#report-sankey-relationships">TRM Sankey view</a>
         <a class="owner-jump-chip" href="#report-incoming-connections-heatmap">TRM Products with most incoming service connections Heatmap</a>
@@ -79,23 +81,29 @@
     <summary class="report-panel-summary">
         <div>
             <span class="eyebrow">Model diagram</span>
-            <h2>TRM Model diagram</h2>
-            <p>Browse the HERM structure with mapped products inside each component, open a full-screen canvas, or export the same data to draw.io and Archi XML.</p>
+            <h2>@Model.ModelDiagram.DiagramTitle</h2>
+            <p>@Model.ModelDiagram.DiagramDescription</p>
         </div>
         <span class="report-panel-toggle" aria-hidden="true"></span>
     </summary>
     <div class="report-panel-body">
         <div class="report-panel-actions">
-            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" target="_blank" rel="noopener noreferrer">Open full screen</a>
-            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadDrawIo">Download draw.io</a>
-            <a class="btn btn-primary btn-sm" asp-action="DownloadArchiXml">Download Archi XML</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.ModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.ModelDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.ModelDiagram.DrawIoDownloadAction">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ModelDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ModelDiagram.ArchiDownloadAction">Download Archi XML</a>
+            }
         </div>
 
         @if (!Model.ModelDiagram.HasAnyContent)
         {
             <div class="empty-state compact">
-                <h3>No model content available</h3>
-                <p>Import the HERM reference model and product mappings to populate this report.</p>
+                <h3>@Model.ModelDiagram.EmptyStateTitle</h3>
+                <p>@Model.ModelDiagram.EmptyStateBody</p>
             </div>
         }
         else
@@ -104,12 +112,89 @@
                 <span class="report-summary-chip"><strong>@Model.ModelDiagram.DomainCount</strong> domains</span>
                 <span class="report-summary-chip"><strong>@Model.ModelDiagram.CapabilityCount</strong> capabilities</span>
                 <span class="report-summary-chip"><strong>@Model.ModelDiagram.ComponentCount</strong> components</span>
-                <span class="report-summary-chip"><strong>@Model.ModelDiagram.ProductCount</strong> products</span>
-                <span class="report-summary-chip"><strong>@Model.ModelDiagram.UnmappedProductCount</strong> unmapped</span>
+                <span class="report-summary-chip"><strong>@Model.ModelDiagram.ItemCount</strong> @Model.ModelDiagram.MappedSummaryLabel</span>
+                @if (Model.ModelDiagram.ShowUnmappedItems)
+                {
+                    <span class="report-summary-chip"><strong>@Model.ModelDiagram.UnmappedItemCount</strong> unmapped</span>
+                }
             </div>
 
             <div class="model-report-preview-frame">
                 <partial name="_ModelDiagramReport" model="Model.ModelDiagram" />
+            </div>
+        }
+    </div>
+</details>
+
+<details class="content-card report-panel" id="report-arm-model">
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Model diagram</span>
+            <h2>@Model.ArmModelDiagram.DiagramTitle</h2>
+            <p>@Model.ArmModelDiagram.DiagramDescription</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.ArmModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
+        </div>
+
+        @if (!Model.ArmModelDiagram.HasAnyContent)
+        {
+            <div class="empty-state compact">
+                <h3>@Model.ArmModelDiagram.EmptyStateTitle</h3>
+                <p>@Model.ArmModelDiagram.EmptyStateBody</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.ArmModelDiagram.DomainCount</strong> domains</span>
+                <span class="report-summary-chip"><strong>@Model.ArmModelDiagram.CapabilityCount</strong> capabilities</span>
+                <span class="report-summary-chip"><strong>@Model.ArmModelDiagram.ComponentCount</strong> components</span>
+                <span class="report-summary-chip"><strong>@Model.ArmModelDiagram.ItemCount</strong> @Model.ArmModelDiagram.MappedSummaryLabel</span>
+            </div>
+
+            <div class="model-report-preview-frame">
+                <partial name="_ModelDiagramReport" model="Model.ArmModelDiagram" />
+            </div>
+        }
+    </div>
+</details>
+
+<details class="content-card report-panel" id="report-brm-model">
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Model diagram</span>
+            <h2>@Model.BrmModelDiagram.DiagramTitle</h2>
+            <p>@Model.BrmModelDiagram.DiagramDescription</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
+        </div>
+
+        @if (!Model.BrmModelDiagram.HasAnyContent)
+        {
+            <div class="empty-state compact">
+                <h3>@Model.BrmModelDiagram.EmptyStateTitle</h3>
+                <p>@Model.BrmModelDiagram.EmptyStateBody</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.BrmModelDiagram.DomainCount</strong> domains</span>
+                <span class="report-summary-chip"><strong>@Model.BrmModelDiagram.CapabilityCount</strong> capabilities</span>
+                <span class="report-summary-chip"><strong>@Model.BrmModelDiagram.ComponentCount</strong> components</span>
+                <span class="report-summary-chip"><strong>@Model.BrmModelDiagram.ItemCount</strong> @Model.BrmModelDiagram.MappedSummaryLabel</span>
+            </div>
+
+            <div class="model-report-preview-frame">
+                <partial name="_ModelDiagramReport" model="Model.BrmModelDiagram" />
             </div>
         }
     </div>
