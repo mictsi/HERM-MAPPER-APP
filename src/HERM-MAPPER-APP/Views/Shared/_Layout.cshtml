@@ -5,6 +5,7 @@
 @using HERMMapperApp.ViewModels
 @{
     var bodyClass = ViewData["BodyClass"] as string;
+    var isPosterMode = !string.IsNullOrWhiteSpace(bodyClass) && bodyClass.Contains("report-poster-mode", StringComparison.OrdinalIgnoreCase);
 }
 <html lang="en">
 <head>
@@ -17,151 +18,160 @@
     <link rel="stylesheet" href="~/HERM-MAPPER-APP.styles.css" asp-append-version="true" />
 </head>
 <body class="@bodyClass">
-    <div class="app-shell">
-        <header class="shell-header">
-            <div class="container-xxl">
-                <nav class="navbar navbar-expand-lg">
-                    <a class="navbar-brand brand-lockup" asp-controller="Home" asp-action="Index">
-                        <span class="brand-mark">H</span>
-                        <span>
-                            <span class="brand-title">HERM Mapper</span>
-                        </span>
-                    </a>
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <div class="collapse navbar-collapse justify-content-end" id="mainNav">
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
-                        var canReadCatalogue = AppRoles.CanReadCatalogue(User);
-                        var isAdministrator = AppRoles.IsAdministrator(User);
-                        var isLocalAccount = AppAuthenticationService.IsLocalUser(User);
-                        <ul class="navbar-nav gap-lg-2">
-                            @if (canReadCatalogue)
+    @if (isPosterMode)
+    {
+        <main class="poster-shell">
+            @RenderBody()
+        </main>
+    }
+    else
+    {
+        <div class="app-shell">
+            <header class="shell-header">
+                <div class="container-xxl">
+                    <nav class="navbar navbar-expand-lg">
+                        <a class="navbar-brand brand-lockup" asp-controller="Home" asp-action="Index">
+                            <span class="brand-mark">H</span>
+                            <span>
+                                <span class="brand-title">HERM Mapper</span>
+                            </span>
+                        </a>
+                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                            <span class="navbar-toggler-icon"></span>
+                        </button>
+                        <div class="collapse navbar-collapse justify-content-end" id="mainNav">
+                            @if (User.Identity?.IsAuthenticated == true)
                             {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Home" asp-action="Index">Dashboard</a>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">BRM</a>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" asp-controller="Capabilities" asp-action="Index">Capabilities</a></li>
-                                </ul>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">ARM</a>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" asp-controller="Applications" asp-action="Index">Applications</a></li>
-                                </ul>
-                            </li>
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">TRM</a>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" asp-controller="Products" asp-action="Index">Products</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Services" asp-action="Index">Services</a></li>
-                                </ul>
-                            </li>
-                            }
-                            @if (isAdministrator)
-                            {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Mappings" asp-action="Index">Mapping Board</a>
-                            </li>
-                            }
-                            @if (canReadCatalogue)
-                            {
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" asp-controller="Reference" asp-action="Index">HERM Browser</a>
-                            </li>
-                            }
-                            @if (isAdministrator)
-                            {
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item" asp-controller="Users" asp-action="Index">Users</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Configuration" asp-action="Index">Configuration</a></li>
-                                    <li><a class="dropdown-item" asp-controller="ChangeLog" asp-action="Index">Change Log</a></li>
-                                    <li><hr class="dropdown-divider" /></li>
-                                    <li><a class="dropdown-item" asp-controller="Products" asp-action="Restore">Restore Products</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Services" asp-action="Restore">Restore Services</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Reference" asp-action="Restore">Restore TRM model objects</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Reference" asp-action="RestoreArm">Restore ARM model objects</a></li>
-                                    <li><a class="dropdown-item" asp-controller="Reference" asp-action="RestoreBrm">Restore BRM model objects</a></li>
-                                </ul>
-                            </li>
-                            }
-                            <li class="nav-item dropdown herm-info-nav-item">
-                                <button class="nav-link nav-icon-link herm-info-trigger dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="About HERM Mapper">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                                        <circle cx="12" cy="12" r="10" fill="currentColor" />
-                                        <circle cx="12" cy="7.5" r="1.25" fill="#fff" />
-                                        <path d="M10.85 10.5a1.15 1.15 0 0 1 1.15-1.15h0a1.15 1.15 0 0 1 1.15 1.15v5.7h1.1a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5h1.1Z" fill="#fff" />
-                                    </svg>
-                                </button>
-                                <div class="dropdown-menu dropdown-menu-end herm-info-menu">
-                                    <div class="herm-info-panel">
-                                        <span class="herm-info-eyebrow">About HERM</span>
-                                        <p class="herm-info-copy">
-                                            &copy; 2025 CAUDIT; The HERM, the Higher Education Reference Models, is a collaborative community effort curated by the CAUDIT Enterprise Architecture group in active partnership with EUNIS, UCISA, and EDUCAUSE peer groups. The HERM is offered under the Creative Commons 4.0 CC BY-NC-SA license: you are free to use and adapt it, provided you do not use it for commercial gain. We encourage and require that any extensions or adaptations be shared back to benefit the global community. CAUDIT acknowledges the generous contributions of FromHereOn Pty Ltd. Please visit <a href="https://caudit.edu.au/" target="_blank" rel="noopener noreferrer">caudit.edu.au</a> for more information, and email <a href="mailto:herm-feedback@googlegroups.com">herm-feedback@googlegroups.com</a> with any feedback, suggestions, questions, and share-alike submissions.
-                                        </p>
-                                        <div class="herm-info-logo-grid" aria-label="Partner organisations">
-                                            <div class="herm-info-logo-card">
-                                                <img src="~/images/caudit-wordmark.svg" asp-append-version="true" alt="CAUDIT logo" class="herm-info-logo herm-info-logo-caudit" />
-                                            </div>
-                                            <div class="herm-info-logo-card">
-                                                <img src="~/images/eunis-wordmark.svg" asp-append-version="true" alt="EUNIS logo" class="herm-info-logo herm-info-logo-eunis" />
-                                            </div>
-                                            <div class="herm-info-logo-card">
-                                                <img src="~/images/ucisa-wordmark.svg" asp-append-version="true" alt="UCISA logo" class="herm-info-logo herm-info-logo-ucisa" />
-                                            </div>
-                                            <div class="herm-info-logo-card">
-                                                <img src="~/images/educause-wordmark.svg" asp-append-version="true" alt="EDUCAUSE wordmark" class="herm-info-logo herm-info-logo-educause" />
+                            var canReadCatalogue = AppRoles.CanReadCatalogue(User);
+                            var isAdministrator = AppRoles.IsAdministrator(User);
+                            var isLocalAccount = AppAuthenticationService.IsLocalUser(User);
+                            <ul class="navbar-nav gap-lg-2">
+                                @if (canReadCatalogue)
+                                {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Home" asp-action="Index">Dashboard</a>
+                                </li>
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">BRM</a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" asp-controller="Capabilities" asp-action="Index">Capabilities</a></li>
+                                    </ul>
+                                </li>
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">ARM</a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" asp-controller="Applications" asp-action="Index">Applications</a></li>
+                                    </ul>
+                                </li>
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">TRM</a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" asp-controller="Products" asp-action="Index">Products</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Services" asp-action="Index">Services</a></li>
+                                    </ul>
+                                </li>
+                                }
+                                @if (isAdministrator)
+                                {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Mappings" asp-action="Index">Mapping Board</a>
+                                </li>
+                                }
+                                @if (canReadCatalogue)
+                                {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Reference" asp-action="Index">HERM Browser</a>
+                                </li>
+                                }
+                                @if (isAdministrator)
+                                {
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" asp-controller="Users" asp-action="Index">Users</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Configuration" asp-action="Index">Configuration</a></li>
+                                        <li><a class="dropdown-item" asp-controller="ChangeLog" asp-action="Index">Change Log</a></li>
+                                        <li><hr class="dropdown-divider" /></li>
+                                        <li><a class="dropdown-item" asp-controller="Products" asp-action="Restore">Restore Products</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Services" asp-action="Restore">Restore Services</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Reference" asp-action="Restore">Restore TRM model objects</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Reference" asp-action="RestoreArm">Restore ARM model objects</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Reference" asp-action="RestoreBrm">Restore BRM model objects</a></li>
+                                    </ul>
+                                </li>
+                                }
+                                <li class="nav-item dropdown herm-info-nav-item">
+                                    <button class="nav-link nav-icon-link herm-info-trigger dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="About HERM Mapper">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                                            <circle cx="12" cy="12" r="10" fill="currentColor" />
+                                            <circle cx="12" cy="7.5" r="1.25" fill="#fff" />
+                                            <path d="M10.85 10.5a1.15 1.15 0 0 1 1.15-1.15h0a1.15 1.15 0 0 1 1.15 1.15v5.7h1.1a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5h1.1Z" fill="#fff" />
+                                        </svg>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end herm-info-menu">
+                                        <div class="herm-info-panel">
+                                            <span class="herm-info-eyebrow">About HERM</span>
+                                            <p class="herm-info-copy">
+                                                &copy; 2025 CAUDIT; The HERM, the Higher Education Reference Models, is a collaborative community effort curated by the CAUDIT Enterprise Architecture group in active partnership with EUNIS, UCISA, and EDUCAUSE peer groups. The HERM is offered under the Creative Commons 4.0 CC BY-NC-SA license: you are free to use and adapt it, provided you do not use it for commercial gain. We encourage and require that any extensions or adaptations be shared back to benefit the global community. CAUDIT acknowledges the generous contributions of FromHereOn Pty Ltd. Please visit <a href="https://caudit.edu.au/" target="_blank" rel="noopener noreferrer">caudit.edu.au</a> for more information, and email <a href="mailto:herm-feedback@googlegroups.com">herm-feedback@googlegroups.com</a> with any feedback, suggestions, questions, and share-alike submissions.
+                                            </p>
+                                            <div class="herm-info-logo-grid" aria-label="Partner organisations">
+                                                <div class="herm-info-logo-card">
+                                                    <img src="~/images/caudit-wordmark.svg" asp-append-version="true" alt="CAUDIT logo" class="herm-info-logo herm-info-logo-caudit" />
+                                                </div>
+                                                <div class="herm-info-logo-card">
+                                                    <img src="~/images/eunis-wordmark.svg" asp-append-version="true" alt="EUNIS logo" class="herm-info-logo herm-info-logo-eunis" />
+                                                </div>
+                                                <div class="herm-info-logo-card">
+                                                    <img src="~/images/ucisa-wordmark.svg" asp-append-version="true" alt="UCISA logo" class="herm-info-logo herm-info-logo-ucisa" />
+                                                </div>
+                                                <div class="herm-info-logo-card">
+                                                    <img src="~/images/educause-wordmark.svg" asp-append-version="true" alt="EDUCAUSE wordmark" class="herm-info-logo herm-info-logo-educause" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </li>
-                            @if (isLocalAccount)
-                            {
-                            <li class="nav-item">
-                                <a class="nav-link nav-icon-link" asp-controller="Account" asp-action="Profile" aria-label="Profile">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M20 21a8 8 0 0 0-16 0"/>
-                                        <circle cx="12" cy="7" r="4"/>
-                                    </svg>
-                                </a>
-                            </li>
+                                </li>
+                                @if (isLocalAccount)
+                                {
+                                <li class="nav-item">
+                                    <a class="nav-link nav-icon-link" asp-controller="Account" asp-action="Profile" aria-label="Profile">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M20 21a8 8 0 0 0-16 0"/>
+                                            <circle cx="12" cy="7" r="4"/>
+                                        </svg>
+                                    </a>
+                                </li>
+                                }
+                                <li class="nav-item">
+                                    <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button class="btn btn-outline-secondary navbar-action" type="submit">Logout</button>
+                                    </form>
+                                </li>
+                            </ul>
                             }
-                            <li class="nav-item">
-                                <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button class="btn btn-outline-secondary navbar-action" type="submit">Logout</button>
-                                </form>
-                            </li>
-                        </ul>
-                        }
-                    </div>
-                </nav>
-            </div>
-        </header>
+                        </div>
+                    </nav>
+                </div>
+            </header>
 
-        <main class="shell-main">
-            <div class="container-xxl">
-                @RenderBody()
-            </div>
-        </main>
+            <main class="shell-main">
+                <div class="container-xxl">
+                    @RenderBody()
+                </div>
+            </main>
 
-        <footer class="shell-footer">
-            <div class="container-xxl d-flex flex-column flex-md-row justify-content-between gap-2">
-                <span>HERM Mapper.</span>
-                <span>Reference models can be verified and imported from uploaded HERM TRM workbooks.</span>
-            </div>
-        </footer>
-    </div>
+            <footer class="shell-footer">
+                <div class="container-xxl d-flex flex-column flex-md-row justify-content-between gap-2">
+                    <span>HERM Mapper.</span>
+                    <span>Reference models can be verified and imported from uploaded HERM TRM workbooks.</span>
+                </div>
+            </footer>
+        </div>
+    }
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>

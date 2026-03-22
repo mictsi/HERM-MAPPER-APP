@@ -3,6 +3,7 @@ using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
@@ -13,7 +14,9 @@ namespace HERMMapperApp.Controllers;
 public sealed class ReportsController(
     AppDbContext dbContext,
     ModelDiagramReportService modelDiagramReportService,
-    ReferenceModelDiagramService referenceModelDiagramService) : Controller
+    ReferenceModelDiagramService referenceModelDiagramService,
+    ModelDiagramPosterSvgService modelDiagramPosterSvgService,
+    IWebHostEnvironment environment) : Controller
 {
     public async Task<IActionResult> Index(string? lifecycleOwner = null)
     {
@@ -109,18 +112,17 @@ public sealed class ReportsController(
             return BadRequest(ModelState);
         }
 
-        var normalizedScope = string.IsNullOrWhiteSpace(scope)
-            ? "trm"
-            : scope.Trim().ToLowerInvariant();
-
-        var model = normalizedScope switch
-        {
-            "arm" => await referenceModelDiagramService.BuildArmAsync(),
-            "brm" => await referenceModelDiagramService.BuildBrmAsync(),
-            _ => await modelDiagramReportService.BuildAsync()
-        };
+        var model = await BuildModelDiagramAsync(scope);
+        model.PosterSvgMarkup = modelDiagramPosterSvgService.BuildSvg(model);
 
         return View("ModelDiagram", model);
+    }
+
+    public async Task<FileContentResult> DownloadModelDiagramSvg(string? scope = null)
+    {
+        var model = await BuildModelDiagramAsync(scope);
+        var content = Encoding.UTF8.GetBytes(modelDiagramPosterSvgService.BuildSvg(model));
+        return File(content, "image/svg+xml", ModelDiagramPosterSvgService.BuildDownloadFileName(model.ScopeKey));
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
@@ -142,14 +144,28 @@ public sealed class ReportsController(
         return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
     }
 
-    public async Task<FileContentResult> DownloadDrawIoAsync()
+    public async Task<FileContentResult> DownloadDrawIoAsync(string? scope = null)
     {
+        var normalizedScope = NormalizeScope(scope);
+        if (normalizedScope is "arm" or "brm")
+        {
+            var file = ResolveReferenceModelArtifact(normalizedScope, "drawio");
+            return File(await System.IO.File.ReadAllBytesAsync(file), "application/xml", Path.GetFileName(file));
+        }
+
         var content = await modelDiagramReportService.BuildDrawIoAsync();
         return File(content, "application/xml", "herm-product-model.drawio");
     }
 
-    public async Task<FileContentResult> DownloadArchiXmlAsync()
+    public async Task<FileContentResult> DownloadArchiXmlAsync(string? scope = null)
     {
+        var normalizedScope = NormalizeScope(scope);
+        if (normalizedScope is "arm" or "brm")
+        {
+            var file = ResolveReferenceModelArtifact(normalizedScope, "archimate.xml");
+            return File(await System.IO.File.ReadAllBytesAsync(file), "application/xml", Path.GetFileName(file));
+        }
+
         var content = await modelDiagramReportService.BuildArchiXmlAsync();
         return File(content, "application/xml", "herm-product-model.archimate.xml");
     }
@@ -586,6 +602,40 @@ public sealed class ReportsController(
         return string.IsNullOrWhiteSpace(detail)
             ? productName
             : $"{productName}\n{detail}";
+    }
+
+    private async Task<ModelDiagramReportViewModel> BuildModelDiagramAsync(string? scope)
+    {
+        var normalizedScope = NormalizeScope(scope);
+
+        return normalizedScope switch
+        {
+            "arm" => await referenceModelDiagramService.BuildArmAsync(),
+            "brm" => await referenceModelDiagramService.BuildBrmAsync(),
+            _ => await modelDiagramReportService.BuildAsync()
+        };
+    }
+
+    private static string NormalizeScope(string? scope) =>
+        string.IsNullOrWhiteSpace(scope)
+            ? "trm"
+            : scope.Trim().ToLowerInvariant();
+
+    private string ResolveReferenceModelArtifact(string scope, string extension)
+    {
+        var fileName = $"HERM-{scope.ToUpperInvariant()}-V320-model.{extension}";
+        var candidates = new[]
+        {
+            Path.Combine(environment.ContentRootPath, ".local.data", "Model", fileName),
+            Path.Combine(environment.ContentRootPath, "..", ".local.data", "Model", fileName),
+            Path.Combine(environment.ContentRootPath, "..", "..", ".local.data", "Model", fileName)
+        };
+
+        var file = candidates
+            .Select(Path.GetFullPath)
+            .FirstOrDefault(System.IO.File.Exists);
+
+        return file ?? throw new FileNotFoundException($"Could not find the reference model artifact '{fileName}'.", fileName);
     }
 
     private sealed record ServiceProductConnectionRecord(

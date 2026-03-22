@@ -13,13 +13,15 @@
         </div>
         <div class="report-toolbar-actions">
             <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-fragment="@Model.ReportFragmentId">Back to reports</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadModelDiagramSvg" asp-route-scope="@Model.ScopeKey">Download SVG</a>
+            <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print / Save PDF</button>
             @if (!string.IsNullOrWhiteSpace(Model.DrawIoDownloadAction))
             {
-                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction">Download draw.io</a>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction" asp-route-scope="@Model.ScopeKey">Download draw.io</a>
             }
             @if (!string.IsNullOrWhiteSpace(Model.ArchiDownloadAction))
             {
-                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction">Download Archi XML</a>
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction" asp-route-scope="@Model.ScopeKey">Download Archi XML</a>
             }
         </div>
     </div>
@@ -33,19 +35,19 @@
     }
     else
     {
-        <div class="report-summary-chips">
-            <span class="report-summary-chip"><strong>@Model.DomainCount</strong> domains</span>
-            <span class="report-summary-chip"><strong>@Model.CapabilityCount</strong> capabilities</span>
-            <span class="report-summary-chip"><strong>@Model.ComponentCount</strong> components</span>
-            <span class="report-summary-chip"><strong>@Model.ItemCount</strong> @Model.MappedSummaryLabel</span>
-            @if (Model.ShowUnmappedItems)
-            {
-                <span class="report-summary-chip"><strong>@Model.UnmappedItemCount</strong> unmapped</span>
-            }
-        </div>
-
         <div class="model-report-poster-frame">
-            <partial name="_ModelDiagramReport" model="Model" />
+            <div class="model-report-poster-stage">
+                @if (!string.IsNullOrWhiteSpace(Model.PosterSvgMarkup))
+                {
+                    <div class="model-report-poster-svg-shell">
+                        @Html.Raw(Model.PosterSvgMarkup)
+                    </div>
+                }
+                else
+                {
+                    <partial name="_ModelDiagramReport" model="Model" />
+                }
+            </div>
         </div>
     }
 </section>

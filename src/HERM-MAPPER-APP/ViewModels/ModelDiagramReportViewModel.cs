@@ -20,6 +20,7 @@ public sealed class ModelDiagramReportViewModel
     public string UnmappedSummaryLabel { get; init; } = "item(s) still need a component placement";
     public string? DrawIoDownloadAction { get; init; } = "DownloadDrawIo";
     public string? ArchiDownloadAction { get; init; } = "DownloadArchiXml";
+    public string PosterSvgMarkup { get; set; } = string.Empty;
     public int DomainCount { get; init; }
     public int CapabilityCount { get; init; }
     public int ComponentCount { get; init; }

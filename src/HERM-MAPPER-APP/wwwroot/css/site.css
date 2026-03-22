@@ -2529,33 +2529,52 @@ a {
   max-height: 48rem;
 }
 
+.model-report-preview-frame .model-report-canvas {
+  min-width: 100%;
+}
+
+.model-report-preview-frame .model-report-domain {
+  min-width: 100%;
+}
+
+.model-report-preview-frame .model-report-capability-grid {
+  flex-wrap: wrap;
+}
+
 .model-report-fullscreen-frame {
   min-height: calc(100vh - 18rem);
 }
 
-.report-poster-mode .shell-main > .container-xxl {
-  max-width: none;
-  padding-right: 1rem;
-  padding-left: 1rem;
+.poster-shell {
+  min-height: 100vh;
+}
+
+.report-poster-mode {
+  background: #11161d;
 }
 
 .model-report-poster-page {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: flex-start;
   gap: 1rem;
-  min-height: calc(100vh - 12rem);
+  min-height: 100vh;
+  height: 100vh;
+  padding: 1rem;
+  overflow: hidden;
 }
 
 .model-report-poster-toolbar {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
   align-items: end;
+  justify-content: space-between;
   gap: 1rem;
-  padding: 0.6rem 0;
   width: 100%;
+  padding: 1rem 1.25rem;
+  border-radius: 1.4rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
 }
 
 .model-report-poster-toolbar h1 {
@@ -2563,14 +2582,42 @@ a {
 }
 
 .model-report-poster-frame {
-  overflow: auto;
-  min-height: calc(100vh - 16rem);
-  padding: 1.35rem;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
   border-radius: 1.6rem;
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), rgba(244, 241, 236, 0.97)),
-    linear-gradient(180deg, rgba(196, 196, 196, 0.22), rgba(178, 178, 178, 0.3));
-  box-shadow: 0 24px 48px rgba(31, 41, 51, 0.14);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.model-report-poster-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  padding: 0.75rem;
+}
+
+.model-report-poster-svg-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.diagram-poster-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .model-report-canvas {
@@ -2717,6 +2764,55 @@ a {
 .model-report-product-link:hover {
   color: #0b6e4f;
   text-decoration: underline;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    background: #fff;
+  }
+
+  .model-report-poster-toolbar {
+    display: none !important;
+  }
+
+  .model-report-poster-page {
+    min-height: 100vh;
+    height: 100vh;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .model-report-poster-frame {
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .model-report-poster-stage,
+  .model-report-poster-svg-shell {
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+  }
+
+  .diagram-poster-svg {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+  }
 }
 
 .model-report-status {

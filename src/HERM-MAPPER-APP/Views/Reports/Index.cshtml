@@ -91,11 +91,11 @@
             <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.ModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
             @if (!string.IsNullOrWhiteSpace(Model.ModelDiagram.DrawIoDownloadAction))
             {
-                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.ModelDiagram.DrawIoDownloadAction">Download draw.io</a>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.ModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.ModelDiagram.ScopeKey">Download draw.io</a>
             }
             @if (!string.IsNullOrWhiteSpace(Model.ModelDiagram.ArchiDownloadAction))
             {
-                <a class="btn btn-primary btn-sm" asp-action="@Model.ModelDiagram.ArchiDownloadAction">Download Archi XML</a>
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.ModelDiagram.ScopeKey">Download Archi XML</a>
             }
         </div>
 
@@ -138,6 +138,14 @@
     <div class="report-panel-body">
         <div class="report-panel-actions">
             <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.ArmModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.ArmModelDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.ArmModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.ArmModelDiagram.ScopeKey">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ArmModelDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ArmModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.ArmModelDiagram.ScopeKey">Download Archi XML</a>
+            }
         </div>
 
         @if (!Model.ArmModelDiagram.HasAnyContent)
@@ -175,6 +183,14 @@
     <div class="report-panel-body">
         <div class="report-panel-actions">
             <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.BrmModelDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.BrmModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.BrmModelDiagram.ScopeKey">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.BrmModelDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.BrmModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.BrmModelDiagram.ScopeKey">Download Archi XML</a>
+            }
         </div>
 
         @if (!Model.BrmModelDiagram.HasAnyContent)
