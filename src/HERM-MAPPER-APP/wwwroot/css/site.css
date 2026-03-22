@@ -2516,7 +2516,7 @@ a {
 
 .model-report-preview-frame,
 .model-report-fullscreen-frame {
-  overflow: auto;
+  overflow: visible;
   padding: 1rem;
   border: 1px solid rgba(31, 41, 51, 0.08);
   border-radius: 1.25rem;
@@ -2526,7 +2526,7 @@ a {
 }
 
 .model-report-preview-frame {
-  max-height: 48rem;
+  max-height: none;
 }
 
 .model-report-preview-frame .model-report-canvas {
@@ -2565,6 +2565,12 @@ a {
   overflow: hidden;
 }
 
+.model-report-poster-page-html-fallback {
+  min-height: 100vh;
+  height: auto;
+  overflow: visible;
+}
+
 .model-report-poster-toolbar {
   display: flex;
   align-items: end;
@@ -2594,6 +2600,12 @@ a {
   overflow: hidden;
 }
 
+.model-report-poster-frame-html-fallback {
+  display: block;
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
 .model-report-poster-stage {
   display: flex;
   align-items: center;
@@ -2602,6 +2614,25 @@ a {
   min-height: 0;
   height: 100%;
   padding: 0.75rem;
+}
+
+.model-report-poster-stage-html-fallback {
+  display: block;
+  min-height: 0;
+  height: auto;
+  padding: 0;
+}
+
+.model-report-poster-stage-html-fallback .model-report-canvas {
+  min-width: 100%;
+}
+
+.model-report-poster-stage-html-fallback .model-report-domain {
+  min-width: 100%;
+}
+
+.model-report-poster-stage-html-fallback .model-report-capability-grid {
+  flex-wrap: wrap;
 }
 
 .model-report-poster-svg-shell {

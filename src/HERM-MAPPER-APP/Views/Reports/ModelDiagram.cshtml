@@ -2,9 +2,19 @@
 @{
     ViewData["Title"] = Model.PosterTitle;
     ViewData["BodyClass"] = "report-poster-mode";
+    var usesSvgPoster = !string.IsNullOrWhiteSpace(Model.PosterSvgMarkup);
+    var posterPageClass = usesSvgPoster
+        ? "model-report-poster-page"
+        : "model-report-poster-page model-report-poster-page-html-fallback";
+    var posterFrameClass = usesSvgPoster
+        ? "model-report-poster-frame"
+        : "model-report-poster-frame model-report-poster-frame-html-fallback";
+    var posterStageClass = usesSvgPoster
+        ? "model-report-poster-stage"
+        : "model-report-poster-stage model-report-poster-stage-html-fallback";
 }
 
-<section class="model-report-poster-page">
+<section class="@posterPageClass">
     <div class="model-report-poster-toolbar">
         <div>
             <span class="eyebrow">Reports</span>
@@ -35,9 +45,9 @@
     }
     else
     {
-        <div class="model-report-poster-frame">
-            <div class="model-report-poster-stage">
-                @if (!string.IsNullOrWhiteSpace(Model.PosterSvgMarkup))
+        <div class="@posterFrameClass">
+            <div class="@posterStageClass">
+                @if (usesSvgPoster)
                 {
                     <div class="model-report-poster-svg-shell">
                         @Html.Raw(Model.PosterSvgMarkup)
