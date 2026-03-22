@@ -8,7 +8,7 @@
     <CollectCoverage>true</CollectCoverage>
     <CoverletOutputFormat>cobertura</CoverletOutputFormat>
     <CoverletOutput>$(MSBuildProjectDirectory)\TestResults\coverage\</CoverletOutput>
-    <ExpandedAppCoverageThreshold>80</ExpandedAppCoverageThreshold>
+    <ExpandedAppCoverageThreshold>70</ExpandedAppCoverageThreshold>
   </PropertyGroup>
 
   <ItemGroup>

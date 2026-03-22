@@ -101,9 +101,12 @@ public sealed class ProductsControllerCrudTests
         var result = await controller.Details(product.Id);
 
         var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<ProductCatalogItem>(view.Model);
-        Assert.Single(model.Mappings);
-        Assert.Equal(component.Id, Assert.Single(model.Mappings).TrmComponentId);
+        var model = Assert.IsType<ProductVisualizationViewModel>(view.Model);
+        Assert.Equal(product.Id, model.Product.Id);
+        Assert.Single(model.Product.Mappings);
+        Assert.Equal(component.Id, Assert.Single(model.Product.Mappings).TrmComponentId);
+        Assert.Single(model.Paths);
+        Assert.Equal(component.DisplayLabel, model.Paths[0].ComponentLabel);
     }
 
     [Fact]

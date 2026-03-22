@@ -3,9 +3,11 @@ using HERMMapperApp.Data;
 using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using System.Text;
 using Xunit;
 
@@ -395,7 +397,12 @@ public sealed class ReportsAndDashboardControllerTests
             return new TestFixture(connection, dbContext);
         }
 
-        public ReportsController CreateReportsController() => new(DbContext, new ModelDiagramReportService(DbContext));
+        public ReportsController CreateReportsController() => new(
+            DbContext,
+            new ModelDiagramReportService(DbContext),
+            new ReferenceModelDiagramService(DbContext),
+            new ModelDiagramPosterSvgService(new TestWebHostEnvironment()),
+            new TestWebHostEnvironment());
 
         public HomeController CreateHomeController() => new(DbContext);
 
@@ -404,5 +411,15 @@ public sealed class ReportsAndDashboardControllerTests
             await DbContext.DisposeAsync();
             await connection.DisposeAsync();
         }
+    }
+
+    private sealed class TestWebHostEnvironment : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = "HERM-MAPPER-APP.Tests";
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+        public string WebRootPath { get; set; } = string.Empty;
+        public string EnvironmentName { get; set; } = "Development";
+        public string ContentRootPath { get; set; } = System.IO.Path.GetTempPath();
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 }
