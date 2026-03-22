@@ -1,3 +1,4 @@
+@using System.Text.Json
 @using HERMMapperApp
 @using HERMMapperApp.Models
 @using HERMMapperApp.Services
@@ -6,6 +7,12 @@
 @{
     ViewData["Title"] = "Visualize Product Dependencies";
     var isAdministrator = AppRoles.IsAdministrator(User);
+    var hierarchyData = JsonSerializer.Serialize(
+        Model.HierarchyRoot,
+        new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
 }
 
 <section class="page-header">
@@ -24,7 +31,7 @@
 </section>
 
 <section class="content-card">
-    @if (Model.Paths.Count == 0)
+    @if (!Model.HasResolvedPaths)
     {
         <div class="empty-state">
             <h3>No dependencies available yet</h3>
@@ -50,3 +57,47 @@
         </div>
     }
 </section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Hierarchy</span>
+            <h2>Product dependency map</h2>
+        </div>
+    </div>
+
+    @if (!Model.HasResolvedPaths)
+    {
+        <div class="empty-state compact">
+            <h3>No dependency map yet</h3>
+            <p>Create at least one TRM mapping to build the product dependency tree.</p>
+        </div>
+    }
+    else
+    {
+        <div class="application-radial-tree-shell" data-application-radial-tree-shell>
+            <div class="application-radial-tree-toolbar">
+                <button type="button"
+                        class="application-radial-tree-fullscreen-button"
+                        data-application-radial-tree-fullscreen
+                        aria-label="Enter full screen"
+                        title="Enter full screen">
+                    <span class="application-radial-tree-fullscreen-icon" aria-hidden="true"></span>
+                    <span data-application-radial-tree-fullscreen-label>Full screen</span>
+                </button>
+            </div>
+            <script type="application/json" data-application-radial-tree-data>@Html.Raw(hierarchyData)</script>
+            <div class="application-radial-tree"
+                 data-application-radial-tree
+                 data-include-products="true"
+                 data-empty-title="No dependency map yet"
+                 data-empty-body="Create at least one TRM mapping to build the product dependency tree."></div>
+            <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The tree reads from left to right, starting with the product and expanding into its mapped TRM domain, capability, and component routes.</p>
+        </div>
+    }
+</section>
+
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/js/application-radial-tree.js" asp-append-version="true"></script>
+}

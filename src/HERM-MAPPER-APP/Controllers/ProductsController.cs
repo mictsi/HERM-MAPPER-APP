@@ -146,7 +146,7 @@ public sealed class ProductsController(
             .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
-        return product is null ? NotFound() : View(product);
+        return product is null ? NotFound() : View(BuildProductVisualizationModel(product));
     }
 
     public async Task<IActionResult> Visualize(int id)
@@ -174,31 +174,7 @@ public sealed class ProductsController(
             return NotFound();
         }
 
-        var paths = product.Mappings
-            .Select(mapping =>
-            {
-                var capability = mapping.TrmComponent?.ParentCapability ?? mapping.TrmCapability;
-                var domain = mapping.TrmComponent?.ParentCapability?.ParentDomain ?? capability?.ParentDomain ?? mapping.TrmDomain;
-
-                return new ProductDependencyPathViewModel
-                {
-                    Status = mapping.MappingStatus.ToString(),
-                    DomainLabel = domain is null ? "-" : $"{domain.Code} {domain.Name}",
-                    CapabilityLabel = capability is null ? "-" : $"{capability.Code} {capability.Name}",
-                    ComponentLabel = mapping.TrmComponent?.DisplayLabel ?? "-"
-                };
-            })
-            .DistinctBy(x => new { x.DomainLabel, x.CapabilityLabel, x.ComponentLabel, x.Status })
-            .OrderBy(x => x.DomainLabel)
-            .ThenBy(x => x.CapabilityLabel)
-            .ThenBy(x => x.ComponentLabel)
-            .ToList();
-
-        return View(new ProductVisualizationViewModel
-        {
-            Product = product,
-            Paths = paths
-        });
+        return View(BuildProductVisualizationModel(product));
     }
 
     public async Task<IActionResult> ShowDependencies(int id)
@@ -742,6 +718,120 @@ public sealed class ProductsController(
         }
 
         return appliedFields;
+    }
+
+    private static ProductVisualizationViewModel BuildProductVisualizationModel(ProductCatalogItem product)
+    {
+        var paths = product.Mappings
+            .Select(mapping =>
+            {
+                var capability = mapping.TrmComponent?.ParentCapability ?? mapping.TrmCapability;
+                var domain = mapping.TrmComponent?.ParentCapability?.ParentDomain ?? capability?.ParentDomain ?? mapping.TrmDomain;
+
+                return new ProductDependencyPathViewModel
+                {
+                    Status = mapping.MappingStatus.ToString(),
+                    DomainLabel = domain is null ? "-" : $"{domain.Code} {domain.Name}",
+                    CapabilityLabel = capability is null ? "-" : $"{capability.Code} {capability.Name}",
+                    ComponentLabel = mapping.TrmComponent?.DisplayLabel ?? "-"
+                };
+            })
+            .DistinctBy(x => new { x.DomainLabel, x.CapabilityLabel, x.ComponentLabel, x.Status })
+            .OrderBy(x => x.DomainLabel)
+            .ThenBy(x => x.CapabilityLabel)
+            .ThenBy(x => x.ComponentLabel)
+            .ToList();
+
+        return new ProductVisualizationViewModel
+        {
+            Product = product,
+            Paths = paths,
+            HierarchyRoot = BuildProductHierarchy(product, paths)
+        };
+    }
+
+    private static ApplicationHierarchyNodeViewModel BuildProductHierarchy(
+        ProductCatalogItem product,
+        List<ProductDependencyPathViewModel> paths) =>
+        new()
+        {
+            Key = $"product-{product.Id}",
+            NodeType = "Product",
+            CssType = "product",
+            Label = product.Name,
+            PathCount = paths.Count,
+            ProductCount = 1,
+            ProductId = product.Id,
+            IsExpanded = true,
+            Children = BuildProductHierarchyNodes(paths, 0, $"product-{product.Id}")
+        };
+
+    private static List<ApplicationHierarchyNodeViewModel> BuildProductHierarchyNodes(
+        List<ProductDependencyPathViewModel> paths,
+        int level,
+        string keyPrefix)
+    {
+        if (paths.Count == 0)
+        {
+            return [];
+        }
+
+        string nodeType;
+        string cssType;
+        string fallbackLabel;
+        Func<ProductDependencyPathViewModel, string> labelSelector;
+
+        switch (level)
+        {
+            case 0:
+                nodeType = "TRM domain";
+                cssType = "trm-domain";
+                fallbackLabel = "TRM domain";
+                labelSelector = static path => path.DomainLabel;
+                break;
+            case 1:
+                nodeType = "TRM capability";
+                cssType = "trm-capability";
+                fallbackLabel = "TRM capability";
+                labelSelector = static path => path.CapabilityLabel;
+                break;
+            default:
+                nodeType = "TRM component";
+                cssType = "trm-component";
+                fallbackLabel = "TRM component";
+                labelSelector = static path => path.ComponentLabel;
+                break;
+        }
+
+        return paths
+            .GroupBy(path => NormalizeHierarchyLabel(labelSelector(path), fallbackLabel))
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select((group, index) =>
+            {
+                var childPaths = group.ToList();
+                return new ApplicationHierarchyNodeViewModel
+                {
+                    Key = $"{keyPrefix}-{cssType}-{index}",
+                    NodeType = nodeType,
+                    CssType = cssType,
+                    Label = group.Key,
+                    PathCount = childPaths.Count,
+                    ProductCount = 1,
+                    IsExpanded = true,
+                    Children = level >= 2
+                        ? []
+                        : BuildProductHierarchyNodes(childPaths, level + 1, $"{keyPrefix}-{cssType}-{index}")
+                };
+            })
+            .ToList();
+    }
+
+    private static string NormalizeHierarchyLabel(string? label, string fallbackLabel)
+    {
+        var trimmed = label?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) || trimmed == "-"
+            ? $"Unresolved {fallbackLabel}"
+            : trimmed;
     }
 
     private static bool OwnerSelectionsMatch(ProductCatalogItem product, List<string> selectedOwners)

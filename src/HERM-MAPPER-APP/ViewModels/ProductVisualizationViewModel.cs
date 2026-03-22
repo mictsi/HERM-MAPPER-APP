@@ -6,6 +6,9 @@ public sealed class ProductVisualizationViewModel
 {
     public ProductCatalogItem Product { get; init; } = new();
     public IReadOnlyList<ProductDependencyPathViewModel> Paths { get; init; } = [];
+    public ApplicationHierarchyNodeViewModel HierarchyRoot { get; init; } = new();
+
+    public bool HasResolvedPaths => Paths.Count != 0;
 }
 
 public sealed class ProductDependencyPathViewModel

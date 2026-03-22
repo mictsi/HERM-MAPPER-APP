@@ -210,7 +210,7 @@ const buildRadialTreeNode = (node, includeProducts, isRoot = false) => {
   }
 
   const cssType = normalizeString(readNodeProperty(node, "cssType", "CssType"));
-  if (cssType === "product" && !includeProducts) {
+  if (cssType === "product" && !includeProducts && !isRoot) {
     return null;
   }
 
