@@ -114,7 +114,17 @@
     }
     else
     {
-        <div class="application-radial-tree-shell">
+        <div class="application-radial-tree-shell" data-application-radial-tree-shell>
+            <div class="application-radial-tree-toolbar">
+                <button type="button"
+                        class="application-radial-tree-fullscreen-button"
+                        data-application-radial-tree-fullscreen
+                        aria-label="Enter full screen"
+                        title="Enter full screen">
+                    <span class="application-radial-tree-fullscreen-icon" aria-hidden="true"></span>
+                    <span data-application-radial-tree-fullscreen-label>Full screen</span>
+                </button>
+            </div>
             <script type="application/json" data-application-radial-tree-data>@Html.Raw(hierarchyData)</script>
             <div class="application-radial-tree"
                  data-application-radial-tree

@@ -12,10 +12,16 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const shell = host.closest("[data-application-radial-tree-shell]");
     const dataScript = host.parentElement?.querySelector("[data-application-radial-tree-data]");
+    const fullscreenButton = shell?.querySelector("[data-application-radial-tree-fullscreen]");
+    const fullscreenButtonLabel = fullscreenButton?.querySelector("[data-application-radial-tree-fullscreen-label]");
     const emptyTitle = host.dataset.emptyTitle ?? "No dependency map yet";
     const emptyBody = host.dataset.emptyBody ?? "Add application mappings first, then complete the TRM product mappings to see the dependency graph.";
     const includeProducts = host.dataset.includeProducts === "true";
+    const canToggleFullscreen = shell instanceof HTMLElement
+      && typeof shell.requestFullscreen === "function"
+      && document.fullscreenEnabled !== false;
 
     const showEmptyState = (title, body) => {
       host.innerHTML = `
@@ -55,13 +61,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const metrics = measureTree(treeRoot);
     let lastHeight = 0;
     const resizeChart = () => {
-      const nextHeight = computeChartHeight(host, metrics);
+      const nextHeight = computeChartHeight(host, metrics, shell);
       if (nextHeight !== lastHeight) {
         host.style.height = `${nextHeight}px`;
         lastHeight = nextHeight;
       }
 
       chart.resize();
+    };
+    const updateFullscreenButtonState = () => {
+      if (!(fullscreenButton instanceof HTMLButtonElement) || !(fullscreenButtonLabel instanceof HTMLElement)) {
+        return;
+      }
+
+      const isFullscreen = document.fullscreenElement === shell;
+      const nextLabel = isFullscreen ? "Exit full screen" : "Full screen";
+      fullscreenButtonLabel.textContent = nextLabel;
+      fullscreenButton.setAttribute("aria-label", isFullscreen ? "Exit full screen" : "Enter full screen");
+      fullscreenButton.setAttribute("title", isFullscreen ? "Exit full screen" : "Enter full screen");
+      fullscreenButton.setAttribute("aria-pressed", isFullscreen ? "true" : "false");
     };
 
     const chartOption = {
@@ -148,6 +166,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     chart.setOption(chartOption);
     resizeChart();
+    updateFullscreenButtonState();
 
     const resizeObserver = typeof ResizeObserver === "function"
       ? new ResizeObserver(() => resizeChart())
@@ -156,6 +175,28 @@ document.addEventListener("DOMContentLoaded", () => {
     resizeObserver?.observe(host.parentElement ?? host);
 
     window.addEventListener("resize", resizeChart);
+    document.addEventListener("fullscreenchange", () => {
+      updateFullscreenButtonState();
+      resizeChart();
+    });
+
+    if (fullscreenButton instanceof HTMLButtonElement) {
+      if (!canToggleFullscreen) {
+        fullscreenButton.hidden = true;
+      } else {
+        fullscreenButton.addEventListener("click", async () => {
+          try {
+            if (document.fullscreenElement === shell) {
+              await document.exitFullscreen();
+            } else {
+              await shell.requestFullscreen();
+            }
+          } catch (error) {
+            console.error("Unable to toggle dependency map full screen mode", error);
+          }
+        });
+      }
+    }
 
     host._applicationRadialTreeChart = chart;
     host._applicationRadialTreeResize = resizeChart;
@@ -337,11 +378,16 @@ const measureTree = (node, depth = 1) => {
   });
 };
 
-const computeChartHeight = (host, metrics) => {
+const computeChartHeight = (host, metrics, shell) => {
   const byLeaves = 280 + (metrics.leafCount * 72);
   const byNodes = 300 + (metrics.nodeCount * 26);
   const byDepth = 360 + (metrics.depth * 34);
-  return Math.max(560, Math.min(1600, Math.max(byLeaves, byNodes, byDepth)));
+  const contentHeight = Math.max(byLeaves, byNodes, byDepth);
+  const fullscreenHeight = document.fullscreenElement === shell
+    ? Math.max(window.innerHeight - 176, 560)
+    : 0;
+
+  return Math.max(560, Math.min(1600, Math.max(contentHeight, fullscreenHeight)));
 };
 
 const getNodeVisual = (cssType, nodeType, isRoot) => {
