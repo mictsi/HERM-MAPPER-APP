@@ -840,7 +840,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             .ToList();
     }
 
-    private static IReadOnlyList<ApplicationHierarchyNodeViewModel> BuildCapabilityChildren(
+    private static List<ApplicationHierarchyNodeViewModel> BuildCapabilityChildren(
         List<CapabilityResolvedPathViewModel> childPaths,
         int level,
         string keyPrefix)

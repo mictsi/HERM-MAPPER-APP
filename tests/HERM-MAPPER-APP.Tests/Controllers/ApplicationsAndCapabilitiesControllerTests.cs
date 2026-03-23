@@ -960,7 +960,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         Assert.Equal(2, model.HierarchyRoot.Children.Count);
         Assert.Contains(model.HierarchyRoot.Children, x => x.Label == connectedCapabilityName);
 
-        var disconnectedNode = Assert.Single(model.HierarchyRoot.Children.Where(x => x.Label == disconnectedCapabilityName));
+        var disconnectedNode = Assert.Single(model.HierarchyRoot.Children, x => x.Label == disconnectedCapabilityName);
         var brmDomainNode = Assert.Single(disconnectedNode.Children);
         var brmCapabilityNode = Assert.Single(brmDomainNode.Children);
         var brmComponentNode = Assert.Single(brmCapabilityNode.Children);

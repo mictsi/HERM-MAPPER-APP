@@ -69,10 +69,21 @@ public sealed class ControllerAuthorizationTests
         AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
 
-        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Create), AppPolicies.ProductsAndServicesWrite, 0);
         AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Create), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Create), AppPolicies.ProductsAndServicesWrite, 2);
         AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
         AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Delete), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.DeleteConfirmed), AppPolicies.ProductsAndServicesWrite, 1);
+    }
+
+    [Fact]
+    public void BrmModelWriteActionsRequireProductsAndServicesWritePolicy()
+    {
+        AssertMethodPolicy<BrmModelsController>(nameof(BrmModelsController.Create), AppPolicies.ProductsAndServicesWrite, 0);
+        AssertMethodPolicy<BrmModelsController>(nameof(BrmModelsController.Create), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<BrmModelsController>(nameof(BrmModelsController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<BrmModelsController>(nameof(BrmModelsController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
     }
 
     [Fact]
