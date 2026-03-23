@@ -14,6 +14,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ArmCapability> ArmCapabilities => Set<ArmCapability>();
     public DbSet<ArmComponent> ArmComponents => Set<ArmComponent>();
     public DbSet<ArmComponentCapabilityLink> ArmComponentCapabilityLinks => Set<ArmComponentCapabilityLink>();
+    public DbSet<BrmModel> BrmModels => Set<BrmModel>();
     public DbSet<BrmDomain> BrmDomains => Set<BrmDomain>();
     public DbSet<BrmCapability> BrmCapabilities => Set<BrmCapability>();
     public DbSet<BrmComponent> BrmComponents => Set<BrmComponent>();
@@ -142,6 +143,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(x => x.ComponentLinks)
                 .HasForeignKey(x => x.ArmCapabilityId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BrmModel>(entity =>
+        {
+            entity.ToTable("BrmModels");
+            entity.HasIndex(x => x.Name);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Area).HasMaxLength(120);
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.Status).HasMaxLength(80);
         });
 
         modelBuilder.Entity<BrmDomain>(entity =>
@@ -345,9 +356,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<BusinessCapabilityCatalogItem>(entity =>
         {
             entity.ToTable("BusinessCapabilityCatalogItems");
+            entity.HasIndex(x => x.BrmModelId);
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.Description).HasMaxLength(2000);
             entity.Property(x => x.Notes).HasMaxLength(4000);
+            entity.HasOne(x => x.BrmModel)
+                .WithMany(x => x.Capabilities)
+                .HasForeignKey(x => x.BrmModelId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<BusinessCapabilityCatalogItemMapping>(entity =>

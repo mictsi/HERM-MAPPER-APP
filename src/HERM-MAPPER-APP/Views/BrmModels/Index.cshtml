@@ -1,0 +1,101 @@
+@using HERMMapperApp
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
+@model BrmModelsIndexViewModel
+@{
+    ViewData["Title"] = "BRM Models";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>BRM models</h1>
+        <p>Create separate BRM model workspaces for different areas, then manage each model's capabilities independently.</p>
+    </div>
+    @if (canManageProductsAndServices)
+    {
+        <div class="d-flex gap-2">
+            <a class="btn btn-primary" asp-action="Create">Add BRM model</a>
+        </div>
+    }
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <section class="content-card">
+        <div class="alert alert-success mb-0" role="status">@Model.StatusMessage</div>
+    </section>
+}
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Catalogue</span>
+            <h2>@Model.Models.Count BRM model(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.Models.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No BRM models yet</h3>
+            <p>Create the first BRM model to start grouping capabilities by area.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Area</th>
+                        <th>Status</th>
+                        <th>Capabilities</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var modelRow in Model.Models)
+                {
+                    <tr>
+                        <td>
+                            <strong>@modelRow.Name</strong>
+                            <div class="table-subline">@(string.IsNullOrWhiteSpace(modelRow.Description) ? "No description provided." : modelRow.Description)</div>
+                        </td>
+                        <td>@modelRow.Area</td>
+                        <td>@modelRow.Status</td>
+                        <td>@modelRow.CapabilityCount</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(modelRow.UpdatedUtc)</td>
+                        <td class="text-end">
+                            <div class="table-action-group">
+                                <a class="table-action-button"
+                                   asp-action="Details"
+                                   asp-route-id="@modelRow.Id"
+                                   title="Show details for @modelRow.Name"
+                                   aria-label="Show details for @modelRow.Name">
+                                    <partial name="_ActionIcon" model="@("details")" />
+                                    <span class="visually-hidden">Show details</span>
+                                </a>
+                                @if (canManageProductsAndServices)
+                                {
+                                    <a class="table-action-button"
+                                       asp-action="Edit"
+                                       asp-route-id="@modelRow.Id"
+                                       title="Edit @modelRow.Name"
+                                       aria-label="Edit @modelRow.Name">
+                                        <partial name="_ActionIcon" model="@("edit")" />
+                                        <span class="visually-hidden">Edit</span>
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

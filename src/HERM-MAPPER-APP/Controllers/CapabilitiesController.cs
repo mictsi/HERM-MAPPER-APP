@@ -18,92 +18,45 @@ public sealed class CapabilitiesController(
 {
     private const int MinimumMappingRowCount = 1;
 
-    public async Task<IActionResult> Index(string? search)
+    public Task<IActionResult> Index(string? search, int? brmModelId = null)
     {
-        var query = dbContext.BusinessCapabilityCatalogItems
-            .AsNoTracking()
-            .Include(x => x.Mappings)
-            .ThenInclude(x => x.BrmComponent)
-            .Include(x => x.Mappings)
-            .ThenInclude(x => x.ArmCapability)
-            .Include(x => x.Mappings)
-            .ThenInclude(x => x.ArmComponent)
-            .AsSplitQuery()
-            .AsQueryable();
-
-        var likePattern = HERMMapperApp.Infrastructure.SearchPattern.CreateContainsPattern(search);
-        if (likePattern is not null)
+        if (!ModelState.IsValid)
         {
-            query = query.Where(x =>
-                EF.Functions.Like(x.Name, likePattern) ||
-                (x.Description != null && EF.Functions.Like(x.Description, likePattern)) ||
-                (x.Notes != null && EF.Functions.Like(x.Notes, likePattern)) ||
-                x.Mappings.Any(mapping =>
-                    EF.Functions.Like(mapping.BrmComponent!.Code, likePattern) ||
-                    EF.Functions.Like(mapping.BrmComponent.Name, likePattern) ||
-                    (mapping.ArmCapability != null && (
-                        EF.Functions.Like(mapping.ArmCapability.Code, likePattern) ||
-                        EF.Functions.Like(mapping.ArmCapability.Name, likePattern))) ||
-                    EF.Functions.Like(mapping.ArmComponent!.Code, likePattern) ||
-                    EF.Functions.Like(mapping.ArmComponent.Name, likePattern)));
+            return Task.FromResult<IActionResult>(BadRequest(ModelState));
         }
 
-        var capabilities = await query
-            .OrderBy(x => x.Name)
-            .ToListAsync();
+        IActionResult result = brmModelId is > 0
+            ? RedirectToAction("Details", "BrmModels", new { id = brmModelId.Value })
+            : RedirectToAction("Index", "BrmModels");
 
-        var linkedApplicationCountByCapabilityId = capabilities.ToDictionary(capability => capability.Id, _ => 0);
-        var linkedProductCountByCapabilityId = capabilities.ToDictionary(capability => capability.Id, _ => 0);
-
-        var allArmComponentIds = capabilities
-            .SelectMany(x => x.Mappings)
-            .Select(x => x.ArmComponentId)
-            .Distinct()
-            .ToList();
-
-        if (allArmComponentIds.Count != 0)
-        {
-            var applicationMappings = await dbContext.ApplicationCatalogItemMappings
-                .AsNoTracking()
-                .Where(x => allArmComponentIds.Contains(x.ArmComponentId))
-                .Select(x => new { x.ApplicationCatalogItemId, x.ArmComponentId, x.ProductCatalogItemId })
-                .ToListAsync();
-
-            foreach (var capability in capabilities)
-            {
-                var armIds = capability.Mappings.Select(x => x.ArmComponentId).Distinct().ToHashSet();
-                var matchingApplicationMappings = applicationMappings
-                    .Where(x => armIds.Contains(x.ArmComponentId))
-                    .ToList();
-
-                linkedApplicationCountByCapabilityId[capability.Id] = matchingApplicationMappings
-                    .Select(x => x.ApplicationCatalogItemId)
-                    .Distinct()
-                    .Count();
-
-                linkedProductCountByCapabilityId[capability.Id] = matchingApplicationMappings
-                    .Select(x => x.ProductCatalogItemId)
-                    .Distinct()
-                    .Count();
-            }
-        }
-
-        return View(new CapabilitiesIndexViewModel
-        {
-            Search = search,
-            Capabilities = capabilities
-                .Select(capability => BuildIndexRow(
-                    capability,
-                    linkedApplicationCountByCapabilityId.GetValueOrDefault(capability.Id),
-                    linkedProductCountByCapabilityId.GetValueOrDefault(capability.Id)))
-                .ToList()
-        });
+        return Task.FromResult(result);
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> Create(int? brmModelId = null)
     {
-        var model = new CapabilityEditViewModel();
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (brmModelId is not > 0)
+        {
+            return RedirectToAction("Index", "BrmModels");
+        }
+
+        var brmModelExists = await dbContext.BrmModels
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == brmModelId.Value);
+        if (!brmModelExists)
+        {
+            return RedirectToAction("Index", "BrmModels");
+        }
+
+        var model = new CapabilityEditViewModel
+        {
+            SelectedBrmModelId = brmModelId
+        };
         EnsureMappingRows(model.MappingRows);
         await PopulateOptionsAsync(model);
         return View(model);
@@ -112,8 +65,15 @@ public sealed class CapabilitiesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(CapabilityEditViewModel input)
+    public async Task<IActionResult> Create(int brmModelId, CapabilityEditViewModel input)
     {
+        if (brmModelId <= 0)
+        {
+            return RedirectToAction("Index", "BrmModels");
+        }
+
+        input.SelectedBrmModelId = brmModelId;
+        ModelState.Remove(nameof(input.SelectedBrmModelId));
         NormalizeInput(input);
         var normalizedMappings = await ValidateMappingsAsync(input);
         if (!ModelState.IsValid || normalizedMappings is null)
@@ -129,6 +89,7 @@ public sealed class CapabilitiesController(
 
         var capability = new BusinessCapabilityCatalogItem
         {
+            BrmModelId = input.SelectedBrmModelId,
             Name = BuildBrmComponentLabel(brmComponent),
             Description = NormalizeSelection(input.Description),
             Notes = NormalizeSelection(input.Notes),
@@ -157,8 +118,8 @@ public sealed class CapabilitiesController(
             $"Created capability {capability.Name}.",
             $"BRM/ARM mappings: {capability.Mappings.Count}.");
 
-        TempData["CapabilitiesStatusMessage"] = $"Created capability {capability.Name}.";
-        return RedirectToAction(nameof(Details), new { id = capability.Id });
+        TempData["BrmModelsStatusMessage"] = $"Created capability {capability.Name} in {await ResolveBrmModelNameAsync(capability.BrmModelId)}.";
+        return RedirectToAction("Details", "BrmModels", new { id = capability.BrmModelId });
     }
 
     public async Task<IActionResult> Details(int id)
@@ -186,7 +147,7 @@ public sealed class CapabilitiesController(
             Eyebrow = "Hierarchy",
             Heading = "All capability dependencies",
             Description = "Explore the full capability drilldown from BRM into ARM, applications, and TRM with the same dependency map settings used on each capability page.",
-            BackLabel = "Back to capabilities",
+            BackLabel = "Back to BRM models",
             BackAction = nameof(Index),
             HierarchyRoot = await drilldownService.BuildAllCapabilitiesHierarchyAsync(cancellationToken),
             EmptyTitle = "No capability dependency map yet",
@@ -218,6 +179,7 @@ public sealed class CapabilitiesController(
         var model = new CapabilityEditViewModel
         {
             Id = capability.Id,
+            SelectedBrmModelId = capability.BrmModelId,
             SelectedBrmComponentId = capability.Mappings
                 .Select(x => (int?)x.BrmComponentId)
                 .Distinct()
@@ -253,6 +215,8 @@ public sealed class CapabilitiesController(
         }
 
         input.Id = id;
+        input.SelectedBrmModelId = capability.BrmModelId;
+        ModelState.Remove(nameof(input.SelectedBrmModelId));
         NormalizeInput(input);
         var normalizedMappings = await ValidateMappingsAsync(input);
         if (!ModelState.IsValid || normalizedMappings is null)
@@ -294,12 +258,105 @@ public sealed class CapabilitiesController(
             $"Updated capability {capability.Name}.",
             $"BRM/ARM mappings: {capability.Mappings.Count}.");
 
-        TempData["CapabilitiesStatusMessage"] = $"Updated capability {capability.Name}.";
-        return RedirectToAction(nameof(Details), new { id = capability.Id });
+        TempData["BrmModelsStatusMessage"] = $"Updated capability {capability.Name} in {await ResolveBrmModelNameAsync(capability.BrmModelId)}.";
+        return RedirectToAction("Details", "BrmModels", new { id = capability.BrmModelId });
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    public async Task<IActionResult> Delete(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var model = await dbContext.BusinessCapabilityCatalogItems
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new CapabilityDeleteViewModel
+            {
+                Id = x.Id,
+                BrmModelId = x.BrmModelId,
+                BrmModelName = x.BrmModel != null ? x.BrmModel.Name : "-",
+                Name = x.Name,
+                Description = x.Description,
+                ArmComponentCount = x.Mappings
+                    .Select(mapping => mapping.ArmComponentId)
+                    .Distinct()
+                    .Count(),
+                UpdatedUtc = x.UpdatedUtc
+            })
+            .FirstOrDefaultAsync();
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        return View(model);
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    [HttpPost, ActionName(nameof(Delete))]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteConfirmed(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var capability = await dbContext.BusinessCapabilityCatalogItems
+            .Include(x => x.BrmModel)
+            .FirstOrDefaultAsync(x => x.Id == id);
+        if (capability is null)
+        {
+            return NotFound();
+        }
+
+        var brmModelId = capability.BrmModelId;
+        var brmModelName = capability.BrmModel?.Name ?? await ResolveBrmModelNameAsync(brmModelId);
+        var capabilityName = capability.Name;
+
+        dbContext.BusinessCapabilityCatalogItems.Remove(capability);
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Capability",
+            "Delete",
+            nameof(BusinessCapabilityCatalogItem),
+            id,
+            $"Removed capability {capabilityName}.",
+            $"Removed from BRM model {brmModelName}.");
+
+        TempData["BrmModelsStatusMessage"] = $"Removed capability {capabilityName} from {brmModelName}.";
+
+        return brmModelId is > 0
+            ? RedirectToAction("Details", "BrmModels", new { id = brmModelId.Value })
+            : RedirectToAction("Index", "BrmModels");
     }
 
     private async Task PopulateOptionsAsync(CapabilityEditViewModel model)
     {
+        if (model.SelectedBrmModelId is > 0)
+        {
+            var brmModel = await dbContext.BrmModels
+                .AsNoTracking()
+                .Where(x => x.Id == model.SelectedBrmModelId.Value)
+                .Select(x => new
+                {
+                    x.Name,
+                    x.Area,
+                    x.Status
+                })
+                .FirstOrDefaultAsync();
+
+            if (brmModel is not null)
+            {
+                model.BrmModelName = brmModel.Name;
+                model.BrmModelArea = brmModel.Area;
+                model.BrmModelStatus = brmModel.Status;
+            }
+        }
+
         model.BrmComponentOptions = await dbContext.BrmComponents
             .AsNoTracking()
             .Where(x => !x.IsDeleted)
@@ -350,6 +407,22 @@ public sealed class CapabilitiesController(
     private async Task<List<NormalizedCapabilityMappingRow>?> ValidateMappingsAsync(CapabilityEditViewModel input)
     {
         var normalizedRows = new List<NormalizedCapabilityMappingRow>();
+
+        if (!input.SelectedBrmModelId.HasValue)
+        {
+            ModelState.AddModelError(nameof(input.SelectedBrmModelId), "Choose a BRM model.");
+        }
+        else
+        {
+            var brmModelExists = await dbContext.BrmModels
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == input.SelectedBrmModelId.Value);
+
+            if (!brmModelExists)
+            {
+                ModelState.AddModelError(nameof(input.SelectedBrmModelId), "The selected BRM model could not be found.");
+            }
+        }
 
         if (!input.SelectedBrmComponentId.HasValue)
         {
@@ -487,24 +560,20 @@ public sealed class CapabilitiesController(
         return capabilityOptions;
     }
 
-    private static CapabilityIndexRowViewModel BuildIndexRow(BusinessCapabilityCatalogItem capability, int applicationCount, int productCount) =>
-        new()
+    private async Task<string> ResolveBrmModelNameAsync(int? brmModelId)
+    {
+        if (!brmModelId.HasValue)
         {
-            Id = capability.Id,
-            Name = capability.Name,
-            Description = capability.Description,
-            BrmCapabilityCount = capability.Mappings
-                .Select(x => x.BrmComponentId)
-                .Distinct()
-                .Count(),
-            ArmComponentCount = capability.Mappings
-                .Select(x => x.ArmComponentId)
-                .Distinct()
-                .Count(),
-            ApplicationCount = applicationCount,
-            ProductCount = productCount,
-            UpdatedUtc = capability.UpdatedUtc
-        };
+            return "the selected BRM model";
+        }
+
+        return await dbContext.BrmModels
+            .AsNoTracking()
+            .Where(x => x.Id == brmModelId.Value)
+            .Select(x => x.Name)
+            .FirstOrDefaultAsync()
+            ?? "the selected BRM model";
+    }
 
     private sealed record NormalizedCapabilityMappingRow(int ArmComponentId, int ArmCapabilityId);
 }

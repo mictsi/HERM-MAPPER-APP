@@ -1,0 +1,60 @@
+@model BrmModelEditViewModel
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="content-card">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">BRM model</span>
+                    <h2>Details</h2>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label"></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Area" class="form-label"></label>
+                    <input asp-for="Area" class="form-control" />
+                    <span asp-validation-for="Area" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Status" class="form-label"></label>
+                    <select asp-for="Status" class="form-select">
+                        <option value="">Choose a status</option>
+                        @foreach (var status in Model.SuggestedStatuses)
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Status" class="text-danger"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Description" class="form-label"></label>
+                    <textarea asp-for="Description" class="form-control" rows="5"></textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <aside class="content-card h-100">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Workflow</span>
+                    <h2>What this creates</h2>
+                </div>
+            </div>
+            <p class="mb-3">Each BRM model becomes its own workspace for business capabilities, so different areas can maintain separate capability sets without changing the existing capability mapping flow.</p>
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Save BRM model</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </div>
+        </aside>
+    </div>
+</div>

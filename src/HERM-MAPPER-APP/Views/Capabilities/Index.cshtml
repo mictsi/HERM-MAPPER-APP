@@ -11,22 +11,33 @@
     <div>
         <span class="eyebrow">Business Layer</span>
         <h1>Capabilities</h1>
-        <p>Define business capabilities from the BRM model and connect them to the ARM layer for future drilldown into applications, products, and TRM mappings.</p>
+        <p>Define business capabilities inside each BRM model and connect them to the ARM layer for future drilldown into applications, products, and TRM mappings.</p>
     </div>
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary" asp-action="AllDependencies">Show all capabilities</a>
         @if (canManageProductsAndServices)
         {
-            <a class="btn btn-primary" asp-action="Create">Add capability</a>
+            @if (Model.HasBrmModels)
+            {
+                <a class="btn btn-primary" asp-action="Create" asp-route-brmModelId="@Model.BrmModelId">Add capability</a>
+            }
+            else
+            {
+                <a class="btn btn-primary" asp-controller="BrmModels" asp-action="Create">Add BRM model</a>
+            }
         }
     </div>
 </section>
 
 <section class="content-card">
     <form method="get" class="row g-3 align-items-end">
-        <div class="col-lg-10">
+        <div class="col-lg-7">
             <label class="form-label" for="search">Search capabilities</label>
             <input class="form-control" id="search" name="search" value="@Model.Search" placeholder="Capability, BRM capability, ARM component" />
+        </div>
+        <div class="col-lg-3">
+            <label asp-for="BrmModelId" class="form-label"></label>
+            <select asp-for="BrmModelId" class="form-select" asp-items="Model.BrmModelOptions"></select>
         </div>
         <div class="col-lg-2 d-grid">
             <button class="btn btn-primary" type="submit">Go</button>
@@ -46,7 +57,11 @@
     {
         <div class="empty-state compact">
             <h3>No capabilities yet</h3>
-            <p>Create the first capability and connect BRM capabilities to ARM components.</p>
+            <p>
+                @(Model.HasBrmModels
+                    ? "Create the first capability and connect BRM capabilities to ARM components."
+                    : "Create a BRM model first, then add capabilities inside it.")
+            </p>
         </div>
     }
     else
@@ -55,6 +70,7 @@
             <table class="table align-middle">
                 <thead>
                     <tr>
+                        <th>BRM model</th>
                         <th>Capability</th>
                         <th>BRM</th>
                         <th>ARM</th>
@@ -68,6 +84,10 @@
                 @foreach (var capability in Model.Capabilities)
                 {
                     <tr>
+                        <td>
+                            <div><strong>@capability.BrmModelName</strong></div>
+                            <div class="table-subline">@capability.BrmModelArea</div>
+                        </td>
                         <td>
                             <strong>@capability.Name</strong>
                             <div class="table-subline">@(string.IsNullOrWhiteSpace(capability.Description) ? "No description provided." : capability.Description)</div>

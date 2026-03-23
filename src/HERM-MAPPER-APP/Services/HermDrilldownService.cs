@@ -163,6 +163,10 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
         return new CapabilityDetailsViewModel
         {
             Id = capability.Id,
+            BrmModelId = capability.BrmModelId,
+            BrmModelName = capability.BrmModel?.Name ?? "-",
+            BrmModelArea = capability.BrmModel?.Area ?? "-",
+            BrmModelStatus = capability.BrmModel?.Status ?? "-",
             Name = capability.Name,
             Description = capability.Description,
             Notes = capability.Notes,
@@ -203,7 +207,10 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             .Select(capability =>
             {
                 var resolvedPaths = capability.Mappings
-                    .SelectMany(mapping => BuildCapabilityPaths(mapping, applicationMappings.Where(x => x.ArmComponentId == mapping.ArmComponentId)))
+                    .SelectMany(mapping => BuildCapabilityPaths(
+                        mapping,
+                        applicationMappings.Where(x => x.ArmComponentId == mapping.ArmComponentId),
+                        includeMappingOnlyBranch: true))
                     .OrderBy(x => x.BrmDomainLabel)
                     .ThenBy(x => x.BrmCapabilityLabel)
                     .ThenBy(x => x.BrmComponentLabel)
@@ -229,6 +236,77 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             Label = "All capabilities",
             PathCount = capabilityNodes.Sum(x => x.PathCount),
             ProductCount = capabilityNodes.Sum(x => x.ProductCount),
+            IsExpanded = true,
+            Children = capabilityNodes
+        };
+    }
+
+    public async Task<ApplicationHierarchyNodeViewModel> BuildBrmModelHierarchyAsync(int brmModelId, CancellationToken cancellationToken = default)
+    {
+        var brmModel = await dbContext.BrmModels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == brmModelId, cancellationToken);
+
+        if (brmModel is null)
+        {
+            return new ApplicationHierarchyNodeViewModel
+            {
+                Key = $"brm-model-{brmModelId}",
+                NodeType = "BRM model",
+                CssType = "capability",
+                Label = "BRM model",
+                IsExpanded = true
+            };
+        }
+
+        var capabilities = await BuildCapabilityDetailsQuery()
+            .Where(x => x.BrmModelId == brmModelId)
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
+        var armComponentIds = capabilities
+            .SelectMany(x => x.Mappings)
+            .Select(x => x.ArmComponentId)
+            .Distinct()
+            .ToList();
+
+        var applicationMappings = await LoadApplicationMappingsForArmComponentsAsync(armComponentIds, cancellationToken);
+        var allResolvedPaths = new List<CapabilityResolvedPathViewModel>();
+
+        var capabilityNodes = capabilities
+            .Select(capability =>
+            {
+                var resolvedPaths = capability.Mappings
+                    .SelectMany(mapping => BuildCapabilityPaths(
+                        mapping,
+                        applicationMappings.Where(x => x.ArmComponentId == mapping.ArmComponentId),
+                        includeMappingOnlyBranch: true))
+                    .OrderBy(x => x.BrmDomainLabel)
+                    .ThenBy(x => x.BrmCapabilityLabel)
+                    .ThenBy(x => x.BrmComponentLabel)
+                    .ThenBy(x => x.ArmDomainLabel)
+                    .ThenBy(x => x.ArmCapabilityLabel)
+                    .ThenBy(x => x.ArmComponentLabel)
+                    .ThenBy(x => x.ApplicationName)
+                    .ThenBy(x => x.ProductLabel)
+                    .ThenBy(x => x.TrmDomainLabel)
+                    .ThenBy(x => x.TrmCapabilityLabel)
+                    .ThenBy(x => x.TrmComponentLabel)
+                    .ToList();
+
+                allResolvedPaths.AddRange(resolvedPaths);
+                return BuildCapabilityHierarchy(capability, resolvedPaths);
+            })
+            .ToList();
+
+        return new ApplicationHierarchyNodeViewModel
+        {
+            Key = $"brm-model-{brmModelId}",
+            NodeType = "BRM model",
+            CssType = "capability",
+            Label = brmModel.Name,
+            PathCount = capabilityNodes.Sum(x => x.PathCount),
+            ProductCount = CountDistinctProducts(allResolvedPaths),
             IsExpanded = true,
             Children = capabilityNodes
         };
@@ -276,6 +354,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
     private IQueryable<BusinessCapabilityCatalogItem> BuildCapabilityDetailsQuery() =>
         dbContext.BusinessCapabilityCatalogItems
             .AsNoTracking()
+            .Include(x => x.BrmModel)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.BrmComponent)
             .ThenInclude(x => x!.ParentCapability)
@@ -373,7 +452,8 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
 
     private static IEnumerable<CapabilityResolvedPathViewModel> BuildCapabilityPaths(
         BusinessCapabilityCatalogItemMapping mapping,
-        IEnumerable<ApplicationCatalogItemMapping> applicationMappings)
+        IEnumerable<ApplicationCatalogItemMapping> applicationMappings,
+        bool includeMappingOnlyBranch = false)
     {
         var brmDomainLabel = BuildBrmDomainLabel(mapping.BrmComponent);
         var brmCapabilityLabel = BuildBrmCapabilityLabel(mapping.BrmComponent);
@@ -382,8 +462,27 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
         var armDomainLabel = BuildArmDomainLabel(armCapability);
         var armCapabilityLabel = BuildArmCapabilityLabel(armCapability);
         var armComponentLabel = mapping.ArmComponent?.DisplayLabel ?? "-";
+        var applicationMappingList = applicationMappings.ToList();
 
-        foreach (var applicationMapping in applicationMappings)
+        if (applicationMappingList.Count == 0)
+        {
+            if (includeMappingOnlyBranch)
+            {
+                yield return new CapabilityResolvedPathViewModel
+                {
+                    BrmDomainLabel = brmDomainLabel,
+                    BrmCapabilityLabel = brmCapabilityLabel,
+                    BrmComponentLabel = brmComponentLabel,
+                    ArmDomainLabel = armDomainLabel,
+                    ArmCapabilityLabel = armCapabilityLabel,
+                    ArmComponentLabel = armComponentLabel
+                };
+            }
+
+            yield break;
+        }
+
+        foreach (var applicationMapping in applicationMappingList)
         {
             var productMappings = GetResolvedProductMappings(applicationMapping);
             if (productMappings.Count == 0)
@@ -397,7 +496,8 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
                     ArmCapabilityLabel = armCapabilityLabel,
                     ArmComponentLabel = armComponentLabel,
                     ApplicationName = applicationMapping.ApplicationCatalogItem?.Name ?? "-",
-                    ProductLabel = BuildProductLabel(GetMappedProduct(applicationMapping))
+                    ProductLabel = BuildProductLabel(GetMappedProduct(applicationMapping)),
+                    ProductId = GetMappedProduct(applicationMapping)?.Id
                 };
 
                 continue;
@@ -415,6 +515,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
                     ArmComponentLabel = armComponentLabel,
                     ApplicationName = applicationMapping.ApplicationCatalogItem?.Name ?? "-",
                     ProductLabel = BuildProductLabel(productMapping.ProductCatalogItem ?? GetMappedProduct(applicationMapping)),
+                    ProductId = productMapping.ProductCatalogItem?.Id ?? GetMappedProduct(applicationMapping)?.Id,
                     TrmDomainLabel = BuildTrmDomainLabel(productMapping),
                     TrmCapabilityLabel = BuildTrmCapabilityLabel(productMapping),
                     TrmComponentLabel = productMapping.TrmComponent?.DisplayLabel ?? "-",
@@ -434,10 +535,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             CssType = "capability",
             Label = capability.Name,
             PathCount = resolvedPaths.Count,
-            ProductCount = resolvedPaths
-                .Select(path => NormalizeHierarchyLabel(path.ApplicationName, "Application"))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count(),
+            ProductCount = CountDistinctProducts(resolvedPaths),
             IsExpanded = true,
             Children = BuildCapabilityHierarchyNodes(resolvedPaths, 0, $"capability-{capability.Id}")
         };
@@ -734,17 +832,36 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
                     CssType = cssType,
                     Label = group.Key,
                     PathCount = childPaths.Count,
-                    ProductCount = childPaths
-                        .Select(path => NormalizeHierarchyLabel(path.ApplicationName, "Application"))
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .Count(),
+                    ProductCount = CountDistinctProducts(childPaths),
                     IsExpanded = true,
-                    Children = level >= 9
-                        ? []
-                        : BuildCapabilityHierarchyNodes(childPaths, level + 1, $"{keyPrefix}-{cssType}-{index}")
+                    Children = BuildCapabilityChildren(childPaths, level, $"{keyPrefix}-{cssType}-{index}")
                 };
             })
             .ToList();
+    }
+
+    private static IReadOnlyList<ApplicationHierarchyNodeViewModel> BuildCapabilityChildren(
+        List<CapabilityResolvedPathViewModel> childPaths,
+        int level,
+        string keyPrefix)
+    {
+        if (level >= 9)
+        {
+            return [];
+        }
+
+        if (level == 5)
+        {
+            var applicationPaths = childPaths
+                .Where(HasResolvedApplication)
+                .ToList();
+
+            return applicationPaths.Count == 0
+                ? []
+                : BuildCapabilityHierarchyNodes(applicationPaths, level + 1, keyPrefix);
+        }
+
+        return BuildCapabilityHierarchyNodes(childPaths, level + 1, keyPrefix);
     }
 
     private static string NormalizeHierarchyLabel(string? label, string fallbackLabel)
@@ -755,8 +872,32 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             : trimmed;
     }
 
+    private static bool HasResolvedApplication(CapabilityResolvedPathViewModel path) =>
+        HasResolvedLabel(path.ApplicationName);
+
+    private static bool HasResolvedProduct(ApplicationResolvedPathViewModel path) =>
+        path.ProductId.HasValue || HasResolvedLabel(path.ProductLabel);
+
+    private static bool HasResolvedProduct(CapabilityResolvedPathViewModel path) =>
+        path.ProductId.HasValue || HasResolvedLabel(path.ProductLabel);
+
+    private static bool HasResolvedLabel(string? label)
+    {
+        var trimmed = label?.Trim();
+        return !string.IsNullOrWhiteSpace(trimmed) && trimmed != "-";
+    }
+
     private static int CountDistinctProducts(IEnumerable<ApplicationResolvedPathViewModel> paths) =>
-        paths.Select(path => path.ProductId.HasValue ? $"id:{path.ProductId.Value}" : $"label:{path.ProductLabel}")
+        paths.Where(HasResolvedProduct)
+            .Select(path => path.ProductId.HasValue ? $"id:{path.ProductId.Value}" : $"label:{path.ProductLabel}")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+    private static int CountDistinctProducts(IEnumerable<CapabilityResolvedPathViewModel> paths) =>
+        paths.Where(HasResolvedProduct)
+            .Select(path => path.ProductId.HasValue
+                ? $"id:{path.ProductId.Value}"
+                : $"label:{NormalizeHierarchyLabel(path.ProductLabel, "Product")}")
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
 

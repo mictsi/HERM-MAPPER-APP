@@ -22,10 +22,18 @@
         <p>@(string.IsNullOrWhiteSpace(Model.Description) ? "No description provided." : Model.Description)</p>
     </div>
     <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary" asp-action="Index">Back to capabilities</a>
+        @if (Model.BrmModelId.HasValue)
+        {
+            <a class="btn btn-outline-secondary" asp-controller="BrmModels" asp-action="Details" asp-route-id="@Model.BrmModelId">Back to BRM model</a>
+        }
+        else
+        {
+            <a class="btn btn-outline-secondary" asp-controller="BrmModels" asp-action="Index">Back to BRM models</a>
+        }
         @if (canManageProductsAndServices)
         {
             <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">Edit capability</a>
+            <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@Model.Id">Remove capability</a>
         }
     </div>
 </section>
@@ -43,6 +51,12 @@
         </div>
     </div>
     <dl class="detail-grid">
+        <dt>BRM model</dt>
+        <dd>@Model.BrmModelName</dd>
+        <dt>Area</dt>
+        <dd>@Model.BrmModelArea</dd>
+        <dt>Model status</dt>
+        <dd>@Model.BrmModelStatus</dd>
         <dt>BRM capabilities</dt>
         <dd>@Model.BrmCapabilityCount</dd>
         <dt>ARM components</dt>

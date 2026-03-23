@@ -9,6 +9,16 @@
         <h1>Edit capability</h1>
         <p>Update the BRM to ARM links that drive the future drilldown into applications and products.</p>
     </div>
+    <div class="d-flex gap-2">
+        @if (Model.SelectedBrmModelId.HasValue)
+        {
+            <a class="btn btn-outline-secondary" asp-controller="BrmModels" asp-action="Details" asp-route-id="@Model.SelectedBrmModelId">Back to BRM model</a>
+        }
+        else
+        {
+            <a class="btn btn-outline-secondary" asp-controller="BrmModels" asp-action="Index">Back to BRM models</a>
+        }
+    </div>
 </section>
 
 <form asp-action="Edit" asp-route-id="@Model.Id" method="post">

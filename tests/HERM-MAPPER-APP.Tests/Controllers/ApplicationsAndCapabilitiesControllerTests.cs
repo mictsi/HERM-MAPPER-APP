@@ -18,7 +18,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     public async Task CreateFormsStartWithSingleEmptyMappingRow()
     {
         await using var fixture = await TestFixture.CreateAsync();
-        await fixture.SeedHermAlignmentAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
 
         using var applicationsController = fixture.CreateApplicationsController();
         var applicationCreate = await applicationsController.Create();
@@ -28,11 +28,22 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         Assert.Single(applicationModel.MappingRows);
 
         using var capabilitiesController = fixture.CreateCapabilitiesController();
-        var capabilityCreate = await capabilitiesController.Create();
+        var capabilityCreateWithoutModel = await capabilitiesController.Create();
+
+        var capabilityRedirect = Assert.IsType<RedirectToActionResult>(capabilityCreateWithoutModel);
+        Assert.Equal(nameof(BrmModelsController.Index), capabilityRedirect.ActionName);
+        Assert.Equal("BrmModels", capabilityRedirect.ControllerName);
+
+        using var scopedCapabilitiesController = fixture.CreateCapabilitiesController();
+        var capabilityCreate = await scopedCapabilitiesController.Create(seeded.BrmModel.Id);
 
         var capabilityView = Assert.IsType<ViewResult>(capabilityCreate);
         var capabilityModel = Assert.IsType<CapabilityEditViewModel>(capabilityView.Model);
         Assert.Single(capabilityModel.MappingRows);
+        Assert.Equal(seeded.BrmModel.Id, capabilityModel.SelectedBrmModelId);
+        Assert.Equal("Student BRM", capabilityModel.BrmModelName);
+        Assert.Equal("Student Services", capabilityModel.BrmModelArea);
+        Assert.Equal("Production", capabilityModel.BrmModelStatus);
     }
 
     [Fact]
@@ -112,6 +123,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
 
         await fixture.DbContext.AddAsync(new BusinessCapabilityCatalogItem
         {
+            BrmModelId = seeded.BrmModel.Id,
             Name = $"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}",
             Mappings =
             [
@@ -356,8 +368,9 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var createResult = await controller.Create(new CapabilityEditViewModel
+        var createResult = await controller.Create(seeded.BrmModel.Id, new CapabilityEditViewModel
         {
+            SelectedBrmModelId = seeded.BrmModel.Id,
             SelectedBrmComponentId = seeded.BrmComponent.Id,
             Description = "Business recruitment view",
             MappingRows =
@@ -371,11 +384,14 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(createResult);
-        Assert.Equal(nameof(CapabilitiesController.Details), redirect.ActionName);
+        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("BrmModels", redirect.ControllerName);
+        Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
 
         var capability = await fixture.DbContext.BusinessCapabilityCatalogItems
             .Include(x => x.Mappings)
             .SingleAsync();
+        Assert.Equal(seeded.BrmModel.Id, capability.BrmModelId);
         Assert.Equal("BC002 Student Recruitment", capability.Name);
         var storedMapping = Assert.Single(capability.Mappings);
         Assert.Equal(seeded.BrmComponent.Id, storedMapping.BrmComponentId);
@@ -387,6 +403,9 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<CapabilityDetailsViewModel>(view.Model);
+        Assert.Equal("Student BRM", model.BrmModelName);
+        Assert.Equal("Student Services", model.BrmModelArea);
+        Assert.Equal("Production", model.BrmModelStatus);
         var mappingRow = Assert.Single(model.MappingRows);
         Assert.Equal("BD001 Student Lifecycle", mappingRow.BrmDomainLabel);
         Assert.Equal("BC001 Student Management", mappingRow.BrmCapabilityLabel);
@@ -420,34 +439,84 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task CapabilityIndexSearchMatchesMappedArmLabels()
+    public async Task CapabilityHierarchyCountsDistinctProductsInsteadOfApplications()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
 
-        await fixture.DbContext.AddAsync(new BusinessCapabilityCatalogItem
-        {
-            Name = $"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}",
-            Mappings =
-            [
-                new BusinessCapabilityCatalogItemMapping
-                {
-                    BrmComponentId = seeded.BrmComponent.Id,
-                    ArmComponentId = seeded.ArmComponent.Id,
-                    ArmCapabilityId = seeded.ArmCapability.Id
-                }
-            ]
-        });
+        await fixture.DbContext.AddRangeAsync(
+            new ApplicationCatalogItem
+            {
+                Name = "Admissions Hub",
+                Mappings =
+                [
+                    new ApplicationCatalogItemMapping
+                    {
+                        ArmComponentId = seeded.ArmComponent.Id,
+                        ProductMappingId = seeded.ProductMapping.Id,
+                        ProductCatalogItemId = seeded.Product.Id
+                    }
+                ]
+            },
+            new ApplicationCatalogItem
+            {
+                Name = "Enrolment Portal",
+                Mappings =
+                [
+                    new ApplicationCatalogItemMapping
+                    {
+                        ArmComponentId = seeded.ArmComponent.Id,
+                        ProductMappingId = seeded.ProductMapping.Id,
+                        ProductCatalogItemId = seeded.Product.Id
+                    }
+                ]
+            },
+            new BusinessCapabilityCatalogItem
+            {
+                BrmModelId = seeded.BrmModel.Id,
+                Name = $"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}",
+                Mappings =
+                [
+                    new BusinessCapabilityCatalogItemMapping
+                    {
+                        BrmComponentId = seeded.BrmComponent.Id,
+                        ArmComponentId = seeded.ArmComponent.Id,
+                        ArmCapabilityId = seeded.ArmCapability.Id
+                    }
+                ]
+            });
         await fixture.DbContext.SaveChangesAsync();
+
+        var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
+
+        using var controller = fixture.CreateCapabilitiesController();
+        var result = await controller.Details(capability.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<CapabilityDetailsViewModel>(view.Model);
+
+        Assert.Equal(2, model.ApplicationCount);
+        Assert.Equal(1, model.ProductCount);
+        Assert.Equal(1, model.HierarchyRoot.ProductCount);
+
+        var brmDomainNode = Assert.Single(model.HierarchyRoot.Children);
+        Assert.Equal(1, brmDomainNode.ProductCount);
+        var brmCapabilityNode = Assert.Single(brmDomainNode.Children);
+        Assert.Equal(1, brmCapabilityNode.ProductCount);
+    }
+
+    [Fact]
+    public async Task CapabilitiesIndexRedirectsToBrmModelsIndex()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedHermAlignmentAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
         var result = await controller.Index("Applicant Portal");
 
-        var view = Assert.IsType<ViewResult>(result);
-        var model = Assert.IsType<CapabilitiesIndexViewModel>(view.Model);
-        var row = Assert.Single(model.Capabilities);
-        Assert.Equal("BC002 Student Recruitment", row.Name);
-        Assert.Equal(1, row.ArmComponentCount);
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(BrmModelsController.Index), redirect.ActionName);
+        Assert.Equal("BrmModels", redirect.ControllerName);
     }
 
     [Fact]
@@ -498,8 +567,9 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var invalidResult = await controller.Create(new CapabilityEditViewModel
+        var invalidResult = await controller.Create(seeded.BrmModel.Id, new CapabilityEditViewModel
         {
+            SelectedBrmModelId = seeded.BrmModel.Id,
             SelectedBrmComponentId = seeded.BrmComponent.Id,
             MappingRows =
             [
@@ -517,8 +587,9 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         Assert.Single(invalidModel.MappingRows);
 
         using var validController = fixture.CreateCapabilitiesController();
-        var validResult = await validController.Create(new CapabilityEditViewModel
+        var validResult = await validController.Create(seeded.BrmModel.Id, new CapabilityEditViewModel
         {
+            SelectedBrmModelId = seeded.BrmModel.Id,
             SelectedBrmComponentId = seeded.BrmComponent.Id,
             MappingRows =
             [
@@ -531,11 +602,394 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(validResult);
-        Assert.Equal(nameof(CapabilitiesController.Details), redirect.ActionName);
+        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("BrmModels", redirect.ControllerName);
+        Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
 
         var mapping = await fixture.DbContext.BusinessCapabilityCatalogItemMappings.SingleAsync();
         Assert.Equal(seeded.ArmComponent.Id, mapping.ArmComponentId);
         Assert.Equal(secondArmCapability.Id, mapping.ArmCapabilityId);
+    }
+
+    [Fact]
+    public async Task CapabilityCreateUsesRouteBrmModelInsteadOfPostedModelSelection()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+        var otherModel = new BrmModel
+        {
+            Name = "Operations BRM",
+            Area = "Operations",
+            Status = "Draft"
+        };
+
+        await fixture.DbContext.AddAsync(otherModel);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateCapabilitiesController();
+        var result = await controller.Create(seeded.BrmModel.Id, new CapabilityEditViewModel
+        {
+            SelectedBrmModelId = otherModel.Id,
+            SelectedBrmComponentId = seeded.BrmComponent.Id,
+            MappingRows =
+            [
+                new CapabilityMappingRowInputViewModel
+                {
+                    ArmComponentId = seeded.ArmComponent.Id,
+                    ArmCapabilityId = seeded.ArmCapability.Id
+                }
+            ]
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
+
+        var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
+        Assert.Equal(seeded.BrmModel.Id, capability.BrmModelId);
+    }
+
+    [Fact]
+    public async Task CapabilityEditKeepsExistingBrmModelEvenIfPostedModelChanges()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+        var otherModel = new BrmModel
+        {
+            Name = "Operations BRM",
+            Area = "Operations",
+            Status = "Draft"
+        };
+
+        await fixture.DbContext.AddAsync(otherModel);
+        await fixture.DbContext.AddAsync(new BusinessCapabilityCatalogItem
+        {
+            BrmModelId = seeded.BrmModel.Id,
+            Name = $"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}",
+            Mappings =
+            [
+                new BusinessCapabilityCatalogItemMapping
+                {
+                    BrmComponentId = seeded.BrmComponent.Id,
+                    ArmComponentId = seeded.ArmComponent.Id,
+                    ArmCapabilityId = seeded.ArmCapability.Id
+                }
+            ]
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
+
+        using var controller = fixture.CreateCapabilitiesController();
+        var result = await controller.Edit(capability.Id, new CapabilityEditViewModel
+        {
+            SelectedBrmModelId = otherModel.Id,
+            SelectedBrmComponentId = seeded.BrmComponent.Id,
+            Description = "Updated description",
+            MappingRows =
+            [
+                new CapabilityMappingRowInputViewModel
+                {
+                    ArmComponentId = seeded.ArmComponent.Id,
+                    ArmCapabilityId = seeded.ArmCapability.Id
+                }
+            ]
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
+
+        var storedCapability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
+        Assert.Equal(seeded.BrmModel.Id, storedCapability.BrmModelId);
+        Assert.Equal("Updated description", storedCapability.Description);
+    }
+
+    [Fact]
+    public async Task CapabilityDeleteRemovesCapabilityAndRedirectsToOwningBrmModel()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        await fixture.DbContext.AddAsync(new BusinessCapabilityCatalogItem
+        {
+            BrmModelId = seeded.BrmModel.Id,
+            Name = $"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}",
+            Mappings =
+            [
+                new BusinessCapabilityCatalogItemMapping
+                {
+                    BrmComponentId = seeded.BrmComponent.Id,
+                    ArmComponentId = seeded.ArmComponent.Id,
+                    ArmCapabilityId = seeded.ArmCapability.Id
+                }
+            ]
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
+
+        using var controller = fixture.CreateCapabilitiesController();
+        var result = await controller.DeleteConfirmed(capability.Id);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("BrmModels", redirect.ControllerName);
+        Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
+        Assert.False(await fixture.DbContext.BusinessCapabilityCatalogItems.AnyAsync());
+        Assert.False(await fixture.DbContext.BusinessCapabilityCatalogItemMappings.AnyAsync());
+    }
+
+    [Fact]
+    public async Task CapabilitiesIndexWithBrmModelIdRedirectsToThatModel()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        using var controller = fixture.CreateCapabilitiesController();
+        var result = await controller.Index(null, seeded.BrmModel.Id);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("BrmModels", redirect.ControllerName);
+        Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
+    }
+
+    [Fact]
+    public async Task BrmModelCreatePersistsAndDetailsShowScopedCapabilities()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        using var createController = fixture.CreateBrmModelsController();
+        var createResult = await createController.Create(new BrmModelEditViewModel
+        {
+            Name = "Operations BRM",
+            Area = "Operations",
+            Status = "Proposal",
+            Description = "Operations capability set"
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(createResult);
+        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+
+        var brmModel = await fixture.DbContext.BrmModels
+            .OrderByDescending(x => x.Id)
+            .FirstAsync();
+
+        await fixture.DbContext.AddAsync(new BusinessCapabilityCatalogItem
+        {
+            BrmModelId = brmModel.Id,
+            Name = $"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}",
+            Mappings =
+            [
+                new BusinessCapabilityCatalogItemMapping
+                {
+                    BrmComponentId = seeded.BrmComponent.Id,
+                    ArmComponentId = seeded.ArmComponent.Id,
+                    ArmCapabilityId = seeded.ArmCapability.Id
+                }
+            ]
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var detailsController = fixture.CreateBrmModelsController();
+        var detailsResult = await detailsController.Details(brmModel.Id);
+
+        var view = Assert.IsType<ViewResult>(detailsResult);
+        var model = Assert.IsType<BrmModelDetailsViewModel>(view.Model);
+        Assert.Equal("Operations BRM", model.Name);
+        Assert.Equal("Operations", model.Area);
+        Assert.Equal("Proposal", model.Status);
+        Assert.Single(model.Capabilities);
+        Assert.Equal($"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}", model.Capabilities[0].Name);
+    }
+
+    [Fact]
+    public async Task BrmModelDetailsBuildDependencyHierarchyForConnectedCapabilities()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        await fixture.DbContext.AddRangeAsync(
+            new ApplicationCatalogItem
+            {
+                Name = "Admissions Hub",
+                Mappings =
+                [
+                    new ApplicationCatalogItemMapping
+                    {
+                        ArmComponentId = seeded.ArmComponent.Id,
+                        ProductMappingId = seeded.ProductMapping.Id,
+                        ProductCatalogItemId = seeded.Product.Id
+                    }
+                ]
+            },
+            new BusinessCapabilityCatalogItem
+            {
+                BrmModelId = seeded.BrmModel.Id,
+                Name = $"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}",
+                Mappings =
+                [
+                    new BusinessCapabilityCatalogItemMapping
+                    {
+                        BrmComponentId = seeded.BrmComponent.Id,
+                        ArmComponentId = seeded.ArmComponent.Id,
+                        ArmCapabilityId = seeded.ArmCapability.Id
+                    }
+                ]
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateBrmModelsController();
+        var result = await controller.Details(seeded.BrmModel.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<BrmModelDetailsViewModel>(view.Model);
+        Assert.True(model.HasDependencyTree);
+        Assert.Equal(seeded.BrmModel.Name, model.HierarchyRoot.Label);
+
+        var capabilityNode = Assert.Single(model.HierarchyRoot.Children);
+        Assert.Equal("Capability", capabilityNode.NodeType);
+        Assert.Equal($"{seeded.BrmComponent.Code} {seeded.BrmComponent.Name}", capabilityNode.Label);
+    }
+
+    [Fact]
+    public async Task BrmModelDetailsDependencyHierarchyIncludesCapabilitiesWithoutApplications()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        var secondArmDomain = new ArmDomain { Code = "AD002", Name = "Enrolment" };
+        var secondArmCapability = new ArmCapability
+        {
+            Code = "AP002",
+            Name = "Enrolment Services",
+            ParentDomain = secondArmDomain,
+            ParentDomainCode = secondArmDomain.Code
+        };
+        var secondArmComponent = new ArmComponent
+        {
+            Code = "AC002",
+            Name = "Enrolment Portal",
+            ParentCapability = secondArmCapability,
+            ParentCapabilityCode = secondArmCapability.Code
+        };
+
+        var secondBrmDomain = new BrmDomain { Code = "BD002", Name = "Enrolment" };
+        var secondBrmCapability = new BrmCapability
+        {
+            Code = "BC010",
+            Name = "Enrolment Management",
+            ParentDomain = secondBrmDomain,
+            ParentDomainCode = secondBrmDomain.Code
+        };
+        var secondBrmComponent = new BrmComponent
+        {
+            Code = "BC011",
+            Name = "Enrolment Services",
+            ParentCapability = secondBrmCapability,
+            ParentCapabilityCode = secondBrmCapability.Code
+        };
+
+        const string connectedCapabilityName = "BC002 Student Recruitment";
+        const string disconnectedCapabilityName = "BC011 Enrolment Services";
+
+        await fixture.DbContext.AddRangeAsync(
+            secondArmDomain,
+            secondArmCapability,
+            secondArmComponent,
+            new ArmComponentCapabilityLink
+            {
+                ArmComponent = secondArmComponent,
+                ArmCapability = secondArmCapability
+            },
+            secondBrmDomain,
+            secondBrmCapability,
+            secondBrmComponent,
+            new ApplicationCatalogItem
+            {
+                Name = "Admissions Hub",
+                Mappings =
+                [
+                    new ApplicationCatalogItemMapping
+                    {
+                        ArmComponentId = seeded.ArmComponent.Id,
+                        ProductMappingId = seeded.ProductMapping.Id,
+                        ProductCatalogItemId = seeded.Product.Id
+                    }
+                ]
+            },
+            new BusinessCapabilityCatalogItem
+            {
+                BrmModelId = seeded.BrmModel.Id,
+                Name = connectedCapabilityName,
+                Mappings =
+                [
+                    new BusinessCapabilityCatalogItemMapping
+                    {
+                        BrmComponentId = seeded.BrmComponent.Id,
+                        ArmComponentId = seeded.ArmComponent.Id,
+                        ArmCapabilityId = seeded.ArmCapability.Id
+                    }
+                ]
+            },
+            new BusinessCapabilityCatalogItem
+            {
+                BrmModelId = seeded.BrmModel.Id,
+                Name = disconnectedCapabilityName,
+                Mappings =
+                [
+                    new BusinessCapabilityCatalogItemMapping
+                    {
+                        BrmComponent = secondBrmComponent,
+                        ArmComponent = secondArmComponent,
+                        ArmCapability = secondArmCapability
+                    }
+                ]
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateBrmModelsController();
+        var result = await controller.Details(seeded.BrmModel.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<BrmModelDetailsViewModel>(view.Model);
+        Assert.True(model.HasDependencyTree);
+        Assert.Equal(seeded.BrmModel.Name, model.HierarchyRoot.Label);
+        Assert.Equal(2, model.HierarchyRoot.Children.Count);
+        Assert.Contains(model.HierarchyRoot.Children, x => x.Label == connectedCapabilityName);
+
+        var disconnectedNode = Assert.Single(model.HierarchyRoot.Children.Where(x => x.Label == disconnectedCapabilityName));
+        var brmDomainNode = Assert.Single(disconnectedNode.Children);
+        var brmCapabilityNode = Assert.Single(brmDomainNode.Children);
+        var brmComponentNode = Assert.Single(brmCapabilityNode.Children);
+        var armDomainNode = Assert.Single(brmComponentNode.Children);
+        var armCapabilityNode = Assert.Single(armDomainNode.Children);
+        var armComponentNode = Assert.Single(armCapabilityNode.Children);
+
+        Assert.Equal("AC002 Enrolment Portal", armComponentNode.Label);
+        Assert.Empty(armComponentNode.Children);
+    }
+
+    [Fact]
+    public async Task BrmModelCreateRejectsStatusOutsideDropdownOptions()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        using var controller = fixture.CreateBrmModelsController();
+        var result = await controller.Create(new BrmModelEditViewModel
+        {
+            Name = "Operations BRM",
+            Area = "Operations",
+            Status = "Custom"
+        });
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<BrmModelEditViewModel>(view.Model);
+        Assert.False(controller.ModelState.IsValid);
+        Assert.Contains(nameof(BrmModelEditViewModel.Status), controller.ModelState.Keys);
+        Assert.Equal("Custom", model.Status);
     }
 
     private sealed class TestFixture : IAsyncDisposable
@@ -587,8 +1041,25 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
             return controller;
         }
 
+        public BrmModelsController CreateBrmModelsController()
+        {
+            var controller = new BrmModelsController(
+                DbContext,
+                new AuditLogService(DbContext),
+                new HermDrilldownService(DbContext));
+
+            controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider());
+            return controller;
+        }
+
         public async Task<SeededHermAlignment> SeedHermAlignmentAsync()
         {
+            var brmModel = new BrmModel
+            {
+                Name = "Student BRM",
+                Area = "Student Services",
+                Status = "Production"
+            };
             var armDomain = new ArmDomain { Code = "AD001", Name = "Student" };
             var armCapability = new ArmCapability
             {
@@ -654,6 +1125,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
             };
 
             await DbContext.AddRangeAsync(
+                brmModel,
                 armDomain,
                 armCapability,
                 armComponent,
@@ -671,7 +1143,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
                 product);
             await DbContext.SaveChangesAsync();
 
-            return new SeededHermAlignment(armCapability, armComponent, brmComponent, product, product.Mappings.Single());
+            return new SeededHermAlignment(brmModel, armCapability, armComponent, brmComponent, product, product.Mappings.Single());
         }
 
         public async ValueTask DisposeAsync()
@@ -682,6 +1154,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     private sealed record SeededHermAlignment(
+        BrmModel BrmModel,
         ArmCapability ArmCapability,
         ArmComponent ArmComponent,
         BrmComponent BrmComponent,

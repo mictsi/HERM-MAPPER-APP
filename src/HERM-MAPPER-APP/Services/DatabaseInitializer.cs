@@ -21,7 +21,9 @@ public sealed partial class DatabaseInitializer(
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureServiceTablesAsync(cancellationToken);
         await EnsureApplicationTablesAsync(cancellationToken);
+        await EnsureBrmModelTablesAsync(cancellationToken);
         await EnsureBusinessCapabilityTablesAsync(cancellationToken);
+        await EnsureLegacyBusinessCapabilitiesHaveBrmModelAsync(cancellationToken);
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureProductSoftDeleteColumnsAsync(cancellationToken);
         await EnsureServiceSoftDeleteColumnsAsync(cancellationToken);
@@ -102,6 +104,70 @@ public sealed partial class DatabaseInitializer(
 
     [LoggerMessage(EventId = 1004, Level = LogLevel.Information, Message = "Imported sample relationships from {sampleCsvPath}")]
     private static partial void LogImportedSampleRelationships(ILogger logger, string sampleCsvPath);
+
+    private async Task EnsureBrmModelTablesAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "BrmModels" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_BrmModels" PRIMARY KEY AUTOINCREMENT,
+                    "Name" TEXT NOT NULL,
+                    "Area" TEXT NOT NULL,
+                    "Description" TEXT NULL,
+                    "Status" TEXT NOT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_BrmModels_Name"
+                ON "BrmModels" ("Name")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[BrmModels]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [BrmModels] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_BrmModels] PRIMARY KEY,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [Area] NVARCHAR(120) NOT NULL,
+                        [Description] NVARCHAR(2000) NULL,
+                        [Status] NVARCHAR(80) NOT NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_BrmModels_Name'
+                      AND object_id = OBJECT_ID(N'[BrmModels]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_BrmModels_Name]
+                    ON [BrmModels] ([Name]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
 
     [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP004:Don't ignore created IDisposable", Justification = "AppDbContext owns the relational connection lifetime.")]
     private async Task EnsureSqliteSchemaUpToDateAsync(CancellationToken cancellationToken)
@@ -1012,12 +1078,29 @@ public sealed partial class DatabaseInitializer(
                 """
                 CREATE TABLE IF NOT EXISTS "BusinessCapabilityCatalogItems" (
                     "Id" INTEGER NOT NULL CONSTRAINT "PK_BusinessCapabilityCatalogItems" PRIMARY KEY AUTOINCREMENT,
+                    "BrmModelId" INTEGER NULL,
                     "Name" TEXT NOT NULL,
                     "Description" TEXT NULL,
                     "Notes" TEXT NULL,
                     "CreatedUtc" TEXT NOT NULL,
-                    "UpdatedUtc" TEXT NOT NULL
+                    "UpdatedUtc" TEXT NOT NULL,
+                    CONSTRAINT "FK_BusinessCapabilityCatalogItems_BrmModels_BrmModelId"
+                        FOREIGN KEY ("BrmModelId") REFERENCES "BrmModels" ("Id") ON DELETE SET NULL
                 )
+                """,
+                cancellationToken);
+
+            if (!await SqliteColumnExistsAsync("BusinessCapabilityCatalogItems", "BrmModelId", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE BusinessCapabilityCatalogItems ADD COLUMN BrmModelId INTEGER NULL",
+                    cancellationToken);
+            }
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_BusinessCapabilityCatalogItems_BrmModelId"
+                ON "BusinessCapabilityCatalogItems" ("BrmModelId")
                 """,
                 cancellationToken);
 
@@ -1115,12 +1198,56 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     CREATE TABLE [BusinessCapabilityCatalogItems] (
                         [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_BusinessCapabilityCatalogItems] PRIMARY KEY,
+                        [BrmModelId] INT NULL,
                         [Name] NVARCHAR(200) NOT NULL,
                         [Description] NVARCHAR(2000) NULL,
                         [Notes] NVARCHAR(4000) NULL,
                         [CreatedUtc] DATETIME2 NOT NULL,
-                        [UpdatedUtc] DATETIME2 NOT NULL
+                        [UpdatedUtc] DATETIME2 NOT NULL,
+                        CONSTRAINT [FK_BusinessCapabilityCatalogItems_BrmModels_BrmModelId]
+                            FOREIGN KEY ([BrmModelId]) REFERENCES [BrmModels] ([Id]) ON DELETE SET NULL
                     );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[BusinessCapabilityCatalogItems]', N'BrmModelId') IS NULL
+                BEGIN
+                    ALTER TABLE [BusinessCapabilityCatalogItems]
+                    ADD [BrmModelId] INT NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.foreign_keys
+                    WHERE name = N'FK_BusinessCapabilityCatalogItems_BrmModels_BrmModelId'
+                      AND parent_object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItems]')
+                )
+                BEGIN
+                    ALTER TABLE [BusinessCapabilityCatalogItems]
+                    ADD CONSTRAINT [FK_BusinessCapabilityCatalogItems_BrmModels_BrmModelId]
+                        FOREIGN KEY ([BrmModelId]) REFERENCES [BrmModels] ([Id]) ON DELETE SET NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_BusinessCapabilityCatalogItems_BrmModelId'
+                      AND object_id = OBJECT_ID(N'[BusinessCapabilityCatalogItems]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_BusinessCapabilityCatalogItems_BrmModelId]
+                    ON [BusinessCapabilityCatalogItems] ([BrmModelId]);
                 END
                 """,
                 cancellationToken);
@@ -1270,6 +1397,46 @@ public sealed partial class DatabaseInitializer(
                 """,
                 cancellationToken);
         }
+    }
+
+    private async Task EnsureLegacyBusinessCapabilitiesHaveBrmModelAsync(CancellationToken cancellationToken)
+    {
+        var unassignedCapabilityCount = await dbContext.BusinessCapabilityCatalogItems
+            .CountAsync(x => x.BrmModelId == null, cancellationToken);
+        if (unassignedCapabilityCount == 0)
+        {
+            return;
+        }
+
+        var fallbackModel = await dbContext.BrmModels
+            .OrderBy(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (fallbackModel is null)
+        {
+            fallbackModel = new BrmModel
+            {
+                Name = "Primary BRM Model",
+                Area = "General",
+                Description = "Created automatically to group legacy capability records after BRM model support was introduced.",
+                Status = "Production",
+                CreatedUtc = DateTime.UtcNow,
+                UpdatedUtc = DateTime.UtcNow
+            };
+            dbContext.BrmModels.Add(fallbackModel);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        var capabilities = await dbContext.BusinessCapabilityCatalogItems
+            .Where(x => x.BrmModelId == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var capability in capabilities)
+        {
+            capability.BrmModelId = fallbackModel.Id;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task EnsureAuditLogUserColumnAsync(CancellationToken cancellationToken)

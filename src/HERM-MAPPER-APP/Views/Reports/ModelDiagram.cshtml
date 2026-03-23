@@ -22,16 +22,16 @@
             <p>@Model.PosterDescription</p>
         </div>
         <div class="report-toolbar-actions">
-            <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-fragment="@Model.ReportFragmentId">Back to reports</a>
-            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadModelDiagramSvg" asp-route-scope="@Model.ScopeKey">Download SVG</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-brmModelId="@Model.BrmModelId" asp-fragment="@Model.ReportFragmentId">Back to reports</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadModelDiagramSvg" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId">Download SVG</a>
             <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print / Save PDF</button>
             @if (!string.IsNullOrWhiteSpace(Model.DrawIoDownloadAction))
             {
-                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction" asp-route-scope="@Model.ScopeKey">Download draw.io</a>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId">Download draw.io</a>
             }
             @if (!string.IsNullOrWhiteSpace(Model.ArchiDownloadAction))
             {
-                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction" asp-route-scope="@Model.ScopeKey">Download Archi XML</a>
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId">Download Archi XML</a>
             }
         </div>
     </div>

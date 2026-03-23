@@ -126,6 +126,27 @@ public sealed class DatabaseInitializerTests
         Assert.Equal([AppRoles.Administrator, AppRoles.Viewer], roles);
     }
 
+    [Fact]
+    public async Task InitializeAsyncBackfillsLegacyCapabilitiesIntoPrimaryBrmModel()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.BusinessCapabilityCatalogItems.AddAsync(new BusinessCapabilityCatalogItem
+        {
+            Name = "Legacy capability"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var initializer = fixture.CreateInitializer();
+
+        await initializer.InitializeAsync();
+
+        var brmModel = await fixture.DbContext.BrmModels.SingleAsync();
+        var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
+
+        Assert.Equal("Primary BRM Model", brmModel.Name);
+        Assert.Equal(brmModel.Id, capability.BrmModelId);
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

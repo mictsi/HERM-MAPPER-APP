@@ -117,6 +117,7 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Equal(1, model.ComponentCount);
         Assert.Equal(1, model.ProductCount);
         Assert.Equal(2, model.MappingPathCount);
+        Assert.False(model.ExpandBrmModelReport);
         Assert.Equal("Unassigned owner", model.SelectedLifecycleOwner);
         Assert.Equal(2, model.LifecycleProductCount);
         Assert.Equal(["Unassigned owner", "Team Blue", "Team Red"], model.AvailableOwners);
@@ -231,6 +232,151 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Contains("Sentinel", archiXml);
         Assert.Contains("Technology", archiXml);
         Assert.Contains("<views>", archiXml);
+    }
+
+    [Fact]
+    public async Task ReportsIndexAndPosterUseSelectedBrmModel()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var selectedModel = new BrmModel
+        {
+            Name = "Student BRM",
+            Area = "Student Services",
+            Status = "Production"
+        };
+        var otherModel = new BrmModel
+        {
+            Name = "Finance BRM",
+            Area = "Finance",
+            Status = "Draft"
+        };
+        var brmDomain = new BrmDomain
+        {
+            Code = "BD001",
+            Name = "Student Lifecycle"
+        };
+        var brmCapability = new BrmCapability
+        {
+            Code = "BC001",
+            Name = "Student Management",
+            ParentDomain = brmDomain,
+            ParentDomainCode = brmDomain.Code
+        };
+        var brmComponent = new BrmComponent
+        {
+            Code = "BC002",
+            Name = "Student Recruitment",
+            ParentCapability = brmCapability,
+            ParentCapabilityCode = brmCapability.Code
+        };
+        var studentArmDomain = new ArmDomain
+        {
+            Code = "AD001",
+            Name = "Student"
+        };
+        var studentArmCapability = new ArmCapability
+        {
+            Code = "AP001",
+            Name = "Recruitment",
+            ParentDomain = studentArmDomain,
+            ParentDomainCode = studentArmDomain.Code
+        };
+        var studentArmComponent = new ArmComponent
+        {
+            Code = "AC001",
+            Name = "Applicant Portal",
+            ParentCapability = studentArmCapability,
+            ParentCapabilityCode = studentArmCapability.Code
+        };
+        var financeArmDomain = new ArmDomain
+        {
+            Code = "AD002",
+            Name = "Finance"
+        };
+        var financeArmCapability = new ArmCapability
+        {
+            Code = "AP002",
+            Name = "Billing",
+            ParentDomain = financeArmDomain,
+            ParentDomainCode = financeArmDomain.Code
+        };
+        var financeArmComponent = new ArmComponent
+        {
+            Code = "AC002",
+            Name = "Finance Hub",
+            ParentCapability = financeArmCapability,
+            ParentCapabilityCode = financeArmCapability.Code
+        };
+
+        await fixture.DbContext.AddRangeAsync(
+            selectedModel,
+            otherModel,
+            brmDomain,
+            brmCapability,
+            brmComponent,
+            studentArmDomain,
+            studentArmCapability,
+            studentArmComponent,
+            financeArmDomain,
+            financeArmCapability,
+            financeArmComponent,
+            new BusinessCapabilityCatalogItem
+            {
+                BrmModel = selectedModel,
+                Name = $"{brmComponent.Code} {brmComponent.Name}",
+                Mappings =
+                [
+                    new BusinessCapabilityCatalogItemMapping
+                    {
+                        BrmComponent = brmComponent,
+                        ArmComponent = studentArmComponent,
+                        ArmCapability = studentArmCapability
+                    }
+                ]
+            },
+            new BusinessCapabilityCatalogItem
+            {
+                BrmModel = otherModel,
+                Name = $"{brmComponent.Code} {brmComponent.Name}",
+                Mappings =
+                [
+                    new BusinessCapabilityCatalogItemMapping
+                    {
+                        BrmComponent = brmComponent,
+                        ArmComponent = financeArmComponent,
+                        ArmCapability = financeArmCapability
+                    }
+                ]
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var indexResult = await fixture.CreateReportsController().Index(brmModelId: selectedModel.Id, showBrmModelReport: true);
+
+        var indexView = Assert.IsType<ViewResult>(indexResult);
+        var indexModel = Assert.IsType<ReportsViewModel>(indexView.Model);
+        Assert.True(indexModel.ExpandBrmModelReport);
+        Assert.Equal(selectedModel.Id, indexModel.SelectedBrmModelId);
+        Assert.Equal(2, indexModel.BrmModelOptions.Count);
+        Assert.Equal(selectedModel.Id, indexModel.BrmModelDiagram.BrmModelId);
+        Assert.Contains("Student BRM", indexModel.BrmModelDiagram.DiagramDescription);
+
+        var mappedArmDomains = indexModel.BrmModelDiagram.Domains
+            .SelectMany(domain => domain.Capabilities)
+            .SelectMany(capabilityNode => capabilityNode.Components)
+            .SelectMany(componentNode => componentNode.Products)
+            .Select(product => product.Name)
+            .ToList();
+
+        Assert.Contains("AD001 Student", mappedArmDomains);
+        Assert.DoesNotContain("AD002 Finance", mappedArmDomains);
+
+        var posterResult = await fixture.CreateReportsController().ModelDiagram("brm", selectedModel.Id);
+
+        var posterView = Assert.IsType<ViewResult>(posterResult);
+        var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
+        Assert.Equal(selectedModel.Id, posterModel.BrmModelId);
+        Assert.Contains("Student BRM", posterModel.PosterTitle);
     }
 
     [Fact]

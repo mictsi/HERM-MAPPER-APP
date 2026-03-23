@@ -5,7 +5,9 @@ using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Text;
 
 namespace HERMMapperApp.Controllers;
@@ -18,7 +20,7 @@ public sealed class ReportsController(
     ModelDiagramPosterSvgService modelDiagramPosterSvgService,
     IWebHostEnvironment environment) : Controller
 {
-    public async Task<IActionResult> Index(string? lifecycleOwner = null)
+    public async Task<IActionResult> Index(string? lifecycleOwner = null, int? brmModelId = null, bool showBrmModelReport = false)
     {
         if (!ModelState.IsValid)
         {
@@ -78,6 +80,14 @@ public sealed class ReportsController(
             : lifecycleOwner.Trim();
 
         var lifecycleProducts = FilterProductsByOwner(products, lifecycleOwner).ToList();
+        var brmModels = await dbContext.BrmModels
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .ThenBy(x => x.Area)
+            .ToListAsync();
+        var selectedBrmModelId = brmModels.Any(x => x.Id == brmModelId)
+            ? brmModelId
+            : brmModels.FirstOrDefault()?.Id;
 
         var model = new ReportsViewModel
         {
@@ -87,11 +97,14 @@ public sealed class ReportsController(
             ComponentCount = paths.Select(x => x.ComponentId).Distinct().Count(),
             ProductCount = paths.Select(x => x.ProductId).Distinct().Count(),
             MappingPathCount = paths.Count,
+            ExpandBrmModelReport = showBrmModelReport,
+            SelectedBrmModelId = selectedBrmModelId,
             SelectedLifecycleOwner = lifecycleOwner,
             LifecycleProductCount = lifecycleProducts.Count,
             ModelDiagram = await modelDiagramReportService.BuildAsync(),
             ArmModelDiagram = await referenceModelDiagramService.BuildArmAsync(),
-            BrmModelDiagram = await referenceModelDiagramService.BuildBrmAsync(),
+            BrmModelOptions = BuildBrmModelOptions(brmModels, selectedBrmModelId),
+            BrmModelDiagram = await referenceModelDiagramService.BuildBrmModelAsync(selectedBrmModelId),
             AvailableOwners = availableOwners,
             LifecycleStatuses = BuildLifecycleStatuses(lifecycleProducts),
             Owners = BuildReportsHierarchy(paths),
@@ -105,22 +118,27 @@ public sealed class ReportsController(
         return View(model);
     }
 
-    public async Task<IActionResult> ModelDiagram(string? scope = null)
+    public async Task<IActionResult> ModelDiagram(string? scope = null, int? brmModelId = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        var model = await BuildModelDiagramAsync(scope);
+        var model = await BuildModelDiagramAsync(scope, brmModelId);
         model.PosterSvgMarkup = modelDiagramPosterSvgService.BuildSvg(model);
 
         return View("ModelDiagram", model);
     }
 
-    public async Task<FileContentResult> DownloadModelDiagramSvg(string? scope = null)
+    public async Task<FileContentResult> DownloadModelDiagramSvg(string? scope = null, int? brmModelId = null)
     {
-        var model = await BuildModelDiagramAsync(scope);
+        if (!ModelState.IsValid)
+        {
+            return File(Array.Empty<byte>(), "image/svg+xml", "invalid-request.svg");
+        }
+
+        var model = await BuildModelDiagramAsync(scope, brmModelId);
         var content = Encoding.UTF8.GetBytes(modelDiagramPosterSvgService.BuildSvg(model));
         return File(content, "image/svg+xml", ModelDiagramPosterSvgService.BuildDownloadFileName(model.ScopeKey));
     }
@@ -144,8 +162,13 @@ public sealed class ReportsController(
         return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
     }
 
-    public async Task<FileContentResult> DownloadDrawIoAsync(string? scope = null)
+    public async Task<FileContentResult> DownloadDrawIoAsync(string? scope = null, int? brmModelId = null)
     {
+        if (!ModelState.IsValid)
+        {
+            return File(Array.Empty<byte>(), "application/xml", "invalid-request.xml");
+        }
+
         var normalizedScope = NormalizeScope(scope);
         if (normalizedScope is "arm" or "brm")
         {
@@ -157,8 +180,13 @@ public sealed class ReportsController(
         return File(content, "application/xml", "herm-product-model.drawio");
     }
 
-    public async Task<FileContentResult> DownloadArchiXmlAsync(string? scope = null)
+    public async Task<FileContentResult> DownloadArchiXmlAsync(string? scope = null, int? brmModelId = null)
     {
+        if (!ModelState.IsValid)
+        {
+            return File(Array.Empty<byte>(), "application/xml", "invalid-request.xml");
+        }
+
         var normalizedScope = NormalizeScope(scope);
         if (normalizedScope is "arm" or "brm")
         {
@@ -604,14 +632,26 @@ public sealed class ReportsController(
             : $"{productName}\n{detail}";
     }
 
-    private async Task<ModelDiagramReportViewModel> BuildModelDiagramAsync(string? scope)
+    private static List<SelectListItem> BuildBrmModelOptions(
+        IReadOnlyList<BrmModel> brmModels,
+        int? selectedBrmModelId) =>
+        brmModels
+            .Select(x => new SelectListItem(
+                string.IsNullOrWhiteSpace(x.Area)
+                    ? $"{x.Name} ({x.Status})"
+                    : $"{x.Name} - {x.Area} ({x.Status})",
+                x.Id.ToString(CultureInfo.InvariantCulture),
+                x.Id == selectedBrmModelId))
+            .ToList();
+
+    private async Task<ModelDiagramReportViewModel> BuildModelDiagramAsync(string? scope, int? brmModelId)
     {
         var normalizedScope = NormalizeScope(scope);
 
         return normalizedScope switch
         {
             "arm" => await referenceModelDiagramService.BuildArmAsync(),
-            "brm" => await referenceModelDiagramService.BuildBrmAsync(),
+            "brm" => await referenceModelDiagramService.BuildBrmModelAsync(brmModelId),
             _ => await modelDiagramReportService.BuildAsync()
         };
     }

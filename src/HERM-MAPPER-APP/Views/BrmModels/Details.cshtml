@@ -1,0 +1,185 @@
+@using System.Text.Json
+@using HERMMapperApp
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
+@model BrmModelDetailsViewModel
+@{
+    ViewData["Title"] = "BRM Model Details";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var hierarchyData = JsonSerializer.Serialize(
+        Model.HierarchyRoot,
+        new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>@Model.Name</h1>
+        <p>@(string.IsNullOrWhiteSpace(Model.Description) ? "No description provided." : Model.Description)</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary" asp-action="Index">Back to BRM models</a>
+        @if (canManageProductsAndServices)
+        {
+            <a class="btn btn-outline-secondary" asp-controller="Capabilities" asp-action="Create" asp-route-brmModelId="@Model.Id">Add capability</a>
+            <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">Edit BRM model</a>
+        }
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <section class="content-card">
+        <div class="alert alert-success mb-0" role="status">@Model.StatusMessage</div>
+    </section>
+}
+
+<section class="content-card mb-4">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Summary</span>
+            <h2>Model overview</h2>
+        </div>
+    </div>
+    <dl class="detail-grid">
+        <dt>Area</dt>
+        <dd>@Model.Area</dd>
+        <dt>Status</dt>
+        <dd>@Model.Status</dd>
+        <dt>Capabilities</dt>
+        <dd>@Model.CapabilityCount</dd>
+        <dt>Last updated</dt>
+        <dd>@await TimeZoneDisplay.FormatUtcAsync(Model.UpdatedUtc)</dd>
+        <dt>Description</dt>
+        <dd>@(string.IsNullOrWhiteSpace(Model.Description) ? "-" : Model.Description)</dd>
+    </dl>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Capabilities</span>
+            <h2>@Model.Capabilities.Count capability record(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.Capabilities.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No capabilities in this model yet</h3>
+            <p>Add the first capability to start mapping this BRM model into ARM, applications, and products.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Capability</th>
+                        <th>ARM</th>
+                        <th>Applications</th>
+                        <th>Products</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var capability in Model.Capabilities)
+                {
+                    <tr>
+                        <td>
+                            <strong>@capability.Name</strong>
+                            <div class="table-subline">@(string.IsNullOrWhiteSpace(capability.Description) ? "No description provided." : capability.Description)</div>
+                        </td>
+                        <td>@capability.ArmComponentCount component(s)</td>
+                        <td>@capability.ApplicationCount</td>
+                        <td>@capability.ProductCount</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(capability.UpdatedUtc)</td>
+                        <td class="text-end">
+                            <div class="table-action-group">
+                                <a class="table-action-button"
+                                   asp-controller="Capabilities"
+                                   asp-action="Details"
+                                   asp-route-id="@capability.Id"
+                                   title="Show details for @capability.Name"
+                                   aria-label="Show details for @capability.Name">
+                                    <partial name="_ActionIcon" model="@("details")" />
+                                    <span class="visually-hidden">Show details</span>
+                                </a>
+                                @if (canManageProductsAndServices)
+                                {
+                                    <a class="table-action-button"
+                                       asp-controller="Capabilities"
+                                       asp-action="Edit"
+                                       asp-route-id="@capability.Id"
+                                       title="Edit @capability.Name"
+                                       aria-label="Edit @capability.Name">
+                                        <partial name="_ActionIcon" model="@("edit")" />
+                                        <span class="visually-hidden">Edit</span>
+                                    </a>
+                                    <a class="table-action-button table-action-button-danger"
+                                       asp-controller="Capabilities"
+                                       asp-action="Delete"
+                                       asp-route-id="@capability.Id"
+                                       title="Remove @capability.Name"
+                                       aria-label="Remove @capability.Name">
+                                        <partial name="_ActionIcon" model="@("trash")" />
+                                        <span class="visually-hidden">Remove</span>
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<section class="content-card mt-4">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Hierarchy</span>
+            <h2>BRM model dependency map</h2>
+        </div>
+    </div>
+
+    @if (!Model.HasDependencyTree)
+    {
+        <div class="empty-state compact">
+            <h3>No dependency tree yet</h3>
+            <p>Add capabilities to this BRM model, then connect them through ARM, applications, and TRM products to populate the radial tree.</p>
+        </div>
+    }
+    else
+    {
+        <div class="application-radial-tree-shell" data-application-radial-tree-shell>
+            <div class="application-radial-tree-toolbar">
+                <button type="button"
+                        class="application-radial-tree-fullscreen-button"
+                        data-application-radial-tree-fullscreen
+                        aria-label="Enter full screen"
+                        title="Enter full screen">
+                    <span class="application-radial-tree-fullscreen-icon" aria-hidden="true"></span>
+                    <span data-application-radial-tree-fullscreen-label>Full screen</span>
+                </button>
+            </div>
+            <script type="application/json" data-application-radial-tree-data>@Html.Raw(hierarchyData)</script>
+            <div class="application-radial-tree"
+                 data-application-radial-tree
+                 data-empty-title="No dependency map yet"
+                 data-empty-body="Add capabilities to this BRM model, then connect them through ARM, applications, and TRM products to generate the dependency graph."></div>
+            <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The tree reads from left to right, while product endpoints stay out of the diagram to keep the model view readable.</p>
+        </div>
+    }
+</section>
+
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/js/application-radial-tree.js" asp-append-version="true"></script>
+}

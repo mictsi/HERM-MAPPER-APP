@@ -16,6 +16,7 @@
         links = Model.SankeyLinks
     });
     var incomingConnectionsHeatmapPayload = JsonSerializer.Serialize(Model.IncomingConnectionsHeatmap);
+    var brmModelFilterAction = $"{Url.Action("Index", "Reports")}#report-brm-model";
 }
 
 <section class="page-header" id="report-top">
@@ -171,7 +172,7 @@
     </div>
 </details>
 
-<details class="content-card report-panel" id="report-brm-model">
+<details class="content-card report-panel" id="report-brm-model" @(Model.ExpandBrmModelReport ? "open" : null)>
     <summary class="report-panel-summary">
         <div>
             <span class="eyebrow">Model diagram</span>
@@ -181,15 +182,33 @@
         <span class="report-panel-toggle" aria-hidden="true"></span>
     </summary>
     <div class="report-panel-body">
+        @if (Model.BrmModelOptions.Count != 0)
+        {
+            <form method="get" action="@brmModelFilterAction" class="owner-lifecycle-filter-form mb-3">
+                @if (!string.IsNullOrWhiteSpace(Model.SelectedLifecycleOwner))
+                {
+                    <input type="hidden" name="lifecycleOwner" value="@Model.SelectedLifecycleOwner" />
+                }
+                <input type="hidden" name="showBrmModelReport" value="true" />
+                <div>
+                    <label class="form-label" for="brmModelId">BRM model</label>
+                    <select class="form-select" id="brmModelId" name="brmModelId" asp-items="Model.BrmModelOptions"></select>
+                </div>
+                <div class="owner-lifecycle-filter-actions">
+                    <button class="btn btn-primary" type="submit">View model</button>
+                </div>
+            </form>
+        }
+
         <div class="report-panel-actions">
-            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" asp-route-brmModelId="@Model.BrmModelDiagram.BrmModelId" target="_blank" rel="noopener noreferrer">Open full screen</a>
             @if (!string.IsNullOrWhiteSpace(Model.BrmModelDiagram.DrawIoDownloadAction))
             {
-                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.BrmModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.BrmModelDiagram.ScopeKey">Download draw.io</a>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.BrmModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" asp-route-brmModelId="@Model.BrmModelDiagram.BrmModelId">Download draw.io</a>
             }
             @if (!string.IsNullOrWhiteSpace(Model.BrmModelDiagram.ArchiDownloadAction))
             {
-                <a class="btn btn-primary btn-sm" asp-action="@Model.BrmModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.BrmModelDiagram.ScopeKey">Download Archi XML</a>
+                <a class="btn btn-primary btn-sm" asp-action="@Model.BrmModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" asp-route-brmModelId="@Model.BrmModelDiagram.BrmModelId">Download Archi XML</a>
             }
         </div>
 
@@ -198,6 +217,10 @@
             <div class="empty-state compact">
                 <h3>@Model.BrmModelDiagram.EmptyStateTitle</h3>
                 <p>@Model.BrmModelDiagram.EmptyStateBody</p>
+                @if (Model.BrmModelOptions.Count == 0)
+                {
+                    <p><a asp-controller="BrmModels" asp-action="Create">Create a BRM model</a> to start building this diagram.</p>
+                }
             </div>
         }
         else
@@ -436,6 +459,14 @@
         </div>
 
         <form method="get" class="owner-lifecycle-filter-form">
+            @if (Model.SelectedBrmModelId.HasValue)
+            {
+                <input type="hidden" name="brmModelId" value="@Model.SelectedBrmModelId" />
+            }
+            @if (Model.ExpandBrmModelReport)
+            {
+                <input type="hidden" name="showBrmModelReport" value="true" />
+            }
             <div>
                 <label class="form-label" for="lifecycleOwner">Owner</label>
                 <select class="form-select" id="lifecycleOwner" name="lifecycleOwner">
@@ -448,7 +479,7 @@
             </div>
             <div class="owner-lifecycle-filter-actions">
                 <button class="btn btn-primary" type="submit">Apply filter</button>
-                <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
+                <a class="btn btn-outline-secondary" asp-action="Index" asp-route-brmModelId="@Model.SelectedBrmModelId" asp-route-showBrmModelReport="@(Model.ExpandBrmModelReport ? "true" : null)">Reset</a>
             </div>
         </form>
 

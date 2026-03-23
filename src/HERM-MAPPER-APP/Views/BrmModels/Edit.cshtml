@@ -1,0 +1,20 @@
+@model BrmModelEditViewModel
+@{
+    ViewData["Title"] = "Edit BRM Model";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>Edit BRM model</h1>
+        <p>Update the model metadata that scopes capability records for this area.</p>
+    </div>
+</section>
+
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

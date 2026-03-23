@@ -3,6 +3,7 @@ namespace HERMMapperApp.ViewModels;
 public sealed class ModelDiagramReportViewModel
 {
     public string ScopeKey { get; init; } = "trm";
+    public int? BrmModelId { get; init; }
     public string ReportFragmentId { get; init; } = "report-product-model";
     public string DiagramTitle { get; init; } = "TRM Model diagram";
     public string DiagramDescription { get; init; } = string.Empty;

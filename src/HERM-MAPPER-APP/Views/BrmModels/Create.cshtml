@@ -1,0 +1,20 @@
+@model BrmModelEditViewModel
+@{
+    ViewData["Title"] = "Add BRM Model";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>Add a BRM model</h1>
+        <p>Create a BRM model for a specific area, then attach capability records to it.</p>
+    </div>
+</section>
+
+<form asp-action="Create" method="post">
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

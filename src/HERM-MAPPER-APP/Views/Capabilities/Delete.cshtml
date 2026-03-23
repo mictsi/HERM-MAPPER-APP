@@ -1,0 +1,42 @@
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
+@model CapabilityDeleteViewModel
+@{
+    ViewData["Title"] = "Remove Capability";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>Remove capability from model?</h1>
+        <p>This removes <strong>@Model.Name</strong> from <strong>@Model.BrmModelName</strong> and deletes its BRM to ARM mappings.</p>
+    </div>
+</section>
+
+<section class="content-card">
+    <dl class="detail-grid mb-4">
+        <dt>Capability</dt>
+        <dd>@Model.Name</dd>
+        <dt>BRM model</dt>
+        <dd>@Model.BrmModelName</dd>
+        <dt>ARM components</dt>
+        <dd>@Model.ArmComponentCount</dd>
+        <dt>Last updated</dt>
+        <dd>@await TimeZoneDisplay.FormatUtcAsync(Model.UpdatedUtc)</dd>
+        <dt>Description</dt>
+        <dd>@(string.IsNullOrWhiteSpace(Model.Description) ? "-" : Model.Description)</dd>
+    </dl>
+
+    <form asp-action="Delete" method="post" class="d-flex gap-2">
+        <input type="hidden" asp-for="Id" />
+        <button type="submit" class="btn btn-danger">Remove capability</button>
+        @if (Model.BrmModelId.HasValue)
+        {
+            <a class="btn btn-outline-secondary" asp-controller="BrmModels" asp-action="Details" asp-route-id="@Model.BrmModelId">Cancel</a>
+        }
+        else
+        {
+            <a class="btn btn-outline-secondary" asp-controller="BrmModels" asp-action="Index">Cancel</a>
+        }
+    </form>
+</section>
