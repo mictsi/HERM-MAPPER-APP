@@ -233,6 +233,7 @@ public sealed class ServicesController(
         }
 
         input.ServiceId = id;
+        ModelState.Remove(nameof(ServiceConnectionEditorViewModel.ServiceId));
         HydrateConnectionEditorSummary(input, service);
         ApplyCanvasState(input);
         NormalizeConnectionInput(input);

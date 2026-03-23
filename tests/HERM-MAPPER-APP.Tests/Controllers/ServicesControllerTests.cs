@@ -234,6 +234,60 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
+    public async Task ConnectionsPostUsesRouteServiceIdWhenBoundServiceIdIsMissing()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedConfigurableOptionsAsync();
+
+        var products = await fixture.SeedProductsAsync("Entry", "Portal");
+        fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
+        {
+            Name = "Admissions",
+            Owner = "Team Blue",
+            LifecycleStatus = "Production"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
+        var canvasStateJson = JsonSerializer.Serialize(
+            new
+            {
+                nodes = new[]
+                {
+                    new { productId = products[0].Id, x = 120, y = 80 },
+                    new { productId = products[1].Id, x = 380, y = 80 }
+                },
+                connections = new[]
+                {
+                    new { fromProductId = products[0].Id, toProductId = products[1].Id }
+                }
+            },
+            TestJsonSerializerOptions);
+
+        using var controller = fixture.CreateController();
+        controller.ModelState.AddModelError(nameof(ServiceConnectionEditorViewModel.ServiceId), "The ServiceId field is required.");
+
+        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        {
+            CanvasStateJson = canvasStateJson
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
+        Assert.Equal(serviceId, redirect.RouteValues!["id"]);
+
+        var service = await fixture.DbContext.ServiceCatalogItems
+            .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .SingleAsync();
+
+        Assert.Equal([products[0].Id, products[1].Id], service.ProductLinks.OrderBy(x => x.SortOrder).Select(x => x.ProductCatalogItemId).ToArray());
+        var connection = Assert.Single(service.ProductConnections);
+        Assert.Equal(products[0].Id, connection.FromProductCatalogItemId);
+        Assert.Equal(products[1].Id, connection.ToProductCatalogItemId);
+    }
+
+    [Fact]
     public async Task EditPostUpdatesServiceMetadataAndWritesAudit()
     {
         await using var fixture = await TestFixture.CreateAsync();

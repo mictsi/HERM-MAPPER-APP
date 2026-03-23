@@ -36,6 +36,7 @@
 }
 
 <form asp-action="Connections" asp-route-id="@Model.ServiceId" method="post">
+    <input asp-for="ServiceId" type="hidden" />
     <section class="content-card">
         <div class="detail-grid">
             <div>
