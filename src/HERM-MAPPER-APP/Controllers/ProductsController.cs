@@ -559,6 +559,14 @@ public sealed class ProductsController(
             return NotFound();
         }
 
+        var relatedConnections = await dbContext.ServiceCatalogItemConnections
+            .Where(x => x.FromProductCatalogItemId == id || x.ToProductCatalogItemId == id)
+            .ToListAsync();
+        if (relatedConnections.Count != 0)
+        {
+            dbContext.ServiceCatalogItemConnections.RemoveRange(relatedConnections);
+        }
+
         dbContext.ProductCatalogItems.Remove(product);
         await dbContext.SaveChangesAsync();
         await auditLogService.WriteAsync(

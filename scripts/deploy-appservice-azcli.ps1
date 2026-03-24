@@ -77,6 +77,15 @@ function Get-FlattenedSettings {
     $items = New-Object System.Collections.Generic.List[psobject]
     if ($null -eq $Value) { return $items }
 
+    if ($Value -is [pscustomobject]) {
+        foreach ($property in @($Value.PSObject.Properties)) {
+            if ($property.IsGettable -eq $false) { continue }
+            $childPrefix = if ([string]::IsNullOrWhiteSpace($Prefix)) { [string]$property.Name } else { "$Prefix`__$($property.Name)" }
+            foreach ($item in Get-FlattenedSettings -Value $property.Value -Prefix $childPrefix) { $items.Add($item) }
+        }
+        return $items
+    }
+
     if ($Value -is [System.Collections.IDictionary]) {
         foreach ($key in $Value.Keys) {
             $childPrefix = if ([string]::IsNullOrWhiteSpace($Prefix)) { [string]$key } else { "$Prefix`__$key" }
@@ -103,15 +112,15 @@ function Get-FlattenedSettings {
     return $items
 }
 
-function Get-AppServiceSettingsArguments {
+function Get-AppServiceSettingsObject {
     param([System.Collections.Generic.List[psobject]]$FlatSettings, [string]$AppEnvironmentValue)
-    $settings = New-Object System.Collections.Generic.List[string]
+    $settings = [ordered]@{}
     foreach ($setting in $FlatSettings) {
         if ([string]::IsNullOrWhiteSpace($setting.Name)) { continue }
-        $settings.Add("$($setting.Name)=$($setting.Value)")
+        $settings[$setting.Name] = [string]$setting.Value
     }
-    $settings.Add("ASPNETCORE_ENVIRONMENT=$AppEnvironmentValue")
-    $settings.Add("DOTNET_ENVIRONMENT=$AppEnvironmentValue")
+    $settings['ASPNETCORE_ENVIRONMENT'] = $AppEnvironmentValue
+    $settings['DOTNET_ENVIRONMENT'] = $AppEnvironmentValue
     # NOTE: Do NOT set WEBSITE_RUN_FROM_PACKAGE=1 when using writable local files (SQLite). Running from package mounts the app as read-only.
     return $settings
 }
@@ -226,7 +235,7 @@ Invoke-Az -Arguments @(
 Write-Step "Loading application settings from $SettingsFile"
 $settingsJson = Get-Content $SettingsFile -Raw | ConvertFrom-Json -Depth 100
 $flatSettings = Get-FlattenedSettings -Value $settingsJson
-$appSettingsArguments = Get-AppServiceSettingsArguments -FlatSettings $flatSettings -AppEnvironmentValue $AppEnvironment
+$appSettingsObject = Get-AppServiceSettingsObject -FlatSettings $flatSettings -AppEnvironmentValue $AppEnvironment
 
 # Ensure App Service plan exists (create if missing)
 $prefix = ConvertTo-NormalizedPrefix -InputPrefix $NamePrefix
@@ -317,15 +326,10 @@ Write-Step 'Creating deployment archive'
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath $zipPath -Force
 
-Write-Step 'Applying App Service settings (in chunks)'
-$chunkSize = 50
-for ($i = 0; $i -lt $appSettingsArguments.Count; $i += $chunkSize) {
-    $endIndex = [Math]::Min($i + $chunkSize - 1, $appSettingsArguments.Count - 1)
-    $chunk = $appSettingsArguments[$i..$endIndex]
-    if ($null -eq $chunk -or $chunk.Count -eq 0) { continue }
-    $setArgs = @('webapp','config','appsettings','set','--resource-group',$ResourceGroupName,'--name',$WebAppName,'--settings') + $chunk
-    Invoke-Az -Arguments $setArgs
-}
+Write-Step 'Applying App Service settings'
+$appSettingsPayloadPath = Join-Path $artifactsRoot 'appsettings.appservice.json'
+$appSettingsObject | ConvertTo-Json -Depth 100 | Set-Content -Path $appSettingsPayloadPath -Encoding utf8
+Invoke-Az -Arguments @('webapp','config','appsettings','set','--resource-group',$ResourceGroupName,'--name',$WebAppName,'--settings',"@$appSettingsPayloadPath")
 
 Write-Step 'Deploying ZIP package'
 Invoke-Az -Arguments @('webapp','deploy','--resource-group',$ResourceGroupName,'--name',$WebAppName,'--src-path',$zipPath,'--type','zip','--restart','true','--clean','true')

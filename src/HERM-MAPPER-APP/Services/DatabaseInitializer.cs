@@ -277,7 +277,7 @@ public sealed partial class DatabaseInitializer(
                     "TrmCapabilityId" INTEGER NOT NULL,
                     "CreatedUtc" TEXT NOT NULL,
                     CONSTRAINT "FK_TrmComponentCapabilityLinks_TrmCapabilities_TrmCapabilityId" FOREIGN KEY ("TrmCapabilityId") REFERENCES "TrmCapabilities" ("Id") ON DELETE CASCADE,
-                    CONSTRAINT "FK_TrmComponentCapabilityLinks_TrmComponents_TrmComponentId" FOREIGN KEY ("TrmComponentId") REFERENCES "TrmComponents" ("Id") ON DELETE CASCADE
+                    CONSTRAINT "FK_TrmComponentCapabilityLinks_TrmComponents_TrmComponentId" FOREIGN KEY ("TrmComponentId") REFERENCES "TrmComponents" ("Id") ON DELETE NO ACTION
                 )
                 """,
                 cancellationToken);
@@ -493,17 +493,18 @@ public sealed partial class DatabaseInitializer(
                 """
                 IF COL_LENGTH(N'[ProductCatalogItems]', N'Owner') IS NOT NULL
                 BEGIN
-                    INSERT INTO [ProductCatalogItemOwners] ([ProductCatalogItemId], [OwnerValue])
-                    SELECT p.[Id], LTRIM(RTRIM(p.[Owner]))
-                    FROM [ProductCatalogItems] p
-                    WHERE p.[Owner] IS NOT NULL
-                      AND LTRIM(RTRIM(p.[Owner])) <> N''
-                      AND NOT EXISTS (
-                          SELECT 1
-                          FROM [ProductCatalogItemOwners] o
-                          WHERE o.[ProductCatalogItemId] = p.[Id]
-                            AND LOWER(o.[OwnerValue]) = LOWER(LTRIM(RTRIM(p.[Owner])))
-                      );
+                                        EXEC(N'
+                                                INSERT INTO [ProductCatalogItemOwners] ([ProductCatalogItemId], [OwnerValue])
+                                                SELECT p.[Id], LTRIM(RTRIM(p.[Owner]))
+                                                FROM [ProductCatalogItems] p
+                                                WHERE p.[Owner] IS NOT NULL
+                                                    AND LTRIM(RTRIM(p.[Owner])) <> N''''
+                                                    AND NOT EXISTS (
+                                                            SELECT 1
+                                                            FROM [ProductCatalogItemOwners] o
+                                                            WHERE o.[ProductCatalogItemId] = p.[Id]
+                                                                AND LOWER(o.[OwnerValue]) = LOWER(LTRIM(RTRIM(p.[Owner])))
+                                                    );');
                 END
                 """,
                 cancellationToken);
@@ -559,9 +560,9 @@ public sealed partial class DatabaseInitializer(
                     CONSTRAINT "FK_ServiceCatalogItemConnections_ServiceCatalogItems_ServiceCatalogItemId"
                         FOREIGN KEY ("ServiceCatalogItemId") REFERENCES "ServiceCatalogItems" ("Id") ON DELETE CASCADE,
                     CONSTRAINT "FK_ServiceCatalogItemConnections_ProductCatalogItems_FromProductCatalogItemId"
-                        FOREIGN KEY ("FromProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE,
+                            FOREIGN KEY ("FromProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE NO ACTION,
                     CONSTRAINT "FK_ServiceCatalogItemConnections_ProductCatalogItems_ToProductCatalogItemId"
-                        FOREIGN KEY ("ToProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE
+                            FOREIGN KEY ("ToProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE NO ACTION
                 )
                 """,
                 cancellationToken);
@@ -680,9 +681,9 @@ public sealed partial class DatabaseInitializer(
                         CONSTRAINT [FK_ServiceCatalogItemConnections_ServiceCatalogItems_ServiceCatalogItemId]
                             FOREIGN KEY ([ServiceCatalogItemId]) REFERENCES [ServiceCatalogItems] ([Id]) ON DELETE CASCADE,
                         CONSTRAINT [FK_ServiceCatalogItemConnections_ProductCatalogItems_FromProductCatalogItemId]
-                            FOREIGN KEY ([FromProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE,
+                            FOREIGN KEY ([FromProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE NO ACTION,
                         CONSTRAINT [FK_ServiceCatalogItemConnections_ProductCatalogItems_ToProductCatalogItemId]
-                            FOREIGN KEY ([ToProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE
+                            FOREIGN KEY ([ToProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE NO ACTION
                     );
                 END
                 """,
@@ -843,7 +844,7 @@ public sealed partial class DatabaseInitializer(
                     CONSTRAINT "FK_ApplicationCatalogItemMappings_ArmComponents_ArmComponentId"
                         FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE CASCADE,
                     CONSTRAINT "FK_ApplicationCatalogItemMappings_ProductMappings_ProductMappingId"
-                        FOREIGN KEY ("ProductMappingId") REFERENCES "ProductMappings" ("Id") ON DELETE CASCADE,
+                        FOREIGN KEY ("ProductMappingId") REFERENCES "ProductMappings" ("Id") ON DELETE NO ACTION,
                     CONSTRAINT "FK_ApplicationCatalogItemMappings_ProductCatalogItems_ProductCatalogItemId"
                         FOREIGN KEY ("ProductCatalogItemId") REFERENCES "ProductCatalogItems" ("Id") ON DELETE CASCADE
                 )
@@ -944,7 +945,7 @@ public sealed partial class DatabaseInitializer(
                         CONSTRAINT [FK_ApplicationCatalogItemMappings_ArmComponents_ArmComponentId]
                             FOREIGN KEY ([ArmComponentId]) REFERENCES [ArmComponents] ([Id]) ON DELETE CASCADE,
                         CONSTRAINT [FK_ApplicationCatalogItemMappings_ProductMappings_ProductMappingId]
-                            FOREIGN KEY ([ProductMappingId]) REFERENCES [ProductMappings] ([Id]) ON DELETE CASCADE,
+                            FOREIGN KEY ([ProductMappingId]) REFERENCES [ProductMappings] ([Id]) ON DELETE NO ACTION,
                         CONSTRAINT [FK_ApplicationCatalogItemMappings_ProductCatalogItems_ProductCatalogItemId]
                             FOREIGN KEY ([ProductCatalogItemId]) REFERENCES [ProductCatalogItems] ([Id]) ON DELETE CASCADE
                     );
@@ -972,7 +973,7 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     ALTER TABLE [ApplicationCatalogItemMappings]
                     ADD CONSTRAINT [FK_ApplicationCatalogItemMappings_ProductMappings_ProductMappingId]
-                    FOREIGN KEY ([ProductMappingId]) REFERENCES [ProductMappings] ([Id]) ON DELETE CASCADE;
+                    FOREIGN KEY ([ProductMappingId]) REFERENCES [ProductMappings] ([Id]) ON DELETE NO ACTION;
                 END
                 """,
                 cancellationToken);
@@ -2224,7 +2225,7 @@ public sealed partial class DatabaseInitializer(
                 "ArmCapabilityId" INTEGER NOT NULL,
                 "CreatedUtc" TEXT NOT NULL,
                 CONSTRAINT "FK_ArmComponentCapabilityLinks_ArmCapabilities_ArmCapabilityId" FOREIGN KEY ("ArmCapabilityId") REFERENCES "ArmCapabilities" ("Id") ON DELETE CASCADE,
-                CONSTRAINT "FK_ArmComponentCapabilityLinks_ArmComponents_ArmComponentId" FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE CASCADE
+                CONSTRAINT "FK_ArmComponentCapabilityLinks_ArmComponents_ArmComponentId" FOREIGN KEY ("ArmComponentId") REFERENCES "ArmComponents" ("Id") ON DELETE NO ACTION
             )
             """,
             cancellationToken);

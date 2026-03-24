@@ -1,12 +1,12 @@
 {
   "ConnectionStrings": {
-    "Sqlite": "Data Source=|DataDirectory|/herm-mapper.db",
-    "DefaultConnection": "Data Source=|DataDirectory|/herm-mapper.db"
+    "SqlServer": "Server=tcp:<sql-server-host>,1433;Database=<database-name>;User ID=<sql-user>;Password=<sql-password>;Encrypt=True;TrustServerCertificate=False;MultipleActiveResultSets=True",
+    "DefaultConnection": "Server=tcp:<sql-server-host>,1433;Database=<database-name>;User ID=<sql-user>;Password=<sql-password>;Encrypt=True;TrustServerCertificate=False;MultipleActiveResultSets=True"
   },
   "Database": {
-    "Provider": "Sqlite",
-    "SqliteFilePath": "|DataDirectory|/herm-mapper.db",
-    "ConnectionString": ""
+    "Provider": "SqlServer",
+    "SqliteFilePath": "",
+    "ConnectionString": "Server=tcp:<sql-server-host>,1433;Database=<database-name>;User ID=<sql-user>;Password=<sql-password>;Encrypt=True;TrustServerCertificate=False;MultipleActiveResultSets=True"
   },
   "HermWorkbook": {
     "Path": "",

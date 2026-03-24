@@ -680,6 +680,52 @@ public sealed class ProductsControllerCrudTests
         Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
 
+    [Fact]
+    public async Task PermanentDeleteRemovesDependentServiceConnectionsBeforeDeletingProduct()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var service = new ServiceCatalogItem
+        {
+            Name = "Payments",
+            Owner = "Platform",
+            LifecycleStatus = "Production"
+        };
+        var fromProduct = new ProductCatalogItem { Name = "Atlas" };
+        var deletedProduct = new ProductCatalogItem
+        {
+            Name = "Sentinel",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow.AddDays(-1),
+            DeletedReason = "Moved to trash from the product catalogue."
+        };
+        var outgoingConnection = new ServiceCatalogItemConnection
+        {
+            ServiceCatalogItem = service,
+            FromProductCatalogItem = deletedProduct,
+            ToProductCatalogItem = fromProduct,
+            SortOrder = 1
+        };
+        var incomingConnection = new ServiceCatalogItemConnection
+        {
+            ServiceCatalogItem = service,
+            FromProductCatalogItem = fromProduct,
+            ToProductCatalogItem = deletedProduct,
+            SortOrder = 2
+        };
+
+        await fixture.DbContext.AddRangeAsync(service, fromProduct, deletedProduct, outgoingConnection, incomingConnection);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var permanentDeleteController = fixture.CreateController();
+        var result = await permanentDeleteController.PermanentDelete(deletedProduct.Id);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ProductsController.Restore), redirect.ActionName);
+        Assert.DoesNotContain(await fixture.DbContext.ProductCatalogItems.ToListAsync(), x => x.Id == deletedProduct.Id);
+        Assert.Empty(await fixture.DbContext.ServiceCatalogItemConnections.ToListAsync());
+        Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

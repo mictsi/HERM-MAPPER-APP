@@ -477,6 +477,7 @@ public sealed class ReferenceControllerTests
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Restore", redirect.ActionName);
         Assert.Equal(0, await fixture.DbContext.TrmComponents.CountAsync());
+        Assert.Equal(0, await fixture.DbContext.TrmComponentCapabilityLinks.CountAsync());
         Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
 
@@ -519,6 +520,47 @@ public sealed class ReferenceControllerTests
         Assert.Equal("RestoreArm", redirect.ActionName);
         Assert.Equal(0, await fixture.DbContext.ArmComponents.CountAsync());
         Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task PermanentlyDeleteComponentTrmClearsDependentProductMappings()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, capability, component) = await fixture.SeedComponentAsync("TD001", "Technology", "TP001", "Observability", "TC001", "Monitoring", isCustom: false);
+        component.IsDeleted = true;
+        component.DeletedUtc = DateTime.UtcNow.AddDays(-1);
+
+        var product = new ProductCatalogItem
+        {
+            Name = "Case Management",
+            Description = "Workflow tooling",
+            CreatedUtc = DateTime.UtcNow,
+            UpdatedUtc = DateTime.UtcNow
+        };
+
+        var mapping = new ProductMapping
+        {
+            ProductCatalogItem = product,
+            TrmCapabilityId = capability.Id,
+            TrmComponentId = component.Id,
+            MappingStatus = MappingStatus.Complete,
+            CreatedUtc = DateTime.UtcNow,
+            UpdatedUtc = DateTime.UtcNow
+        };
+
+        await fixture.DbContext.AddAsync(mapping);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.PermanentlyDeleteComponent(component.Id, ReferenceModelKind.Trm);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Restore", redirect.ActionName);
+
+        var storedMapping = await fixture.DbContext.ProductMappings.SingleAsync();
+        Assert.Null(storedMapping.TrmComponentId);
+        Assert.Equal(capability.Id, storedMapping.TrmCapabilityId);
+        Assert.Equal(0, await fixture.DbContext.TrmComponents.CountAsync());
     }
 
     [Fact]

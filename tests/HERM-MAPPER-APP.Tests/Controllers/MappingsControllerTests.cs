@@ -638,6 +638,46 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
+    public async Task DeleteConfirmedRemovesDependentApplicationMappings()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var trmDomain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var trmCapability = new TrmCapability { Code = "TP001", Name = "Observability", ParentDomain = trmDomain, ParentDomainCode = trmDomain.Code };
+        var trmComponent = new TrmComponent { Code = "TC001", Name = "Monitoring", ParentCapability = trmCapability, ParentCapabilityCode = trmCapability.Code };
+        var armDomain = new ArmDomain { Code = "AD001", Name = "Applications" };
+        var armCapability = new ArmCapability { Code = "AP001", Name = "Recruitment", ParentDomain = armDomain, ParentDomainCode = armDomain.Code };
+        var armComponent = new ArmComponent { Code = "AC001", Name = "Portal", ParentCapability = armCapability, ParentCapabilityCode = armCapability.Code };
+        var product = new ProductCatalogItem { Name = "Sentinel", UpdatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
+        var application = new ApplicationCatalogItem { Name = "Admissions", CreatedUtc = DateTime.UtcNow, UpdatedUtc = DateTime.UtcNow };
+
+        await fixture.DbContext.AddRangeAsync(trmDomain, trmCapability, trmComponent, armDomain, armCapability, armComponent, product, application);
+        await fixture.DbContext.SaveChangesAsync();
+
+        var mapping = new ProductMapping { ProductCatalogItemId = product.Id, TrmDomainId = trmDomain.Id, TrmCapabilityId = trmCapability.Id, TrmComponentId = trmComponent.Id, MappingStatus = MappingStatus.Complete };
+        await fixture.DbContext.ProductMappings.AddAsync(mapping);
+        await fixture.DbContext.SaveChangesAsync();
+
+        await fixture.DbContext.ApplicationCatalogItemMappings.AddAsync(new ApplicationCatalogItemMapping
+        {
+            ApplicationCatalogItemId = application.Id,
+            ArmComponentId = armComponent.Id,
+            ProductMappingId = mapping.Id,
+            ProductCatalogItemId = product.Id,
+            CreatedUtc = DateTime.UtcNow
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.DeleteConfirmed(mapping.Id);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(MappingsController.Index), redirect.ActionName);
+        Assert.Equal(0, await fixture.DbContext.ProductMappings.CountAsync());
+        Assert.Equal(0, await fixture.DbContext.ApplicationCatalogItemMappings.CountAsync());
+    }
+
+    [Fact]
     public async Task ExportCsvIncludesUnfinishedMappingsWhenRequestedAndAppliesFilters()
     {
         await using var fixture = await TestFixture.CreateAsync();

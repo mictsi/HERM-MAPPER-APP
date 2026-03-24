@@ -244,6 +244,15 @@ public sealed class MappingsController(
             mapping.ProductCatalogItem.UpdatedUtc = DateTime.UtcNow;
         }
 
+        var applicationMappings = await dbContext.ApplicationCatalogItemMappings
+            .Where(x => x.ProductMappingId == mapping.Id)
+            .ToListAsync();
+
+        if (applicationMappings.Count != 0)
+        {
+            dbContext.ApplicationCatalogItemMappings.RemoveRange(applicationMappings);
+        }
+
         dbContext.ProductMappings.Remove(mapping);
         await dbContext.SaveChangesAsync();
         await auditLogService.WriteAsync(

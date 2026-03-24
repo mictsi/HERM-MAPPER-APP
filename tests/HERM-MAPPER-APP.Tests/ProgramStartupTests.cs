@@ -451,6 +451,124 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
+    public void ConfigureApplicationServicesUsesNoActionForServiceConnectionProductDeletes()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        Program.ConfigureApplicationServices(
+            services,
+            new ConfigurationBuilder().Build(),
+            "Production",
+            new ResolvedDatabaseConfiguration(DatabaseProviderKind.SqlServer, "Server=(localdb)\\mssqllocaldb;Database=HERMMapperAppTests;Trusted_Connection=True;TrustServerCertificate=True"),
+            new StartupDiagnosticsOptions(false, LogLevel.Information, false, LogLevel.Information, false, false));
+
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var connectionEntity = dbContext.Model.FindEntityType(typeof(ServiceCatalogItemConnection));
+        Assert.NotNull(connectionEntity);
+
+        var productForeignKeys = connectionEntity!
+            .GetForeignKeys()
+            .Where(x => x.PrincipalEntityType.ClrType == typeof(ProductCatalogItem))
+            .OrderBy(x => x.Properties[0].Name)
+            .ToList();
+
+        Assert.Equal(["FromProductCatalogItemId", "ToProductCatalogItemId"], productForeignKeys.Select(x => x.Properties[0].Name).ToArray());
+        Assert.All(productForeignKeys, x => Assert.Equal(DeleteBehavior.NoAction, x.DeleteBehavior));
+    }
+
+    [Fact]
+    public void ConfigureApplicationServicesUsesNoActionForProductMappingTrmDeletes()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        Program.ConfigureApplicationServices(
+            services,
+            new ConfigurationBuilder().Build(),
+            "Production",
+            new ResolvedDatabaseConfiguration(DatabaseProviderKind.SqlServer, "Server=(localdb)\\mssqllocaldb;Database=HERMMapperAppTests;Trusted_Connection=True;TrustServerCertificate=True"),
+            new StartupDiagnosticsOptions(false, LogLevel.Information, false, LogLevel.Information, false, false));
+
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var mappingEntity = dbContext.Model.FindEntityType(typeof(ProductMapping));
+        Assert.NotNull(mappingEntity);
+
+        var trmForeignKeys = mappingEntity!
+            .GetForeignKeys()
+            .Where(x => x.PrincipalEntityType.ClrType == typeof(TrmDomain)
+                || x.PrincipalEntityType.ClrType == typeof(TrmCapability)
+                || x.PrincipalEntityType.ClrType == typeof(TrmComponent))
+            .OrderBy(x => x.Properties[0].Name)
+            .ToList();
+
+        Assert.Equal(["TrmCapabilityId", "TrmComponentId", "TrmDomainId"], trmForeignKeys.Select(x => x.Properties[0].Name).ToArray());
+        Assert.All(trmForeignKeys, x => Assert.Equal(DeleteBehavior.NoAction, x.DeleteBehavior));
+    }
+
+    [Fact]
+    public void ConfigureApplicationServicesUsesNoActionForTrmComponentCapabilityLinkComponentDelete()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        Program.ConfigureApplicationServices(
+            services,
+            new ConfigurationBuilder().Build(),
+            "Production",
+            new ResolvedDatabaseConfiguration(DatabaseProviderKind.SqlServer, "Server=(localdb)\\mssqllocaldb;Database=HERMMapperAppTests;Trusted_Connection=True;TrustServerCertificate=True"),
+            new StartupDiagnosticsOptions(false, LogLevel.Information, false, LogLevel.Information, false, false));
+
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var linkEntity = dbContext.Model.FindEntityType(typeof(TrmComponentCapabilityLink));
+        Assert.NotNull(linkEntity);
+
+        var componentForeignKey = linkEntity!
+            .GetForeignKeys()
+            .Single(x => x.PrincipalEntityType.ClrType == typeof(TrmComponent));
+
+        Assert.Equal("TrmComponentId", componentForeignKey.Properties[0].Name);
+        Assert.Equal(DeleteBehavior.NoAction, componentForeignKey.DeleteBehavior);
+    }
+
+    [Fact]
+    public void ConfigureApplicationServicesUsesNoActionForApplicationProductMappingDelete()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        Program.ConfigureApplicationServices(
+            services,
+            new ConfigurationBuilder().Build(),
+            "Production",
+            new ResolvedDatabaseConfiguration(DatabaseProviderKind.SqlServer, "Server=(localdb)\\mssqllocaldb;Database=HERMMapperAppTests;Trusted_Connection=True;TrustServerCertificate=True"),
+            new StartupDiagnosticsOptions(false, LogLevel.Information, false, LogLevel.Information, false, false));
+
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var mappingEntity = dbContext.Model.FindEntityType(typeof(ApplicationCatalogItemMapping));
+        Assert.NotNull(mappingEntity);
+
+        var productMappingForeignKey = mappingEntity!
+            .GetForeignKeys()
+            .Single(x => x.PrincipalEntityType.ClrType == typeof(ProductMapping));
+
+        Assert.Equal("ProductMappingId", productMappingForeignKey.Properties[0].Name);
+        Assert.Equal(DeleteBehavior.NoAction, productMappingForeignKey.DeleteBehavior);
+    }
+
+    [Fact]
     public void ConfigureApplicationServicesThrowsWhenAllAuthenticationMethodsAreDisabled()
     {
         var configuration = new ConfigurationBuilder()

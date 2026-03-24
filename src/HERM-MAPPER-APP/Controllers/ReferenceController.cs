@@ -416,6 +416,21 @@ public sealed class ReferenceController(
                     return NotFound();
                 }
 
+                var productMappings = await dbContext.ProductMappings
+                    .Where(x => x.TrmComponentId == component.Id)
+                    .ToListAsync();
+
+                foreach (var productMapping in productMappings)
+                {
+                    productMapping.TrmComponentId = null;
+                }
+
+                var capabilityLinks = await dbContext.TrmComponentCapabilityLinks
+                    .Where(x => x.TrmComponentId == component.Id)
+                    .ToListAsync();
+
+                dbContext.TrmComponentCapabilityLinks.RemoveRange(capabilityLinks);
+
                 dbContext.TrmComponents.Remove(component);
                 await dbContext.SaveChangesAsync();
                 await auditLogService.WriteAsync(
@@ -431,12 +446,15 @@ public sealed class ReferenceController(
             case ReferenceModelKind.Arm:
             {
                 var component = await dbContext.ArmComponents
+                    .Include(x => x.CapabilityLinks)
                     .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
                 if (component is null)
                 {
                     return NotFound();
                 }
 
+                // Remove all dependent ArmComponentCapabilityLinks first
+                dbContext.ArmComponentCapabilityLinks.RemoveRange(component.CapabilityLinks);
                 dbContext.ArmComponents.Remove(component);
                 await dbContext.SaveChangesAsync();
                 await auditLogService.WriteAsync(

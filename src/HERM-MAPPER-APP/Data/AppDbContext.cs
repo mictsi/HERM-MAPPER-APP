@@ -77,7 +77,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.TrmComponent)
                 .WithMany(x => x.CapabilityLinks)
                 .HasForeignKey(x => x.TrmComponentId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.TrmCapability)
                 .WithMany(x => x.ComponentLinks)
                 .HasForeignKey(x => x.TrmCapabilityId)
@@ -138,7 +138,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.ArmComponent)
                 .WithMany(x => x.CapabilityLinks)
                 .HasForeignKey(x => x.ArmComponentId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.ArmCapability)
                 .WithMany(x => x.ComponentLinks)
                 .HasForeignKey(x => x.ArmCapabilityId)
@@ -256,17 +256,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.TrmDomain)
                 .WithMany()
                 .HasForeignKey(x => x.TrmDomainId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasOne(x => x.TrmCapability)
                 .WithMany()
                 .HasForeignKey(x => x.TrmCapabilityId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasOne(x => x.TrmComponent)
                 .WithMany()
                 .HasForeignKey(x => x.TrmComponentId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<ServiceCatalogItem>(entity =>
@@ -310,12 +310,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.FromProductCatalogItem)
                 .WithMany()
                 .HasForeignKey(x => x.FromProductCatalogItemId)
-                .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasOne(x => x.ToProductCatalogItem)
                 .WithMany()
                 .HasForeignKey(x => x.ToProductCatalogItemId)
-                .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<ApplicationCatalogItem>(entity =>
@@ -345,7 +345,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.ProductMapping)
                 .WithMany()
                 .HasForeignKey(x => x.ProductMappingId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasOne(x => x.ProductCatalogItem)
                 .WithMany()
