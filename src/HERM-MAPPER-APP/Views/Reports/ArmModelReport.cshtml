@@ -1,0 +1,52 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@{
+    ViewData["Title"] = "ARM Model diagram";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-arm-model" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Model diagram</span>
+            <h2>@Model.ArmModelDiagram.DiagramTitle</h2>
+            <p>@Model.ArmModelDiagram.DiagramDescription</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.ArmModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.ArmModelDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.ArmModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.ArmModelDiagram.ScopeKey">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ArmModelDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ArmModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.ArmModelDiagram.ScopeKey">Download Archi XML</a>
+            }
+        </div>
+
+        @if (!Model.ArmModelDiagram.HasAnyContent)
+        {
+            <div class="empty-state compact">
+                <h3>@Model.ArmModelDiagram.EmptyStateTitle</h3>
+                <p>@Model.ArmModelDiagram.EmptyStateBody</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.ArmModelDiagram.DomainCount</strong> domains</span>
+                <span class="report-summary-chip"><strong>@Model.ArmModelDiagram.CapabilityCount</strong> capabilities</span>
+                <span class="report-summary-chip"><strong>@Model.ArmModelDiagram.ComponentCount</strong> components</span>
+                <span class="report-summary-chip"><strong>@Model.ArmModelDiagram.ItemCount</strong> @Model.ArmModelDiagram.MappedSummaryLabel</span>
+            </div>
+
+            <div class="model-report-preview-frame">
+                <partial name="_ModelDiagramReport" model="Model.ArmModelDiagram" />
+            </div>
+        }
+    </div>
+</details>

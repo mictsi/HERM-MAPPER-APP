@@ -6,6 +6,137 @@
 @{
     var bodyClass = ViewData["BodyClass"] as string;
     var isPosterMode = !string.IsNullOrWhiteSpace(bodyClass) && bodyClass.Contains("report-poster-mode", StringComparison.OrdinalIgnoreCase);
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var canReadCatalogue = isAuthenticated && AppRoles.CanReadCatalogue(User);
+    var isAdministrator = isAuthenticated && AppRoles.IsAdministrator(User);
+    var isLocalAccount = isAuthenticated && AppAuthenticationService.IsLocalUser(User);
+    var userDisplayName = User.Identity?.Name ?? "Workspace User";
+    var userInitial = "H";
+    if (!string.IsNullOrWhiteSpace(userDisplayName))
+    {
+        userInitial = userDisplayName.Trim()[0].ToString().ToUpperInvariant();
+    }
+
+    var roleLabel = "Viewer";
+    if (isAdministrator)
+    {
+        roleLabel = "Workspace Admin";
+    }
+    else if (!canReadCatalogue)
+    {
+        roleLabel = "Guest";
+    }
+
+    bool IsCurrentController(params string[] controllers)
+        => Array.Exists(controllers, controller => string.Equals(controller, currentController, StringComparison.OrdinalIgnoreCase));
+
+    string SubnavLinkClass(string controller, string action = "Index")
+        => string.Equals(controller, currentController, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(action, currentAction, StringComparison.OrdinalIgnoreCase)
+                ? "shell-subnav-link is-active"
+                : "shell-subnav-link";
+
+    string GroupSummaryClass(bool isActive)
+        => isActive ? "shell-nav-summary is-active" : "shell-nav-summary";
+
+    var currentPageTitle = ViewData["Title"] as string ?? currentAction;
+    var isProductRestore = string.Equals(currentController, "Products", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase);
+    var isServiceRestore = string.Equals(currentController, "Services", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase);
+    var isReferenceRestore = string.Equals(currentController, "Reference", StringComparison.OrdinalIgnoreCase)
+        && (string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentAction, "RestoreArm", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(currentAction, "RestoreBrm", StringComparison.OrdinalIgnoreCase));
+
+    (string Eyebrow, string Title, string Copy)? sidebarContext = null;
+
+    if (string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase))
+    {
+        sidebarContext = string.Equals(currentAction, "About", StringComparison.OrdinalIgnoreCase)
+            ? ("About HERM", currentPageTitle, "Background, licensing, and partner organisations behind the HERM initiative.")
+            : ("Dashboard", currentPageTitle, "Workspace overview, navigation handoff, and catalogue status.");
+    }
+    else if (string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase))
+    {
+        sidebarContext = ("Account", currentPageTitle, "Manage your signed-in profile and update the local workspace password.");
+    }
+    else if (isProductRestore || isServiceRestore || isReferenceRestore
+        || IsCurrentController("Users", "Configuration", "ChangeLog"))
+    {
+        var adminCopy = currentAction switch
+        {
+            "Restore" when string.Equals(currentController, "Products", StringComparison.OrdinalIgnoreCase) => "Recover deleted products and repopulate the TRM catalogue safely.",
+            "Restore" when string.Equals(currentController, "Services", StringComparison.OrdinalIgnoreCase) => "Recover deleted services and restore flow editing history.",
+            "Restore" when string.Equals(currentController, "Reference", StringComparison.OrdinalIgnoreCase) => "Reload TRM reference data and recovery tooling.",
+            "RestoreArm" => "Reload ARM reference data and recovery tooling.",
+            "RestoreBrm" => "Reload BRM reference data and recovery tooling.",
+            "Create" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Add a new local workspace identity and assign its starting role.",
+            "Edit" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Update local user profile data and workspace permissions.",
+            "Delete" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Review the local account before removing its workspace access.",
+            "ResetPassword" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Issue a new local password and hand off updated credentials safely.",
+            "Users" or "Index" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Manage workspace identities and access.",
+            "Index" when string.Equals(currentController, "Configuration", StringComparison.OrdinalIgnoreCase) => "Control workspace fields, imports, and operating settings.",
+            "Index" when string.Equals(currentController, "ChangeLog", StringComparison.OrdinalIgnoreCase) => "Review catalogue activity and operational audit history.",
+            _ => "Workspace administration and recovery tools."
+        };
+        sidebarContext = ("Admin", currentPageTitle, adminCopy);
+    }
+    else if (string.Equals(currentController, "Reports", StringComparison.OrdinalIgnoreCase))
+    {
+        var reportCopy = currentAction switch
+        {
+            "TrmModelReport" => "TRM structure and mapped catalogue coverage.",
+            "ArmModelReport" => "ARM model structure and application landscape.",
+            "BrmModelReport" => "BRM hierarchy preview with selectable business models.",
+            "ExportData" => "Download curated datasets in CSV, JSON, or XLSX.",
+            "MappingByOwnerReport" => "Owner-by-owner traversal from domain to product.",
+            "SankeyReport" => "Flow-based mapping analysis across the TRM path.",
+            "IncomingConnectionsHeatmapReport" => "Visual hotspot view for inbound service load.",
+            "IncomingConnectionsReport" => "Ranked list of products with inbound service connections.",
+            "LifecycleStatusReport" => "Lifecycle distribution with owner filtering.",
+            "ModelDiagram" => "Poster mode for the current model diagram.",
+            _ => "Focused report view."
+        };
+        sidebarContext = ("Reports", currentPageTitle, reportCopy);
+    }
+    else if (IsCurrentController("Mappings", "Products", "Services"))
+    {
+        var trmCopy = currentController switch
+        {
+            "Mappings" => "Resolve and maintain TRM mapping paths across the catalogue.",
+            "Products" => "Catalogue products, owners, and mapping coverage in the TRM layer.",
+            "Services" => "Design service records and the connected-product flows behind them.",
+            _ => "TRM model working area."
+        };
+        sidebarContext = ("TRM Model", currentPageTitle, trmCopy);
+    }
+    else if (string.Equals(currentController, "Applications", StringComparison.OrdinalIgnoreCase))
+    {
+        sidebarContext = ("ARM Model", currentPageTitle, "Application catalogue, resolved paths, and ARM-to-TRM dependencies.");
+    }
+    else if (string.Equals(currentController, "BrmModels", StringComparison.OrdinalIgnoreCase))
+    {
+        sidebarContext = ("BRM Model", currentPageTitle, "Business reference model authoring and hierarchy management.");
+    }
+    else if (string.Equals(currentController, "Reference", StringComparison.OrdinalIgnoreCase))
+    {
+        sidebarContext = ("HERM Browser", currentPageTitle, "Browse reference-model objects and inspect their relationships.");
+    }
+
+    var trmOpen = IsCurrentController("Mappings", "Products", "Services");
+    var armOpen = IsCurrentController("Applications");
+    var brmOpen = IsCurrentController("BrmModels");
+    var reportsOpen = IsCurrentController("Reports");
+    var adminOpen = IsCurrentController("Users", "Configuration", "ChangeLog")
+        || (string.Equals(currentController, "Products", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
+        || (string.Equals(currentController, "Services", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
+        || (string.Equals(currentController, "Reference", StringComparison.OrdinalIgnoreCase)
+            && (string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentAction, "RestoreArm", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentAction, "RestoreBrm", StringComparison.OrdinalIgnoreCase)));
 }
 <html lang="en">
 <head>
@@ -27,149 +158,242 @@
     else
     {
         <div class="app-shell">
-            <header class="shell-header">
-                <div class="container-xxl">
-                    <nav class="navbar navbar-expand-lg">
-                        <a class="navbar-brand brand-lockup" asp-controller="Home" asp-action="Index">
-                            <span class="brand-mark">H</span>
-                            <span>
-                                <span class="brand-title">HERM Mapper</span>
-                            </span>
-                        </a>
-                        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
-                            <span class="navbar-toggler-icon"></span>
-                        </button>
-                        <div class="collapse navbar-collapse justify-content-end" id="mainNav">
-                            @if (User.Identity?.IsAuthenticated == true)
+            <button class="shell-mobile-backdrop" type="button" data-shell-sidebar-close aria-label="Close navigation"></button>
+            <aside class="shell-sidebar">
+                <div class="shell-sidebar-inner">
+                    <a class="brand-lockup shell-brand-lockup" asp-controller="Home" asp-action="Index">
+                        <span class="brand-mark">H</span>
+                        <span>
+                            <span class="brand-title">HERM Mapper</span>
+                            <span class="brand-subtitle">Workspace</span>
+                        </span>
+                    </a>
+
+                    @if (sidebarContext is not null)
+                    {
+                        <div class="shell-context-card" aria-label="Current section context">
+                            <span class="shell-context-eyebrow">@sidebarContext.Value.Eyebrow</span>
+                            <strong class="shell-context-title">@sidebarContext.Value.Title</strong>
+                            <span class="shell-context-copy">@sidebarContext.Value.Copy</span>
+                        </div>
+                    }
+
+                    @if (isAuthenticated)
+                    {
+                        <nav class="shell-nav" aria-label="Primary navigation" id="shell-sidebar-navigation">
+                            @if (canReadCatalogue)
                             {
-                            var canReadCatalogue = AppRoles.CanReadCatalogue(User);
-                            var isAdministrator = AppRoles.IsAdministrator(User);
-                            var isLocalAccount = AppAuthenticationService.IsLocalUser(User);
-                            <ul class="navbar-nav gap-lg-2">
-                                @if (canReadCatalogue)
-                                {
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Home" asp-action="Index">Dashboard</a>
-                                </li>
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">BRM</a>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" asp-controller="BrmModels" asp-action="Index">BRM Models</a></li>
-                                    </ul>
-                                </li>
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">ARM</a>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" asp-controller="Applications" asp-action="Index">Applications</a></li>
-                                    </ul>
-                                </li>
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">TRM</a>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" asp-controller="Products" asp-action="Index">Products</a></li>
-                                        <li><a class="dropdown-item" asp-controller="Services" asp-action="Index">Services</a></li>
-                                    </ul>
-                                </li>
-                                }
-                                @if (isAdministrator)
-                                {
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Mappings" asp-action="Index">Mapping Board</a>
-                                </li>
-                                }
-                                @if (canReadCatalogue)
-                                {
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Reports" asp-action="Index">Reports</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Reference" asp-action="Index">HERM Browser</a>
-                                </li>
-                                }
-                                @if (isAdministrator)
-                                {
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><a class="dropdown-item" asp-controller="Users" asp-action="Index">Users</a></li>
-                                        <li><a class="dropdown-item" asp-controller="Configuration" asp-action="Index">Configuration</a></li>
-                                        <li><a class="dropdown-item" asp-controller="ChangeLog" asp-action="Index">Change Log</a></li>
-                                        <li><hr class="dropdown-divider" /></li>
-                                        <li><a class="dropdown-item" asp-controller="Products" asp-action="Restore">Restore Products</a></li>
-                                        <li><a class="dropdown-item" asp-controller="Services" asp-action="Restore">Restore Services</a></li>
-                                        <li><a class="dropdown-item" asp-controller="Reference" asp-action="Restore">Restore TRM model objects</a></li>
-                                        <li><a class="dropdown-item" asp-controller="Reference" asp-action="RestoreArm">Restore ARM model objects</a></li>
-                                        <li><a class="dropdown-item" asp-controller="Reference" asp-action="RestoreBrm">Restore BRM model objects</a></li>
-                                    </ul>
-                                </li>
-                                }
-                                <li class="nav-item dropdown herm-info-nav-item">
-                                    <button class="nav-link nav-icon-link herm-info-trigger dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="About HERM Mapper">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                                            <circle cx="12" cy="12" r="10" fill="currentColor" />
-                                            <circle cx="12" cy="7.5" r="1.25" fill="#fff" />
-                                            <path d="M10.85 10.5a1.15 1.15 0 0 1 1.15-1.15h0a1.15 1.15 0 0 1 1.15 1.15v5.7h1.1a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5h1.1Z" fill="#fff" />
+                                <a class="shell-dashboard-link @(string.Equals(currentController, "Home", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)" asp-controller="Home" asp-action="Index">
+                                    <span class="shell-nav-summary-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M4.75 5.75h6.5v5.5h-6.5z"></path>
+                                            <path d="M12.75 5.75h6.5v3.5h-6.5z"></path>
+                                            <path d="M12.75 11.25h6.5v8h-6.5z"></path>
+                                            <path d="M4.75 13.25h6.5v6h-6.5z"></path>
                                         </svg>
-                                    </button>
-                                    <div class="dropdown-menu dropdown-menu-end herm-info-menu">
-                                        <div class="herm-info-panel">
-                                            <span class="herm-info-eyebrow">About HERM</span>
-                                            <p class="herm-info-copy">
-                                                &copy; 2025 CAUDIT; The HERM, the Higher Education Reference Models, is a collaborative community effort curated by the CAUDIT Enterprise Architecture group in active partnership with EUNIS, UCISA, and EDUCAUSE peer groups. The HERM is offered under the Creative Commons 4.0 CC BY-NC-SA license: you are free to use and adapt it, provided you do not use it for commercial gain. We encourage and require that any extensions or adaptations be shared back to benefit the global community. CAUDIT acknowledges the generous contributions of FromHereOn Pty Ltd. Please visit <a href="https://caudit.edu.au/" target="_blank" rel="noopener noreferrer">caudit.edu.au</a> for more information, and email <a href="mailto:herm-feedback@googlegroups.com">herm-feedback@googlegroups.com</a> with any feedback, suggestions, questions, and share-alike submissions.
-                                            </p>
-                                            <div class="herm-info-logo-grid" aria-label="Partner organisations">
-                                                <div class="herm-info-logo-card">
-                                                    <img src="~/images/caudit-wordmark.svg" asp-append-version="true" alt="CAUDIT logo" class="herm-info-logo herm-info-logo-caudit" />
-                                                </div>
-                                                <div class="herm-info-logo-card">
-                                                    <img src="~/images/eunis-wordmark.svg" asp-append-version="true" alt="EUNIS logo" class="herm-info-logo herm-info-logo-eunis" />
-                                                </div>
-                                                <div class="herm-info-logo-card">
-                                                    <img src="~/images/ucisa-wordmark.svg" asp-append-version="true" alt="UCISA logo" class="herm-info-logo herm-info-logo-ucisa" />
-                                                </div>
-                                                <div class="herm-info-logo-card">
-                                                    <img src="~/images/educause-wordmark.svg" asp-append-version="true" alt="EDUCAUSE wordmark" class="herm-info-logo herm-info-logo-educause" />
-                                                </div>
-                                            </div>
-                                        </div>
+                                    </span>
+                                    <span class="shell-nav-summary-copy">
+                                        <span class="shell-nav-summary-title">Dashboard</span>
+                                        <span class="shell-nav-summary-meta">Overview and entry point</span>
+                                    </span>
+                                </a>
+
+                                <details class="shell-nav-group" data-shell-nav-group="trm" @(trmOpen ? "open" : null)>
+                                    <summary class="@GroupSummaryClass(trmOpen)">
+                                        <span class="shell-nav-summary-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M5 8.25 12 4.75l7 3.5v7.5L12 19.25 5 15.75Z"></path>
+                                                <path d="M5 8.25 12 12l7-3.75"></path>
+                                                <path d="M12 12v7.25"></path>
+                                            </svg>
+                                        </span>
+                                        <span class="shell-nav-summary-copy">
+                                            <span class="shell-nav-summary-title">TRM Model</span>
+                                            <span class="shell-nav-summary-meta">Mappings, products, services</span>
+                                        </span>
+                                        <span class="shell-nav-summary-caret" aria-hidden="true"></span>
+                                    </summary>
+                                    <div class="shell-nav-links">
+                                        @if (isAdministrator)
+                                        {
+                                            <a class="@SubnavLinkClass("Mappings")" asp-controller="Mappings" asp-action="Index">Mapping Board</a>
+                                        }
+                                        <a class="@SubnavLinkClass("Products")" asp-controller="Products" asp-action="Index">Products</a>
+                                        <a class="@SubnavLinkClass("Services")" asp-controller="Services" asp-action="Index">Services</a>
                                     </div>
-                                </li>
+                                </details>
+
+                                <details class="shell-nav-group" data-shell-nav-group="arm" @(armOpen ? "open" : null)>
+                                    <summary class="@GroupSummaryClass(armOpen)">
+                                        <span class="shell-nav-summary-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M4.5 8.25 12 4.5l7.5 3.75"></path>
+                                                <path d="M5.25 8.5V16L12 19.5l6.75-3.5V8.5"></path>
+                                                <path d="M9 10.25h6"></path>
+                                                <path d="M9 13h6"></path>
+                                            </svg>
+                                        </span>
+                                        <span class="shell-nav-summary-copy">
+                                            <span class="shell-nav-summary-title">ARM Model</span>
+                                            <span class="shell-nav-summary-meta">Application reference mapping</span>
+                                        </span>
+                                        <span class="shell-nav-summary-caret" aria-hidden="true"></span>
+                                    </summary>
+                                    <div class="shell-nav-links">
+                                        <a class="@SubnavLinkClass("Applications")" asp-controller="Applications" asp-action="Index">Applications</a>
+                                    </div>
+                                </details>
+
+                                <details class="shell-nav-group" data-shell-nav-group="brm" @(brmOpen ? "open" : null)>
+                                    <summary class="@GroupSummaryClass(brmOpen)">
+                                        <span class="shell-nav-summary-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M5 6.5A2.5 2.5 0 0 1 7.5 4H19v14.5A1.5 1.5 0 0 0 17.5 17H7.5A2.5 2.5 0 0 0 5 19.5Z"></path>
+                                                <path d="M7.5 4v13"></path>
+                                                <path d="M10 8h6"></path>
+                                                <path d="M10 11.5h5"></path>
+                                            </svg>
+                                        </span>
+                                        <span class="shell-nav-summary-copy">
+                                            <span class="shell-nav-summary-title">BRM Model</span>
+                                            <span class="shell-nav-summary-meta">Business reference models</span>
+                                        </span>
+                                        <span class="shell-nav-summary-caret" aria-hidden="true"></span>
+                                    </summary>
+                                    <div class="shell-nav-links">
+                                        <a class="@SubnavLinkClass("BrmModels")" asp-controller="BrmModels" asp-action="Index">BRM Models</a>
+                                    </div>
+                                </details>
+
+                                <a class="shell-dashboard-link @(string.Equals(currentController, "Reference", StringComparison.OrdinalIgnoreCase) ? "is-active" : null)" asp-controller="Reference" asp-action="Index">
+                                    <span class="shell-nav-summary-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                            <circle cx="11" cy="11" r="5.5"></circle>
+                                            <path d="M16 16l3.25 3.25"></path>
+                                            <path d="M8.75 11h4.5"></path>
+                                            <path d="M11 8.75v4.5"></path>
+                                        </svg>
+                                    </span>
+                                    <span class="shell-nav-summary-copy">
+                                        <span class="shell-nav-summary-title">HERM Browser</span>
+                                        <span class="shell-nav-summary-meta">Browse reference model objects</span>
+                                    </span>
+                                </a>
+
+                                <details class="shell-nav-group" data-shell-nav-group="reports" @(reportsOpen ? "open" : null)>
+                                    <summary class="@GroupSummaryClass(reportsOpen)">
+                                        <span class="shell-nav-summary-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M5 18.5h14"></path>
+                                                <path d="M7.25 16V11.5"></path>
+                                                <path d="M12 16V6.5"></path>
+                                                <path d="M16.75 16V9.25"></path>
+                                            </svg>
+                                        </span>
+                                        <span class="shell-nav-summary-copy">
+                                            <span class="shell-nav-summary-title">Reports</span>
+                                            <span class="shell-nav-summary-meta">Diagrams and analytics</span>
+                                        </span>
+                                        <span class="shell-nav-summary-caret" aria-hidden="true"></span>
+                                    </summary>
+                                    <div class="shell-nav-links">
+                                        <a class="@SubnavLinkClass("Reports", "TrmModelReport")" asp-controller="Reports" asp-action="TrmModelReport">TRM Model diagram</a>
+                                        <a class="@SubnavLinkClass("Reports", "ArmModelReport")" asp-controller="Reports" asp-action="ArmModelReport">ARM Model diagram</a>
+                                        <a class="@SubnavLinkClass("Reports", "BrmModelReport")" asp-controller="Reports" asp-action="BrmModelReport">BRM Model diagram</a>
+                                        <a class="@SubnavLinkClass("Reports", "MappingByOwnerReport")" asp-controller="Reports" asp-action="MappingByOwnerReport">TRM Mapping by owner</a>
+                                        <a class="@SubnavLinkClass("Reports", "SankeyReport")" asp-controller="Reports" asp-action="SankeyReport">TRM Sankey view</a>
+                                        <a class="@SubnavLinkClass("Reports", "IncomingConnectionsHeatmapReport")" asp-controller="Reports" asp-action="IncomingConnectionsHeatmapReport">Incoming heatmap</a>
+                                        <a class="@SubnavLinkClass("Reports", "IncomingConnectionsReport")" asp-controller="Reports" asp-action="IncomingConnectionsReport">Incoming connections</a>
+                                        <a class="@SubnavLinkClass("Reports", "LifecycleStatusReport")" asp-controller="Reports" asp-action="LifecycleStatusReport">Lifecycle status</a>
+                                        <a class="@SubnavLinkClass("Reports", "ExportData")" asp-controller="Reports" asp-action="ExportData">Export data</a>
+                                    </div>
+                                </details>
+                            }
+
+                            @if (isAdministrator)
+                            {
+                                <details class="shell-nav-group" data-shell-nav-group="admin" @(adminOpen ? "open" : null)>
+                                    <summary class="@GroupSummaryClass(adminOpen)">
+                                        <span class="shell-nav-summary-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z"></path>
+                                                <path d="M19 12a7 7 0 0 0-.09-1.08l1.77-1.38-1.85-3.2-2.17.77a7.62 7.62 0 0 0-1.86-1.08L14.5 3.75h-5l-.3 2.28c-.66.24-1.29.6-1.85 1.08l-2.18-.77-1.85 3.2 1.78 1.38A7.88 7.88 0 0 0 5 12c0 .37.03.73.09 1.08l-1.77 1.38 1.85 3.2 2.17-.77c.56.48 1.19.84 1.86 1.08l.3 2.28h5l.3-2.28c.67-.24 1.3-.6 1.86-1.08l2.17.77 1.85-3.2-1.77-1.38c.06-.35.09-.71.09-1.08Z"></path>
+                                            </svg>
+                                        </span>
+                                        <span class="shell-nav-summary-copy">
+                                            <span class="shell-nav-summary-title">Admin</span>
+                                            <span class="shell-nav-summary-meta">Users, config, restore tools</span>
+                                        </span>
+                                        <span class="shell-nav-summary-caret" aria-hidden="true"></span>
+                                    </summary>
+                                    <div class="shell-nav-links">
+                                        <a class="@SubnavLinkClass("Users")" asp-controller="Users" asp-action="Index">Users</a>
+                                        <a class="@SubnavLinkClass("Configuration")" asp-controller="Configuration" asp-action="Index">Configuration</a>
+                                        <a class="@SubnavLinkClass("ChangeLog")" asp-controller="ChangeLog" asp-action="Index">Change Log</a>
+                                        <a class="@SubnavLinkClass("Products", "Restore")" asp-controller="Products" asp-action="Restore">Restore Products</a>
+                                        <a class="@SubnavLinkClass("Services", "Restore")" asp-controller="Services" asp-action="Restore">Restore Services</a>
+                                        <a class="@SubnavLinkClass("Reference", "Restore")" asp-controller="Reference" asp-action="Restore">Restore TRM</a>
+                                        <a class="@SubnavLinkClass("Reference", "RestoreArm")" asp-controller="Reference" asp-action="RestoreArm">Restore ARM</a>
+                                        <a class="@SubnavLinkClass("Reference", "RestoreBrm")" asp-controller="Reference" asp-action="RestoreBrm">Restore BRM</a>
+                                    </div>
+                                </details>
+                            }
+                        </nav>
+
+                        <div class="shell-sidebar-footer">
+                            <div class="shell-account-card">
+                                <span class="shell-account-label">@roleLabel</span>
+                                <div class="shell-account-profile">
+                                    <span class="shell-account-avatar">@userInitial</span>
+                                    <span class="shell-account-copy">
+                                        <strong>@userDisplayName</strong>
+                                        <span>HERM workspace access</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="shell-footer-tools">
+                                <a class="shell-utility-link" asp-controller="Home" asp-action="About">About HERM</a>
+
                                 @if (isLocalAccount)
                                 {
-                                <li class="nav-item">
-                                    <a class="nav-link nav-icon-link" asp-controller="Account" asp-action="Profile" aria-label="Profile">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                            <path d="M20 21a8 8 0 0 0-16 0"/>
-                                            <circle cx="12" cy="7" r="4"/>
-                                        </svg>
-                                    </a>
-                                </li>
+                                    <a class="shell-utility-link" asp-controller="Account" asp-action="Profile">Profile</a>
                                 }
-                                <li class="nav-item">
-                                    <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <button class="btn btn-outline-secondary navbar-action" type="submit">Logout</button>
-                                    </form>
-                                </li>
-                            </ul>
-                            }
+                            </div>
+
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="shell-logout-form">
+                                @Html.AntiForgeryToken()
+                                <button class="shell-logout-button" type="submit">Logout</button>
+                            </form>
                         </div>
-                    </nav>
+                    }
                 </div>
-            </header>
+            </aside>
 
-            <main class="shell-main">
-                <div class="container-xxl">
-                    @RenderBody()
+            <div class="shell-workspace">
+                <div class="shell-mobile-bar">
+                    <button class="shell-mobile-toggle" type="button" data-shell-sidebar-toggle aria-controls="shell-sidebar-navigation" aria-expanded="false">
+                        <span class="shell-mobile-toggle-icon" aria-hidden="true">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </span>
+                        <span>Menu</span>
+                    </button>
+                    <a class="shell-mobile-brand" asp-controller="Home" asp-action="Index">HERM Mapper</a>
                 </div>
-            </main>
+                <main class="shell-main">
+                    <div class="shell-content">
+                        @RenderBody()
+                    </div>
+                </main>
 
-            <footer class="shell-footer">
-                <div class="container-xxl d-flex flex-column flex-md-row justify-content-between gap-2">
-                    <span>HERM Mapper.</span>
-                    <span>Reference models can be verified and imported from uploaded HERM TRM workbooks.</span>
-                </div>
-            </footer>
+                <footer class="shell-footer">
+                    <div class="container-xxl d-flex flex-column flex-md-row justify-content-between gap-2">
+                        <span>HERM Mapper</span>
+                    </div>
+                </footer>
+            </div>
         </div>
     }
 

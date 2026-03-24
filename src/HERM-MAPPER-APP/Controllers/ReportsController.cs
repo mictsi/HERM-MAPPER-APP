@@ -20,11 +20,126 @@ public sealed class ReportsController(
     ModelDiagramPosterSvgService modelDiagramPosterSvgService,
     IWebHostEnvironment environment) : Controller
 {
-    public async Task<IActionResult> Index(string? lifecycleOwner = null, int? brmModelId = null, bool showBrmModelReport = false)
+    private static readonly IReadOnlyList<TabularExportColumn> CompletedMappingExportColumns =
+    [
+        new("model", "MODEL"),
+        new("domain", "DOMAIN"),
+        new("capability", "CAPABILITY"),
+        new("component", "COMPONENT"),
+        new("product", "PRODUCT")
+    ];
+
+    private static readonly IReadOnlyList<TabularExportColumn> ApplicationExportColumns =
+    [
+        new("name", "Name"),
+        new("description", "Description"),
+        new("notes", "Notes"),
+        new("armComponentCount", "ARM components"),
+        new("productCount", "Products"),
+        new("resolvedPathCount", "Resolved paths"),
+        new("updatedUtc", "Updated UTC")
+    ];
+
+    private static readonly IReadOnlyList<TabularExportColumn> ServiceExportColumns =
+    [
+        new("name", "Name"),
+        new("description", "Description"),
+        new("owner", "Owner"),
+        new("lifecycleStatus", "Lifecycle status"),
+        new("assetCriticalityScore", "Asset criticality score"),
+        new("products", "Products"),
+        new("productCount", "Product count"),
+        new("connectionCount", "Connection count"),
+        new("updatedUtc", "Updated UTC")
+    ];
+
+    private static readonly IReadOnlyList<TabularExportColumn> BrmModelExportColumns =
+    [
+        new("name", "Name"),
+        new("area", "Area"),
+        new("description", "Description"),
+        new("status", "Status"),
+        new("capabilityCount", "Capability count"),
+        new("updatedUtc", "Updated UTC")
+    ];
+
+    public Task<IActionResult> Index(string? lifecycleOwner = null, int? brmModelId = null, bool showBrmModelReport = false)
+    {
+        if (!ModelState.IsValid)
+        {
+            return Task.FromResult<IActionResult>(BadRequest(ModelState));
+        }
+
+        if (showBrmModelReport || brmModelId.HasValue)
+        {
+            return Task.FromResult<IActionResult>(RedirectToAction(nameof(BrmModelReport), new { brmModelId }));
+        }
+
+        if (!string.IsNullOrWhiteSpace(lifecycleOwner))
+        {
+            return Task.FromResult<IActionResult>(RedirectToAction(nameof(LifecycleStatusReport), new { lifecycleOwner }));
+        }
+
+        return Task.FromResult<IActionResult>(RedirectToAction(nameof(TrmModelReport)));
+    }
+
+    public async Task<IActionResult> TrmModelReport()
+        => View(nameof(TrmModelReport), await BuildReportsViewModelAsync());
+
+    public async Task<IActionResult> ArmModelReport()
+        => View(nameof(ArmModelReport), await BuildReportsViewModelAsync());
+
+    public async Task<IActionResult> BrmModelReport(int? brmModelId = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
+        }
+
+        return View(nameof(BrmModelReport), await BuildReportsViewModelAsync(brmModelId: brmModelId));
+    }
+
+    public async Task<IActionResult> MappingByOwnerReport()
+        => View(nameof(MappingByOwnerReport), await BuildReportsViewModelAsync());
+
+    public async Task<IActionResult> SankeyReport()
+        => View(nameof(SankeyReport), await BuildReportsViewModelAsync());
+
+    public async Task<IActionResult> IncomingConnectionsHeatmapReport()
+        => View(nameof(IncomingConnectionsHeatmapReport), await BuildReportsViewModelAsync());
+
+    public async Task<IActionResult> IncomingConnectionsReport()
+        => View(nameof(IncomingConnectionsReport), await BuildReportsViewModelAsync());
+
+    public async Task<IActionResult> LifecycleStatusReport(string? lifecycleOwner = null)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return View(nameof(LifecycleStatusReport), await BuildReportsViewModelAsync(lifecycleOwner: lifecycleOwner));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> ExportData()
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return View(nameof(ExportData), await BuildExportDataViewModelAsync());
+    }
+
+    private async Task<ReportsViewModel> BuildReportsViewModelAsync(
+        string? lifecycleOwner = null,
+        int? brmModelId = null,
+        bool showBrmModelReport = false)
+    {
+        if (!ModelState.IsValid)
+        {
+            throw new InvalidOperationException("Reports view model cannot be built from an invalid model state.");
         }
 
         var mappings = await dbContext.ProductMappings
@@ -115,7 +230,7 @@ public sealed class ReportsController(
             SankeyLinks = BuildReportsSankeyLinks(paths)
         };
 
-        return View(model);
+        return model;
     }
 
     public async Task<IActionResult> ModelDiagram(string? scope = null, int? brmModelId = null)
@@ -151,15 +266,42 @@ public sealed class ReportsController(
             return BadRequest(ModelState);
         }
 
-        var mappings = await BuildMappingsCsvQuery()
-            .OrderBy(x => x.TrmDomain != null ? x.TrmDomain.Name : string.Empty)
-            .ThenBy(x => x.TrmComponent != null ? x.TrmComponent.Name : string.Empty)
-            .ThenBy(x => x.ProductCatalogItem != null ? x.ProductCatalogItem.Name : string.Empty)
-            .ToListAsync();
+        return await DownloadExport(ExportDataset.CompletedMappings, ExportFileFormat.Csv);
+    }
 
-        var csv = CsvExportService.BuildProductMappingExport(mappings);
-        var fileName = $"herm-mappings-{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
-        return File(Encoding.UTF8.GetBytes(csv), "text/csv", fileName);
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> DownloadExport(ExportDataset dataset, ExportFileFormat format)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (!Enum.IsDefined(dataset) || !Enum.IsDefined(format))
+        {
+            return BadRequest();
+        }
+
+        var table = await BuildExportTableAsync(dataset);
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        var fileStem = BuildExportFileStem(dataset);
+
+        return format switch
+        {
+            ExportFileFormat.Csv => File(
+                Encoding.UTF8.GetBytes(TabularExportService.BuildCsv(table)),
+                "text/csv",
+                $"{fileStem}-{timestamp}.csv"),
+            ExportFileFormat.Json => File(
+                Encoding.UTF8.GetBytes(TabularExportService.BuildJson(table)),
+                "application/json",
+                $"{fileStem}-{timestamp}.json"),
+            ExportFileFormat.Xlsx => File(
+                TabularExportService.BuildXlsx(table),
+                TabularExportService.GetSpreadsheetContentType(),
+                $"{fileStem}-{timestamp}.xlsx"),
+            _ => BadRequest()
+        };
     }
 
     public async Task<FileContentResult> DownloadDrawIoAsync(string? scope = null, int? brmModelId = null)
@@ -555,6 +697,351 @@ public sealed class ReportsController(
                 x.TrmComponentId != null &&
                 x.ProductCatalogItem != null &&
                 !x.ProductCatalogItem.IsDeleted);
+
+    private async Task<ExportDataViewModel> BuildExportDataViewModelAsync()
+    {
+        var completedMappingCount = await BuildMappingsCsvQuery().CountAsync();
+        var applicationCount = await dbContext.ApplicationCatalogItems.AsNoTracking().CountAsync();
+        var serviceCount = await dbContext.ServiceCatalogItems.AsNoTracking().CountAsync(x => !x.IsDeleted);
+        var brmModelCount = await dbContext.BrmModels.AsNoTracking().CountAsync();
+
+        return new ExportDataViewModel
+        {
+            Datasets =
+            [
+                new ExportDatasetCardViewModel
+                {
+                    Dataset = ExportDataset.CompletedMappings,
+                    Title = "Completed mappings",
+                    Description = "Exports the uploaded sample layout for completed TRM mappings only.",
+                    RecordCount = completedMappingCount,
+                    RecordLabel = "mapping rows",
+                    IncludedFields = CompletedMappingExportColumns.Select(column => column.Header).ToList()
+                },
+                new ExportDatasetCardViewModel
+                {
+                    Dataset = ExportDataset.Applications,
+                    Title = "Applications",
+                    Description = "Exports the application catalogue with description, notes, and resolved ARM or product counts.",
+                    RecordCount = applicationCount,
+                    RecordLabel = "application records",
+                    IncludedFields = ApplicationExportColumns.Select(column => column.Header).ToList()
+                },
+                new ExportDatasetCardViewModel
+                {
+                    Dataset = ExportDataset.Services,
+                    Title = "Services",
+                    Description = "Exports active services with ownership, lifecycle, connected products, and flow counts.",
+                    RecordCount = serviceCount,
+                    RecordLabel = "service records",
+                    IncludedFields = ServiceExportColumns.Select(column => column.Header).ToList()
+                },
+                new ExportDatasetCardViewModel
+                {
+                    Dataset = ExportDataset.BrmModels,
+                    Title = "BRM models",
+                    Description = "Exports business reference models with area, status, and capability totals.",
+                    RecordCount = brmModelCount,
+                    RecordLabel = "BRM records",
+                    IncludedFields = BrmModelExportColumns.Select(column => column.Header).ToList()
+                }
+            ]
+        };
+    }
+
+    private Task<TabularExportTable> BuildExportTableAsync(ExportDataset dataset)
+        => dataset switch
+        {
+            ExportDataset.CompletedMappings => BuildCompletedMappingExportTableAsync(),
+            ExportDataset.Applications => BuildApplicationExportTableAsync(),
+            ExportDataset.Services => BuildServiceExportTableAsync(),
+            ExportDataset.BrmModels => BuildBrmModelExportTableAsync(),
+            _ => throw new InvalidOperationException($"Unsupported export dataset '{dataset}'.")
+        };
+
+    private async Task<TabularExportTable> BuildCompletedMappingExportTableAsync()
+    {
+        var mappings = await BuildMappingsCsvQuery()
+            .OrderBy(x => x.TrmDomain != null ? x.TrmDomain.Name : string.Empty)
+            .ThenBy(x => x.TrmComponent != null ? x.TrmComponent.Name : string.Empty)
+            .ThenBy(x => x.ProductCatalogItem != null ? x.ProductCatalogItem.Name : string.Empty)
+            .ToListAsync();
+
+        var rows = mappings
+            .Select(mapping =>
+            {
+                var capability = mapping.TrmComponent?.ParentCapability ?? mapping.TrmCapability;
+                var domain = mapping.TrmComponent?.ParentCapability?.ParentDomain ?? capability?.ParentDomain ?? mapping.TrmDomain;
+
+                return BuildExportRow(
+                    ("model", "HERM"),
+                    ("domain", domain is null ? null : $"{domain.Code} {domain.Name}"),
+                    ("capability", capability is null ? null : $"{capability.Code} {capability.Name}"),
+                    ("component", mapping.TrmComponent?.DisplayLabel),
+                    ("product", mapping.ProductCatalogItem?.Name));
+            })
+            .ToList();
+
+        return new TabularExportTable("Mappings", CompletedMappingExportColumns, rows);
+    }
+
+    private async Task<TabularExportTable> BuildApplicationExportTableAsync()
+    {
+        var applications = await dbContext.ApplicationCatalogItems
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .Select(application => new
+            {
+                application.Name,
+                application.Description,
+                application.Notes,
+                ArmComponentCount = application.Mappings
+                    .Select(mapping => mapping.ArmComponentId)
+                    .Distinct()
+                    .Count(),
+                ProductCount = application.Mappings
+                    .Select(mapping => mapping.ProductCatalogItemId)
+                    .Distinct()
+                    .Count(),
+                ResolvedPathCount = application.Mappings.Count,
+                application.UpdatedUtc
+            })
+            .ToListAsync();
+
+        var rows = applications
+            .Select(application => BuildExportRow(
+                ("name", application.Name),
+                ("description", application.Description),
+                ("notes", application.Notes),
+                ("armComponentCount", application.ArmComponentCount.ToString(CultureInfo.InvariantCulture)),
+                ("productCount", application.ProductCount.ToString(CultureInfo.InvariantCulture)),
+                ("resolvedPathCount", application.ResolvedPathCount.ToString(CultureInfo.InvariantCulture)),
+                ("updatedUtc", FormatUtc(application.UpdatedUtc))))
+            .ToList();
+
+        return new TabularExportTable("Applications", ApplicationExportColumns, rows);
+    }
+
+    private async Task<TabularExportTable> BuildServiceExportTableAsync()
+    {
+        var services = await dbContext.ServiceCatalogItems
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
+            .ThenInclude(x => x.ProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.FromProductCatalogItem)
+            .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+            .ThenInclude(x => x.ToProductCatalogItem)
+            .AsSplitQuery()
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+
+        var rows = services
+            .Select(service =>
+            {
+                var productNames = GetOrderedServiceProductLabels(service);
+
+                return BuildExportRow(
+                    ("name", service.Name),
+                    ("description", service.Description),
+                    ("owner", service.Owner),
+                    ("lifecycleStatus", service.LifecycleStatus),
+                    ("assetCriticalityScore", service.AssetCriticalityScore.ToString(CultureInfo.InvariantCulture)),
+                    ("products", productNames.Count == 0 ? null : string.Join(" | ", productNames)),
+                    ("productCount", productNames.Count.ToString(CultureInfo.InvariantCulture)),
+                    ("connectionCount", service.ConnectionCount.ToString(CultureInfo.InvariantCulture)),
+                    ("updatedUtc", FormatUtc(service.UpdatedUtc)));
+            })
+            .ToList();
+
+        return new TabularExportTable("Services", ServiceExportColumns, rows);
+    }
+
+    private async Task<TabularExportTable> BuildBrmModelExportTableAsync()
+    {
+        var models = await dbContext.BrmModels
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .ThenBy(x => x.Area)
+            .Select(model => new
+            {
+                model.Name,
+                model.Area,
+                model.Description,
+                model.Status,
+                CapabilityCount = model.Capabilities.Count,
+                model.UpdatedUtc
+            })
+            .ToListAsync();
+
+        var rows = models
+            .Select(model => BuildExportRow(
+                ("name", model.Name),
+                ("area", model.Area),
+                ("description", model.Description),
+                ("status", model.Status),
+                ("capabilityCount", model.CapabilityCount.ToString(CultureInfo.InvariantCulture)),
+                ("updatedUtc", FormatUtc(model.UpdatedUtc))))
+            .ToList();
+
+        return new TabularExportTable("BRM Models", BrmModelExportColumns, rows);
+    }
+
+    private static Dictionary<string, string?> BuildExportRow(params (string Key, string? Value)[] values)
+    {
+        var row = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var (key, value) in values)
+        {
+            row[key] = value;
+        }
+
+        return row;
+    }
+
+    private static string BuildExportFileStem(ExportDataset dataset)
+        => dataset switch
+        {
+            ExportDataset.CompletedMappings => "herm-mappings-complete",
+            ExportDataset.Applications => "herm-applications",
+            ExportDataset.Services => "herm-services",
+            ExportDataset.BrmModels => "herm-brm-models",
+            _ => "herm-export"
+        };
+
+    private static string FormatUtc(DateTime value)
+        => value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+
+    private static List<string> GetOrderedServiceProductLabels(ServiceCatalogItem service)
+    {
+        if (service.ProductConnections.Count == 0)
+        {
+            return service.GetOrderedProductLinks()
+                .Select(link => BuildProductLabel(link.ProductCatalogItem))
+                .ToList();
+        }
+
+        var orderedConnections = service.GetOrderedProductConnections();
+        var orderedProductIds = BuildOrderedGraphProductIds(
+            orderedConnections
+                .Select(connection => new ConnectionPair(connection.FromProductCatalogItemId, connection.ToProductCatalogItemId))
+                .ToList(),
+            out _);
+
+        var labelsById = new Dictionary<int, string>();
+        foreach (var connection in orderedConnections)
+        {
+            labelsById.TryAdd(connection.FromProductCatalogItemId, BuildProductLabel(connection.FromProductCatalogItem));
+            labelsById.TryAdd(connection.ToProductCatalogItemId, BuildProductLabel(connection.ToProductCatalogItem));
+        }
+
+        return orderedProductIds
+            .Where(labelsById.ContainsKey)
+            .Select(id => labelsById[id])
+            .ToList();
+    }
+
+    private static string BuildProductLabel(ProductCatalogItem product)
+    {
+        var detailParts = new[] { product.Vendor, product.Version }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToList();
+
+        return detailParts.Count == 0
+            ? BuildDeletedProductLabel(product.Name, product.IsDeleted)
+            : BuildDeletedProductLabel($"{product.Name} ({string.Join(" ", detailParts)})", product.IsDeleted);
+    }
+
+    private static string BuildDeletedProductLabel(string label, bool isDeleted) =>
+        isDeleted ? $"{label} [deleted]" : label;
+
+    private static List<int> BuildOrderedGraphProductIds(
+        IReadOnlyList<ConnectionPair> connections,
+        out bool supportsGraphLayout)
+    {
+        supportsGraphLayout = false;
+        if (connections.Count == 0)
+        {
+            return [];
+        }
+
+        var firstAppearance = new Dictionary<int, int>();
+        var adjacency = new Dictionary<int, HashSet<int>>();
+        var indegree = new Dictionary<int, int>();
+        var appearanceIndex = 0;
+
+        static void EnsureNode(
+            int productId,
+            Dictionary<int, int> firstAppearance,
+            Dictionary<int, HashSet<int>> adjacency,
+            Dictionary<int, int> indegree,
+            ref int appearanceIndex)
+        {
+            if (!firstAppearance.ContainsKey(productId))
+            {
+                firstAppearance[productId] = appearanceIndex++;
+            }
+
+            adjacency.TryAdd(productId, []);
+            indegree.TryAdd(productId, 0);
+        }
+
+        foreach (var connection in connections)
+        {
+            EnsureNode(connection.FromProductId, firstAppearance, adjacency, indegree, ref appearanceIndex);
+            EnsureNode(connection.ToProductId, firstAppearance, adjacency, indegree, ref appearanceIndex);
+
+            if (adjacency[connection.FromProductId].Add(connection.ToProductId))
+            {
+                indegree[connection.ToProductId]++;
+            }
+        }
+
+        var levels = indegree.Keys.ToDictionary(productId => productId, _ => 0);
+        var remainingIndegree = indegree.ToDictionary(pair => pair.Key, pair => pair.Value);
+        var ready = remainingIndegree
+            .Where(pair => pair.Value == 0)
+            .Select(pair => pair.Key)
+            .OrderBy(productId => firstAppearance[productId])
+            .ToList();
+
+        var orderedIds = new List<int>();
+
+        while (ready.Count != 0)
+        {
+            var currentProductId = ready[0];
+            ready.RemoveAt(0);
+            orderedIds.Add(currentProductId);
+
+            foreach (var nextProductId in adjacency[currentProductId].OrderBy(productId => firstAppearance[productId]))
+            {
+                levels[nextProductId] = Math.Max(levels[nextProductId], levels[currentProductId] + 1);
+                remainingIndegree[nextProductId]--;
+                if (remainingIndegree[nextProductId] == 0)
+                {
+                    ready.Add(nextProductId);
+                    ready.Sort((left, right) => firstAppearance[left].CompareTo(firstAppearance[right]));
+                }
+            }
+        }
+
+        if (orderedIds.Count != remainingIndegree.Count)
+        {
+            return firstAppearance
+                .OrderBy(pair => pair.Value)
+                .Select(pair => pair.Key)
+                .ToList();
+        }
+
+        supportsGraphLayout = true;
+
+        return orderedIds
+            .OrderBy(productId => levels[productId])
+            .ThenBy(productId => firstAppearance[productId])
+            .ToList();
+    }
+
+    private sealed record ConnectionPair(int FromProductId, int ToProductId);
 
     private async Task<List<ServiceProductConnectionRecord>> LoadServiceConnectionsAsync()
     {

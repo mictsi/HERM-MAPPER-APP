@@ -12,6 +12,18 @@
     var posterStageClass = usesSvgPoster
         ? "model-report-poster-stage"
         : "model-report-poster-stage model-report-poster-stage-html-fallback";
+    var backReportAction = Model.ScopeKey switch
+    {
+        "arm" => "ArmModelReport",
+        "brm" => "BrmModelReport",
+        _ => "TrmModelReport"
+    };
+    var backReportLabel = Model.ScopeKey switch
+    {
+        "arm" => "Back to ARM report",
+        "brm" => "Back to BRM report",
+        _ => "Back to TRM report"
+    };
 }
 
 <section class="@posterPageClass">
@@ -22,7 +34,7 @@
             <p>@Model.PosterDescription</p>
         </div>
         <div class="report-toolbar-actions">
-            <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-brmModelId="@Model.BrmModelId" asp-fragment="@Model.ReportFragmentId">Back to reports</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="@backReportAction" asp-route-brmModelId="@Model.BrmModelId" asp-fragment="@Model.ReportFragmentId">@backReportLabel</a>
             <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadModelDiagramSvg" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId">Download SVG</a>
             <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print / Save PDF</button>
             @if (!string.IsNullOrWhiteSpace(Model.DrawIoDownloadAction))

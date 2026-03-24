@@ -3,6 +3,9 @@
 @{
     ViewData["Title"] = Model.PageTitle;
     ViewData["AdminNav"] = Model.AdminNavKey;
+    ViewData["BodyClass"] = "admin-page restore-page reference-restore-page";
+    var historyCount = Model.Components.Count(component => component.SupportsHistory);
+    var reasonCount = Model.Components.Count(component => !string.IsNullOrWhiteSpace(component.DeletedReason));
 }
 
 <div class="admin-shell">
@@ -14,6 +17,29 @@
                 <h1>@Model.Heading</h1>
                 <p>@Model.Description</p>
             </div>
+        </section>
+
+        <section class="stats-grid stats-grid-compact admin-overview-grid">
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Deleted components</span>
+                <span class="stat-value">@Model.Components.Count</span>
+                <span class="stat-meta">items available to restore</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">History support</span>
+                <span class="stat-value">@historyCount</span>
+                <span class="stat-meta">items with version history</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Deleted reasons</span>
+                <span class="stat-value">@reasonCount</span>
+                <span class="stat-meta">items carrying a recorded reason</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Model scope</span>
+                <span class="stat-value details-overview-value-small">@Model.Heading</span>
+                <span class="stat-meta">reference-model restore workspace</span>
+            </article>
         </section>
 
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))

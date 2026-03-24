@@ -1,6 +1,7 @@
 @model ApplicationEditViewModel
 @{
     ViewData["Title"] = "Edit Application";
+    ViewData["BodyClass"] = "applications-page applications-editor-page";
 }
 
 <section class="page-header">
@@ -11,7 +12,7 @@
     </div>
 </section>
 
-<form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post" class="editor-form-shell">
     <partial name="_Form" model="Model" />
 </form>
 

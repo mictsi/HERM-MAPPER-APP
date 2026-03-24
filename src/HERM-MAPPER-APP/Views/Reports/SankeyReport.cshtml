@@ -1,0 +1,83 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "TRM Sankey view";
+    ViewData["BodyClass"] = "reports-page";
+    var sankeyPayload = JsonSerializer.Serialize(new
+    {
+        paths = Model.Paths,
+        nodes = Model.SankeyNodes,
+        links = Model.SankeyLinks
+    });
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-sankey-relationships" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Sankey view</span>
+            <h2>TRM Sankey view</h2>
+            <p>Use the filters or click a sankey node to isolate a branch. Link width represents how many mapping paths flow through each step.</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        @if (Model.SankeyNodes.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No sankey data available</h3>
+                <p>The sankey appears when at least one complete mapping path exists.</p>
+            </div>
+        }
+        else
+        {
+            <div class="owner-sankey-shell">
+                <div class="owner-sankey-filters">
+                    <div>
+                        <label class="form-label" for="ownerFilter">Owner</label>
+                        <select class="form-select" id="ownerFilter" data-owner-filter="owner">
+                            <option value="">All owners</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="domainFilter">Domain</label>
+                        <select class="form-select" id="domainFilter" data-owner-filter="domain">
+                            <option value="">All domains</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="capabilityFilter">Capability</label>
+                        <select class="form-select" id="capabilityFilter" data-owner-filter="capability">
+                            <option value="">All capabilities</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="componentFilter">Component</label>
+                        <select class="form-select" id="componentFilter" data-owner-filter="component">
+                            <option value="">All components</option>
+                        </select>
+                    </div>
+                    <div class="owner-sankey-filter-actions">
+                        <button class="btn btn-outline-secondary" type="button" data-owner-filter-reset>Reset filters</button>
+                    </div>
+                </div>
+                <div class="owner-sankey-filter-summary" data-owner-filter-summary></div>
+                <div class="owner-sankey-legend">
+                    <span class="owner-legend-chip owner">Owner</span>
+                    <span class="owner-legend-chip domain">Domain</span>
+                    <span class="owner-legend-chip capability">Capability</span>
+                    <span class="owner-legend-chip component">Component</span>
+                    <span class="owner-legend-chip product">Product</span>
+                </div>
+                <div class="owner-sankey-frame" data-owner-sankey></div>
+                <script type="application/json" data-owner-sankey-payload>@Html.Raw(sankeyPayload)</script>
+            </div>
+        }
+    </div>
+</details>
+
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/js/owner-visualization.js" asp-append-version="true"></script>
+}

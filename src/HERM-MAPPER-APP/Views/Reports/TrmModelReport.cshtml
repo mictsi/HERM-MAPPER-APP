@@ -1,0 +1,56 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@{
+    ViewData["Title"] = "TRM Model diagram";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-product-model" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Model diagram</span>
+            <h2>@Model.ModelDiagram.DiagramTitle</h2>
+            <p>@Model.ModelDiagram.DiagramDescription</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.ModelDiagram.ScopeKey" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.ModelDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.ModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.ModelDiagram.ScopeKey">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ModelDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.ModelDiagram.ScopeKey">Download Archi XML</a>
+            }
+        </div>
+
+        @if (!Model.ModelDiagram.HasAnyContent)
+        {
+            <div class="empty-state compact">
+                <h3>@Model.ModelDiagram.EmptyStateTitle</h3>
+                <p>@Model.ModelDiagram.EmptyStateBody</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.ModelDiagram.DomainCount</strong> domains</span>
+                <span class="report-summary-chip"><strong>@Model.ModelDiagram.CapabilityCount</strong> capabilities</span>
+                <span class="report-summary-chip"><strong>@Model.ModelDiagram.ComponentCount</strong> components</span>
+                <span class="report-summary-chip"><strong>@Model.ModelDiagram.ItemCount</strong> @Model.ModelDiagram.MappedSummaryLabel</span>
+                @if (Model.ModelDiagram.ShowUnmappedItems)
+                {
+                    <span class="report-summary-chip"><strong>@Model.ModelDiagram.UnmappedItemCount</strong> unmapped</span>
+                }
+            </div>
+
+            <div class="model-report-preview-frame">
+                <partial name="_ModelDiagramReport" model="Model.ModelDiagram" />
+            </div>
+        }
+    </div>
+</details>

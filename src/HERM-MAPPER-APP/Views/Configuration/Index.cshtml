@@ -6,6 +6,7 @@
 @{
     ViewData["Title"] = "Configuration";
     ViewData["AdminNav"] = "Configuration";
+    ViewData["BodyClass"] = "admin-page configuration-page";
     var catalogueReview = Model.CatalogueImportReview.Verification;
     var productReview = Model.ProductImportReview.Verification;
     var remoteSqlImport = Model.RemoteSqlImport;
@@ -57,6 +58,18 @@
     {
         secretHelpText = "A password is already saved. Leave this blank to keep it.";
     }
+    var importModeSummary = "Manual";
+    if (!remoteSqlImport.IsEnabled)
+    {
+        importModeSummary = "Disabled";
+    }
+    else if (remoteSqlImport.Input.ScheduleHours > 0)
+    {
+        importModeSummary = "Scheduled";
+    }
+    var reviewCount = (Model.CatalogueImportReview.HasReview ? 1 : 0)
+        + (Model.ProductImportReview.HasReview ? 1 : 0)
+        + (remoteSqlImport.TestResult is not null ? 1 : 0);
 }
 
 <div class="admin-shell">
@@ -68,6 +81,29 @@
                 <h1>Configuration</h1>
                 <p>Manage import workflows and the allowed values for configurable product and mapping fields.</p>
             </div>
+        </section>
+
+        <section class="stats-grid stats-grid-compact admin-overview-grid">
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Configurable fields</span>
+                <span class="stat-value">@Model.Fields.Count</span>
+                <span class="stat-meta">field groups managed here</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Allowed values</span>
+                <span class="stat-value">@Model.Fields.Sum(field => field.Options.Count)</span>
+                <span class="stat-meta">configurable options across all fields</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Display zones</span>
+                <span class="stat-value">@Model.AvailableTimeZones.Count</span>
+                <span class="stat-meta">available time-zone choices</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Import mode</span>
+                <span class="stat-value">@importModeSummary</span>
+                <span class="stat-meta">@reviewCount verification result(s) currently loaded</span>
+            </article>
         </section>
 
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -279,7 +315,7 @@
                         <form asp-action="SetRemoteSqlImportEnabled" method="post">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="isEnabled" value="@(remoteSqlImport.IsEnabled ? "false" : "true")" />
-                            <button class="btn @(remoteSqlImport.IsEnabled ? "btn-outline-warning" : "btn-outline-success")" type="submit">
+                            <button class="btn @(remoteSqlImport.IsEnabled ? "btn-outline-warning" : "btn-outline-primary")" type="submit">
                                 @(remoteSqlImport.IsEnabled ? "Disable import" : "Enable import")
                             </button>
                         </form>

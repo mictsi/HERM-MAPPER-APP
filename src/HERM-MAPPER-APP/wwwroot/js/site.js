@@ -2,6 +2,136 @@
 // for details on configuring this project to bundle and minify static web assets.
 
 document.addEventListener("DOMContentLoaded", () => {
+  const shellNavStorageKey = "herm-shell-nav-state";
+  const shellIsMobile = () => window.matchMedia("(max-width: 991.98px)").matches;
+  const shellGroups = Array.from(document.querySelectorAll("details[data-shell-nav-group]"));
+  const shellRoot = document.body;
+  const shellSidebarToggle = document.querySelector("[data-shell-sidebar-toggle]");
+  const shellSidebarClosers = document.querySelectorAll("[data-shell-sidebar-close]");
+
+  const setSidebarOpenState = (isOpen) => {
+    shellRoot.classList.toggle("shell-sidebar-open", isOpen);
+
+    if (shellSidebarToggle instanceof HTMLButtonElement) {
+      shellSidebarToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
+  };
+
+  const closeSidebar = () => setSidebarOpenState(false);
+  const openSidebar = () => setSidebarOpenState(true);
+
+  const collapseOtherGroups = (activeGroup) => {
+    shellGroups.forEach((group) => {
+      if (group !== activeGroup) {
+        group.open = false;
+      }
+    });
+  };
+
+  const readShellNavState = () => {
+    try {
+      const rawState = window.localStorage.getItem(shellNavStorageKey);
+      if (rawState === null) {
+        return {};
+      }
+
+      const parsedState = JSON.parse(rawState);
+      return parsedState !== null && typeof parsedState === "object" ? parsedState : {};
+    } catch (error) {
+      console.warn("Unable to read sidebar navigation state", error);
+      return {};
+    }
+  };
+
+  const writeShellNavState = (state) => {
+    try {
+      window.localStorage.setItem(shellNavStorageKey, JSON.stringify(state));
+    } catch (error) {
+      console.warn("Unable to persist sidebar navigation state", error);
+    }
+  };
+
+  const shellNavState = readShellNavState();
+  shellGroups.forEach((group) => {
+    const groupName = group.getAttribute("data-shell-nav-group");
+    if (groupName === null || groupName === "") {
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(shellNavState, groupName)) {
+      group.open = Boolean(shellNavState[groupName]);
+    }
+
+    group.addEventListener("toggle", () => {
+      if (group.open) {
+        collapseOtherGroups(group);
+      }
+
+      shellNavState[groupName] = group.open;
+      shellGroups.forEach((candidate) => {
+        const candidateName = candidate.getAttribute("data-shell-nav-group");
+        if (candidateName !== null && candidateName !== "") {
+          shellNavState[candidateName] = candidate.open;
+        }
+      });
+      writeShellNavState(shellNavState);
+    });
+  });
+
+  document.querySelectorAll(".shell-nav-links a").forEach((link) => {
+    link.addEventListener("click", () => {
+      const activeGroup = link.closest("details[data-shell-nav-group]");
+      if (activeGroup instanceof HTMLDetailsElement) {
+        activeGroup.open = true;
+        collapseOtherGroups(activeGroup);
+
+        shellGroups.forEach((candidate) => {
+          const candidateName = candidate.getAttribute("data-shell-nav-group");
+          if (candidateName !== null && candidateName !== "") {
+            shellNavState[candidateName] = candidate.open;
+          }
+        });
+
+        writeShellNavState(shellNavState);
+      }
+
+      if (shellIsMobile()) {
+        closeSidebar();
+      }
+    });
+  });
+
+  if (shellSidebarToggle instanceof HTMLButtonElement) {
+    shellSidebarToggle.addEventListener("click", () => {
+      if (shellRoot.classList.contains("shell-sidebar-open")) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+  }
+
+  shellSidebarClosers.forEach((element) => {
+    element.addEventListener("click", closeSidebar);
+  });
+
+  window.addEventListener("resize", () => {
+    if (!shellIsMobile()) {
+      closeSidebar();
+    }
+  });
+
+  if (window.location.hash !== "") {
+    document.querySelectorAll(".is-report-link").forEach((link) => {
+      const href = link.getAttribute("href");
+      if (href !== null && href.endsWith(window.location.hash)) {
+        link.classList.add("is-active");
+      } else {
+        link.classList.remove("is-active");
+      }
+    });
+  }
+
   document.querySelectorAll("[data-owner-dropdown]").forEach((dropdown) => {
     const label = dropdown.querySelector("[data-owner-dropdown-label]");
     const checkboxes = dropdown.querySelectorAll("input[type='checkbox'][name='owners']");
@@ -897,12 +1027,12 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll("'", "&#39;");
 
   const graphBranchPalette = [
-    { surface: "rgba(11, 110, 79, 0.10)", border: "rgba(11, 110, 79, 0.42)" },
-    { surface: "rgba(43, 111, 119, 0.10)", border: "rgba(43, 111, 119, 0.42)" },
-    { surface: "rgba(92, 124, 53, 0.10)", border: "rgba(92, 124, 53, 0.42)" },
-    { surface: "rgba(139, 94, 52, 0.10)", border: "rgba(139, 94, 52, 0.42)" },
-    { surface: "rgba(123, 63, 97, 0.10)", border: "rgba(123, 63, 97, 0.42)" },
-    { surface: "rgba(62, 89, 157, 0.10)", border: "rgba(62, 89, 157, 0.42)" }
+    { surface: "rgba(29, 92, 129, 0.10)", border: "rgba(29, 92, 129, 0.42)" },
+    { surface: "rgba(46, 111, 138, 0.10)", border: "rgba(46, 111, 138, 0.42)" },
+    { surface: "rgba(74, 99, 140, 0.10)", border: "rgba(74, 99, 140, 0.42)" },
+    { surface: "rgba(107, 90, 130, 0.10)", border: "rgba(107, 90, 130, 0.42)" },
+    { surface: "rgba(113, 77, 99, 0.10)", border: "rgba(113, 77, 99, 0.42)" },
+    { surface: "rgba(90, 111, 144, 0.10)", border: "rgba(90, 111, 144, 0.42)" }
   ];
 
   const sortByFirstAppearance = (values, firstAppearance) =>

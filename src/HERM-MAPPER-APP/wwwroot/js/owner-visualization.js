@@ -1,11 +1,11 @@
 (function () {
   const svgNs = "http://www.w3.org/2000/svg";
   const colors = {
-    owner: "#0b6e4f",
-    domain: "#2b6f77",
-    capability: "#5c7c35",
-    component: "#8b5e34",
-    product: "#7b3f61"
+    owner: "#1d5c81",
+    domain: "#2e6f8a",
+    capability: "#4a638c",
+    component: "#6b5a82",
+    product: "#714d63"
   };
   const filterConfig = [
     { name: "owner", valueKey: "ownerName", labelKey: "ownerName" },

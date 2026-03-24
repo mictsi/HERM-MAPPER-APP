@@ -1,0 +1,47 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@{
+    ViewData["Title"] = "TRM Mapping by owner";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-mapping-by-owner" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Hierarchy view</span>
+            <h2>TRM Mapping by owner</h2>
+            <p>Expand an owner to follow the mapping path from domain to capability, component, and product.</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        @if (Model.Owners.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No complete mappings available yet</h3>
+                <p>Add complete mappings with owners to populate this hierarchy view.</p>
+            </div>
+        }
+        else
+        {
+            <div class="owner-jump-list">
+                @foreach (var owner in Model.Owners)
+                {
+                    <a class="owner-jump-chip" href="#@owner.Key.Replace(":", "-")">@owner.Label</a>
+                }
+            </div>
+
+            <div class="owner-hierarchy-stack">
+                @foreach (var owner in Model.Owners)
+                {
+                    <article class="owner-hierarchy-card" id="@owner.Key.Replace(":", "-")">
+                        <ul class="owner-tree-list owner-tree-root">
+                            <partial name="_HierarchyNode" model="owner" />
+                        </ul>
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</details>

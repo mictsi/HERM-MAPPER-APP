@@ -4,8 +4,12 @@
 @model ReferenceCatalogueViewModel
 @{
     ViewData["Title"] = "HERM Browser";
+    ViewData["BodyClass"] = "reference-browser-page";
     var isAdministrator = AppRoles.IsAdministrator(User);
     var searchFormAction = $"{Url.Action("Index", "Reference")}#{Model.ActiveTreeAnchorId}";
+    var domainCount = Model.ModelGroups.Sum(group => group.Domains.Count);
+    var capabilityCount = Model.ModelGroups.Sum(group => group.Domains.Sum(domain => domain.Capabilities.Count));
+    var searchSummary = string.IsNullOrWhiteSpace(Model.Search) ? Model.SelectionTitle : $"Search: {Model.Search}";
 }
 
 <section class="page-header">
@@ -16,15 +20,40 @@
     </div>
 </section>
 
+<section class="stats-grid stats-grid-compact reference-browser-overview-grid">
+    <article class="stat-card reference-browser-overview-card">
+        <span class="stat-label">Model groups</span>
+        <span class="stat-value">@Model.ModelGroups.Count</span>
+        <span class="stat-meta">TRM, ARM, and BRM collections loaded</span>
+    </article>
+    <article class="stat-card reference-browser-overview-card">
+        <span class="stat-label">Domains</span>
+        <span class="stat-value">@domainCount</span>
+        <span class="stat-meta">reference-model domains in navigation</span>
+    </article>
+    <article class="stat-card reference-browser-overview-card">
+        <span class="stat-label">Capabilities</span>
+        <span class="stat-value">@capabilityCount</span>
+        <span class="stat-meta">capabilities exposed through the browser</span>
+    </article>
+    <article class="stat-card reference-browser-overview-card">
+        <span class="stat-label">Visible results</span>
+        <span class="stat-value">@Model.Components.Count</span>
+        <span class="stat-meta">@searchSummary</span>
+    </article>
+</section>
+
 @if (!string.IsNullOrWhiteSpace(Model.ImportStatusMessage))
 {
-    <section class="alert alert-success" role="status">
-        @Model.ImportStatusMessage
+    <section class="content-card reference-browser-status-card">
+        <div class="alert alert-success mb-0" role="status">
+            @Model.ImportStatusMessage
+        </div>
     </section>
 }
 
-<section class="content-card">
-    <form method="get" action="@searchFormAction" class="row g-3 align-items-end">
+<section class="content-card reference-browser-filter-card">
+    <form method="get" action="@searchFormAction" class="row g-3 align-items-end reference-browser-filter-form">
         @if (Model.SelectedModelKind.HasValue)
         {
             <input type="hidden" name="modelKind" value="@Model.SelectedModelKind" />

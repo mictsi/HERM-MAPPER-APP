@@ -1,6 +1,7 @@
 @model ProductMapping
 @{
     ViewData["Title"] = "Delete Mapping";
+    ViewData["BodyClass"] = "confirmation-page mapping-delete-page";
 }
 
 <section class="page-header">
@@ -11,21 +12,66 @@
     </div>
 </section>
 
-<section class="content-card">
-    <dl class="detail-grid mb-4">
-        <dt>Product</dt>
-        <dd>@Model.ProductCatalogItem?.Name</dd>
-        <dt>Domain</dt>
-        <dd>@(Model.TrmDomain is null ? "-" : $"{Model.TrmDomain.Code} {Model.TrmDomain.Name}")</dd>
-        <dt>Capability</dt>
-        <dd>@(Model.TrmCapability is null ? "-" : $"{Model.TrmCapability.Code} {Model.TrmCapability.Name}")</dd>
-        <dt>Component</dt>
-        <dd>@(Model.TrmComponent is null ? "-" : Model.TrmComponent.DisplayLabel)</dd>
-    </dl>
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Product</span>
+        <span class="stat-value details-overview-value-small">@(Model.ProductCatalogItem?.Name ?? "Unknown")</span>
+        <span class="stat-meta">catalogue record linked by this mapping</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Domain</span>
+        <span class="stat-value details-overview-value-small">@(Model.TrmDomain is null ? "Unset" : Model.TrmDomain.Code)</span>
+        <span class="stat-meta">TRM domain segment involved</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Capability</span>
+        <span class="stat-value details-overview-value-small">@(Model.TrmCapability is null ? "Unset" : Model.TrmCapability.Code)</span>
+        <span class="stat-meta">capability branch affected by removal</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Outcome</span>
+        <span class="stat-value details-overview-value-small">Permanent</span>
+        <span class="stat-meta">this individual mapping row will be removed</span>
+    </article>
+</section>
 
-    <form asp-action="Delete" method="post" class="d-flex gap-2">
-        <input type="hidden" asp-for="Id" />
-        <button type="submit" class="btn btn-danger">Delete mapping</button>
-        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
-    </form>
+<section class="row g-4 confirmation-shell">
+    <div class="col-xl-8">
+        <section class="content-card confirmation-main-card mb-0">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Relationship review</span>
+                    <h2>Mapped path details</h2>
+                </div>
+            </div>
+            <dl class="detail-grid mb-0">
+                <dt>Product</dt>
+                <dd>@Model.ProductCatalogItem?.Name</dd>
+                <dt>Domain</dt>
+                <dd>@(Model.TrmDomain is null ? "-" : $"{Model.TrmDomain.Code} {Model.TrmDomain.Name}")</dd>
+                <dt>Capability</dt>
+                <dd>@(Model.TrmCapability is null ? "-" : $"{Model.TrmCapability.Code} {Model.TrmCapability.Name}")</dd>
+                <dt>Component</dt>
+                <dd>@(Model.TrmComponent is null ? "-" : Model.TrmComponent.DisplayLabel)</dd>
+            </dl>
+        </section>
+    </div>
+    <div class="col-xl-4">
+        <aside class="content-card confirmation-side-card mb-0">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Action</span>
+                    <h2>Remove mapping</h2>
+                </div>
+            </div>
+            <div class="confirmation-note mb-3">
+                Deleting the mapping only removes this one HERM relationship. The product and reference-model entries remain in place.
+            </div>
+            <form asp-action="Delete" method="post" class="d-grid gap-2">
+                <input type="hidden" asp-for="Id" />
+                <button type="submit" class="btn btn-danger">Delete mapping</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </form>
+        </aside>
+    </div>
 </section>

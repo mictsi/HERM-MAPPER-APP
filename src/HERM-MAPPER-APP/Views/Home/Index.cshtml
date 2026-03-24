@@ -2,20 +2,28 @@
 @model HomeDashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
+    ViewData["BodyClass"] = "dashboard-page";
     var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var isAdministrator = AppRoles.IsAdministrator(User);
 }
 
 <section class="hero-panel">
     <div>
-        <h1>Welcome to HERM Mapper</h1>
+        <span class="eyebrow">Dashboard</span>
+        <h1>Start from the workspace dashboard</h1>
+        <p class="hero-copy">Review model coverage, hand off into mapping and catalogue maintenance, and open exports from the main landing surface instead of dropping straight into a model editor.</p>
 
         <div class="d-flex flex-wrap gap-3 mt-4">
-            <a class="btn btn-outline-light btn-lg" asp-controller="Mappings" asp-action="Index">Open mapping board</a>
+            <a class="btn btn-primary btn-lg" asp-controller="Mappings" asp-action="Index">Open mapping board</a>
             @if (canManageProductsAndServices)
             {
-                <a class="btn btn-primary btn-lg" asp-controller="Products" asp-action="Create">Add product</a>
+                <a class="btn btn-outline-light btn-lg" asp-controller="Products" asp-action="Create">Add product</a>
                 <a class="btn btn-outline-light btn-lg" asp-controller="Applications" asp-action="Create">Add application</a>
                 <a class="btn btn-outline-light btn-lg" asp-controller="BrmModels" asp-action="Create">Add BRM model</a>
+            }
+            @if (isAdministrator)
+            {
+                <a class="btn btn-outline-light btn-lg" asp-controller="Reports" asp-action="ExportData">Export data</a>
             }
         </div>
     </div>

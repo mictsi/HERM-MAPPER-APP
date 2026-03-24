@@ -52,4 +52,14 @@ public sealed class HomeController(AppDbContext dbContext) : Controller
 
         return View(model);
     }
+
+    public IActionResult About()
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return View();
+    }
 }

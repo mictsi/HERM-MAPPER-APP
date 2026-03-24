@@ -4,7 +4,20 @@
 @model BrmModelsIndexViewModel
 @{
     ViewData["Title"] = "BRM Models";
+    ViewData["BodyClass"] = "brm-models-page";
     var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var areaCount = Model.Models
+        .Select(model => model.Area)
+        .Where(area => !string.IsNullOrWhiteSpace(area))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
+    var totalCapabilities = Model.Models.Sum(model => model.CapabilityCount);
+    var populatedModelCount = Model.Models.Count(model => model.CapabilityCount != 0);
+    var statusCount = Model.Models
+        .Select(model => model.Status)
+        .Where(status => !string.IsNullOrWhiteSpace(status))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
 }
 
 <section class="page-header">
@@ -21,18 +34,42 @@
     }
 </section>
 
+<section class="stats-grid stats-grid-compact brm-models-overview-grid">
+    <article class="stat-card brm-models-overview-card">
+        <span class="stat-label">Visible models</span>
+        <span class="stat-value">@Model.Models.Count</span>
+        <span class="stat-meta">business workspaces in view</span>
+    </article>
+    <article class="stat-card brm-models-overview-card">
+        <span class="stat-label">Areas covered</span>
+        <span class="stat-value">@areaCount</span>
+        <span class="stat-meta">distinct BRM areas represented</span>
+    </article>
+    <article class="stat-card brm-models-overview-card">
+        <span class="stat-label">Capabilities</span>
+        <span class="stat-value">@totalCapabilities</span>
+        <span class="stat-meta">across @populatedModelCount populated model(s)</span>
+    </article>
+    <article class="stat-card brm-models-overview-card">
+        <span class="stat-label">Statuses in use</span>
+        <span class="stat-value">@statusCount</span>
+        <span class="stat-meta">workflow states across the catalogue</span>
+    </article>
+</section>
+
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
-    <section class="content-card">
+    <section class="content-card brm-models-status-card">
         <div class="alert alert-success mb-0" role="status">@Model.StatusMessage</div>
     </section>
 }
 
-<section class="content-card">
+<section class="content-card brm-models-results-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Catalogue</span>
             <h2>@Model.Models.Count BRM model(s)</h2>
+            <p>Track each business-model workspace, its current area, and how much downstream capability structure has already been defined.</p>
         </div>
     </div>
 

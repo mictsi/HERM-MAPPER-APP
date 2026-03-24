@@ -1,0 +1,117 @@
+@{
+    ViewData["Title"] = "About HERM";
+    ViewData["BodyClass"] = "tool-page about-herm-page";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">About HERM</span>
+        <h1>Higher Education Reference Models</h1>
+        <p>HERM brings the technology, application, and business reference models together so institutions can map products, services, and capabilities against a shared higher-education frame.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-primary" asp-controller="Home" asp-action="Index">Back to dashboard</a>
+        <a class="btn btn-primary" asp-controller="Reference" asp-action="Index">Open HERM Browser</a>
+    </div>
+</section>
+
+<section class="stats-grid stats-grid-compact about-herm-overview-grid">
+    <article class="stat-card about-herm-overview-card">
+        <span class="stat-label">Reference models</span>
+        <span class="stat-value">3</span>
+        <span class="stat-meta">TRM, ARM, and BRM work together in one catalogue</span>
+    </article>
+    <article class="stat-card about-herm-overview-card">
+        <span class="stat-label">Community partners</span>
+        <span class="stat-value">4</span>
+        <span class="stat-meta">CAUDIT, EUNIS, UCISA, and EDUCAUSE collaboration</span>
+    </article>
+    <article class="stat-card about-herm-overview-card">
+        <span class="stat-label">License</span>
+        <span class="stat-value about-herm-license-value">CC BY-NC-SA</span>
+        <span class="stat-meta">Creative Commons 4.0 share-alike, non-commercial use</span>
+    </article>
+    <article class="stat-card about-herm-overview-card">
+        <span class="stat-label">Feedback</span>
+        <span class="stat-value about-herm-contact-value">Open</span>
+        <span class="stat-meta">Send ideas and share-alike submissions back to the community</span>
+    </article>
+</section>
+
+<div class="editor-form-shell">
+    <div class="row g-4 editor-panel-grid">
+        <div class="col-xl-8">
+            <section class="content-card editor-main-card about-herm-main-card">
+                <div class="section-heading">
+                    <div>
+                        <span class="eyebrow">Overview</span>
+                        <h2>What HERM is for</h2>
+                    </div>
+                </div>
+
+                <div class="stack-list">
+                    <article class="stack-item">
+                        <h3>Shared language for architecture</h3>
+                        <p class="stack-body">HERM gives higher-education teams a common structure for discussing business capabilities, applications, and technology components without forcing every institution to start from scratch.</p>
+                    </article>
+
+                    <article class="stack-item">
+                        <h3>Model relationships in one workspace</h3>
+                        <p class="stack-body">This workspace supports TRM product mappings, ARM application paths, and BRM capability modelling so the relationships between those layers stay visible while you curate the catalogue.</p>
+                    </article>
+
+                    <article class="stack-item">
+                        <h3>Community-maintained and share-alike</h3>
+                        <p class="stack-body">The HERM, the Higher Education Reference Models, is a collaborative community effort curated by the CAUDIT Enterprise Architecture group in active partnership with EUNIS, UCISA, and EDUCAUSE peer groups.</p>
+                    </article>
+                </div>
+            </section>
+        </div>
+
+        <div class="col-xl-4">
+            <section class="content-card editor-side-card about-herm-side-card">
+                <div class="section-heading">
+                    <div>
+                        <span class="eyebrow">Usage</span>
+                        <h2>License and feedback</h2>
+                    </div>
+                </div>
+
+                <div class="confirmation-note">
+                    The HERM is offered under the Creative Commons 4.0 CC BY-NC-SA license: you are free to use and adapt it, provided you do not use it for commercial gain. Extensions and adaptations should be shared back to benefit the community.
+                </div>
+
+                <ul class="confirmation-list">
+                    <li>Visit <a href="https://caudit.edu.au/" target="_blank" rel="noopener noreferrer">caudit.edu.au</a> for background information.</li>
+                    <li>Email <a href="mailto:herm-feedback@googlegroups.com">herm-feedback@googlegroups.com</a> with feedback, questions, or suggested improvements.</li>
+                    <li>FromHereOn Pty Ltd is acknowledged for its contribution to the initiative.</li>
+                </ul>
+            </section>
+        </div>
+    </div>
+</div>
+
+<section class="content-card about-herm-partners-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Partners</span>
+            <h2>Organisations behind the model</h2>
+            <p>These organisations collaborate to evolve the reference models and encourage share-alike reuse across the sector.</p>
+        </div>
+    </div>
+
+    <div class="herm-info-logo-grid" aria-label="Partner organisations">
+        <div class="herm-info-logo-card">
+            <img src="~/images/caudit-wordmark.svg" asp-append-version="true" alt="CAUDIT logo" class="herm-info-logo herm-info-logo-caudit" />
+        </div>
+        <div class="herm-info-logo-card">
+            <img src="~/images/eunis-wordmark.svg" asp-append-version="true" alt="EUNIS logo" class="herm-info-logo herm-info-logo-eunis" />
+        </div>
+        <div class="herm-info-logo-card">
+            <img src="~/images/ucisa-wordmark.svg" asp-append-version="true" alt="UCISA logo" class="herm-info-logo herm-info-logo-ucisa" />
+        </div>
+        <div class="herm-info-logo-card">
+            <img src="~/images/educause-wordmark.svg" asp-append-version="true" alt="EDUCAUSE wordmark" class="herm-info-logo herm-info-logo-educause" />
+        </div>
+    </div>
+</section>

@@ -3,6 +3,11 @@
 @{
     ViewData["Title"] = "Restore Products";
     ViewData["AdminNav"] = "RestoreProducts";
+    ViewData["BodyClass"] = "admin-page restore-page products-restore-page";
+    var ownerCount = Model.Products
+        .SelectMany(product => product.GetOwnerValues())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
 }
 
 <div class="admin-shell">
@@ -14,6 +19,29 @@
                 <h1>Restore products</h1>
                 <p>Restore products back into the catalogue or permanently delete them.</p>
             </div>
+        </section>
+
+        <section class="stats-grid stats-grid-compact admin-overview-grid">
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Deleted products</span>
+                <span class="stat-value">@Model.Products.Count</span>
+                <span class="stat-meta">currently in the trash</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Owners</span>
+                <span class="stat-value">@ownerCount</span>
+                <span class="stat-meta">distinct owners represented</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Mappings</span>
+                <span class="stat-value">@Model.Products.Sum(product => product.Mappings.Count)</span>
+                <span class="stat-meta">TRM mappings preserved in trash</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Restore status</span>
+                <span class="stat-value details-overview-value-small">@(string.IsNullOrWhiteSpace(Model.StatusMessage) ? "Ready" : "Updated")</span>
+                <span class="stat-meta">recover or permanently delete records</span>
+            </article>
         </section>
 
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))

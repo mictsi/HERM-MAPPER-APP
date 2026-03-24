@@ -3,8 +3,13 @@
 @model ProductDependenciesViewModel
 @{
     ViewData["Title"] = "Show Dependencies";
+    ViewData["BodyClass"] = "products-page products-dependencies-page";
     var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
     var rowCount = Math.Max(Model.IncomingDependencies.Count, Model.OutgoingDependencies.Count);
+    var distinctServiceCount = Model.IncomingDependencies.Select(dependency => dependency.ServiceId)
+        .Concat(Model.OutgoingDependencies.Select(dependency => dependency.ServiceId))
+        .Distinct()
+        .Count();
 }
 
 <section class="page-header">
@@ -23,7 +28,30 @@
     </div>
 </section>
 
-<section class="content-card">
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Dependency links</span>
+        <span class="stat-value">@(Model.IncomingDependencies.Count + Model.OutgoingDependencies.Count)</span>
+        <span class="stat-meta">service relationships discovered</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Incoming</span>
+        <span class="stat-value">@Model.IncomingDependencies.Count</span>
+        <span class="stat-meta">products connecting into this one</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Outgoing</span>
+        <span class="stat-value">@Model.OutgoingDependencies.Count</span>
+        <span class="stat-meta">products this one connects toward</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Services</span>
+        <span class="stat-value">@distinctServiceCount</span>
+        <span class="stat-meta">distinct service flows in scope</span>
+    </article>
+</section>
+
+<section class="content-card details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Dependencies</span>

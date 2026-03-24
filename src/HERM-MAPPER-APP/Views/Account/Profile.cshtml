@@ -1,6 +1,7 @@
 @model PasswordSelfServiceViewModel
 @{
     ViewData["Title"] = "Profile";
+    ViewData["BodyClass"] = "account-page admin-page admin-crud-page account-profile-page";
 }
 
 <section class="page-header">
@@ -11,6 +12,29 @@
     </div>
 </section>
 
+<section class="stats-grid stats-grid-compact admin-overview-grid">
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Account type</span>
+        <span class="stat-value details-overview-value-small">Local profile</span>
+        <span class="stat-meta">managed inside the HERM workspace</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Username</span>
+        <span class="stat-value details-overview-value-small">@Model.UserName</span>
+        <span class="stat-meta">current sign-in identity</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Role</span>
+        <span class="stat-value details-overview-value-small">@Model.RoleName</span>
+        <span class="stat-meta">workspace access currently assigned</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Password fields</span>
+        <span class="stat-value">3</span>
+        <span class="stat-meta">current, new, and confirmation inputs</span>
+    </article>
+</section>
+
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <section class="content-card">
@@ -18,51 +42,86 @@
     </section>
 }
 
-<section class="content-card">
-    <dl class="detail-grid mb-0">
-        <dt>Given name</dt>
-        <dd>@Model.GivenName</dd>
-        <dt>Last name</dt>
-        <dd>@Model.LastName</dd>
-        <dt>Email</dt>
-        <dd>@Model.Email</dd>
-        <dt>Username</dt>
-        <dd>@Model.UserName</dd>
-        <dt>Role</dt>
-        <dd>@Model.RoleName</dd>
-    </dl>
-</section>
-
-<section class="content-card">
-    <form asp-action="Profile" method="post" class="row g-4">
+<form asp-action="Profile" method="post" class="editor-form-shell">
+    <section class="row g-4 editor-panel-grid">
         @Html.AntiForgeryToken()
-        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-        <div class="col-12">
-            <label asp-for="CurrentPassword" class="form-label"></label>
-            <input asp-for="CurrentPassword" class="form-control" autocomplete="current-password" />
-            <span asp-validation-for="CurrentPassword" class="text-danger small"></span>
-        </div>
-        <div class="col-lg-6" data-password-strength-root>
-            <label asp-for="NewPassword" class="form-label"></label>
-            <input asp-for="NewPassword" class="form-control" autocomplete="new-password" data-password-input />
-            <span asp-validation-for="NewPassword" class="text-danger small"></span>
-            <div class="password-strength mt-3">
-                <div class="password-strength-track">
-                    <div class="password-strength-bar" data-password-strength-bar data-strength-tone="weak"></div>
+        <div class="col-xl-8">
+            <section class="content-card editor-main-card mb-0">
+                <div class="section-heading">
+                    <div>
+                        <span class="eyebrow">Profile details</span>
+                        <h2>Identity and password</h2>
+                        <p>Review the signed-in account record, then update the password using the current credential for verification.</p>
+                    </div>
                 </div>
-                <div class="password-strength-label" data-password-strength-label>Weak</div>
-            </div>
+
+                <dl class="detail-grid mb-4">
+                    <dt>Given name</dt>
+                    <dd>@Model.GivenName</dd>
+                    <dt>Last name</dt>
+                    <dd>@Model.LastName</dd>
+                    <dt>Email</dt>
+                    <dd>@Model.Email</dd>
+                    <dt>Username</dt>
+                    <dd>@Model.UserName</dd>
+                    <dt>Role</dt>
+                    <dd>@Model.RoleName</dd>
+                </dl>
+
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                <div class="row g-4">
+                    <div class="col-12">
+                        <label asp-for="CurrentPassword" class="form-label"></label>
+                        <input asp-for="CurrentPassword" class="form-control" autocomplete="current-password" />
+                        <span asp-validation-for="CurrentPassword" class="text-danger small"></span>
+                    </div>
+                    <div class="col-lg-6" data-password-strength-root>
+                        <label asp-for="NewPassword" class="form-label"></label>
+                        <input asp-for="NewPassword" class="form-control" autocomplete="new-password" data-password-input />
+                        <span asp-validation-for="NewPassword" class="text-danger small"></span>
+                        <div class="password-strength mt-3">
+                            <div class="password-strength-track">
+                                <div class="password-strength-bar" data-password-strength-bar data-strength-tone="weak"></div>
+                            </div>
+                            <div class="password-strength-label" data-password-strength-label>Weak</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <label asp-for="ConfirmPassword" class="form-label"></label>
+                        <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                    </div>
+                </div>
+            </section>
         </div>
-        <div class="col-lg-6">
-            <label asp-for="ConfirmPassword" class="form-label"></label>
-            <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
-            <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+        <div class="col-xl-4">
+            <aside class="content-card editor-side-card h-100 mb-0">
+                <div class="section-heading">
+                    <div>
+                        <span class="eyebrow">Workflow</span>
+                        <h2>Password update</h2>
+                    </div>
+                </div>
+
+                <div class="confirmation-note mb-3">
+                    Your current password is required before the replacement credential can be saved. The change takes effect immediately after submission.
+                </div>
+
+                <ul class="confirmation-list mb-4">
+                    <li>Use a unique password that is not shared with any other account.</li>
+                    <li>Your profile data and role are shown for reference only and are not edited here.</li>
+                    <li>After saving, use the new password for the next local sign-in.</li>
+                </ul>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary" type="submit">Save password</button>
+                    <a class="btn btn-outline-secondary" asp-controller="Home" asp-action="Index">Back to dashboard</a>
+                </div>
+            </aside>
         </div>
-        <div class="col-12 d-flex justify-content-end">
-            <button class="btn btn-primary" type="submit">Save password</button>
-        </div>
-    </form>
-</section>
+    </section>
+</form>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />

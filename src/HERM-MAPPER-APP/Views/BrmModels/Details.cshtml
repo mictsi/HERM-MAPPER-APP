@@ -5,7 +5,11 @@
 @model BrmModelDetailsViewModel
 @{
     ViewData["Title"] = "BRM Model Details";
+    ViewData["BodyClass"] = "brm-models-page brm-models-details-page";
     var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var linkedArmComponents = Model.Capabilities.Sum(capability => capability.ArmComponentCount);
+    var linkedApplications = Model.Capabilities.Sum(capability => capability.ApplicationCount);
+    var linkedProducts = Model.Capabilities.Sum(capability => capability.ProductCount);
     var hierarchyData = JsonSerializer.Serialize(
         Model.HierarchyRoot,
         new JsonSerializerOptions
@@ -30,6 +34,29 @@
     </div>
 </section>
 
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Capabilities</span>
+        <span class="stat-value">@Model.CapabilityCount</span>
+        <span class="stat-meta">records inside this model</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">ARM links</span>
+        <span class="stat-value">@linkedArmComponents</span>
+        <span class="stat-meta">components connected downstream</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Applications</span>
+        <span class="stat-value">@linkedApplications</span>
+        <span class="stat-meta">application connections in scope</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Products</span>
+        <span class="stat-value">@linkedProducts</span>
+        <span class="stat-meta">products surfaced through capabilities</span>
+    </article>
+</section>
+
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <section class="content-card">
@@ -37,7 +64,7 @@
     </section>
 }
 
-<section class="content-card mb-4">
+<section class="content-card mb-4 details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Summary</span>
@@ -58,7 +85,7 @@
     </dl>
 </section>
 
-<section class="content-card">
+<section class="content-card details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Capabilities</span>
@@ -141,7 +168,7 @@
     }
 </section>
 
-<section class="content-card mt-4">
+<section class="content-card mt-4 details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Hierarchy</span>

@@ -3,6 +3,12 @@
 @{
     ViewData["Title"] = "Restore Services";
     ViewData["AdminNav"] = "RestoreServices";
+    ViewData["BodyClass"] = "admin-page restore-page services-restore-page";
+    var ownerCount = Model.Services
+        .Select(service => service.Owner)
+        .Where(owner => !string.IsNullOrWhiteSpace(owner))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
 }
 
 <div class="admin-shell">
@@ -14,6 +20,29 @@
                 <h1>Restore services</h1>
                 <p>Restore services back into the catalogue or permanently delete them.</p>
             </div>
+        </section>
+
+        <section class="stats-grid stats-grid-compact admin-overview-grid">
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Deleted services</span>
+                <span class="stat-value">@Model.Services.Count</span>
+                <span class="stat-meta">currently in the service trash</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Owners</span>
+                <span class="stat-value">@ownerCount</span>
+                <span class="stat-meta">distinct owners represented</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Products linked</span>
+                <span class="stat-value">@Model.Services.Sum(service => service.ProductLinks.Count)</span>
+                <span class="stat-meta">direct product links preserved</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Connections</span>
+                <span class="stat-value">@Model.Services.Sum(service => service.ConnectionCount)</span>
+                <span class="stat-meta">saved flow connections in trash</span>
+            </article>
         </section>
 
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))

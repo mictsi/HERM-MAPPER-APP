@@ -1,0 +1,94 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@using System.Globalization
+@{
+    ViewData["Title"] = "Lifecycle status";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-lifecycle-status" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Lifecycle report</span>
+            <h2>TRM Lifecycle status</h2>
+            <p>See how products are distributed across lifecycle states and narrow the report to a specific owner.</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        <form method="get" asp-action="LifecycleStatusReport" class="owner-lifecycle-filter-form">
+            <div>
+                <label class="form-label" for="lifecycleOwner">Owner</label>
+                <select class="form-select" id="lifecycleOwner" name="lifecycleOwner">
+                    <option value="">All owners</option>
+                    @foreach (var owner in Model.AvailableOwners)
+                    {
+                        <option value="@owner" selected="@(string.Equals(owner, Model.SelectedLifecycleOwner, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@owner</option>
+                    }
+                </select>
+            </div>
+            <div class="owner-lifecycle-filter-actions">
+                <button class="btn btn-primary" type="submit">Apply filter</button>
+                <a class="btn btn-outline-secondary" asp-action="LifecycleStatusReport">Reset</a>
+            </div>
+        </form>
+
+        @if (Model.LifecycleStatuses.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No lifecycle data available</h3>
+                <p>No products matched the selected owner filter.</p>
+            </div>
+        }
+        else
+        {
+            <div class="owner-lifecycle-summary">
+                <strong>@Model.LifecycleProductCount</strong> product(s)
+                @if (!string.IsNullOrWhiteSpace(Model.SelectedLifecycleOwner))
+                {
+                    <span>for owner <strong>@Model.SelectedLifecycleOwner</strong></span>
+                }
+                else
+                {
+                    <span>across all owners</span>
+                }
+            </div>
+
+            <div class="owner-lifecycle-list">
+                @foreach (var status in Model.LifecycleStatuses)
+                {
+                    <details class="owner-lifecycle-details">
+                        <summary class="owner-lifecycle-card">
+                            <div class="owner-lifecycle-copy">
+                                <strong>@status.Label</strong>
+                                <span class="table-subline">@status.ProductCount product(s)</span>
+                            </div>
+                            <div class="owner-lifecycle-meter" aria-hidden="true">
+                                <span style="width: @status.Percentage.ToString(CultureInfo.InvariantCulture)%"></span>
+                            </div>
+                            <div class="owner-lifecycle-metrics">
+                                <strong>@status.Percentage%</strong>
+                            </div>
+                            <span class="owner-lifecycle-toggle" aria-hidden="true"></span>
+                        </summary>
+                        <div class="owner-lifecycle-products">
+                            @foreach (var product in status.Products)
+                            {
+                                <article class="owner-lifecycle-product">
+                                    <div class="owner-lifecycle-product-copy">
+                                        <a class="owner-tree-label" asp-controller="Products" asp-action="Details" asp-route-id="@product.ProductId">@product.Name</a>
+                                        <span class="table-subline">@(string.IsNullOrWhiteSpace(product.Vendor) && string.IsNullOrWhiteSpace(product.Version) ? "-" : $"{product.Vendor} {product.Version}".Trim())</span>
+                                    </div>
+                                    <div class="owner-lifecycle-product-meta">
+                                        <span class="table-subline">Owners: @(product.OwnersLabel ?? "-")</span>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    </details>
+                }
+            </div>
+        }
+    </div>
+</details>

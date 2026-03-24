@@ -2,8 +2,14 @@
 @{
     ViewData["Title"] = "Users";
     ViewData["AdminNav"] = "Users";
+    ViewData["BodyClass"] = "admin-page users-page";
     var pageStart = Math.Max(1, Model.Page - 2);
     var pageEnd = Math.Min(Model.TotalPages, Model.Page + 2);
+    var roleCount = Model.Users
+        .Select(user => user.RoleName)
+        .Where(role => !string.IsNullOrWhiteSpace(role))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
 }
 
 <div class="admin-shell">
@@ -16,6 +22,29 @@
                 <p>Create, update, delete, and reset passwords for local application users.</p>
             </div>
             <a class="btn btn-primary" asp-action="Create">Create user</a>
+        </section>
+
+        <section class="stats-grid stats-grid-compact admin-overview-grid">
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Total users</span>
+                <span class="stat-value">@Model.TotalCount</span>
+                <span class="stat-meta">local application accounts</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Visible users</span>
+                <span class="stat-value">@Model.Users.Count</span>
+                <span class="stat-meta">records on the current page</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Roles in view</span>
+                <span class="stat-value">@roleCount</span>
+                <span class="stat-meta">distinct roles on this page</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Pagination</span>
+                <span class="stat-value">@Model.Page / @Model.TotalPages</span>
+                <span class="stat-meta">@(string.IsNullOrWhiteSpace(Model.Search) ? "all users" : $"search: {Model.Search}")</span>
+            </article>
         </section>
 
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -94,10 +123,31 @@
                                 <td>@user.RoleName</td>
                                 <td>@await TimeZoneDisplay.FormatUtcAsync(user.PasswordChangedUtc)</td>
                                 <td class="text-end">
-                                    <div class="btn-group btn-group-sm">
-                                        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@user.Id">Edit</a>
-                                        <a class="btn btn-outline-secondary" asp-action="ResetPassword" asp-route-id="@user.Id">Reset password</a>
-                                        <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@user.Id">Delete</a>
+                                    <div class="table-action-group">
+                                        <a class="table-action-button"
+                                           asp-action="Edit"
+                                           asp-route-id="@user.Id"
+                                           title="Edit @user.DisplayName"
+                                           aria-label="Edit @user.DisplayName">
+                                            <partial name="_ActionIcon" model="@("edit")" />
+                                            <span class="visually-hidden">Edit</span>
+                                        </a>
+                                        <a class="table-action-button"
+                                           asp-action="ResetPassword"
+                                           asp-route-id="@user.Id"
+                                           title="Reset password for @user.DisplayName"
+                                           aria-label="Reset password for @user.DisplayName">
+                                            <partial name="_ActionIcon" model="@("reset-password")" />
+                                            <span class="visually-hidden">Reset password</span>
+                                        </a>
+                                        <a class="table-action-button table-action-button-danger"
+                                           asp-action="Delete"
+                                           asp-route-id="@user.Id"
+                                           title="Delete @user.DisplayName"
+                                           aria-label="Delete @user.DisplayName">
+                                            <partial name="_ActionIcon" model="@("trash")" />
+                                            <span class="visually-hidden">Delete</span>
+                                        </a>
                                     </div>
                                 </td>
                             </tr>

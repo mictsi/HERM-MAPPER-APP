@@ -2,6 +2,17 @@
 @{
     ViewData["Title"] = "Change Log";
     ViewData["AdminNav"] = "ChangeLog";
+    ViewData["BodyClass"] = "admin-page changelog-page";
+    var actorCount = Model.Entries
+        .Select(entry => entry.ActorUserName)
+        .Where(actor => !string.IsNullOrWhiteSpace(actor))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
+    var categoryCount = Model.Entries
+        .Select(entry => entry.Category)
+        .Where(category => !string.IsNullOrWhiteSpace(category))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
 }
 
 <div class="admin-shell">
@@ -13,6 +24,29 @@
         <h1>Central changelog</h1>
         <p>Search imports, component changes, product updates, and mapping activity.</p>
     </div>
+</section>
+
+<section class="stats-grid stats-grid-compact admin-overview-grid">
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Visible entries</span>
+        <span class="stat-value">@Model.Entries.Count</span>
+        <span class="stat-meta">audit rows in this result set</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Actors</span>
+        <span class="stat-value">@actorCount</span>
+        <span class="stat-meta">distinct users represented</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Categories</span>
+        <span class="stat-value">@categoryCount</span>
+        <span class="stat-meta">audit categories in view</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Search</span>
+        <span class="stat-value details-overview-value-small">@(string.IsNullOrWhiteSpace(Model.Search) ? "All entries" : Model.Search)</span>
+        <span class="stat-meta">current changelog scope</span>
+    </article>
 </section>
 
 <section class="content-card">

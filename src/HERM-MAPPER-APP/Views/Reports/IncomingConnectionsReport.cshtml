@@ -1,0 +1,59 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@{
+    ViewData["Title"] = "Incoming connections";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-incoming-connections" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Service connections</span>
+            <h2>TRM Products with most incoming service connections</h2>
+            <p>See which products appear most often as the destination in the service catalogue, based on both graph connections and older linear service flows.</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        @if (Model.IncomingConnections.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No incoming service connections available</h3>
+                <p>Add connected products to services to populate this ranking.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Incoming connections</th>
+                            <th>Services</th>
+                            <th>Connected from</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.IncomingConnections)
+                    {
+                        <tr>
+                            <td>
+                                <a class="owner-tree-label" asp-controller="Products" asp-action="Details" asp-route-id="@row.ProductId">@row.ProductName</a>
+                                <div class="table-subline">@(string.IsNullOrWhiteSpace(row.Vendor) && string.IsNullOrWhiteSpace(row.Version) ? "-" : $"{row.Vendor} {row.Version}".Trim())</div>
+                            </td>
+                            <td>
+                                <strong>@row.IncomingConnectionCount connection(s)</strong>
+                                <div class="table-subline">@row.ServiceCount service(s)</div>
+                            </td>
+                            <td>@row.ServicePreview</td>
+                            <td>@row.SourceProductPreview</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</details>

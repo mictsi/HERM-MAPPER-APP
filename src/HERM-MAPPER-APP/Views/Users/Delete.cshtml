@@ -2,6 +2,8 @@
 @{
     ViewData["Title"] = "Delete user";
     ViewData["AdminNav"] = "Users";
+    ViewData["BodyClass"] = "admin-page confirmation-page users-delete-page";
+    var displayName = $"{Model.GivenName} {Model.LastName}".Trim();
 }
 
 <div class="admin-shell">
@@ -11,28 +13,75 @@
             <div>
                 <span class="eyebrow">Administration</span>
                 <h1>Delete user</h1>
+                <p>Confirm the local account details before removing this user’s workspace access.</p>
             </div>
         </section>
 
-        <section class="content-card">
-            <dl class="detail-grid">
-                <dt>Given name</dt>
-                <dd>@Model.GivenName</dd>
-                <dt>Last name</dt>
-                <dd>@Model.LastName</dd>
-                <dt>Email</dt>
-                <dd>@Model.Email</dd>
-                <dt>Username</dt>
-                <dd>@Model.UserName</dd>
-                <dt>Role</dt>
-                <dd>@Model.RoleName</dd>
-            </dl>
-            <form asp-action="DeleteConfirmed" method="post" class="d-flex justify-content-end gap-2 mt-4">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" value="@Model.Id" />
-                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
-                <button class="btn btn-outline-danger" type="submit">Delete user</button>
-            </form>
+        <section class="stats-grid stats-grid-compact admin-overview-grid">
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">User record</span>
+                <span class="stat-value">@Model.Id</span>
+                <span class="stat-meta">local account identifier</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Display name</span>
+                <span class="stat-value details-overview-value-small">@displayName</span>
+                <span class="stat-meta">profile name on the account</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Role</span>
+                <span class="stat-value details-overview-value-small">@Model.RoleName</span>
+                <span class="stat-meta">workspace access being removed</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Outcome</span>
+                <span class="stat-value details-overview-value-small">Permanent</span>
+                <span class="stat-meta">the local user record will be deleted</span>
+            </article>
+        </section>
+
+        <section class="row g-4 confirmation-shell">
+            <div class="col-xl-8">
+                <section class="content-card confirmation-main-card mb-0">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">Account review</span>
+                            <h2>Identity details</h2>
+                        </div>
+                    </div>
+                    <dl class="detail-grid mb-0">
+                        <dt>Given name</dt>
+                        <dd>@Model.GivenName</dd>
+                        <dt>Last name</dt>
+                        <dd>@Model.LastName</dd>
+                        <dt>Email</dt>
+                        <dd>@Model.Email</dd>
+                        <dt>Username</dt>
+                        <dd>@Model.UserName</dd>
+                        <dt>Role</dt>
+                        <dd>@Model.RoleName</dd>
+                    </dl>
+                </section>
+            </div>
+            <div class="col-xl-4">
+                <aside class="content-card confirmation-side-card mb-0">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">Action</span>
+                            <h2>Remove access</h2>
+                        </div>
+                    </div>
+                    <div class="confirmation-note mb-3">
+                        Deleting this record removes the local account from the workspace. If the user still needs access, use Edit or Reset password instead.
+                    </div>
+                    <form asp-action="DeleteConfirmed" method="post" class="d-grid gap-2">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button class="btn btn-outline-danger" type="submit">Delete user</button>
+                        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+                    </form>
+                </aside>
+            </div>
         </section>
     </div>
 </div>

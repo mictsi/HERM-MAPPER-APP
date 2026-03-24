@@ -5,6 +5,7 @@
 @model ApplicationDetailsViewModel
 @{
     ViewData["Title"] = "Application Details";
+    ViewData["BodyClass"] = "applications-page applications-details-page";
     var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
     var statusMessage = ViewData["StatusMessage"] as string;
     var hierarchyData = JsonSerializer.Serialize(
@@ -30,12 +31,35 @@
     </div>
 </section>
 
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">ARM components</span>
+        <span class="stat-value">@Model.ArmComponentCount</span>
+        <span class="stat-meta">linked into this application</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Products</span>
+        <span class="stat-value">@Model.ProductCount</span>
+        <span class="stat-meta">supporting catalogue products</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Resolved paths</span>
+        <span class="stat-value">@Model.ResolvedPaths.Count</span>
+        <span class="stat-meta">available dependency routes</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Mapping rows</span>
+        <span class="stat-value">@Model.MappingRows.Count</span>
+        <span class="stat-meta">ARM-to-product links maintained here</span>
+    </article>
+</section>
+
 @if (!string.IsNullOrWhiteSpace(statusMessage))
 {
     <div class="alert alert-success" role="status">@statusMessage</div>
 }
 
-<section class="content-card mb-4">
+<section class="content-card mb-4 details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Summary</span>
@@ -56,7 +80,7 @@
     </dl>
 </section>
 
-<section class="content-card mb-4">
+<section class="content-card mb-4 details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Links</span>
@@ -97,7 +121,7 @@
     </div>
 </section>
 
-<section class="content-card">
+<section class="content-card details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Hierarchy</span>

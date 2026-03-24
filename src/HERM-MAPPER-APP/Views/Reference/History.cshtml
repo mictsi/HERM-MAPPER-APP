@@ -1,6 +1,9 @@
 @model ComponentHistoryViewModel
 @{
     ViewData["Title"] = "Component History";
+    ViewData["BodyClass"] = "admin-page history-page reference-history-page";
+    var deletedVersionCount = Model.Versions.Count(version => version.IsDeleted);
+    var latestVersion = Model.Versions.Count == 0 ? 0 : Model.Versions.Max(version => version.VersionNumber);
 }
 
 <section class="page-header">
@@ -10,6 +13,29 @@
         <p>Every imported, updated, deleted, and restored state for this component.</p>
     </div>
     <a class="btn btn-outline-secondary" asp-action="Index">Back to catalogue</a>
+</section>
+
+<section class="stats-grid stats-grid-compact admin-overview-grid">
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Versions</span>
+        <span class="stat-value">@Model.Versions.Count</span>
+        <span class="stat-meta">captured component snapshots</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Deleted states</span>
+        <span class="stat-value">@deletedVersionCount</span>
+        <span class="stat-meta">snapshots marked deleted</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Active states</span>
+        <span class="stat-value">@(Model.Versions.Count - deletedVersionCount)</span>
+        <span class="stat-meta">snapshots remaining active</span>
+    </article>
+    <article class="stat-card admin-overview-card">
+        <span class="stat-label">Latest version</span>
+        <span class="stat-value">@latestVersion</span>
+        <span class="stat-meta">most recent recorded version number</span>
+    </article>
 </section>
 
 <section class="content-card">

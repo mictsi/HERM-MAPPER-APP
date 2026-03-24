@@ -1,0 +1,72 @@
+@model HERMMapperApp.ViewModels.ExportDataViewModel
+@using HERMMapperApp.ViewModels
+@{
+    ViewData["Title"] = "Export Data";
+    ViewData["BodyClass"] = "reports-page export-data-page";
+    var formats = Enum.GetValues<ExportFileFormat>();
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Reports</span>
+        <h1>Export data</h1>
+        <p>Download curated HERM datasets in CSV, JSON, or XLSX from one report workspace.</p>
+    </div>
+</section>
+
+<section class="stats-grid stats-grid-compact">
+    <article class="stat-card">
+        <span class="stat-label">Datasets</span>
+        <span class="stat-value">@Model.Datasets.Count</span>
+        <span class="stat-meta">export groups available</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Formats</span>
+        <span class="stat-value">@formats.Length</span>
+        <span class="stat-meta">CSV, JSON, and XLSX</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Completed mappings</span>
+        <span class="stat-value">@Model.Datasets.FirstOrDefault(dataset => dataset.Dataset == ExportDataset.CompletedMappings)?.RecordCount</span>
+        <span class="stat-meta">sample-format rows ready to download</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">Catalogue exports</span>
+        <span class="stat-value">@Model.Datasets.Where(dataset => dataset.Dataset != ExportDataset.CompletedMappings).Sum(dataset => dataset.RecordCount)</span>
+        <span class="stat-meta">application, service, and BRM records</span>
+    </article>
+</section>
+
+<section class="export-dataset-grid">
+@foreach (var dataset in Model.Datasets)
+{
+    <article class="content-card export-dataset-card">
+        <div class="section-heading export-dataset-heading">
+            <div>
+                <span class="eyebrow">@dataset.RecordCount @dataset.RecordLabel</span>
+                <h2>@dataset.Title</h2>
+                <p>@dataset.Description</p>
+            </div>
+        </div>
+
+        <div class="export-field-list" aria-label="Included fields for @dataset.Title">
+        @foreach (var field in dataset.IncludedFields)
+        {
+            <span class="export-field-chip">@field</span>
+        }
+        </div>
+
+        <div class="export-format-group" aria-label="Export formats for @dataset.Title">
+        @foreach (var format in formats)
+        {
+            <a class="btn btn-outline-primary"
+               asp-action="DownloadExport"
+               asp-route-dataset="@dataset.Dataset"
+               asp-route-format="@format">
+                @format.ToString().ToUpperInvariant()
+            </a>
+        }
+        </div>
+    </article>
+}
+</section>

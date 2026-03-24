@@ -1,6 +1,7 @@
 @model ProductBulkEditViewModel
 @{
     ViewData["Title"] = "Bulk Edit Products";
+    ViewData["BodyClass"] = "products-page tool-page products-bulk-edit-page";
     var backUrlParameters = new List<string>();
     if (!string.IsNullOrWhiteSpace(Model.ReturnSearch))
     {
@@ -20,6 +21,18 @@
     var backUrl = backUrlParameters.Count == 0
         ? "/Products"
         : $"/Products?{string.Join("&", backUrlParameters)}";
+    var selectedOwnerCount = Model.SelectedProducts
+        .SelectMany(product => product.OwnerDisplay
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
+    var filterSummary = Model.ReturnSearch;
+    if (string.IsNullOrWhiteSpace(filterSummary))
+    {
+        filterSummary = string.IsNullOrWhiteSpace(Model.ReturnLifecycleStatus)
+            ? "All products"
+            : Model.ReturnLifecycleStatus;
+    }
 }
 
 <section class="page-header">
@@ -28,6 +41,29 @@
         <h1>Bulk edit @Model.SelectedProducts.Count product(s)</h1>
         <p>Apply the same vendor, owners, or lifecycle status across the selected products in one step.</p>
     </div>
+</section>
+
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Selected products</span>
+        <span class="stat-value">@Model.SelectedProducts.Count</span>
+        <span class="stat-meta">records included in this update</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Owners in scope</span>
+        <span class="stat-value">@selectedOwnerCount</span>
+        <span class="stat-meta">distinct owner values across the selection</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Editable fields</span>
+        <span class="stat-value">3</span>
+        <span class="stat-meta">vendor, owners, and lifecycle status</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Return filter</span>
+        <span class="stat-value details-overview-value-small">@filterSummary</span>
+        <span class="stat-meta">current products index scope</span>
+    </article>
 </section>
 
 <form asp-action="BulkEdit" method="post">
@@ -47,7 +83,7 @@
 
     <div class="row g-4">
         <div class="col-xl-8">
-            <div class="content-card">
+            <div class="content-card editor-main-card">
                 <div class="section-heading">
                     <div>
                         <span class="eyebrow">Update fields</span>
@@ -131,7 +167,7 @@
         </div>
 
         <div class="col-xl-4">
-            <aside class="content-card h-100">
+            <aside class="content-card h-100 editor-side-card">
                 <div class="section-heading">
                     <div>
                         <span class="eyebrow">Selected products</span>

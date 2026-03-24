@@ -6,9 +6,12 @@
 @model ProductVisualizationViewModel
 @{
     ViewData["Title"] = "Product Details";
+    ViewData["BodyClass"] = "products-page products-details-page";
     var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
     var isAdministrator = AppRoles.IsAdministrator(User);
     var product = Model.Product;
+    var ownerCount = product.GetOwnerValues().Count;
+    var lifecycleLabel = string.IsNullOrWhiteSpace(product.LifecycleStatus) ? "Unset" : product.LifecycleStatus;
     var hierarchyData = JsonSerializer.Serialize(
         Model.HierarchyRoot,
         new JsonSerializerOptions
@@ -37,7 +40,30 @@
     </div>
 </section>
 
-<section class="content-card mb-4">
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Mappings</span>
+        <span class="stat-value">@product.Mappings.Count</span>
+        <span class="stat-meta">TRM relationships on this product</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Owners</span>
+        <span class="stat-value">@ownerCount</span>
+        <span class="stat-meta">assigned to this catalogue record</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Resolved paths</span>
+        <span class="stat-value">@Model.Paths.Count</span>
+        <span class="stat-meta">dependency routes available</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Lifecycle</span>
+        <span class="stat-value details-overview-value-small">@lifecycleLabel</span>
+        <span class="stat-meta">current product state</span>
+    </article>
+</section>
+
+<section class="content-card mb-4 details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Product metadata</span>
@@ -60,7 +86,7 @@
     </dl>
 </section>
 
-<section class="content-card">
+<section class="content-card details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">HERM alignment</span>
@@ -144,7 +170,7 @@
     }
 </section>
 
-<section class="content-card">
+<section class="content-card details-primary-card">
     <div class="section-heading">
         <div>
             <span class="eyebrow">Hierarchy</span>

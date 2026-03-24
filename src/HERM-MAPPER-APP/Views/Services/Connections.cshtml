@@ -1,6 +1,7 @@
 @model ServiceConnectionEditorViewModel
 @{
     ViewData["Title"] = "Connect Products";
+    ViewData["BodyClass"] = "services-page services-connections-page";
     var paletteProducts = Model.ProductOptions
         .Where(option => !string.IsNullOrWhiteSpace(option.Value))
         .ToList();
@@ -17,6 +18,29 @@
         <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.ServiceId">Edit details</a>
         <a class="btn btn-primary" asp-action="Visualize" asp-route-id="@Model.ServiceId">Visualize</a>
     </div>
+</section>
+
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Palette products</span>
+        <span class="stat-value">@paletteProducts.Count</span>
+        <span class="stat-meta">available to place on the canvas</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Canvas nodes</span>
+        <span class="stat-value">@Model.CanvasNodes.Count</span>
+        <span class="stat-meta">products currently placed</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Connections</span>
+        <span class="stat-value">@Model.ConnectionRows.Count</span>
+        <span class="stat-meta">linked product-to-product flows</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Lifecycle</span>
+        <span class="stat-value details-overview-value-small">@Model.ServiceLifecycleStatus</span>
+        <span class="stat-meta">ACS @Model.AssetCriticalityScore / 5</span>
+    </article>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -37,7 +61,7 @@
 
 <form asp-action="Connections" asp-route-id="@Model.ServiceId" method="post">
     <input asp-for="ServiceId" type="hidden" />
-    <section class="content-card">
+    <section class="content-card details-primary-card">
         <div class="detail-grid">
             <div>
                 <div class="detail-label">Owner</div>
@@ -58,7 +82,7 @@
         </div>
     </section>
 
-    <section class="content-card service-canvas-editor" data-service-canvas-editor>
+    <section class="content-card service-canvas-editor details-primary-card" data-service-canvas-editor>
         <div class="section-heading">
             <div>
                 <span class="eyebrow">Connected products</span>

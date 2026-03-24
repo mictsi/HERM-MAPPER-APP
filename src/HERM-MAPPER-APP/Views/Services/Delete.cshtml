@@ -1,6 +1,7 @@
 @model ServiceCatalogItem
 @{
     ViewData["Title"] = "Trash Service";
+    ViewData["BodyClass"] = "services-page confirmation-page service-delete-page";
 }
 
 <section class="page-header">
@@ -11,36 +12,81 @@
     </div>
 </section>
 
-<section class="content-card">
-    <dl class="detail-grid mb-4">
-        <dt>Service</dt>
-        <dd>@Model.Name</dd>
-        <dt>Owner</dt>
-        <dd>@Model.Owner</dd>
-        <dt>Lifecycle</dt>
-        <dd>@Model.LifecycleStatus</dd>
-        <dt>Products</dt>
-        <dd>@Model.ProductLinks.Count</dd>
-        <dt>Connections</dt>
-        <dd>@Model.ConnectionCount</dd>
-    </dl>
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Owner</span>
+        <span class="stat-value details-overview-value-small">@(string.IsNullOrWhiteSpace(Model.Owner) ? "Unassigned" : Model.Owner)</span>
+        <span class="stat-meta">current service owner value</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Lifecycle</span>
+        <span class="stat-value details-overview-value-small">@(string.IsNullOrWhiteSpace(Model.LifecycleStatus) ? "Unset" : Model.LifecycleStatus)</span>
+        <span class="stat-meta">status shown on the catalogue record</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Linked products</span>
+        <span class="stat-value">@Model.ProductLinks.Count</span>
+        <span class="stat-meta">connected products preserved in trash</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Connections</span>
+        <span class="stat-value">@Model.ConnectionCount</span>
+        <span class="stat-meta">flow links retained for later restore</span>
+    </article>
+</section>
 
-    @if (Model.ProductLinks.Count != 0)
-    {
-        <div class="stack-list mb-4">
-            @foreach (var link in Model.GetOrderedProductLinks())
+<section class="row g-4 confirmation-shell">
+    <div class="col-xl-8">
+        <section class="content-card confirmation-main-card mb-0">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Record review</span>
+                    <h2>Service details</h2>
+                </div>
+            </div>
+            <dl class="detail-grid mb-4">
+                <dt>Service</dt>
+                <dd>@Model.Name</dd>
+                <dt>Owner</dt>
+                <dd>@Model.Owner</dd>
+                <dt>Lifecycle</dt>
+                <dd>@Model.LifecycleStatus</dd>
+                <dt>Products</dt>
+                <dd>@Model.ProductLinks.Count</dd>
+                <dt>Connections</dt>
+                <dd>@Model.ConnectionCount</dd>
+            </dl>
+
+            @if (Model.ProductLinks.Count != 0)
             {
-                <article class="stack-item">
-                    <div class="stack-title">@link.ProductCatalogItem.Name</div>
-                    <div class="table-subline">Included in the connected products map</div>
-                </article>
+                <div class="stack-list mb-0">
+                    @foreach (var link in Model.GetOrderedProductLinks())
+                    {
+                        <article class="stack-item">
+                            <div class="stack-title">@link.ProductCatalogItem.Name</div>
+                            <div class="table-subline">Included in the connected products map</div>
+                        </article>
+                    }
+                </div>
             }
-        </div>
-    }
-
-    <form asp-action="Delete" method="post" class="d-flex gap-2">
-        <input type="hidden" asp-for="Id" />
-        <button type="submit" class="btn btn-danger">Move to trash</button>
-        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
-    </form>
+        </section>
+    </div>
+    <div class="col-xl-4">
+        <aside class="content-card confirmation-side-card mb-0">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Action</span>
+                    <h2>Send to trash</h2>
+                </div>
+            </div>
+            <div class="confirmation-note mb-3">
+                Trashing the service removes it from active design flows but preserves its connected-product data for restore or permanent deletion later.
+            </div>
+            <form asp-action="Delete" method="post" class="d-grid gap-2">
+                <input type="hidden" asp-for="Id" />
+                <button type="submit" class="btn btn-danger">Move to trash</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </form>
+        </aside>
+    </div>
 </section>

@@ -1,6 +1,7 @@
 @model ServiceEditViewModel
 @{
     ViewData["Title"] = "Add Service";
+    ViewData["BodyClass"] = "services-page services-editor-page";
 }
 
 <section class="page-header">
@@ -11,7 +12,7 @@
     </div>
 </section>
 
-<form asp-action="Create" method="post">
+<form asp-action="Create" method="post" class="editor-form-shell">
     <partial name="_DetailsForm" model="Model" />
 </form>
 

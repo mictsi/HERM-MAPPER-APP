@@ -1,0 +1,69 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@{
+    ViewData["Title"] = "BRM Model diagram";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-brm-model" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Model diagram</span>
+            <h2>@Model.BrmModelDiagram.DiagramTitle</h2>
+            <p>@Model.BrmModelDiagram.DiagramDescription</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        @if (Model.BrmModelOptions.Count != 0)
+        {
+            <form method="get" asp-action="BrmModelReport" class="owner-lifecycle-filter-form mb-3">
+                <div>
+                    <label class="form-label" for="brmModelId">BRM model</label>
+                    <select class="form-select" id="brmModelId" name="brmModelId" asp-items="Model.BrmModelOptions"></select>
+                </div>
+                <div class="owner-lifecycle-filter-actions">
+                    <button class="btn btn-primary" type="submit">View model</button>
+                </div>
+            </form>
+        }
+
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" asp-route-brmModelId="@Model.BrmModelDiagram.BrmModelId" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.BrmModelDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.BrmModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" asp-route-brmModelId="@Model.BrmModelDiagram.BrmModelId">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.BrmModelDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.BrmModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.BrmModelDiagram.ScopeKey" asp-route-brmModelId="@Model.BrmModelDiagram.BrmModelId">Download Archi XML</a>
+            }
+        </div>
+
+        @if (!Model.BrmModelDiagram.HasAnyContent)
+        {
+            <div class="empty-state compact">
+                <h3>@Model.BrmModelDiagram.EmptyStateTitle</h3>
+                <p>@Model.BrmModelDiagram.EmptyStateBody</p>
+                @if (Model.BrmModelOptions.Count == 0)
+                {
+                    <p><a asp-controller="BrmModels" asp-action="Create">Create a BRM model</a> to start building this diagram.</p>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.BrmModelDiagram.DomainCount</strong> domains</span>
+                <span class="report-summary-chip"><strong>@Model.BrmModelDiagram.CapabilityCount</strong> capabilities</span>
+                <span class="report-summary-chip"><strong>@Model.BrmModelDiagram.ComponentCount</strong> components</span>
+                <span class="report-summary-chip"><strong>@Model.BrmModelDiagram.ItemCount</strong> @Model.BrmModelDiagram.MappedSummaryLabel</span>
+            </div>
+
+            <div class="model-report-preview-frame">
+                <partial name="_ModelDiagramReport" model="Model.BrmModelDiagram" />
+            </div>
+        }
+    </div>
+</details>
