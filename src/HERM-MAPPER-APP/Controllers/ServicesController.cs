@@ -1069,12 +1069,12 @@ public sealed class ServicesController(
                 return;
             }
 
-            if (existingNode.X is null && node.X is not null)
+            if (node.X is not null)
             {
                 existingNode.X = node.X;
             }
 
-            if (existingNode.Y is null && node.Y is not null)
+            if (node.Y is not null)
             {
                 existingNode.Y = node.Y;
             }

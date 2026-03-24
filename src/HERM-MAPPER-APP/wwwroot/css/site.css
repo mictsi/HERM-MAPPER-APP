@@ -4225,6 +4225,35 @@ a {
   line-height: 1.2;
 }
 
+.products-details-page .product-details-page-actions,
+.products-details-page .product-details-table-actions {
+  align-items: center;
+}
+
+.products-details-page .product-details-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+}
+
+.products-details-page .product-details-icon-button-sm {
+  width: 2rem;
+  height: 2rem;
+}
+
+.products-details-page .product-details-icon-button svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.45;
+}
+
 .applications-overview-grid,
 .services-overview-grid,
 .brm-models-overview-grid,

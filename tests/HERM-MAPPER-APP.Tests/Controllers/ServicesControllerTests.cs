@@ -1222,6 +1222,9 @@ public sealed class ServicesControllerTests
         Assert.Equal(1, nodes[0].GetProperty("productId").GetInt32());
         Assert.Equal(10, nodes[0].GetProperty("x").GetDouble());
         Assert.Equal(40, nodes[0].GetProperty("y").GetDouble());
+        Assert.Equal(2, nodes[1].GetProperty("productId").GetInt32());
+        Assert.Equal(50, nodes[1].GetProperty("x").GetDouble());
+        Assert.Equal(60, nodes[1].GetProperty("y").GetDouble());
         Assert.Equal(3, nodes[2].GetProperty("productId").GetInt32());
         Assert.True(nodes[2].GetProperty("x").ValueKind is JsonValueKind.Null);
         Assert.True(nodes[2].GetProperty("y").ValueKind is JsonValueKind.Null);

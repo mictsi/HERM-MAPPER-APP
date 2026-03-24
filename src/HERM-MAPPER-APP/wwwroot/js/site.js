@@ -1902,15 +1902,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const getDefaultNodePosition = () => {
       const index = state.nodes.size;
       const columns = getCanvasColumnCapacity();
+        const viewportLeft = stage.scrollLeft;
+        const viewportTop = stage.scrollTop;
+
       return {
-        x: 56 + ((index % columns) * (canvasNodeWidth + canvasColumnGap)),
-        y: 56 + (Math.floor(index / columns) * (canvasNodeHeight + canvasRowGap))
+          x: viewportLeft + 56 + ((index % columns) * (canvasNodeWidth + canvasColumnGap)),
+          y: viewportTop + 56 + (Math.floor(index / columns) * (canvasNodeHeight + canvasRowGap))
       };
     };
 
     const getViewportPlacementPoint = () => ({
-      x: (stage.clientWidth / 2) - (canvasNodeWidth / 2),
-      y: (stage.clientHeight / 2) - (canvasNodeHeight / 2)
+        x: stage.scrollLeft + (stage.clientWidth / 2) - (canvasNodeWidth / 2),
+        y: stage.scrollTop + (stage.clientHeight / 2) - (canvasNodeHeight / 2)
     });
 
     const placeNode = (productId, point = null) => {

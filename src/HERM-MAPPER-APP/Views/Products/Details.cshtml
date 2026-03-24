@@ -26,16 +26,63 @@
         <h1>@product.Name</h1>
         <p>@product.Vendor @product.Version</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 product-details-page-actions">
         @if (isAdministrator)
         {
-        <a class="btn btn-primary" asp-controller="Mappings" asp-action="Create" asp-route-productId="@product.Id">Add mapping</a>
+        <a class="btn btn-primary product-details-icon-button"
+           asp-controller="Mappings"
+           asp-action="Create"
+           asp-route-productId="@product.Id"
+           aria-label="Add mapping"
+           title="Add mapping">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M8 3.25v9.5"></path>
+                <path d="M3.25 8h9.5"></path>
+            </svg>
+        </a>
         }
-        <a class="btn btn-outline-secondary" asp-action="Visualize" asp-route-id="@product.Id">Visualize</a>
-        <a class="btn btn-outline-secondary" asp-action="ShowDependencies" asp-route-id="@product.Id">Show dependencies</a>
+        <a class="btn btn-outline-secondary product-details-icon-button"
+           asp-action="Visualize"
+           asp-route-id="@product.Id"
+           aria-label="Visualize"
+           title="Visualize">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <circle cx="3.25" cy="8" r="1.35"></circle>
+                <circle cx="8" cy="3.25" r="1.35"></circle>
+                <circle cx="12.75" cy="8" r="1.35"></circle>
+                <circle cx="8" cy="12.75" r="1.35"></circle>
+                <path d="M4.35 7.15 6.95 4.35"></path>
+                <path d="M9.05 4.35 11.65 7.15"></path>
+                <path d="M11.65 8.85 9.05 11.65"></path>
+                <path d="M6.95 11.65 4.35 8.85"></path>
+            </svg>
+        </a>
+        <a class="btn btn-outline-secondary product-details-icon-button"
+           asp-action="ShowDependencies"
+           asp-route-id="@product.Id"
+           aria-label="Show dependencies"
+           title="Show dependencies">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <rect x="2.25" y="2.5" width="3.5" height="3.25" rx="0.7"></rect>
+                <rect x="10.25" y="2.5" width="3.5" height="3.25" rx="0.7"></rect>
+                <rect x="6.25" y="10.25" width="3.5" height="3.25" rx="0.7"></rect>
+                <path d="M5.75 4.125h4.5"></path>
+                <path d="M8 5.75v4.5"></path>
+            </svg>
+        </a>
         @if (canManageProductsAndServices)
         {
-        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@product.Id">Edit product</a>
+        <a class="btn btn-outline-secondary product-details-icon-button"
+           asp-action="Edit"
+           asp-route-id="@product.Id"
+           aria-label="Edit product"
+           title="Edit product">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M3 13h2.6l6.2-6.2-2.6-2.6L3 10.4V13Z"></path>
+                <path d="m8.85 4.15 2.6 2.6"></path>
+                <path d="M2.75 13.25h10.5"></path>
+            </svg>
+        </a>
         }
     </div>
 </section>
@@ -156,9 +203,34 @@
                         <td class="text-end">
                             @if (isAdministrator)
                             {
-                            <div class="btn-group btn-group-sm">
-                                <a class="btn btn-outline-secondary" asp-controller="Mappings" asp-action="Edit" asp-route-id="@mapping.Id">Modify mapping</a>
-                                <a class="btn btn-outline-danger" asp-controller="Mappings" asp-action="Delete" asp-route-id="@mapping.Id">Delete</a>
+                            <div class="btn-group btn-group-sm product-details-table-actions">
+                                <a class="btn btn-outline-secondary product-details-icon-button product-details-icon-button-sm"
+                                   asp-controller="Mappings"
+                                   asp-action="Edit"
+                                   asp-route-id="@mapping.Id"
+                                   aria-label="Modify mapping"
+                                   title="Modify mapping">
+                                    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                                        <path d="M3 13h2.6l6.2-6.2-2.6-2.6L3 10.4V13Z"></path>
+                                        <path d="m8.85 4.15 2.6 2.6"></path>
+                                        <path d="M2.75 13.25h10.5"></path>
+                                    </svg>
+                                </a>
+                                <a class="btn btn-outline-danger product-details-icon-button product-details-icon-button-sm"
+                                   asp-controller="Mappings"
+                                   asp-action="Delete"
+                                   asp-route-id="@mapping.Id"
+                                   aria-label="Delete mapping"
+                                   title="Delete mapping">
+                                    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                                        <path d="M3.5 4.5h9"></path>
+                                        <path d="M6.25 2.75h3.5"></path>
+                                        <path d="M5 4.5v7.25"></path>
+                                        <path d="M8 4.5v7.25"></path>
+                                        <path d="M11 4.5v7.25"></path>
+                                        <path d="M4.5 4.5l.55 8.1c.04.55.49.97 1.04.97h3.82c.55 0 1-.42 1.04-.97l.55-8.1"></path>
+                                    </svg>
+                                </a>
                             </div>
                             }
                         </td>
