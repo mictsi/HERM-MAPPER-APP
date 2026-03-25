@@ -2,7 +2,8 @@
 // for details on configuring this project to bundle and minify static web assets.
 
 document.addEventListener("DOMContentLoaded", () => {
-  const shellNavStorageKey = "herm-shell-nav-state";
+  const shellNavLegacyStorageKey = "herm-shell-nav-state";
+  const shellNavStorageKey = "herm-shell-nav-state-v2";
   const shellIsMobile = () => window.matchMedia("(max-width: 991.98px)").matches;
   const shellGroups = Array.from(document.querySelectorAll("details[data-shell-nav-group]"));
   const shellRoot = document.body;
@@ -30,7 +31,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const readShellNavState = () => {
     try {
-      const rawState = window.localStorage.getItem(shellNavStorageKey);
+      window.localStorage.removeItem(shellNavLegacyStorageKey);
+
+      const rawState = window.sessionStorage.getItem(shellNavStorageKey);
       if (rawState === null) {
         return {};
       }
@@ -45,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const writeShellNavState = (state) => {
     try {
-      window.localStorage.setItem(shellNavStorageKey, JSON.stringify(state));
+      window.sessionStorage.setItem(shellNavStorageKey, JSON.stringify(state));
     } catch (error) {
       console.warn("Unable to persist sidebar navigation state", error);
     }
