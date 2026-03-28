@@ -129,7 +129,7 @@
                 <summary class="admin-disclosure-summary">
                     <div>
                         <span class="eyebrow">Regional display</span>
-                        <h2>Display time zone</h2>
+                        <h2>Change time zone</h2>
                         <p>Choose the time zone used when timestamps are shown in the application.</p>
                     </div>
                     <span class="admin-disclosure-meta">@Model.DisplayTimeZoneId</span>
@@ -159,7 +159,7 @@
                 <summary class="admin-disclosure-summary">
                     <div>
                         <span class="eyebrow">Remote import</span>
-                        <h2>Remote MS SQL product import</h2>
+                        <h2>Import products from Remote MS SQL server</h2>
                         <p>Configure a remote SQL Server source for products and mappings, test it, and run imports on demand or on a schedule.</p>
                     </div>
                     <span class="admin-disclosure-meta">@remoteSqlImport.StatusSummary</span>
@@ -395,8 +395,8 @@
                 <summary class="admin-disclosure-summary">
                     <div>
                         <span class="eyebrow">Catalogue import</span>
-                        <h2>Verify workbook before importing</h2>
-                        <p>Upload the HERM workbook and review the proposed changes before applying them.</p>
+                        <h2>Import models to catalogue</h2>
+                        <p>Import models to the catalogue by uploading the HERM catalogue and reviewing the proposed changes before applying them.</p>
                     </div>
                     @if (catalogueReview is not null)
                     {
@@ -508,8 +508,8 @@
                 <summary class="admin-disclosure-summary">
                     <div>
                         <span class="eyebrow">Product import</span>
-                        <h2>Review CSV rows before importing</h2>
-                        <p>Verify product CSV rows before they add products or mappings.</p>
+                        <h2>Import products to catalogue</h2>
+                        <p>Import products to catalogue and verify product CSV rows before they add products or mappings.</p>
                     </div>
                     @if (productReview is not null)
                     {
