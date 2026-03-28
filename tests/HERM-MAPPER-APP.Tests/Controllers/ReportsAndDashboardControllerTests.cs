@@ -270,6 +270,20 @@ public sealed class ReportsAndDashboardControllerTests
             ParentCapability = brmCapability,
             ParentCapabilityCode = brmCapability.Code
         };
+        var unmappedCapability = new BrmCapability
+        {
+            Code = "BC003",
+            Name = "Student Support",
+            ParentDomain = brmDomain,
+            ParentDomainCode = brmDomain.Code
+        };
+        var unmappedComponent = new BrmComponent
+        {
+            Code = "BC004",
+            Name = "Case Guidance",
+            ParentCapability = unmappedCapability,
+            ParentCapabilityCode = unmappedCapability.Code
+        };
         var studentArmDomain = new ArmDomain
         {
             Code = "AD001",
@@ -315,6 +329,8 @@ public sealed class ReportsAndDashboardControllerTests
             brmDomain,
             brmCapability,
             brmComponent,
+            unmappedCapability,
+            unmappedComponent,
             studentArmDomain,
             studentArmCapability,
             studentArmComponent,
@@ -359,6 +375,7 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Equal(selectedModel.Id, indexModel.SelectedBrmModelId);
         Assert.Equal(2, indexModel.BrmModelOptions.Count);
         Assert.Equal(selectedModel.Id, indexModel.BrmModelDiagram.BrmModelId);
+        Assert.False(indexModel.BrmModelDiagram.OnlyShowMappedNodes);
         Assert.Contains("Student BRM", indexModel.BrmModelDiagram.DiagramDescription);
 
         var mappedArmDomains = indexModel.BrmModelDiagram.Domains
@@ -371,12 +388,42 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Contains("AD001 Student", mappedArmDomains);
         Assert.DoesNotContain("AD002 Finance", mappedArmDomains);
 
+        var brmComponentNames = indexModel.BrmModelDiagram.Domains
+            .SelectMany(domain => domain.Capabilities)
+            .SelectMany(capabilityNode => capabilityNode.Components)
+            .Select(componentNode => componentNode.Name)
+            .ToList();
+
+        Assert.Contains("Student Recruitment", brmComponentNames);
+        Assert.Contains("Case Guidance", brmComponentNames);
+
         var posterResult = await fixture.CreateReportsController().ModelDiagram("brm", selectedModel.Id);
 
         var posterView = Assert.IsType<ViewResult>(posterResult);
         var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
         Assert.Equal(selectedModel.Id, posterModel.BrmModelId);
+        Assert.False(posterModel.OnlyShowMappedNodes);
         Assert.Contains("Student BRM", posterModel.PosterTitle);
+    }
+
+    [Fact]
+    public void ModelDiagramPosterSvgBuildsImplicitWhiteCardsForBrmPosterNodes()
+    {
+        var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
+        {
+            ContentRootPath = ResolveRepositoryRoot()
+        });
+
+        var svg = service.BuildSvg(new ModelDiagramReportViewModel
+        {
+            ScopeKey = "brm"
+        });
+
+        Assert.Contains(
+            "<rect x=\"995.872\" y=\"462.191\" width=\"177.165\" height=\"70.866\" rx=\"16\" ry=\"16\" fill=\"#ffffff\" stroke=\"none\" stroke-width=\"1\" /><text x=\"1001.967\" y=\"480.16\" fill=\"#1f2933\"",
+            svg);
+        Assert.Contains("Student Academic", svg);
+        Assert.Contains("(BC046)", svg);
     }
 
     [Fact]
@@ -567,5 +614,21 @@ public sealed class ReportsAndDashboardControllerTests
         public string EnvironmentName { get; set; } = "Development";
         public string ContentRootPath { get; set; } = System.IO.Path.GetTempPath();
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static string ResolveRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, ".local.data", "Model", "HERM-BRM-V320-model.drawio")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the repository root for BRM poster template tests.");
     }
 }

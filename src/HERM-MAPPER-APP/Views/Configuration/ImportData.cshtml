@@ -1,0 +1,36 @@
+@model ConfigurationIndexViewModel
+@using HERMMapperApp.ViewModels
+@{
+    ViewData["Title"] = "Import data";
+    ViewData["AdminNav"] = "ImportData";
+    ViewData["BodyClass"] = "admin-page configuration-page import-data-page";
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Admin workflow</span>
+                <h1>Import data</h1>
+                <p>Manage the catalogue import workflows, product CSV validation, and the remote SQL import connection.</p>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-success mb-0">@Model.StatusMessage</div>
+            </section>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage) && string.IsNullOrWhiteSpace(Model.ErrorSectionKey))
+        {
+            <section class="content-card">
+                <div class="alert alert-danger mb-0">@Model.ErrorMessage</div>
+            </section>
+        }
+
+        @await Html.PartialAsync("_ImportDataSections", Model)
+    </div>
+</div>

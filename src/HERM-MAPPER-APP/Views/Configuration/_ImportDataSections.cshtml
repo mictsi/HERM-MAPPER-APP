@@ -1,0 +1,567 @@
+@model ConfigurationIndexViewModel
+@using HERMMapperApp
+@using HERMMapperApp.Models
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
+@{
+    var catalogueReview = Model.CatalogueImportReview.Verification;
+    var productReview = Model.ProductImportReview.Verification;
+    var remoteSqlImport = Model.RemoteSqlImport;
+    var openCatalogueImport = Model.CatalogueImportReview.HasReview;
+    var openProductImport = Model.ProductImportReview.HasReview;
+    var openRemoteSqlImport = Model.OpenRemoteSqlImportSection;
+    var importModeCardClass = "import-status-card-warning";
+    var importModeLabel = "Manual";
+    if (!remoteSqlImport.IsEnabled)
+    {
+        importModeCardClass = "import-status-card-danger";
+        importModeLabel = "Disabled";
+    }
+    else if (remoteSqlImport.Input.ScheduleHours > 0)
+    {
+        importModeCardClass = "import-status-card-success";
+        importModeLabel = "Scheduled";
+    }
+    var storedCredentialsCardClass = remoteSqlImport.HasSavedUserName && remoteSqlImport.HasSavedPassword
+        ? "import-status-card-success"
+        : string.Empty;
+    var lastRunCardClass = remoteSqlImport.StatusSummary switch
+    {
+        "Last run succeeded" => "import-status-card-success",
+        "Last run failed" => "import-status-card-danger",
+        "Import in progress" => "import-status-card-warning",
+        _ when remoteSqlImport.IsEnabled && remoteSqlImport.NextScheduledRunUtc.HasValue => "import-status-card-warning",
+        _ => string.Empty
+    };
+    bool showErrorForSection(string sectionKey) =>
+        !string.IsNullOrWhiteSpace(Model.ErrorMessage) &&
+        string.Equals(Model.ErrorSectionKey, sectionKey, StringComparison.OrdinalIgnoreCase);
+    var userNameHelpText = "Required for SQL login.";
+    if (remoteSqlImport.Input.UseIntegratedSecurity)
+    {
+        userNameHelpText = "Ignored when integrated security is selected.";
+    }
+    else if (remoteSqlImport.HasSavedUserName)
+    {
+        userNameHelpText = $"A user name is already saved ({remoteSqlImport.SavedUserNameDisplay}). Enter a new one only to replace it.";
+    }
+
+    var secretHelpText = "Required for SQL login.";
+    if (remoteSqlImport.Input.UseIntegratedSecurity)
+    {
+        secretHelpText = "Ignored when integrated security is selected.";
+    }
+    else if (remoteSqlImport.HasSavedPassword)
+    {
+        secretHelpText = "A password is already saved. Leave this blank to keep it.";
+    }
+}
+
+<section class="content-card">
+    @if (showErrorForSection(RemoteSqlImportService.SectionKey))
+    {
+        <div class="alert alert-danger mb-3">@Model.ErrorMessage</div>
+    }
+    <details class="admin-disclosure" @(openRemoteSqlImport ? "open" : null)>
+        <summary class="admin-disclosure-summary">
+            <div>
+                <span class="eyebrow">Remote import</span>
+                <h2>Import products from Remote MS SQL server</h2>
+                <p>Configure a remote SQL Server source for products and mappings, test it, and run imports on demand or on a schedule.</p>
+            </div>
+            <span class="admin-disclosure-meta">@remoteSqlImport.StatusSummary</span>
+        </summary>
+        <div class="admin-disclosure-body">
+            <p class="mb-3">The connection is only saved after a successful connection and schema test. Enter the SQL Server settings as separate fields below. Credentials are stored separately and hidden after save. Leave the password blank to keep the currently saved secret. Disable import to pause both scheduled and manual imports without losing the saved connection details.</p>
+
+            @if (!string.IsNullOrWhiteSpace(remoteSqlImport.SavedUserNameClearText) || !string.IsNullOrWhiteSpace(remoteSqlImport.SavedPasswordClearText))
+            {
+                <div class="alert alert-warning mt-3">
+                    <strong>Saved credentials shown once.</strong>
+                    <div class="mt-2">User name: <code>@(remoteSqlImport.SavedUserNameClearText ?? "(unchanged)")</code></div>
+                    <div>Password: <code>@(remoteSqlImport.SavedPasswordClearText ?? "(unchanged)")</code></div>
+                </div>
+            }
+
+            <div class="stats-grid stats-grid-compact import-stats mb-4">
+                <article class="stat-card @importModeCardClass">
+                    <span class="stat-label">Import mode</span>
+                    <span class="stat-value">@importModeLabel</span>
+                    <span class="stat-meta">
+                        @if (!remoteSqlImport.IsEnabled)
+                        {
+                            <text>Manual and scheduled imports are blocked</text>
+                        }
+                        else if (remoteSqlImport.Input.ScheduleHours > 0)
+                        {
+                            <text>Automatic import schedule is active</text>
+                        }
+                        else
+                        {
+                            <text>Imports run only when started manually</text>
+                        }
+                    </span>
+                </article>
+                <article class="stat-card @importModeCardClass">
+                    <span class="stat-label">Schedule</span>
+                    <span class="stat-value">@remoteSqlImport.ScheduleSummary</span>
+                    <span class="stat-meta">
+                        @if (!remoteSqlImport.IsEnabled)
+                        {
+                            <text>Imports are currently disabled</text>
+                        }
+                        else if (remoteSqlImport.NextScheduledRunUtc.HasValue)
+                        {
+                            <text>Next run: @await TimeZoneDisplay.FormatUtcAsync(remoteSqlImport.NextScheduledRunUtc.Value)</text>
+                        }
+                        else
+                        {
+                            <text>Manual runs only</text>
+                        }
+                    </span>
+                </article>
+                <article class="stat-card @storedCredentialsCardClass">
+                    <span class="stat-label">Stored credentials</span>
+                    <span class="stat-value">@remoteSqlImport.SavedUserNameDisplay</span>
+                    <span class="stat-meta">Password: @remoteSqlImport.SavedPasswordDisplay</span>
+                </article>
+                <article class="stat-card @lastRunCardClass">
+                    <span class="stat-label">Last run</span>
+                    <span class="stat-value">@remoteSqlImport.StatusSummary</span>
+                    <span class="stat-meta">
+                        @if (remoteSqlImport.LastSuccessUtc.HasValue)
+                        {
+                            <text>Last success: @await TimeZoneDisplay.FormatUtcAsync(remoteSqlImport.LastSuccessUtc.Value)</text>
+                        }
+                        else if (remoteSqlImport.LastAttemptUtc.HasValue)
+                        {
+                            <text>Last attempt: @await TimeZoneDisplay.FormatUtcAsync(remoteSqlImport.LastAttemptUtc.Value)</text>
+                        }
+                        else
+                        {
+                            <text>No import has run yet</text>
+                        }
+                    </span>
+                </article>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(remoteSqlImport.LastMessage))
+            {
+                <div class="alert alert-secondary mb-4">@remoteSqlImport.LastMessage</div>
+            }
+
+            <form asp-action="SaveRemoteSqlImportConfiguration" method="post" class="row g-3">
+                @Html.AntiForgeryToken()
+                <div class="col-lg-6">
+                    <label class="form-label" for="RemoteServerName">Server</label>
+                    <input class="form-control" id="RemoteServerName" name="ServerName" value="@remoteSqlImport.Input.ServerName" autocomplete="off" />
+                    <div class="form-text">Example: <code>sql.example.com</code></div>
+                </div>
+                <div class="col-lg-2">
+                    <label class="form-label" for="RemotePort">Port</label>
+                    <input class="form-control" id="RemotePort" name="Port" type="number" min="1" max="65535" value="@remoteSqlImport.Input.Port" />
+                </div>
+                <div class="col-lg-4">
+                    <label class="form-label" for="RemoteDatabaseName">Database</label>
+                    <input class="form-control" id="RemoteDatabaseName" name="DatabaseName" value="@remoteSqlImport.Input.DatabaseName" autocomplete="off" />
+                </div>
+                <div class="col-lg-4">
+                    <label class="form-label" for="RemoteEncrypt">Encrypt connection</label>
+                    <select class="form-select" id="RemoteEncrypt" name="Encrypt">
+                        <option value="true" selected="@(remoteSqlImport.Input.Encrypt ? "selected" : null)">Yes</option>
+                        <option value="false" selected="@(!remoteSqlImport.Input.Encrypt ? "selected" : null)">No</option>
+                    </select>
+                </div>
+                <div class="col-lg-4">
+                    <label class="form-label" for="RemoteTrustServerCertificate">Trust server certificate</label>
+                    <select class="form-select" id="RemoteTrustServerCertificate" name="TrustServerCertificate">
+                        <option value="false" selected="@(!remoteSqlImport.Input.TrustServerCertificate ? "selected" : null)">No</option>
+                        <option value="true" selected="@(remoteSqlImport.Input.TrustServerCertificate ? "selected" : null)">Yes</option>
+                    </select>
+                </div>
+                <div class="col-lg-4">
+                    <label class="form-label" for="RemoteUseIntegratedSecurity">Authentication</label>
+                    <select class="form-select" id="RemoteUseIntegratedSecurity" name="UseIntegratedSecurity">
+                        <option value="false" selected="@(!remoteSqlImport.Input.UseIntegratedSecurity ? "selected" : null)">SQL login</option>
+                        <option value="true" selected="@(remoteSqlImport.Input.UseIntegratedSecurity ? "selected" : null)">Integrated security</option>
+                    </select>
+                    <div class="form-text mt-2">
+                        Required source tables and columns are listed in <code>docs/remote-sql-import-source-schema.sql</code>.
+                        Use it as the reference for the remote SQL import source schema.
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <label class="form-label" for="RemoteUserName">User name</label>
+                    <input class="form-control" id="RemoteUserName" name="UserName" value="@remoteSqlImport.Input.UserName" autocomplete="off" />
+                    <div class="form-text">
+                        @userNameHelpText
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <label class="form-label" for="RemotePassword">Password</label>
+                    <input class="form-control" id="RemotePassword" name="Password" type="password" autocomplete="new-password" />
+                    <div class="form-text">
+                        @secretHelpText
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <label class="form-label" for="RemoteScheduleHours">Schedule</label>
+                    <select class="form-select" id="RemoteScheduleHours" name="ScheduleHours" asp-items="remoteSqlImport.ScheduleOptions"></select>
+                </div>
+                <div class="col-12 d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary" type="submit">Test and save remote SQL settings</button>
+                    <button class="btn btn-outline-secondary" type="submit" formaction="@Url.Action("TestRemoteSqlImportConnection", "Configuration")">Test connection</button>
+                </div>
+            </form>
+
+            <div class="d-flex gap-2 flex-wrap mt-3">
+                <form asp-action="RunRemoteSqlImportNow" method="post">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-outline-primary" type="submit" @(remoteSqlImport.CanRunImportNow ? null : "disabled")>Run import now</button>
+                </form>
+                <form asp-action="SetRemoteSqlImportEnabled" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="isEnabled" value="@(remoteSqlImport.IsEnabled ? "false" : "true")" />
+                    <button class="btn @(remoteSqlImport.IsEnabled ? "btn-outline-warning" : "btn-outline-primary")" type="submit">
+                        @(remoteSqlImport.IsEnabled ? "Disable import" : "Enable import")
+                    </button>
+                </form>
+                <form asp-action="ClearRemoteSqlImportConfiguration" method="post">
+                    @Html.AntiForgeryToken()
+                    <button class="btn btn-outline-danger" type="submit">Clear saved SQL configuration</button>
+                </form>
+            </div>
+            <p class="form-text mt-2 mb-0">Clearing removes the saved server, database, schedule, execution state, and stored credentials from the database.</p>
+
+            @if (remoteSqlImport.TestResult is not null)
+            {
+                <div class="import-review mt-4">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">Connection test</span>
+                            <h3>@remoteSqlImport.TestResult.Summary</h3>
+                        </div>
+                        <span class="status-pill @(remoteSqlImport.TestResult.IsSuccess ? "status-complete" : "status-outofscope")">
+                            @(remoteSqlImport.TestResult.IsSuccess ? "Connection ready" : "Connection failed")
+                        </span>
+                    </div>
+
+                    <div class="stats-grid stats-grid-compact import-stats">
+                        <article class="stat-card">
+                            <span class="stat-label">Remote products</span>
+                            <span class="stat-value">@remoteSqlImport.TestResult.RemoteProductCount</span>
+                            <span class="stat-meta">Active product rows found</span>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-label">Remote mappings</span>
+                            <span class="stat-value">@remoteSqlImport.TestResult.RemoteMappingCount</span>
+                            <span class="stat-meta">Product-to-component mappings found</span>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-label">Owners table</span>
+                            <span class="stat-value">@(remoteSqlImport.TestResult.OwnersTableAvailable ? "Available" : "Missing")</span>
+                            <span class="stat-meta">Owner values @(remoteSqlImport.TestResult.OwnersTableAvailable ? "can" : "cannot") be imported</span>
+                        </article>
+                    </div>
+
+                    @if (remoteSqlImport.TestResult.Errors.Count > 0)
+                    {
+                        <div class="alert alert-danger mt-3 mb-0">
+                            <ul class="mb-0">
+                                @foreach (var error in remoteSqlImport.TestResult.Errors)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    @if (remoteSqlImport.TestResult.Warnings.Count > 0)
+                    {
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <ul class="mb-0">
+                                @foreach (var warning in remoteSqlImport.TestResult.Warnings)
+                                {
+                                    <li>@warning</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </details>
+</section>
+
+<section class="content-card">
+    @if (showErrorForSection("product-import"))
+    {
+        <div class="alert alert-danger mb-3">@Model.ErrorMessage</div>
+    }
+    <details class="admin-disclosure" @(openProductImport ? "open" : null)>
+        <summary class="admin-disclosure-summary">
+            <div>
+                <span class="eyebrow">Product import</span>
+                <h2>Import products to catalogue</h2>
+                <p>Import products to catalogue and verify product CSV rows before they add products or mappings.</p>
+            </div>
+            @if (productReview is not null)
+            {
+                <span class="status-pill @(productReview.IsValid ? "status-complete" : "status-outofscope")">
+                    @(productReview.IsValid ? "Ready to import" : "Verification failed")
+                </span>
+            }
+            else
+            {
+                <span class="admin-disclosure-meta">Collapsed by default</span>
+            }
+        </summary>
+        <div class="admin-disclosure-body">
+            <p class="mb-3">Upload a semicolon-separated CSV with the columns <code>MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT</code>. Each row is previewed before import so you can see whether it will add a product, create a mapping, or import the product only.</p>
+            <form asp-action="VerifyProductImport" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+                @Html.AntiForgeryToken()
+                <div class="col-lg-8">
+                    <label class="form-label" for="csvFile">CSV file</label>
+                    <input class="form-control" id="csvFile" name="csvFile" type="file" accept=".csv,text/csv" />
+                </div>
+                <div class="col-lg-4 d-grid">
+                    <button class="btn btn-primary" type="submit">Verify product CSV</button>
+                </div>
+            </form>
+
+            @if (Model.ProductImportReview.HasReview && productReview is not null)
+            {
+                <div class="import-review mt-4">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">Verification result</span>
+                            <h3>@(Model.ProductImportReview.UploadedFileName ?? "Uploaded CSV")</h3>
+                        </div>
+                        <span class="status-pill @(productReview.IsValid ? "status-complete" : "status-outofscope")">
+                            @(productReview.IsValid ? "Ready to import" : "Verification failed")
+                        </span>
+                    </div>
+
+                    <div class="stats-grid stats-grid-compact import-stats">
+                        <article class="stat-card">
+                            <span class="stat-label">Rows read</span>
+                            <span class="stat-value">@productReview.RowsRead</span>
+                            <span class="stat-meta">@productReview.RowsSkipped skipped</span>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-label">Products</span>
+                            <span class="stat-value">+@productReview.ProductsToAdd</span>
+                            <span class="stat-meta">@productReview.ProductsMatched existing matched</span>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-label">Mappings</span>
+                            <span class="stat-value">+@productReview.MappingsToAdd</span>
+                            <span class="stat-meta">@productReview.MappingsSkippedAsDuplicate duplicate, @productReview.ProductsOnlyRows product-only</span>
+                        </article>
+                    </div>
+
+                    @if (productReview.Errors.Count > 0)
+                    {
+                        <div class="alert alert-danger mt-3 mb-0">
+                            <strong>Import is blocked.</strong>
+                            <ul class="mb-0 mt-2">
+                                @foreach (var error in productReview.Errors)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    @if (productReview.Warnings.Count > 0)
+                    {
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <ul class="mb-0">
+                                @foreach (var warning in productReview.Warnings)
+                                {
+                                    <li>@warning</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    @if (productReview.Rows.Count > 0)
+                    {
+                        <div class="table-responsive mt-3">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Row</th>
+                                        <th>Product</th>
+                                        <th>MODEL</th>
+                                        <th>DOMAIN</th>
+                                        <th>CAPABILITY</th>
+                                        <th>COMPONENT</th>
+                                        <th>Action</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @foreach (var row in productReview.Rows)
+                                {
+                                    var statusClass = row.StatusKind switch
+                                    {
+                                        ProductImportStatusKind.Ready => "status-complete",
+                                        ProductImportStatusKind.Warning => "status-inreview",
+                                        _ => "status-outofscope"
+                                    };
+                                    <tr>
+                                        <td>@row.RowNumber</td>
+                                        <td>@(string.IsNullOrWhiteSpace(row.ProductName) ? "-" : row.ProductName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(row.ModelName) ? "-" : row.ModelName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(row.DomainName) ? "-" : row.DomainName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(row.CapabilityName) ? "-" : row.CapabilityName)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(row.ComponentName) ? "-" : row.ComponentName)</td>
+                                        <td><span class="status-pill @statusClass">@row.Status</span></td>
+                                        <td>@row.Details</td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                    @if (productReview.IsValid && !string.IsNullOrWhiteSpace(Model.ProductImportReview.PendingImportToken))
+                    {
+                        <div class="d-flex gap-2 mt-3">
+                            <form asp-action="ImportVerifiedProducts" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="pendingImportToken" value="@Model.ProductImportReview.PendingImportToken" />
+                                <button class="btn btn-primary" type="submit">Import verified CSV</button>
+                            </form>
+                            <form asp-action="AbortProductImport" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="pendingImportToken" value="@Model.ProductImportReview.PendingImportToken" />
+                                <button class="btn btn-outline-secondary" type="submit">Abort</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </details>
+</section>
+
+<section class="content-card">
+    @if (showErrorForSection("catalogue-import"))
+    {
+        <div class="alert alert-danger mb-3">@Model.ErrorMessage</div>
+    }
+    <details class="admin-disclosure" @(openCatalogueImport ? "open" : null)>
+        <summary class="admin-disclosure-summary">
+            <div>
+                <span class="eyebrow">Catalogue import</span>
+                <h2>Import models to catalogue</h2>
+                <p>Import models to the catalogue by uploading the HERM catalogue and reviewing the proposed changes before applying them.</p>
+            </div>
+            @if (catalogueReview is not null)
+            {
+                <span class="status-pill @(catalogueReview.IsValid ? "status-complete" : "status-outofscope")">
+                    @(catalogueReview.IsValid ? "Ready to import" : "Verification failed")
+                </span>
+            }
+            else
+            {
+                <span class="admin-disclosure-meta">Collapsed by default</span>
+            }
+        </summary>
+        <div class="admin-disclosure-body">
+            <p class="mb-3">Use one workflow for TRM, ARM, or BRM imports. Validation and row counts adapt to the selected model.</p>
+            <form asp-action="VerifyCatalogueImport" method="post" enctype="multipart/form-data" class="row g-3 align-items-end">
+                @Html.AntiForgeryToken()
+                <div class="col-lg-4">
+                    <label class="form-label" for="modelKind">Model</label>
+                    <select class="form-select" id="modelKind" name="modelKind" asp-items="Model.CatalogueImportModelOptions"></select>
+                </div>
+                <div class="col-lg-5">
+                    <label class="form-label" for="workbook">Workbook</label>
+                    <input class="form-control" id="workbook" name="workbook" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                </div>
+                <div class="col-lg-3 d-grid">
+                    <button class="btn btn-primary" type="submit">Verify workbook</button>
+                </div>
+            </form>
+
+            @if (Model.CatalogueImportReview.HasReview && catalogueReview is not null)
+            {
+                <div class="import-review mt-4">
+                    <div class="section-heading">
+                        <div>
+                            <span class="eyebrow">Verification result</span>
+                            <h3>@(Model.CatalogueImportReview.UploadedFileName ?? "Uploaded workbook")</h3>
+                        </div>
+                        <span class="status-pill @(catalogueReview.IsValid ? "status-complete" : "status-outofscope")">
+                            @(catalogueReview.IsValid ? "Ready to import" : "Verification failed")
+                        </span>
+                    </div>
+
+                    <div class="stats-grid stats-grid-compact import-stats">
+                        <article class="stat-card">
+                            <span class="stat-label">@catalogueReview.DomainLabel</span>
+                            <span class="stat-value">+@catalogueReview.DomainsToAdd</span>
+                            <span class="stat-meta">@catalogueReview.DomainsToUpdate update(s)</span>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-label">@catalogueReview.CapabilityLabel</span>
+                            <span class="stat-value">+@catalogueReview.CapabilitiesToAdd</span>
+                            <span class="stat-meta">@catalogueReview.CapabilitiesToUpdate update(s)</span>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-label">@catalogueReview.ComponentLabel</span>
+                            <span class="stat-value">+@catalogueReview.ComponentsToAdd</span>
+                            <span class="stat-meta">@catalogueReview.ComponentsToUpdate update(s)</span>
+                        </article>
+                    </div>
+
+                    @if (catalogueReview.Errors.Count > 0)
+                    {
+                        <div class="alert alert-danger mt-3 mb-0">
+                            <strong>Import is blocked.</strong>
+                            <ul class="mb-0 mt-2">
+                                @foreach (var error in catalogueReview.Errors)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    @if (catalogueReview.Warnings.Count > 0)
+                    {
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <ul class="mb-0">
+                                @foreach (var warning in catalogueReview.Warnings)
+                                {
+                                    <li>@warning</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    @if (catalogueReview.IsValid && !string.IsNullOrWhiteSpace(Model.CatalogueImportReview.PendingImportToken))
+                    {
+                        <div class="d-flex gap-2 mt-3">
+                            <form asp-action="ImportVerifiedCatalogue" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="pendingImportToken" value="@Model.CatalogueImportReview.PendingImportToken" />
+                                <input type="hidden" name="modelKind" value="@Model.CatalogueImportReview.ModelKind" />
+                                <button class="btn btn-primary" type="submit">Import verified workbook</button>
+                            </form>
+                            <form asp-action="AbortCatalogueImport" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="pendingImportToken" value="@Model.CatalogueImportReview.PendingImportToken" />
+                                <input type="hidden" name="modelKind" value="@Model.CatalogueImportReview.ModelKind" />
+                                <button class="btn btn-outline-secondary" type="submit">Abort</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </details>
+</section>

@@ -164,7 +164,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.VerifyCatalogueImport(null);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("Choose an .xlsx workbook before verifying the import.", Assert.Single(model.CatalogueImportReview.Verification!.Errors));
     }
@@ -178,7 +178,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.VerifyCatalogueImport(null, ReferenceModelKind.Brm);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal(ReferenceModelKind.Brm, model.CatalogueImportModelKind);
         Assert.Equal(ReferenceModelKind.Brm, model.CatalogueImportReview.ModelKind);
@@ -196,7 +196,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.VerifyCatalogueImport(file);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("Only Excel .xlsx workbooks are supported.", Assert.Single(model.CatalogueImportReview.Verification!.Errors));
     }
@@ -212,7 +212,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.VerifyCatalogueImport(file);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("catalogue.xlsx", model.CatalogueImportReview.UploadedFileName);
         Assert.Null(model.CatalogueImportReview.PendingImportToken);
@@ -229,7 +229,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedCatalogue("");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.Equal("Verify a catalogue workbook before importing it.", controller.TempData["ConfigurationError"]);
     }
 
@@ -242,7 +242,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedCatalogue("missing-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.Equal("The verified catalogue workbook is no longer available. Upload it again.", controller.TempData["ConfigurationError"]);
     }
 
@@ -258,7 +258,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedCatalogue("bad-token");
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.NotEmpty(model.CatalogueImportReview.Verification!.Errors);
         Assert.False(File.Exists(pendingPath));
@@ -294,7 +294,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedCatalogue("good-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
             "TRM catalogue imported. Domains +1/0 updated, capabilities +1/0 updated, components +1/0 updated.",
@@ -337,7 +337,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedCatalogue("arm-token", ReferenceModelKind.Arm);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
             "ARM catalogue imported. Domains +1/0 updated, capabilities +1/0 updated, components +1/0 updated.",
@@ -367,7 +367,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedCatalogue("brm-token", ReferenceModelKind.Brm);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
             "BRM catalogue imported. Groups +1/0 updated, level 1 capabilities +1/0 updated, level 2 capabilities +1/0 updated.",
@@ -391,7 +391,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.AbortCatalogueImport(token);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal("TRM catalogue import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
     }
@@ -405,7 +405,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.AbortCatalogueImport("   ");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.Equal("TRM catalogue import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
     }
 
@@ -418,7 +418,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.VerifyProductImport(null);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("Choose a CSV file before verifying the import.", Assert.Single(model.ProductImportReview.Verification!.Errors));
     }
@@ -718,7 +718,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.SetRemoteSqlImportEnabled(false);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.Equal(
             "Remote SQL import disabled. Scheduled and manual imports will be skipped until you enable it again.",
             controller.TempData["ConfigurationStatusMessage"]);
@@ -744,7 +744,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.RunRemoteSqlImportNow();
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.Equal("Remote SQL import is disabled. Enable it before running an import.", controller.TempData["ConfigurationError"]);
     }
 
@@ -766,7 +766,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ClearRemoteSqlImportConfiguration();
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.Equal("Remote SQL configuration was cleared from the database.", controller.TempData["ConfigurationStatusMessage"]);
         Assert.Empty(await fixture.DbContext.AppSettings.Where(x => x.Key.StartsWith("RemoteSqlImport.")).ToListAsync());
         Assert.Contains(
@@ -786,7 +786,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.VerifyProductImport(file);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.True(model.ProductImportReview.HasReview);
         Assert.Equal("relationships.txt", model.ProductImportReview.UploadedFileName);
@@ -805,7 +805,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.VerifyProductImport(file);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("relationships.csv", model.ProductImportReview.UploadedFileName);
         Assert.Null(model.ProductImportReview.PendingImportToken);
@@ -822,7 +822,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedProducts("");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.Equal("Verify a product CSV before importing it.", controller.TempData["ConfigurationError"]);
     }
 
@@ -835,7 +835,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedProducts("missing-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.Equal("The verified product CSV is no longer available. Upload it again.", controller.TempData["ConfigurationError"]);
     }
 
@@ -851,7 +851,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedProducts("bad-token");
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Index", view.ViewName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("The CSV header must be 'MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT'.", Assert.Single(model.ProductImportReview.Verification!.Errors));
         Assert.False(File.Exists(pendingPath));
@@ -877,7 +877,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.ImportVerifiedProducts("good-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
             "Imported 1 new product(s), matched 0 existing product(s), created 1 mapping(s), and left 0 row(s) as product-only because the hierarchy did not match.",
@@ -902,7 +902,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var result = await controller.AbortProductImport(token);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal("Product import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
     }

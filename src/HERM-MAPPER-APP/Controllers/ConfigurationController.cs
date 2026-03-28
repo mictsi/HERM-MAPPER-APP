@@ -38,6 +38,17 @@ public sealed class ConfigurationController(
             openRemoteSqlImportSection: string.Equals(openSection, RemoteSqlImportService.SectionKey, StringComparison.OrdinalIgnoreCase)));
     }
 
+    public async Task<IActionResult> ImportData(string? openSection = null)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return View(await BuildViewModelAsync(
+            openRemoteSqlImportSection: string.Equals(openSection, RemoteSqlImportService.SectionKey, StringComparison.OrdinalIgnoreCase)));
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> VerifyCatalogueImport(IFormFile? workbook, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
@@ -49,7 +60,7 @@ public sealed class ConfigurationController(
 
         if (workbook is null || workbook.Length == 0)
         {
-            return View("Index", await BuildViewModelAsync(
+            return View(nameof(ImportData), await BuildViewModelAsync(
                 catalogueImportReview: BuildCatalogueErrorReview("Choose an .xlsx workbook before verifying the import.", modelKind: modelKind),
                 catalogueImportModelKind: modelKind,
                 errorSectionKey: CatalogueImportSectionKey));
@@ -57,7 +68,7 @@ public sealed class ConfigurationController(
 
         if (!string.Equals(Path.GetExtension(workbook.FileName), ".xlsx", StringComparison.OrdinalIgnoreCase))
         {
-            return View("Index", await BuildViewModelAsync(
+            return View(nameof(ImportData), await BuildViewModelAsync(
                 catalogueImportReview: BuildCatalogueErrorReview("Only Excel .xlsx workbooks are supported.", workbook.FileName, modelKind),
                 catalogueImportModelKind: modelKind,
                 errorSectionKey: CatalogueImportSectionKey));
@@ -85,7 +96,7 @@ public sealed class ConfigurationController(
             $"Verified workbook {workbook.FileName}.",
             verification.IsValid ? "Verification passed." : string.Join(" | ", verification.Errors));
 
-        return View("Index", await BuildViewModelAsync(
+        return View(nameof(ImportData), await BuildViewModelAsync(
             catalogueImportModelKind: modelKind,
             catalogueImportReview: new WorkbookImportReviewViewModel
             {
@@ -109,7 +120,7 @@ public sealed class ConfigurationController(
         {
             TempData["ConfigurationError"] = "Verify a catalogue workbook before importing it.";
             TempData["ConfigurationErrorSection"] = CatalogueImportSectionKey;
-            return RedirectToAction(nameof(Index));
+            return RedirectToImportData();
         }
 
         var pendingPath = Path.Combine(EnsurePendingImportDirectory("catalogue"), $"{pendingImportToken}.xlsx");
@@ -117,14 +128,14 @@ public sealed class ConfigurationController(
         {
             TempData["ConfigurationError"] = "The verified catalogue workbook is no longer available. Upload it again.";
             TempData["ConfigurationErrorSection"] = CatalogueImportSectionKey;
-            return RedirectToAction(nameof(Index));
+            return RedirectToImportData();
         }
 
         var verification = await workbookImportService.VerifyAsync(pendingPath, modelKind);
         if (!verification.IsValid)
         {
             System.IO.File.Delete(pendingPath);
-            return View("Index", await BuildViewModelAsync(
+            return View(nameof(ImportData), await BuildViewModelAsync(
                 catalogueImportModelKind: modelKind,
                 catalogueImportReview: new WorkbookImportReviewViewModel
                 {
@@ -150,7 +161,7 @@ public sealed class ConfigurationController(
             $"{summary.CapabilityLabel.ToLowerInvariant()} +{summary.CapabilitiesAdded}/{summary.CapabilitiesUpdated} updated, " +
             $"{summary.ComponentLabel.ToLowerInvariant()} +{summary.ComponentsAdded}/{summary.ComponentsUpdated} updated.";
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToImportData();
     }
 
     [HttpPost]
@@ -170,7 +181,7 @@ public sealed class ConfigurationController(
             null,
             $"Aborted pending {ReferenceModelCatalog.GetShortName(modelKind)} catalogue import.");
         TempData["ConfigurationStatusMessage"] = $"{ReferenceModelCatalog.GetShortName(modelKind)} catalogue import was aborted.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToImportData();
     }
 
     [HttpPost]
@@ -184,14 +195,14 @@ public sealed class ConfigurationController(
 
         if (csvFile is null || csvFile.Length == 0)
         {
-            return View("Index", await BuildViewModelAsync(
+            return View(nameof(ImportData), await BuildViewModelAsync(
                 productImportReview: BuildProductErrorReview("Choose a CSV file before verifying the import."),
                 errorSectionKey: ProductImportSectionKey));
         }
 
         if (!string.Equals(Path.GetExtension(csvFile.FileName), ".csv", StringComparison.OrdinalIgnoreCase))
         {
-            return View("Index", await BuildViewModelAsync(
+            return View(nameof(ImportData), await BuildViewModelAsync(
                 productImportReview: BuildProductErrorReview("Only .csv files are supported for product import.", csvFile.FileName),
                 errorSectionKey: ProductImportSectionKey));
         }
@@ -218,7 +229,7 @@ public sealed class ConfigurationController(
             $"Verified product import CSV {csvFile.FileName}.",
             verification.IsValid ? $"Rows read: {verification.RowsRead}." : string.Join(" | ", verification.Errors));
 
-        return View("Index", await BuildViewModelAsync(
+        return View(nameof(ImportData), await BuildViewModelAsync(
             productImportReview: new ProductImportReviewViewModel
             {
                 PendingImportToken = verification.IsValid ? pendingImportToken : null,
@@ -240,7 +251,7 @@ public sealed class ConfigurationController(
         {
             TempData["ConfigurationError"] = "Verify a product CSV before importing it.";
             TempData["ConfigurationErrorSection"] = ProductImportSectionKey;
-            return RedirectToAction(nameof(Index));
+            return RedirectToImportData();
         }
 
         var pendingPath = Path.Combine(EnsurePendingImportDirectory("products"), $"{pendingImportToken}.csv");
@@ -248,14 +259,14 @@ public sealed class ConfigurationController(
         {
             TempData["ConfigurationError"] = "The verified product CSV is no longer available. Upload it again.";
             TempData["ConfigurationErrorSection"] = ProductImportSectionKey;
-            return RedirectToAction(nameof(Index));
+            return RedirectToImportData();
         }
 
         var verification = await sampleRelationshipImportService.VerifyAsync(pendingPath);
         if (!verification.IsValid)
         {
             System.IO.File.Delete(pendingPath);
-            return View("Index", await BuildViewModelAsync(
+            return View(nameof(ImportData), await BuildViewModelAsync(
                 productImportReview: new ProductImportReviewViewModel
                 {
                     Verification = verification
@@ -278,7 +289,7 @@ public sealed class ConfigurationController(
             $"Imported {summary.ProductsAdded} new product(s), matched {summary.ProductsMatched} existing product(s), " +
             $"created {summary.MappingsAdded} mapping(s), and left {summary.ProductsOnlyRows} row(s) as product-only because the hierarchy did not match.";
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToImportData();
     }
 
     [HttpPost]
@@ -298,7 +309,7 @@ public sealed class ConfigurationController(
             null,
             "Aborted pending product import.");
         TempData["ConfigurationStatusMessage"] = "Product import was aborted.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToImportData();
     }
 
     [HttpPost]
@@ -613,7 +624,7 @@ public sealed class ConfigurationController(
 
         if (!result.IsSuccess)
         {
-            return View("Index", await BuildViewModelAsync(
+            return View(nameof(ImportData), await BuildViewModelAsync(
                 errorMessage: result.Message,
                 errorSectionKey: RemoteSqlImportService.SectionKey,
                 remoteSqlInput: normalizedInput,
@@ -631,7 +642,7 @@ public sealed class ConfigurationController(
             TempData["RemoteSqlImportSavedPassword"] = result.SavedPasswordClearText;
         }
 
-        return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
+        return RedirectToImportData(RemoteSqlImportService.SectionKey);
     }
 
     [HttpPost]
@@ -657,7 +668,7 @@ public sealed class ConfigurationController(
             Warnings = result.Warnings
         };
 
-        return View("Index", await BuildViewModelAsync(
+        return View(nameof(ImportData), await BuildViewModelAsync(
             statusMessage: result.IsSuccess ? result.Message : null,
             errorMessage: result.IsSuccess ? null : result.Message,
             errorSectionKey: result.IsSuccess ? null : RemoteSqlImportService.SectionKey,
@@ -686,7 +697,7 @@ public sealed class ConfigurationController(
             TempData["ConfigurationErrorSection"] = RemoteSqlImportService.SectionKey;
         }
 
-        return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
+        return RedirectToImportData(RemoteSqlImportService.SectionKey);
     }
 
     [HttpPost]
@@ -699,7 +710,7 @@ public sealed class ConfigurationController(
         }
 
         TempData["ConfigurationStatusMessage"] = await remoteSqlImportService.SetImportEnabledAsync(isEnabled);
-        return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
+        return RedirectToImportData(RemoteSqlImportService.SectionKey);
     }
 
     [HttpPost]
@@ -714,7 +725,7 @@ public sealed class ConfigurationController(
         TempData.Remove("RemoteSqlImportSavedUserName");
         TempData.Remove("RemoteSqlImportSavedPassword");
         TempData["ConfigurationStatusMessage"] = await remoteSqlImportService.ClearConfigurationAsync();
-        return RedirectToAction(nameof(Index), new { openSection = RemoteSqlImportService.SectionKey });
+        return RedirectToImportData(RemoteSqlImportService.SectionKey);
     }
 
     private async Task<int> GetNextSortOrderAsync(string fieldName)
@@ -920,6 +931,11 @@ public sealed class ConfigurationController(
         ConfigurableFieldNames.IsSupported(NormalizeExpandedFieldName(expandedFieldName))
             ? RedirectToAction(nameof(Index), new { expandedFieldName = NormalizeExpandedFieldName(expandedFieldName) })
             : RedirectToAction(nameof(Index));
+
+    private RedirectToActionResult RedirectToImportData(string? openSection = null) =>
+        string.IsNullOrWhiteSpace(openSection)
+            ? RedirectToAction(nameof(ImportData))
+            : RedirectToAction(nameof(ImportData), new { openSection = NormalizeSectionKey(openSection) });
 
     private static string? NormalizeExpandedFieldName(string? expandedFieldName) =>
         string.IsNullOrWhiteSpace(expandedFieldName)

@@ -379,7 +379,7 @@ public sealed partial class ModelDiagramPosterSvgService(IWebHostEnvironment env
 
     private static void RenderShape(StringBuilder svg, TemplateNode node)
     {
-        var fill = GetFill(node.Style);
+        var fill = GetFill(node);
         var stroke = GetStroke(node.Style);
         var strokeWidth = ParseDouble(GetStyleValue(node.Style, "strokeWidth"), 1.0);
 
@@ -749,7 +749,9 @@ public sealed partial class ModelDiagramPosterSvgService(IWebHostEnvironment env
 
     private static bool IsLeafComponentCell(TemplateNode node) =>
         !node.IsGroup &&
-        string.Equals(GetStyleValue(node.Style, "fillColor"), "#ffffff", StringComparison.OrdinalIgnoreCase) &&
+        !IsImageCell(node) &&
+        (string.Equals(NormalizeColor(GetStyleValue(node.Style, "fillColor")), "#ffffff", StringComparison.OrdinalIgnoreCase) ||
+         UsesImplicitPosterCardFill(node)) &&
         !string.IsNullOrWhiteSpace(ExtractCode(node.Value));
 
     private static bool IsImageCell(TemplateNode node) =>
@@ -891,11 +893,21 @@ public sealed partial class ModelDiagramPosterSvgService(IWebHostEnvironment env
     private static string GetStyleValue(IReadOnlyDictionary<string, string> style, string key) =>
         style.TryGetValue(key, out var value) ? value : string.Empty;
 
-    private static string GetFill(IReadOnlyDictionary<string, string> style)
+    private static string GetFill(TemplateNode node)
     {
-        var fillOpacity = ParseDouble(GetStyleValue(style, "fillOpacity"), 100);
-        var fillColor = NormalizeColor(GetStyleValue(style, "fillColor"));
-        return fillOpacity <= 0 || string.IsNullOrWhiteSpace(fillColor) ? "none" : fillColor;
+        var fillOpacity = ParseDouble(GetStyleValue(node.Style, "fillOpacity"), 100);
+        var fillColor = NormalizeColor(GetStyleValue(node.Style, "fillColor"));
+        if (fillOpacity <= 0)
+        {
+            return "none";
+        }
+
+        if (!string.Equals(fillColor, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return fillColor;
+        }
+
+        return UsesImplicitPosterCardFill(node) ? "#ffffff" : "none";
     }
 
     private static string GetStroke(IReadOnlyDictionary<string, string> style)
@@ -919,6 +931,11 @@ public sealed partial class ModelDiagramPosterSvgService(IWebHostEnvironment env
 
         return color;
     }
+
+    private static bool UsesImplicitPosterCardFill(TemplateNode node) =>
+        node.Children.Count == 0 &&
+        string.Equals(GetStyleValue(node.Style, "rounded"), "1", StringComparison.OrdinalIgnoreCase) &&
+        !string.IsNullOrWhiteSpace(ExtractCode(node.Value));
 
     private static string GetFontColor(IReadOnlyDictionary<string, string> style)
     {

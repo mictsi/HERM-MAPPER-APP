@@ -78,7 +78,8 @@
             "Delete" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Review the local account before removing its workspace access.",
             "ResetPassword" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Issue a new local password and hand off updated credentials safely.",
             "Users" or "Index" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Manage workspace identities and access.",
-            "Index" when string.Equals(currentController, "Configuration", StringComparison.OrdinalIgnoreCase) => "Control workspace fields, imports, and operating settings.",
+            "Index" when string.Equals(currentController, "Configuration", StringComparison.OrdinalIgnoreCase) => "Control workspace display settings and configurable field values.",
+            "ImportData" when string.Equals(currentController, "Configuration", StringComparison.OrdinalIgnoreCase) => "Run workbook, CSV, and remote SQL import workflows from one admin workspace.",
             "Index" when string.Equals(currentController, "ChangeLog", StringComparison.OrdinalIgnoreCase) => "Review catalogue activity and operational audit history.",
             _ => "Workspace administration and recovery tools."
         };
@@ -330,6 +331,7 @@
                                     <div class="shell-nav-links">
                                         <a class="@SubnavLinkClass("Users")" asp-controller="Users" asp-action="Index">Users</a>
                                         <a class="@SubnavLinkClass("Configuration")" asp-controller="Configuration" asp-action="Index">Configuration</a>
+                                        <a class="@SubnavLinkClass("Configuration", "ImportData")" asp-controller="Configuration" asp-action="ImportData">Import data</a>
                                         <a class="@SubnavLinkClass("ChangeLog")" asp-controller="ChangeLog" asp-action="Index">Change Log</a>
                                         <a class="@SubnavLinkClass("Products", "Restore")" asp-controller="Products" asp-action="Restore">Restore Products</a>
                                         <a class="@SubnavLinkClass("Services", "Restore")" asp-controller="Services" asp-action="Restore">Restore Services</a>

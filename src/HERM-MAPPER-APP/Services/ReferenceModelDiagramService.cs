@@ -224,14 +224,14 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
                 DiagramTitle: "BRM Model diagram",
                 DiagramDescription: BuildBrmModelDescription(selectedBrmModel),
                 PosterTitle: $"{selectedBrmModel.Name} BRM model poster",
-                PosterDescription: $"Full-screen poster view of {selectedBrmModel.Name} with mapped ARM domains placed inside the BRM reference model.",
+                PosterDescription: $"Full-screen poster view of {selectedBrmModel.Name} across the full BRM reference model with mapped ARM domains placed where they exist.",
                 MappedItemLabel: "mapped ARM domain(s)",
-                OnlyShowMappedNodes: true,
+                OnlyShowMappedNodes: false,
                 UseCompactMappedSummary: true,
                 ShowComponentMappedSummary: false,
                 ShowBranchEmptyStates: false,
-                EmptyStateTitle: $"No mapped capabilities in {selectedBrmModel.Name} yet",
-                EmptyStateBody: "Add capabilities to this BRM model to populate the diagram."));
+                EmptyStateTitle: $"No BRM structure available for {selectedBrmModel.Name}",
+                EmptyStateBody: "Import the BRM reference model to render the full poster and add mappings to populate the ARM placement summary."));
 
         return report;
     }
@@ -299,7 +299,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
     private static string BuildBrmModelDescription(BrmModel brmModel)
     {
         var areaLabel = string.IsNullOrWhiteSpace(brmModel.Area) ? brmModel.Name : $"{brmModel.Name} - {brmModel.Area}";
-        return $"Review {areaLabel} and the mapped ARM domains placed inside each BRM capability.";
+        return $"Review {areaLabel} across the full BRM poster with mapped ARM domains shown inside the configured BRM capabilities.";
     }
 
     private static ModelDiagramReportViewModel BuildReport(
