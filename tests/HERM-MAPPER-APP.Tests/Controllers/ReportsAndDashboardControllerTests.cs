@@ -106,7 +106,12 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateReportsController().Index("Unassigned owner");
+        var redirect = await fixture.CreateReportsController().Index("Unassigned owner");
+        var redirectResult = Assert.IsType<RedirectToActionResult>(redirect);
+        Assert.Equal(nameof(ReportsController.LifecycleStatusReport), redirectResult.ActionName);
+        Assert.Equal("Unassigned owner", redirectResult.RouteValues?["lifecycleOwner"]);
+
+        var result = await fixture.CreateReportsController().LifecycleStatusReport("Unassigned owner");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ReportsViewModel>(view.Model);
@@ -155,11 +160,13 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Contains(model.Paths, path => path.OwnerName == "Team Blue" && path.ProductName == "Sentinel");
         Assert.Contains(model.Paths, path => path.OwnerName == "Team Red" && path.ComponentLabel == "TC001 Monitoring");
         Assert.Equal(1, model.ModelDiagram.DomainCount);
+        Assert.Equal("TRM diagram (all objects)", model.ModelDiagram.DiagramTitle);
         Assert.Equal(1, model.ModelDiagram.CapabilityCount);
         Assert.Equal(1, model.ModelDiagram.ComponentCount);
         Assert.Equal(3, model.ModelDiagram.ProductCount);
         Assert.Equal(1, model.ModelDiagram.MappedProductCount);
         Assert.Equal(2, model.ModelDiagram.UnmappedProductCount);
+        Assert.Equal("ARM diagram (all objects)", model.ArmModelDiagram.DiagramTitle);
         Assert.Single(model.ModelDiagram.Domains);
         Assert.Single(model.ModelDiagram.Domains[0].Capabilities);
         Assert.Single(model.ModelDiagram.Domains[0].Capabilities[0].Components);
@@ -367,11 +374,16 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var indexResult = await fixture.CreateReportsController().Index(brmModelId: selectedModel.Id, showBrmModelReport: true);
+        var redirect = await fixture.CreateReportsController().Index(brmModelId: selectedModel.Id, showBrmModelReport: true);
+        var redirectResult = Assert.IsType<RedirectToActionResult>(redirect);
+        Assert.Equal(nameof(ReportsController.BrmModelReport), redirectResult.ActionName);
+        Assert.Equal(selectedModel.Id, redirectResult.RouteValues?["brmModelId"]);
+
+        var indexResult = await fixture.CreateReportsController().BrmModelReport(selectedModel.Id);
 
         var indexView = Assert.IsType<ViewResult>(indexResult);
         var indexModel = Assert.IsType<ReportsViewModel>(indexView.Model);
-        Assert.True(indexModel.ExpandBrmModelReport);
+        Assert.False(indexModel.ExpandBrmModelReport);
         Assert.Equal(selectedModel.Id, indexModel.SelectedBrmModelId);
         Assert.Equal(2, indexModel.BrmModelOptions.Count);
         Assert.Equal(selectedModel.Id, indexModel.BrmModelDiagram.BrmModelId);
@@ -407,6 +419,278 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
+    public async Task TrmServiceDiagramReportFiltersDiagramToSelectedService()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var domain = new TrmDomain
+        {
+            Code = "TD001",
+            Name = "Technology"
+        };
+        var capability = new TrmCapability
+        {
+            Code = "TP001",
+            Name = "Platforms",
+            ParentDomain = domain,
+            ParentDomainCode = domain.Code
+        };
+        var componentA = new TrmComponent
+        {
+            Code = "TC001",
+            Name = "Identity",
+            ParentCapability = capability,
+            ParentCapabilityCode = capability.Code
+        };
+        var componentB = new TrmComponent
+        {
+            Code = "TC002",
+            Name = "Analytics",
+            ParentCapability = capability,
+            ParentCapabilityCode = capability.Code
+        };
+        var serviceProduct = new ProductCatalogItem { Name = "Service Product" };
+        var otherServiceProduct = new ProductCatalogItem { Name = "Other Service Product" };
+        var unmappedServiceProduct = new ProductCatalogItem { Name = "Needs Mapping" };
+        var selectedService = new ServiceCatalogItem
+        {
+            Name = "Student onboarding",
+            Owner = "Team Blue",
+            LifecycleStatus = "Production",
+            ProductLinks =
+            [
+                new ServiceCatalogItemProduct { ProductCatalogItem = serviceProduct, SortOrder = 1 },
+                new ServiceCatalogItemProduct { ProductCatalogItem = unmappedServiceProduct, SortOrder = 2 }
+            ]
+        };
+        var otherService = new ServiceCatalogItem
+        {
+            Name = "Finance service",
+            Owner = "Team Green",
+            LifecycleStatus = "Production",
+            ProductLinks =
+            [
+                new ServiceCatalogItemProduct { ProductCatalogItem = otherServiceProduct, SortOrder = 1 }
+            ]
+        };
+
+        await fixture.DbContext.AddRangeAsync(
+            domain,
+            capability,
+            componentA,
+            componentB,
+            serviceProduct,
+            otherServiceProduct,
+            unmappedServiceProduct,
+            selectedService,
+            otherService);
+        await fixture.DbContext.SaveChangesAsync();
+
+        await fixture.DbContext.ProductMappings.AddRangeAsync(
+            new ProductMapping
+            {
+                ProductCatalogItemId = serviceProduct.Id,
+                TrmDomainId = domain.Id,
+                TrmCapabilityId = capability.Id,
+                TrmComponentId = componentA.Id,
+                MappingStatus = MappingStatus.Complete
+            },
+            new ProductMapping
+            {
+                ProductCatalogItemId = otherServiceProduct.Id,
+                TrmDomainId = domain.Id,
+                TrmCapabilityId = capability.Id,
+                TrmComponentId = componentB.Id,
+                MappingStatus = MappingStatus.Complete
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var result = await fixture.CreateReportsController().TrmServiceDiagramReport(selectedService.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ReportsViewModel>(view.Model);
+        Assert.Equal(selectedService.Id, model.SelectedServiceId);
+        Assert.Equal(2, model.ServiceOptions.Count);
+        Assert.Equal("TRM diagram per service", model.TrmServiceDiagram.DiagramTitle);
+        Assert.Null(model.TrmServiceDiagram.DrawIoDownloadAction);
+        Assert.Contains("Student onboarding", model.TrmServiceDiagram.DiagramDescription);
+
+        var mappedProducts = model.TrmServiceDiagram.Domains
+            .SelectMany(x => x.Capabilities)
+            .SelectMany(x => x.Components)
+            .SelectMany(x => x.Products)
+            .Select(x => x.Name)
+            .ToList();
+
+        Assert.Contains("Service Product", mappedProducts);
+        Assert.DoesNotContain("Other Service Product", mappedProducts);
+        Assert.Equal(["Needs Mapping"], model.TrmServiceDiagram.UnmappedProducts.Select(x => x.Name).ToArray());
+
+        var posterResult = await fixture.CreateReportsController().ModelDiagram(scope: "trm", serviceId: selectedService.Id);
+
+        var posterView = Assert.IsType<ViewResult>(posterResult);
+        var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
+        Assert.Equal(selectedService.Id, posterModel.ServiceId);
+        Assert.Equal("TrmServiceDiagramReport", posterModel.BackReportAction);
+    }
+
+    [Fact]
+    public async Task ArmApplicationDiagramReportFiltersDiagramToSelectedApplication()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var armDomain = new ArmDomain
+        {
+            Code = "AD001",
+            Name = "Business Apps"
+        };
+        var armCapability = new ArmCapability
+        {
+            Code = "AP001",
+            Name = "Core Capability",
+            ParentDomain = armDomain,
+            ParentDomainCode = armDomain.Code
+        };
+        var armComponentA = new ArmComponent
+        {
+            Code = "AC001",
+            Name = "Student Portal",
+            ParentCapability = armCapability,
+            ParentCapabilityCode = armCapability.Code
+        };
+        var armComponentB = new ArmComponent
+        {
+            Code = "AC002",
+            Name = "Finance Portal",
+            ParentCapability = armCapability,
+            ParentCapabilityCode = armCapability.Code
+        };
+        var trmDomainA = new TrmDomain
+        {
+            Code = "TD001",
+            Name = "Identity"
+        };
+        var trmCapabilityA = new TrmCapability
+        {
+            Code = "TP001",
+            Name = "Access",
+            ParentDomain = trmDomainA,
+            ParentDomainCode = trmDomainA.Code
+        };
+        var trmComponentA = new TrmComponent
+        {
+            Code = "TC001",
+            Name = "SSO",
+            ParentCapability = trmCapabilityA,
+            ParentCapabilityCode = trmCapabilityA.Code
+        };
+        var trmDomainB = new TrmDomain
+        {
+            Code = "TD002",
+            Name = "Finance Tech"
+        };
+        var trmCapabilityB = new TrmCapability
+        {
+            Code = "TP002",
+            Name = "Billing",
+            ParentDomain = trmDomainB,
+            ParentDomainCode = trmDomainB.Code
+        };
+        var trmComponentB = new TrmComponent
+        {
+            Code = "TC002",
+            Name = "Payments",
+            ParentCapability = trmCapabilityB,
+            ParentCapabilityCode = trmCapabilityB.Code
+        };
+        var applicationA = new ApplicationCatalogItem { Name = "Student app" };
+        var applicationB = new ApplicationCatalogItem { Name = "Finance app" };
+        var productA = new ProductCatalogItem { Name = "Student Identity" };
+        var productB = new ProductCatalogItem { Name = "Finance Engine" };
+
+        await fixture.DbContext.AddRangeAsync(
+            armDomain,
+            armCapability,
+            armComponentA,
+            armComponentB,
+            trmDomainA,
+            trmCapabilityA,
+            trmComponentA,
+            trmDomainB,
+            trmCapabilityB,
+            trmComponentB,
+            applicationA,
+            applicationB,
+            productA,
+            productB);
+        await fixture.DbContext.SaveChangesAsync();
+
+        var productMappingA = new ProductMapping
+        {
+            ProductCatalogItemId = productA.Id,
+            TrmDomainId = trmDomainA.Id,
+            TrmCapabilityId = trmCapabilityA.Id,
+            TrmComponentId = trmComponentA.Id,
+            MappingStatus = MappingStatus.Complete
+        };
+        var productMappingB = new ProductMapping
+        {
+            ProductCatalogItemId = productB.Id,
+            TrmDomainId = trmDomainB.Id,
+            TrmCapabilityId = trmCapabilityB.Id,
+            TrmComponentId = trmComponentB.Id,
+            MappingStatus = MappingStatus.Complete
+        };
+
+        await fixture.DbContext.ProductMappings.AddRangeAsync(productMappingA, productMappingB);
+        await fixture.DbContext.SaveChangesAsync();
+
+        await fixture.DbContext.ApplicationCatalogItemMappings.AddRangeAsync(
+            new ApplicationCatalogItemMapping
+            {
+                ApplicationCatalogItemId = applicationA.Id,
+                ArmComponentId = armComponentA.Id,
+                ProductCatalogItemId = productA.Id,
+                ProductMappingId = productMappingA.Id
+            },
+            new ApplicationCatalogItemMapping
+            {
+                ApplicationCatalogItemId = applicationB.Id,
+                ArmComponentId = armComponentB.Id,
+                ProductCatalogItemId = productB.Id,
+                ProductMappingId = productMappingB.Id
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var result = await fixture.CreateReportsController().ArmApplicationDiagramReport(applicationA.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ReportsViewModel>(view.Model);
+        Assert.Equal(applicationA.Id, model.SelectedApplicationId);
+        Assert.Equal(2, model.ApplicationOptions.Count);
+        Assert.Equal("ARM diagram per application", model.ArmApplicationDiagram.DiagramTitle);
+        Assert.Null(model.ArmApplicationDiagram.DrawIoDownloadAction);
+        Assert.Contains("Student app", model.ArmApplicationDiagram.DiagramDescription);
+
+        var mappedDomains = model.ArmApplicationDiagram.Domains
+            .SelectMany(x => x.Capabilities)
+            .SelectMany(x => x.Components)
+            .SelectMany(x => x.Products)
+            .Select(x => x.Name)
+            .ToList();
+
+        Assert.Contains("TD001 Identity", mappedDomains);
+        Assert.DoesNotContain("TD002 Finance Tech", mappedDomains);
+
+        var posterResult = await fixture.CreateReportsController().ModelDiagram(scope: "arm", applicationId: applicationA.Id);
+
+        var posterView = Assert.IsType<ViewResult>(posterResult);
+        var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
+        Assert.Equal(applicationA.Id, posterModel.ApplicationId);
+        Assert.Equal("ArmApplicationDiagramReport", posterModel.BackReportAction);
+    }
+
+    [Fact]
     public void ModelDiagramPosterSvgBuildsImplicitWhiteCardsForBrmPosterNodes()
     {
         var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
@@ -419,16 +703,17 @@ public sealed class ReportsAndDashboardControllerTests
             ScopeKey = "brm"
         });
 
-        Assert.Contains(
-            "<rect x=\"995.872\" y=\"462.191\" width=\"177.165\" height=\"70.866\" rx=\"16\" ry=\"16\" fill=\"#ffffff\" stroke=\"none\" stroke-width=\"1\" /><text x=\"1001.967\" y=\"480.16\" fill=\"#1f2933\"",
-            svg);
-        Assert.Contains("Student Academic", svg);
-        Assert.Contains("(BC046)", svg);
-        Assert.Contains(
-            "<rect x=\"1360.23\" y=\"748.818\" width=\"177.165\" height=\"70.866\" rx=\"16\" ry=\"16\" fill=\"#ffffff\" stroke=\"none\" stroke-width=\"1\" /><text x=\"1366.325\" y=\"766.787\" fill=\"#1f2933\"",
-            svg);
-        Assert.Contains("Housing", svg);
-        Assert.Contains("(BC115)", svg);
+        var studentAcademicCard = GetSvgWindow(svg, "(BC046)");
+        Assert.Contains("Student Academic", studentAcademicCard);
+        Assert.Contains("fill=\"#ffffff\"", studentAcademicCard);
+        Assert.Contains("<rect", studentAcademicCard);
+        Assert.Contains("<text", studentAcademicCard);
+
+        var housingCard = GetSvgWindow(svg, "(BC115)");
+        Assert.Contains("Housing", housingCard);
+        Assert.Contains("fill=\"#ffffff\"", housingCard);
+        Assert.Contains("<rect", housingCard);
+        Assert.Contains("<text", housingCard);
     }
 
     [Fact]
@@ -685,5 +970,15 @@ public sealed class ReportsAndDashboardControllerTests
         }
 
         throw new DirectoryNotFoundException("Could not locate the repository root for BRM poster template tests.");
+    }
+
+    private static string GetSvgWindow(string svg, string marker, int radius = 600)
+    {
+        var index = svg.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(index >= 0, $"Expected to find '{marker}' in the generated SVG.");
+
+        var start = Math.Max(0, index - radius);
+        var length = Math.Min(svg.Length - start, radius * 2);
+        return svg.Substring(start, length);
     }
 }

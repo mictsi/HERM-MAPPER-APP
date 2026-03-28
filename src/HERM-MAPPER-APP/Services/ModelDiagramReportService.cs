@@ -63,13 +63,121 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
 
     public async Task<ModelDiagramReportViewModel> BuildAsync(CancellationToken cancellationToken = default)
     {
-        var data = await BuildDataAsync(cancellationToken);
-        return MapToViewModel(data);
+        var data = await BuildDataAsync(productIds: null, cancellationToken: cancellationToken);
+        return MapToViewModel(
+            data,
+            new DiagramMetadata(
+                ScopeKey: "trm",
+                ServiceId: null,
+                ApplicationId: null,
+                ReportFragmentId: "report-product-model",
+                DiagramTitle: "TRM diagram (all objects)",
+                DiagramDescription: "Browse the HERM structure with mapped products inside each component, open a full-screen canvas, or export the same data to draw.io and Archi XML.",
+                PosterTitle: "Product model poster",
+                PosterDescription: "Full-screen poster view of the HERM model with products placed directly inside each component column.",
+                MappedItemLabel: "mapped product(s)",
+                EmptyStateTitle: "No model content available",
+                EmptyStateBody: "Import the HERM reference model and product mappings to populate this report.",
+                BackReportAction: "TrmModelReport",
+                BackReportLabel: "Back to TRM report",
+                ShowUnmappedItems: true,
+                ShowComponentMappedSummary: false,
+                UnmappedSectionTitle: "Unmapped Products",
+                UnmappedSummaryLabel: "product(s) still need a component placement",
+                DrawIoDownloadAction: "DownloadDrawIo",
+                ArchiDownloadAction: "DownloadArchiXml"));
+    }
+
+    public async Task<ModelDiagramReportViewModel> BuildForServiceAsync(int? serviceId, CancellationToken cancellationToken = default)
+    {
+        var selectedService = serviceId is > 0
+            ? await dbContext.ServiceCatalogItems
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted)
+                .Include(x => x.ProductLinks.OrderBy(link => link.SortOrder))
+                .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(x => x.Id == serviceId.Value, cancellationToken)
+            : null;
+
+        if (selectedService is null)
+        {
+            return new ModelDiagramReportViewModel
+            {
+                ScopeKey = "trm",
+                ReportFragmentId = "report-trm-service",
+                DiagramTitle = "TRM diagram per service",
+                DiagramDescription = "Choose a service to review the TRM components touched by its connected products.",
+                PosterTitle = "TRM service diagram poster",
+                PosterDescription = "Full-screen poster view of the selected service across the TRM reference model.",
+                MappedItemLabel = "mapped product(s)",
+                EmptyStateTitle = "No service selected",
+                EmptyStateBody = "Choose a service to build a TRM diagram for that service's mapped products.",
+                BackReportAction = "TrmServiceDiagramReport",
+                BackReportLabel = "Back to service TRM report",
+                ShowUnmappedItems = true,
+                ShowComponentMappedSummary = false,
+                UnmappedSectionTitle = "Service Products Without TRM Placement",
+                UnmappedSummaryLabel = "service product(s) still need a component placement",
+                DrawIoDownloadAction = null,
+                ArchiDownloadAction = null
+            };
+        }
+
+        var productIds = GetServiceProductIds(selectedService);
+        if (productIds.Count == 0)
+        {
+            return new ModelDiagramReportViewModel
+            {
+                ScopeKey = "trm",
+                ServiceId = selectedService.Id,
+                ReportFragmentId = "report-trm-service",
+                DiagramTitle = "TRM diagram per service",
+                DiagramDescription = BuildServiceDiagramDescription(selectedService),
+                PosterTitle = $"{selectedService.Name} TRM service poster",
+                PosterDescription = $"Full-screen poster view of {selectedService.Name} across the TRM reference model.",
+                MappedItemLabel = "mapped product(s)",
+                EmptyStateTitle = $"No connected products are mapped for {selectedService.Name}",
+                EmptyStateBody = "Add products or product flows to this service to populate its TRM report.",
+                BackReportAction = "TrmServiceDiagramReport",
+                BackReportLabel = "Back to service TRM report",
+                ShowUnmappedItems = true,
+                ShowComponentMappedSummary = false,
+                UnmappedSectionTitle = "Service Products Without TRM Placement",
+                UnmappedSummaryLabel = "service product(s) still need a component placement",
+                DrawIoDownloadAction = null,
+                ArchiDownloadAction = null
+            };
+        }
+
+        var data = await BuildDataAsync(productIds, cancellationToken);
+        return MapToViewModel(
+            data,
+            new DiagramMetadata(
+                ScopeKey: "trm",
+                ServiceId: selectedService.Id,
+                ApplicationId: null,
+                ReportFragmentId: "report-trm-service",
+                DiagramTitle: "TRM diagram per service",
+                DiagramDescription: BuildServiceDiagramDescription(selectedService),
+                PosterTitle: $"{selectedService.Name} TRM service poster",
+                PosterDescription: $"Full-screen poster view of {selectedService.Name} across the TRM reference model with only that service's products rendered.",
+                MappedItemLabel: "mapped product(s)",
+                EmptyStateTitle: $"No TRM mappings found for {selectedService.Name}",
+                EmptyStateBody: "Map the service's connected products to TRM components to populate this report.",
+                BackReportAction: "TrmServiceDiagramReport",
+                BackReportLabel: "Back to service TRM report",
+                ShowUnmappedItems: true,
+                ShowComponentMappedSummary: false,
+                UnmappedSectionTitle: "Service Products Without TRM Placement",
+                UnmappedSummaryLabel: "service product(s) still need a component placement",
+                DrawIoDownloadAction: null,
+                ArchiDownloadAction: null));
     }
 
     public async Task<byte[]> BuildDrawIoAsync(CancellationToken cancellationToken = default)
     {
-        var data = await BuildDataAsync(cancellationToken);
+        var data = await BuildDataAsync(productIds: null, cancellationToken: cancellationToken);
         var mxFile = new XElement("mxfile",
             new XAttribute("host", "app.diagrams.net"),
             new XAttribute("agent", "HERM Mapper"),
@@ -82,11 +190,11 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
 
     public async Task<byte[]> BuildArchiXmlAsync(CancellationToken cancellationToken = default)
     {
-        var data = await BuildDataAsync(cancellationToken);
+        var data = await BuildDataAsync(productIds: null, cancellationToken: cancellationToken);
         return SerializeXml(BuildArchiDocument(data), includeDeclaration: true);
     }
 
-    private async Task<DiagramReportData> BuildDataAsync(CancellationToken cancellationToken)
+    private async Task<DiagramReportData> BuildDataAsync(IReadOnlyCollection<int>? productIds, CancellationToken cancellationToken)
     {
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
@@ -115,12 +223,14 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
         var products = await dbContext.ProductCatalogItems
             .AsNoTracking()
             .Where(x => !x.IsDeleted)
+            .Where(x => productIds == null || productIds.Contains(x.Id))
             .Include(x => x.Owners)
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
         var mappings = await dbContext.ProductMappings
             .AsNoTracking()
+            .Where(x => productIds == null || productIds.Contains(x.ProductCatalogItemId))
             .Include(x => x.TrmDomain)
             .Include(x => x.TrmCapability)
             .ThenInclude(x => x!.ParentDomain)
@@ -216,24 +326,28 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
         };
     }
 
-    private static ModelDiagramReportViewModel MapToViewModel(DiagramReportData data) =>
+    private static ModelDiagramReportViewModel MapToViewModel(DiagramReportData data, DiagramMetadata metadata) =>
         new()
         {
-            ScopeKey = "trm",
-            ReportFragmentId = "report-product-model",
-            DiagramTitle = "TRM Model diagram",
-            DiagramDescription = "Browse the HERM structure with mapped products inside each component, open a full-screen canvas, or export the same data to draw.io and Archi XML.",
-            PosterTitle = "Product model poster",
-            PosterDescription = "Full-screen poster view of the HERM model with products placed directly inside each component column.",
-            MappedItemLabel = "mapped product(s)",
-            EmptyStateTitle = "No model content available",
-            EmptyStateBody = "Import the HERM reference model and product mappings to populate this report.",
-            ShowUnmappedItems = true,
-            ShowComponentMappedSummary = false,
-            UnmappedSectionTitle = "Unmapped Products",
-            UnmappedSummaryLabel = "product(s) still need a component placement",
-            DrawIoDownloadAction = "DownloadDrawIo",
-            ArchiDownloadAction = "DownloadArchiXml",
+            ScopeKey = metadata.ScopeKey,
+            ServiceId = metadata.ServiceId,
+            ApplicationId = metadata.ApplicationId,
+            ReportFragmentId = metadata.ReportFragmentId,
+            DiagramTitle = metadata.DiagramTitle,
+            DiagramDescription = metadata.DiagramDescription,
+            PosterTitle = metadata.PosterTitle,
+            PosterDescription = metadata.PosterDescription,
+            MappedItemLabel = metadata.MappedItemLabel,
+            EmptyStateTitle = metadata.EmptyStateTitle,
+            EmptyStateBody = metadata.EmptyStateBody,
+            BackReportAction = metadata.BackReportAction,
+            BackReportLabel = metadata.BackReportLabel,
+            ShowUnmappedItems = metadata.ShowUnmappedItems,
+            ShowComponentMappedSummary = metadata.ShowComponentMappedSummary,
+            UnmappedSectionTitle = metadata.UnmappedSectionTitle,
+            UnmappedSummaryLabel = metadata.UnmappedSummaryLabel,
+            DrawIoDownloadAction = metadata.DrawIoDownloadAction,
+            ArchiDownloadAction = metadata.ArchiDownloadAction,
             DomainCount = data.Domains.Count,
             CapabilityCount = data.Domains.Sum(x => x.Capabilities.Count),
             ComponentCount = data.Domains.Sum(x => x.Capabilities.Sum(capability => capability.Components.Count)),
@@ -246,6 +360,27 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
             Domains = data.Domains.Select(MapDomain).ToList(),
             UnmappedProducts = data.UnmappedProducts.Select(MapProduct).ToList()
         };
+
+    private static string BuildServiceDiagramDescription(ServiceCatalogItem service) =>
+        $"Review {service.Name} across the full TRM reference model with only that service's connected products shown in their mapped components.";
+
+    private static HashSet<int> GetServiceProductIds(ServiceCatalogItem service)
+    {
+        var productIds = new HashSet<int>();
+
+        foreach (var link in service.ProductLinks)
+        {
+            productIds.Add(link.ProductCatalogItemId);
+        }
+
+        foreach (var connection in service.ProductConnections)
+        {
+            productIds.Add(connection.FromProductCatalogItemId);
+            productIds.Add(connection.ToProductCatalogItemId);
+        }
+
+        return productIds;
+    }
 
     private static ModelDiagramDomainViewModel MapDomain(DiagramDomainNode domain) =>
         new()
@@ -1134,6 +1269,27 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
         public required int MappedProductCount { get; init; }
         public required List<DiagramProductNode> UnmappedProducts { get; init; }
     }
+
+    private sealed record DiagramMetadata(
+        string ScopeKey,
+        int? ServiceId,
+        int? ApplicationId,
+        string ReportFragmentId,
+        string DiagramTitle,
+        string DiagramDescription,
+        string PosterTitle,
+        string PosterDescription,
+        string MappedItemLabel,
+        string EmptyStateTitle,
+        string EmptyStateBody,
+        string BackReportAction,
+        string BackReportLabel,
+        bool ShowUnmappedItems,
+        bool ShowComponentMappedSummary,
+        string UnmappedSectionTitle,
+        string UnmappedSummaryLabel,
+        string? DrawIoDownloadAction,
+        string? ArchiDownloadAction);
 
     private sealed class DiagramDomainNode(int domainId, string code, string name)
     {

@@ -1,0 +1,61 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@{
+    ViewData["Title"] = "TRM diagram per service";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-trm-service" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Model diagram</span>
+            <h2>@Model.TrmServiceDiagram.DiagramTitle</h2>
+            <p>@Model.TrmServiceDiagram.DiagramDescription</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        @if (Model.ServiceOptions.Count != 0)
+        {
+            <form method="get" asp-action="TrmServiceDiagramReport" class="owner-lifecycle-filter-form mb-3">
+                <div>
+                    <label class="form-label" for="serviceId">Service</label>
+                    <select class="form-select" id="serviceId" name="serviceId" asp-items="Model.ServiceOptions"></select>
+                </div>
+                <div class="owner-lifecycle-filter-actions">
+                    <button class="btn btn-primary" type="submit">View service</button>
+                </div>
+            </form>
+        }
+
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.TrmServiceDiagram.ScopeKey" asp-route-serviceId="@Model.TrmServiceDiagram.ServiceId" target="_blank" rel="noopener noreferrer">Open full screen</a>
+        </div>
+
+        @if (!Model.TrmServiceDiagram.HasAnyContent)
+        {
+            <div class="empty-state compact">
+                <h3>@Model.TrmServiceDiagram.EmptyStateTitle</h3>
+                <p>@Model.TrmServiceDiagram.EmptyStateBody</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.TrmServiceDiagram.DomainCount</strong> domains</span>
+                <span class="report-summary-chip"><strong>@Model.TrmServiceDiagram.CapabilityCount</strong> capabilities</span>
+                <span class="report-summary-chip"><strong>@Model.TrmServiceDiagram.ComponentCount</strong> components</span>
+                <span class="report-summary-chip"><strong>@Model.TrmServiceDiagram.ItemCount</strong> @Model.TrmServiceDiagram.MappedSummaryLabel</span>
+                @if (Model.TrmServiceDiagram.ShowUnmappedItems)
+                {
+                    <span class="report-summary-chip"><strong>@Model.TrmServiceDiagram.UnmappedItemCount</strong> unmapped</span>
+                }
+            </div>
+
+            <div class="model-report-preview-frame">
+                <partial name="_ModelDiagramReport" model="Model.TrmServiceDiagram" />
+            </div>
+        }
+    </div>
+</details>

@@ -4,14 +4,18 @@ public sealed class ModelDiagramReportViewModel
 {
     public string ScopeKey { get; init; } = "trm";
     public int? BrmModelId { get; init; }
+    public int? ServiceId { get; init; }
+    public int? ApplicationId { get; init; }
     public string ReportFragmentId { get; init; } = "report-product-model";
-    public string DiagramTitle { get; init; } = "TRM Model diagram";
+    public string DiagramTitle { get; init; } = "TRM diagram (all objects)";
     public string DiagramDescription { get; init; } = string.Empty;
     public string PosterTitle { get; init; } = "Product model poster";
     public string PosterDescription { get; init; } = string.Empty;
     public string MappedItemLabel { get; init; } = "mapped product(s)";
     public string EmptyStateTitle { get; init; } = "No model content available";
     public string EmptyStateBody { get; init; } = "Import the HERM reference model and product mappings to populate this report.";
+    public string BackReportAction { get; init; } = "TrmModelReport";
+    public string BackReportLabel { get; init; } = "Back to TRM report";
     public bool ShowUnmappedItems { get; init; } = true;
     public bool OnlyShowMappedNodes { get; init; }
     public bool UseCompactMappedSummary { get; init; }

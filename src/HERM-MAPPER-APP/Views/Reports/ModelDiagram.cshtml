@@ -12,18 +12,6 @@
     var posterStageClass = usesSvgPoster
         ? "model-report-poster-stage"
         : "model-report-poster-stage model-report-poster-stage-html-fallback";
-    var backReportAction = Model.ScopeKey switch
-    {
-        "arm" => "ArmModelReport",
-        "brm" => "BrmModelReport",
-        _ => "TrmModelReport"
-    };
-    var backReportLabel = Model.ScopeKey switch
-    {
-        "arm" => "Back to ARM report",
-        "brm" => "Back to BRM report",
-        _ => "Back to TRM report"
-    };
 }
 
 <section class="@posterPageClass">
@@ -34,16 +22,16 @@
             <p>@Model.PosterDescription</p>
         </div>
         <div class="report-toolbar-actions">
-            <a class="btn btn-outline-secondary btn-sm" asp-action="@backReportAction" asp-route-brmModelId="@Model.BrmModelId" asp-fragment="@Model.ReportFragmentId">@backReportLabel</a>
-            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadModelDiagramSvg" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId">Download SVG</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.BackReportAction" asp-route-brmModelId="@Model.BrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId" asp-fragment="@Model.ReportFragmentId">@Model.BackReportLabel</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadModelDiagramSvg" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download SVG</a>
             <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print / Save PDF</button>
             @if (!string.IsNullOrWhiteSpace(Model.DrawIoDownloadAction))
             {
-                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId">Download draw.io</a>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download draw.io</a>
             }
             @if (!string.IsNullOrWhiteSpace(Model.ArchiDownloadAction))
             {
-                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId">Download Archi XML</a>
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download Archi XML</a>
             }
         </div>
     </div>

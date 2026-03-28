@@ -71,16 +71,160 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
             new DiagramMetadata(
                 ScopeKey: "arm",
                 BrmModelId: null,
+                ServiceId: null,
+                ApplicationId: null,
                 ReportFragmentId: "report-arm-model",
-                DiagramTitle: "ARM Model diagram",
+                DiagramTitle: "ARM diagram (all objects)",
                 DiagramDescription: "Browse the ARM structure with mapped TRM domains placed inside each component.",
                 PosterTitle: "ARM model poster",
                 PosterDescription: "Full-screen poster view of the ARM model with mapped TRM domains placed directly inside each component column.",
                 MappedItemLabel: "mapped TRM domain(s)",
+                BackReportAction: "ArmModelReport",
+                BackReportLabel: "Back to ARM report",
                 OnlyShowMappedNodes: false,
                 UseCompactMappedSummary: true,
                 ShowComponentMappedSummary: false,
                 ShowBranchEmptyStates: false));
+    }
+
+    public async Task<ModelDiagramReportViewModel> BuildArmApplicationAsync(int? applicationId, CancellationToken cancellationToken = default)
+    {
+        var selectedApplication = applicationId is > 0
+            ? await dbContext.ApplicationCatalogItems
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == applicationId.Value, cancellationToken)
+            : null;
+
+        if (selectedApplication is null)
+        {
+            return new ModelDiagramReportViewModel
+            {
+                ScopeKey = "arm",
+                ReportFragmentId = "report-arm-application",
+                DiagramTitle = "ARM diagram per application",
+                DiagramDescription = "Choose an application to review the ARM structure touched by its mappings.",
+                PosterTitle = "ARM application diagram poster",
+                PosterDescription = "Full-screen poster view of the selected application across the ARM reference model.",
+                MappedItemLabel = "mapped TRM domain(s)",
+                EmptyStateTitle = "No application selected",
+                EmptyStateBody = "Choose an application to build an ARM diagram for its mappings.",
+                BackReportAction = "ArmApplicationDiagramReport",
+                BackReportLabel = "Back to application ARM report",
+                OnlyShowMappedNodes = true,
+                UseCompactMappedSummary = true,
+                ShowComponentMappedSummary = false,
+                ShowBranchEmptyStates = false,
+                DrawIoDownloadAction = null,
+                ArchiDownloadAction = null
+            };
+        }
+
+        var domains = await dbContext.ArmDomains
+            .AsNoTracking()
+            .OrderBy(x => x.Code)
+            .ThenBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
+        var capabilities = await dbContext.ArmCapabilities
+            .AsNoTracking()
+            .OrderBy(x => x.ParentDomainId)
+            .ThenBy(x => x.Code)
+            .ThenBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
+        var components = await dbContext.ArmComponents
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.ParentCapabilityId)
+            .ThenBy(x => x.Code)
+            .ThenBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
+        var mappings = await dbContext.ApplicationCatalogItemMappings
+            .AsNoTracking()
+            .Where(x => x.ApplicationCatalogItemId == selectedApplication.Id)
+            .Include(x => x.ArmComponent)
+            .ThenInclude(x => x!.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .Include(x => x.ProductMapping)
+            .ThenInclude(x => x!.TrmDomain)
+            .Include(x => x.ProductMapping)
+            .ThenInclude(x => x!.TrmCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .Include(x => x.ProductMapping)
+            .ThenInclude(x => x!.TrmComponent)
+            .ThenInclude(x => x!.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .Include(x => x.ProductCatalogItem)
+            .ThenInclude(x => x!.Mappings)
+            .ThenInclude(x => x.TrmDomain)
+            .Include(x => x.ProductCatalogItem)
+            .ThenInclude(x => x!.Mappings)
+            .ThenInclude(x => x.TrmCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .Include(x => x.ProductCatalogItem)
+            .ThenInclude(x => x!.Mappings)
+            .ThenInclude(x => x.TrmComponent)
+            .ThenInclude(x => x!.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        var placements = mappings
+            .SelectMany(ResolveArmPlacements)
+            .ToList();
+
+        if (placements.Count == 0)
+        {
+            return new ModelDiagramReportViewModel
+            {
+                ScopeKey = "arm",
+                ApplicationId = selectedApplication.Id,
+                ReportFragmentId = "report-arm-application",
+                DiagramTitle = "ARM diagram per application",
+                DiagramDescription = BuildApplicationDiagramDescription(selectedApplication),
+                PosterTitle = $"{selectedApplication.Name} ARM application poster",
+                PosterDescription = $"Full-screen poster view of {selectedApplication.Name} across the ARM reference model.",
+                MappedItemLabel = "mapped TRM domain(s)",
+                EmptyStateTitle = $"No ARM mappings found for {selectedApplication.Name}",
+                EmptyStateBody = "Add ARM mappings for this application to populate the report.",
+                BackReportAction = "ArmApplicationDiagramReport",
+                BackReportLabel = "Back to application ARM report",
+                OnlyShowMappedNodes = true,
+                UseCompactMappedSummary = true,
+                ShowComponentMappedSummary = false,
+                ShowBranchEmptyStates = false,
+                DrawIoDownloadAction = null,
+                ArchiDownloadAction = null
+            };
+        }
+
+        return BuildReport(
+            domains.Select(x => new DiagramDomainSeed(x.Id, x.Code, x.Name)).ToList(),
+            capabilities.Select(x => new DiagramCapabilitySeed(x.Id, x.ParentDomainId, x.Code, x.Name)).ToList(),
+            components.Select(x => new DiagramComponentSeed(x.Id, x.ParentCapabilityId, x.Code, x.Name)).ToList(),
+            placements,
+            new DiagramMetadata(
+                ScopeKey: "arm",
+                BrmModelId: null,
+                ServiceId: null,
+                ApplicationId: selectedApplication.Id,
+                ReportFragmentId: "report-arm-application",
+                DiagramTitle: "ARM diagram per application",
+                DiagramDescription: BuildApplicationDiagramDescription(selectedApplication),
+                PosterTitle: $"{selectedApplication.Name} ARM application poster",
+                PosterDescription: $"Full-screen poster view of {selectedApplication.Name} across the ARM reference model with only that application's resolved mappings shown.",
+                MappedItemLabel: "mapped TRM domain(s)",
+                BackReportAction: "ArmApplicationDiagramReport",
+                BackReportLabel: "Back to application ARM report",
+                OnlyShowMappedNodes: false,
+                UseCompactMappedSummary: true,
+                ShowComponentMappedSummary: false,
+                ShowBranchEmptyStates: false,
+                EmptyStateTitle: $"No ARM structure available for {selectedApplication.Name}",
+                EmptyStateBody: "Import the ARM reference model and add application mappings to render this report.",
+                DrawIoDownloadAction: null,
+                ArchiDownloadAction: null));
     }
 
     public async Task<ModelDiagramReportViewModel> BuildBrmAsync(CancellationToken cancellationToken = default)
@@ -131,12 +275,16 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
             new DiagramMetadata(
                 ScopeKey: "brm",
                 BrmModelId: null,
+                ServiceId: null,
+                ApplicationId: null,
                 ReportFragmentId: "report-brm-model",
-                DiagramTitle: "BRM Model diagram",
+                DiagramTitle: "BRM diagram",
                 DiagramDescription: "Browse the BRM structure with mapped ARM domains placed inside each level 2 capability.",
                 PosterTitle: "BRM model poster",
                 PosterDescription: "Full-screen poster view of the BRM model with mapped ARM domains placed directly inside each level 2 capability column.",
                 MappedItemLabel: "mapped ARM domain(s)",
+                BackReportAction: "BrmModelReport",
+                BackReportLabel: "Back to BRM report",
                 OnlyShowMappedNodes: false,
                 UseCompactMappedSummary: true,
                 ShowComponentMappedSummary: false,
@@ -161,13 +309,15 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
             {
                 ScopeKey = "brm",
                 ReportFragmentId = "report-brm-model",
-                DiagramTitle = "BRM Model diagram",
+                DiagramTitle = "BRM diagram",
                 DiagramDescription = "Choose one of your BRM models to review its mapped capability structure.",
                 PosterTitle = "BRM model poster",
                 PosterDescription = "Full-screen poster view of the selected BRM model.",
                 MappedItemLabel = "mapped ARM domain(s)",
                 EmptyStateTitle = "No BRM models available",
                 EmptyStateBody = "Create a BRM model and add capabilities to populate this report.",
+                BackReportAction = "BrmModelReport",
+                BackReportLabel = "Back to BRM report",
                 OnlyShowMappedNodes = true,
                 UseCompactMappedSummary = true,
                 ShowComponentMappedSummary = false,
@@ -220,12 +370,16 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
             new DiagramMetadata(
                 ScopeKey: "brm",
                 BrmModelId: selectedBrmModel.Id,
+                ServiceId: null,
+                ApplicationId: null,
                 ReportFragmentId: "report-brm-model",
-                DiagramTitle: "BRM Model diagram",
+                DiagramTitle: "BRM diagram",
                 DiagramDescription: BuildBrmModelDescription(selectedBrmModel),
                 PosterTitle: $"{selectedBrmModel.Name} BRM model poster",
                 PosterDescription: $"Full-screen poster view of {selectedBrmModel.Name} across the full BRM reference model with mapped ARM domains placed where they exist.",
                 MappedItemLabel: "mapped ARM domain(s)",
+                BackReportAction: "BrmModelReport",
+                BackReportLabel: "Back to BRM report",
                 OnlyShowMappedNodes: false,
                 UseCompactMappedSummary: true,
                 ShowComponentMappedSummary: false,
@@ -301,6 +455,9 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         var areaLabel = string.IsNullOrWhiteSpace(brmModel.Area) ? brmModel.Name : $"{brmModel.Name} - {brmModel.Area}";
         return $"Review {areaLabel} across the full BRM poster with mapped ARM domains shown inside the configured BRM capabilities.";
     }
+
+    private static string BuildApplicationDiagramDescription(ApplicationCatalogItem application) =>
+        $"Review {application.Name} across the ARM reference model with only that application's resolved TRM mappings shown in the mapped ARM components.";
 
     private static ModelDiagramReportViewModel BuildReport(
         IReadOnlyList<DiagramDomainSeed> domains,
@@ -381,6 +538,8 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         {
             ScopeKey = metadata.ScopeKey,
             BrmModelId = metadata.BrmModelId,
+            ServiceId = metadata.ServiceId,
+            ApplicationId = metadata.ApplicationId,
             ReportFragmentId = metadata.ReportFragmentId,
             DiagramTitle = metadata.DiagramTitle,
             DiagramDescription = metadata.DiagramDescription,
@@ -389,13 +548,15 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
             MappedItemLabel = metadata.MappedItemLabel,
             EmptyStateTitle = metadata.EmptyStateTitle ?? "No model content available",
             EmptyStateBody = metadata.EmptyStateBody ?? "Import the matching reference model and mappings to populate this report.",
+            BackReportAction = metadata.BackReportAction,
+            BackReportLabel = metadata.BackReportLabel,
             ShowUnmappedItems = false,
             OnlyShowMappedNodes = metadata.OnlyShowMappedNodes,
             UseCompactMappedSummary = metadata.UseCompactMappedSummary,
             ShowComponentMappedSummary = metadata.ShowComponentMappedSummary,
             ShowBranchEmptyStates = metadata.ShowBranchEmptyStates,
-            DrawIoDownloadAction = "DownloadDrawIo",
-            ArchiDownloadAction = "DownloadArchiXml",
+            DrawIoDownloadAction = metadata.DrawIoDownloadAction,
+            ArchiDownloadAction = metadata.ArchiDownloadAction,
             DomainCount = domainNodes.Count,
             CapabilityCount = domainNodes.Sum(x => x.Capabilities.Count),
             ComponentCount = domainNodes.Sum(x => x.Capabilities.Sum(capability => capability.Components.Count)),
@@ -440,18 +601,24 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
     private sealed record DiagramMetadata(
         string ScopeKey,
         int? BrmModelId,
+        int? ServiceId,
+        int? ApplicationId,
         string ReportFragmentId,
         string DiagramTitle,
         string DiagramDescription,
         string PosterTitle,
         string PosterDescription,
         string MappedItemLabel,
+        string BackReportAction,
+        string BackReportLabel,
         bool OnlyShowMappedNodes,
         bool UseCompactMappedSummary,
         bool ShowComponentMappedSummary,
         bool ShowBranchEmptyStates,
         string? EmptyStateTitle = null,
-        string? EmptyStateBody = null);
+        string? EmptyStateBody = null,
+        string? DrawIoDownloadAction = "DownloadDrawIo",
+        string? ArchiDownloadAction = "DownloadArchiXml");
 
     private sealed record DiagramDomainSeed(int Id, string Code, string Name);
     private sealed record DiagramCapabilitySeed(int Id, int? ParentDomainId, string Code, string Name);

@@ -89,8 +89,10 @@
     {
         var reportCopy = currentAction switch
         {
-            "TrmModelReport" => "TRM structure and mapped catalogue coverage.",
-            "ArmModelReport" => "ARM model structure and application landscape.",
+            "TrmModelReport" => "TRM structure and mapped catalogue coverage across all objects.",
+            "TrmServiceDiagramReport" => "TRM structure filtered down to a single service and its mapped products.",
+            "ArmModelReport" => "ARM model structure and application landscape across all objects.",
+            "ArmApplicationDiagramReport" => "ARM structure filtered to a single application's resolved mappings.",
             "BrmModelReport" => "BRM hierarchy preview with selectable business models.",
             "ExportData" => "Download curated datasets in CSV, JSON, or XLSX.",
             "MappingByOwnerReport" => "Owner-by-owner traversal from domain to product.",
@@ -299,9 +301,11 @@
                                         <span class="shell-nav-summary-caret" aria-hidden="true"></span>
                                     </summary>
                                     <div class="shell-nav-links">
-                                        <a class="@SubnavLinkClass("Reports", "TrmModelReport")" asp-controller="Reports" asp-action="TrmModelReport">TRM Model diagram</a>
-                                        <a class="@SubnavLinkClass("Reports", "ArmModelReport")" asp-controller="Reports" asp-action="ArmModelReport">ARM Model diagram</a>
-                                        <a class="@SubnavLinkClass("Reports", "BrmModelReport")" asp-controller="Reports" asp-action="BrmModelReport">BRM Model diagram</a>
+                                        <a class="@SubnavLinkClass("Reports", "ArmModelReport")" asp-controller="Reports" asp-action="ArmModelReport">ARM diagram (all objects)</a>
+                                        <a class="@SubnavLinkClass("Reports", "ArmApplicationDiagramReport")" asp-controller="Reports" asp-action="ArmApplicationDiagramReport">ARM diagram per application</a>
+                                        <a class="@SubnavLinkClass("Reports", "BrmModelReport")" asp-controller="Reports" asp-action="BrmModelReport">BRM diagram</a>
+                                        <a class="@SubnavLinkClass("Reports", "TrmModelReport")" asp-controller="Reports" asp-action="TrmModelReport">TRM diagram (all objects)</a>
+                                        <a class="@SubnavLinkClass("Reports", "TrmServiceDiagramReport")" asp-controller="Reports" asp-action="TrmServiceDiagramReport">TRM diagram per service</a>
                                         <a class="@SubnavLinkClass("Reports", "MappingByOwnerReport")" asp-controller="Reports" asp-action="MappingByOwnerReport">TRM Mapping by owner</a>
                                         <a class="@SubnavLinkClass("Reports", "SankeyReport")" asp-controller="Reports" asp-action="SankeyReport">TRM Sankey view</a>
                                         <a class="@SubnavLinkClass("Reports", "IncomingConnectionsHeatmapReport")" asp-controller="Reports" asp-action="IncomingConnectionsHeatmapReport">Incoming heatmap</a>

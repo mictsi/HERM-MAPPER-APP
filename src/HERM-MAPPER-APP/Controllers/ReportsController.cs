@@ -89,6 +89,26 @@ public sealed class ReportsController(
     public async Task<IActionResult> ArmModelReport()
         => View(nameof(ArmModelReport), await BuildReportsViewModelAsync());
 
+    public async Task<IActionResult> TrmServiceDiagramReport(int? serviceId = null)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return View(nameof(TrmServiceDiagramReport), await BuildReportsViewModelAsync(serviceId: serviceId));
+    }
+
+    public async Task<IActionResult> ArmApplicationDiagramReport(int? applicationId = null)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return View(nameof(ArmApplicationDiagramReport), await BuildReportsViewModelAsync(applicationId: applicationId));
+    }
+
     public async Task<IActionResult> BrmModelReport(int? brmModelId = null)
     {
         if (!ModelState.IsValid)
@@ -135,6 +155,8 @@ public sealed class ReportsController(
     private async Task<ReportsViewModel> BuildReportsViewModelAsync(
         string? lifecycleOwner = null,
         int? brmModelId = null,
+        int? serviceId = null,
+        int? applicationId = null,
         bool showBrmModelReport = false)
     {
         if (!ModelState.IsValid)
@@ -200,9 +222,25 @@ public sealed class ReportsController(
             .OrderBy(x => x.Name)
             .ThenBy(x => x.Area)
             .ToListAsync();
+        var services = await dbContext.ServiceCatalogItems
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .ThenBy(x => x.Owner)
+            .ToListAsync();
+        var applications = await dbContext.ApplicationCatalogItems
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .ToListAsync();
         var selectedBrmModelId = brmModels.Any(x => x.Id == brmModelId)
             ? brmModelId
             : brmModels.FirstOrDefault()?.Id;
+        var selectedServiceId = services.Any(x => x.Id == serviceId)
+            ? serviceId
+            : services.FirstOrDefault()?.Id;
+        var selectedApplicationId = applications.Any(x => x.Id == applicationId)
+            ? applicationId
+            : applications.FirstOrDefault()?.Id;
 
         var model = new ReportsViewModel
         {
@@ -214,11 +252,17 @@ public sealed class ReportsController(
             MappingPathCount = paths.Count,
             ExpandBrmModelReport = showBrmModelReport,
             SelectedBrmModelId = selectedBrmModelId,
+            SelectedServiceId = selectedServiceId,
+            SelectedApplicationId = selectedApplicationId,
             SelectedLifecycleOwner = lifecycleOwner,
             LifecycleProductCount = lifecycleProducts.Count,
             ModelDiagram = await modelDiagramReportService.BuildAsync(),
             ArmModelDiagram = await referenceModelDiagramService.BuildArmAsync(),
+            TrmServiceDiagram = await modelDiagramReportService.BuildForServiceAsync(selectedServiceId),
+            ArmApplicationDiagram = await referenceModelDiagramService.BuildArmApplicationAsync(selectedApplicationId),
             BrmModelOptions = BuildBrmModelOptions(brmModels, selectedBrmModelId),
+            ServiceOptions = BuildServiceOptions(services, selectedServiceId),
+            ApplicationOptions = BuildApplicationOptions(applications, selectedApplicationId),
             BrmModelDiagram = await referenceModelDiagramService.BuildBrmModelAsync(selectedBrmModelId),
             AvailableOwners = availableOwners,
             LifecycleStatuses = BuildLifecycleStatuses(lifecycleProducts),
@@ -233,27 +277,27 @@ public sealed class ReportsController(
         return model;
     }
 
-    public async Task<IActionResult> ModelDiagram(string? scope = null, int? brmModelId = null)
+    public async Task<IActionResult> ModelDiagram(string? scope = null, int? brmModelId = null, int? serviceId = null, int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        var model = await BuildModelDiagramAsync(scope, brmModelId);
+        var model = await BuildModelDiagramAsync(scope, brmModelId, serviceId, applicationId);
         model.PosterSvgMarkup = modelDiagramPosterSvgService.BuildSvg(model);
 
         return View("ModelDiagram", model);
     }
 
-    public async Task<FileContentResult> DownloadModelDiagramSvg(string? scope = null, int? brmModelId = null)
+    public async Task<FileContentResult> DownloadModelDiagramSvg(string? scope = null, int? brmModelId = null, int? serviceId = null, int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
             return File(Array.Empty<byte>(), "image/svg+xml", "invalid-request.svg");
         }
 
-        var model = await BuildModelDiagramAsync(scope, brmModelId);
+        var model = await BuildModelDiagramAsync(scope, brmModelId, serviceId, applicationId);
         var content = Encoding.UTF8.GetBytes(modelDiagramPosterSvgService.BuildSvg(model));
         return File(content, "image/svg+xml", ModelDiagramPosterSvgService.BuildDownloadFileName(model.ScopeKey));
     }
@@ -1131,14 +1175,38 @@ public sealed class ReportsController(
                 x.Id == selectedBrmModelId))
             .ToList();
 
-    private async Task<ModelDiagramReportViewModel> BuildModelDiagramAsync(string? scope, int? brmModelId)
+    private static List<SelectListItem> BuildServiceOptions(
+        IReadOnlyList<ServiceCatalogItem> services,
+        int? selectedServiceId) =>
+        services
+            .Select(x => new SelectListItem(
+                string.IsNullOrWhiteSpace(x.Owner)
+                    ? x.Name
+                    : $"{x.Name} - {x.Owner}",
+                x.Id.ToString(CultureInfo.InvariantCulture),
+                x.Id == selectedServiceId))
+            .ToList();
+
+    private static List<SelectListItem> BuildApplicationOptions(
+        IReadOnlyList<ApplicationCatalogItem> applications,
+        int? selectedApplicationId) =>
+        applications
+            .Select(x => new SelectListItem(
+                x.Name,
+                x.Id.ToString(CultureInfo.InvariantCulture),
+                x.Id == selectedApplicationId))
+            .ToList();
+
+    private async Task<ModelDiagramReportViewModel> BuildModelDiagramAsync(string? scope, int? brmModelId, int? serviceId, int? applicationId)
     {
         var normalizedScope = NormalizeScope(scope);
 
         return normalizedScope switch
         {
+            "arm" when applicationId.HasValue => await referenceModelDiagramService.BuildArmApplicationAsync(applicationId),
             "arm" => await referenceModelDiagramService.BuildArmAsync(),
             "brm" => await referenceModelDiagramService.BuildBrmModelAsync(brmModelId),
+            "trm" when serviceId.HasValue => await modelDiagramReportService.BuildForServiceAsync(serviceId),
             _ => await modelDiagramReportService.BuildAsync()
         };
     }

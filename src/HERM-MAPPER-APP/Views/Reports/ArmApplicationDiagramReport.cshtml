@@ -1,0 +1,57 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@{
+    ViewData["Title"] = "ARM diagram per application";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-arm-application" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Model diagram</span>
+            <h2>@Model.ArmApplicationDiagram.DiagramTitle</h2>
+            <p>@Model.ArmApplicationDiagram.DiagramDescription</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        @if (Model.ApplicationOptions.Count != 0)
+        {
+            <form method="get" asp-action="ArmApplicationDiagramReport" class="owner-lifecycle-filter-form mb-3">
+                <div>
+                    <label class="form-label" for="applicationId">Application</label>
+                    <select class="form-select" id="applicationId" name="applicationId" asp-items="Model.ApplicationOptions"></select>
+                </div>
+                <div class="owner-lifecycle-filter-actions">
+                    <button class="btn btn-primary" type="submit">View application</button>
+                </div>
+            </form>
+        }
+
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.ArmApplicationDiagram.ScopeKey" asp-route-applicationId="@Model.ArmApplicationDiagram.ApplicationId" target="_blank" rel="noopener noreferrer">Open full screen</a>
+        </div>
+
+        @if (!Model.ArmApplicationDiagram.HasAnyContent)
+        {
+            <div class="empty-state compact">
+                <h3>@Model.ArmApplicationDiagram.EmptyStateTitle</h3>
+                <p>@Model.ArmApplicationDiagram.EmptyStateBody</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.ArmApplicationDiagram.DomainCount</strong> domains</span>
+                <span class="report-summary-chip"><strong>@Model.ArmApplicationDiagram.CapabilityCount</strong> capabilities</span>
+                <span class="report-summary-chip"><strong>@Model.ArmApplicationDiagram.ComponentCount</strong> components</span>
+                <span class="report-summary-chip"><strong>@Model.ArmApplicationDiagram.ItemCount</strong> @Model.ArmApplicationDiagram.MappedSummaryLabel</span>
+            </div>
+
+            <div class="model-report-preview-frame">
+                <partial name="_ModelDiagramReport" model="Model.ArmApplicationDiagram" />
+            </div>
+        }
+    </div>
+</details>
