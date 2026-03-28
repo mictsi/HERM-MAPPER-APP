@@ -1,7 +1,9 @@
 using System.Net;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace HERMMapperApp.Tests;
@@ -91,6 +93,11 @@ public sealed class ProgramHostIntegrationTests
                     ["HermWorkbook:AutoImportOnFirstRun"] = "false",
                     ["SampleRelationships:AutoImportOnFirstRun"] = "false"
                 });
+            });
+            builder.ConfigureServices(services =>
+            {
+                services.AddDataProtection()
+                    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(contentRoot.Path, "data-protection-keys")));
             });
         }
 
