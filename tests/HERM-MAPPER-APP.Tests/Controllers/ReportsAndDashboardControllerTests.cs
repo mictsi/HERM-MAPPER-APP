@@ -427,6 +427,56 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
+    public void ModelDiagramPosterSvgHighlightsMappedComponentsWithRedBorder()
+    {
+        var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
+        {
+            ContentRootPath = ResolveRepositoryRoot()
+        });
+
+        var svg = service.BuildSvg(new ModelDiagramReportViewModel
+        {
+            ScopeKey = "brm",
+            Domains =
+            [
+                new ModelDiagramDomainViewModel
+                {
+                    Code = "BD001",
+                    Name = "Student Lifecycle",
+                    Capabilities =
+                    [
+                        new ModelDiagramCapabilityViewModel
+                        {
+                            Code = "BC019",
+                            Name = "Student Enrolment",
+                            Components =
+                            [
+                                new ModelDiagramComponentViewModel
+                                {
+                                    Code = "BC021",
+                                    Name = "Enrolment",
+                                    Products =
+                                    [
+                                        new ModelDiagramProductViewModel
+                                        {
+                                            ProductId = 1,
+                                            Name = "AD003 Enabling"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        Assert.Contains(
+            "<rect x=\"1236.218\" y=\"200.782\" width=\"177.165\" height=\"107.866\" rx=\"16\" ry=\"16\" fill=\"#ffffff\" stroke=\"#c92d39\" stroke-width=\"4\" />",
+            svg);
+    }
+
+    [Fact]
     public async Task ReportsExportMappingsCsvReturnsCompletedMappings()
     {
         await using var fixture = await TestFixture.CreateAsync();

@@ -73,7 +73,7 @@
                                 <div class="model-report-component-list">
                                     @foreach (var component in visibleComponents)
                                     {
-                                        <article class="model-report-component">
+                                        <article class="model-report-component @(component.ProductCount > 0 ? "is-mapped" : string.Empty)">
                                             <div class="model-report-component-header">
                                                 <strong>@component.DisplayLabel</strong>
                                                 @if (Model.ShowComponentMappedSummary && component.ProductCount > 0)

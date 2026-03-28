@@ -2875,10 +2875,19 @@ a {
   justify-content: flex-start;
   gap: 0.6rem;
   padding: 0.85rem 0.9rem;
+  border: 1px solid rgba(31, 41, 51, 0.08);
   border-radius: 1rem;
   background: white;
   box-shadow: 0 10px 22px rgba(31, 41, 51, 0.08);
   width: 100%;
+}
+
+.model-report-component.is-mapped {
+  border: 4px solid #c92d39;
+  background: linear-gradient(180deg, #ffffff 0%, #fff7f8 100%);
+  box-shadow:
+    0 10px 22px rgba(31, 41, 51, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.75) inset;
 }
 
 .model-report-empty-card {

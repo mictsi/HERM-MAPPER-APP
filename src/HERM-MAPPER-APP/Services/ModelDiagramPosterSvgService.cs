@@ -383,6 +383,12 @@ public sealed partial class ModelDiagramPosterSvgService(IWebHostEnvironment env
         var stroke = GetStroke(node.Style);
         var strokeWidth = ParseDouble(GetStyleValue(node.Style, "strokeWidth"), 1.0);
 
+        if (HasMappedOverlay(node))
+        {
+            stroke = "#c92d39";
+            strokeWidth = 4;
+        }
+
         if (string.Equals(fill, "none", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(stroke, "none", StringComparison.OrdinalIgnoreCase))
         {
@@ -934,8 +940,15 @@ public sealed partial class ModelDiagramPosterSvgService(IWebHostEnvironment env
 
     private static bool UsesImplicitPosterCardFill(TemplateNode node) =>
         node.Children.Count == 0 &&
+        !IsImageCell(node) &&
         string.Equals(GetStyleValue(node.Style, "rounded"), "1", StringComparison.OrdinalIgnoreCase) &&
-        !string.IsNullOrWhiteSpace(ExtractCode(node.Value));
+        !string.IsNullOrWhiteSpace(ExtractPlainText(node.Value)) &&
+        node.Parent is not null &&
+        string.Equals(NormalizeColor(GetStyleValue(node.Parent.Style, "fillColor")), "#e5e5e5", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasMappedOverlay(TemplateNode node) =>
+        node.OverlayItems.Count > 0 &&
+        IsLeafComponentCell(node);
 
     private static string GetFontColor(IReadOnlyDictionary<string, string> style)
     {
