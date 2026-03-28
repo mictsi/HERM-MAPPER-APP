@@ -938,13 +938,36 @@ public sealed partial class ModelDiagramPosterSvgService(IWebHostEnvironment env
         return color;
     }
 
-    private static bool UsesImplicitPosterCardFill(TemplateNode node) =>
-        node.Children.Count == 0 &&
-        !IsImageCell(node) &&
-        string.Equals(GetStyleValue(node.Style, "rounded"), "1", StringComparison.OrdinalIgnoreCase) &&
-        !string.IsNullOrWhiteSpace(ExtractPlainText(node.Value)) &&
-        node.Parent is not null &&
-        string.Equals(NormalizeColor(GetStyleValue(node.Parent.Style, "fillColor")), "#e5e5e5", StringComparison.OrdinalIgnoreCase);
+    private static bool UsesImplicitPosterCardFill(TemplateNode node)
+    {
+        if (node.Children.Count != 0 ||
+            IsImageCell(node) ||
+            !string.Equals(GetStyleValue(node.Style, "rounded"), "1", StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(ExtractPlainText(node.Value)))
+        {
+            return false;
+        }
+
+        for (var current = node.Parent; current is not null; current = current.Parent)
+        {
+            if (IsGreyPosterContainer(current))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsGreyPosterContainer(TemplateNode node) =>
+        string.Equals(NormalizeColor(GetStyleValue(node.Style, "fillColor")), "#e5e5e5", StringComparison.OrdinalIgnoreCase) ||
+        node.Children.Any(child =>
+            !child.IsGroup &&
+            string.Equals(NormalizeColor(GetStyleValue(child.Style, "fillColor")), "#e5e5e5", StringComparison.OrdinalIgnoreCase) &&
+            Math.Abs(child.OriginalX) <= LayoutRowTolerance &&
+            Math.Abs(child.OriginalY) <= LayoutRowTolerance &&
+            Math.Abs(child.OriginalWidth - node.OriginalWidth) <= 2 &&
+            Math.Abs(child.OriginalHeight - node.OriginalHeight) <= 2);
 
     private static bool HasMappedOverlay(TemplateNode node) =>
         node.OverlayItems.Count > 0 &&

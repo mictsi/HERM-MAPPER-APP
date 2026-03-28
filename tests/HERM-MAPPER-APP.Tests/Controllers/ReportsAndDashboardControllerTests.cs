@@ -424,6 +424,11 @@ public sealed class ReportsAndDashboardControllerTests
             svg);
         Assert.Contains("Student Academic", svg);
         Assert.Contains("(BC046)", svg);
+        Assert.Contains(
+            "<rect x=\"1360.23\" y=\"748.818\" width=\"177.165\" height=\"70.866\" rx=\"16\" ry=\"16\" fill=\"#ffffff\" stroke=\"none\" stroke-width=\"1\" /><text x=\"1366.325\" y=\"766.787\" fill=\"#1f2933\"",
+            svg);
+        Assert.Contains("Housing", svg);
+        Assert.Contains("(BC115)", svg);
     }
 
     [Fact]
