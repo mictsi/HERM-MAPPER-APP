@@ -27,6 +27,8 @@ public sealed partial class DatabaseInitializer(
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureProductSoftDeleteColumnsAsync(cancellationToken);
         await EnsureServiceSoftDeleteColumnsAsync(cancellationToken);
+        await EnsureApplicationSoftDeleteColumnsAsync(cancellationToken);
+        await EnsureBrmModelSoftDeleteColumnsAsync(cancellationToken);
         await EnsureServiceAssetCriticalityScoreColumnAsync(cancellationToken);
         await EnsureServiceConnectionLayoutColumnAsync(cancellationToken);
         await EnsureAppSettingsTableAsync(cancellationToken);
@@ -117,6 +119,9 @@ public sealed partial class DatabaseInitializer(
                     "Area" TEXT NOT NULL,
                     "Description" TEXT NULL,
                     "Status" TEXT NOT NULL,
+                    "IsDeleted" INTEGER NOT NULL DEFAULT 0,
+                    "DeletedUtc" TEXT NULL,
+                    "DeletedReason" TEXT NULL,
                     "CreatedUtc" TEXT NOT NULL,
                     "UpdatedUtc" TEXT NOT NULL
                 )
@@ -145,6 +150,9 @@ public sealed partial class DatabaseInitializer(
                         [Area] NVARCHAR(120) NOT NULL,
                         [Description] NVARCHAR(2000) NULL,
                         [Status] NVARCHAR(80) NOT NULL,
+                        [IsDeleted] BIT NOT NULL CONSTRAINT [DF_BrmModels_IsDeleted] DEFAULT 0,
+                        [DeletedUtc] DATETIME2 NULL,
+                        [DeletedReason] NVARCHAR(400) NULL,
                         [CreatedUtc] DATETIME2 NOT NULL,
                         [UpdatedUtc] DATETIME2 NOT NULL
                     );
@@ -822,6 +830,9 @@ public sealed partial class DatabaseInitializer(
                     "Name" TEXT NOT NULL,
                     "Description" TEXT NULL,
                     "Notes" TEXT NULL,
+                    "IsDeleted" INTEGER NOT NULL DEFAULT 0,
+                    "DeletedUtc" TEXT NULL,
+                    "DeletedReason" TEXT NULL,
                     "CreatedUtc" TEXT NOT NULL,
                     "UpdatedUtc" TEXT NOT NULL
                 )
@@ -920,6 +931,9 @@ public sealed partial class DatabaseInitializer(
                         [Name] NVARCHAR(200) NOT NULL,
                         [Description] NVARCHAR(2000) NULL,
                         [Notes] NVARCHAR(4000) NULL,
+                        [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ApplicationCatalogItems_IsDeleted] DEFAULT 0,
+                        [DeletedUtc] DATETIME2 NULL,
+                        [DeletedReason] NVARCHAR(400) NULL,
                         [CreatedUtc] DATETIME2 NOT NULL,
                         [UpdatedUtc] DATETIME2 NOT NULL
                     );
@@ -1585,6 +1599,130 @@ public sealed partial class DatabaseInitializer(
                 IF COL_LENGTH(N'[ServiceCatalogItems]', N'DeletedReason') IS NULL
                 BEGIN
                     ALTER TABLE [ServiceCatalogItems]
+                    ADD [DeletedReason] NVARCHAR(400) NULL;
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureApplicationSoftDeleteColumnsAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            if (!await SqliteColumnExistsAsync("ApplicationCatalogItems", "IsDeleted", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ApplicationCatalogItems ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("ApplicationCatalogItems", "DeletedUtc", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ApplicationCatalogItems ADD COLUMN DeletedUtc TEXT NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("ApplicationCatalogItems", "DeletedReason", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE ApplicationCatalogItems ADD COLUMN DeletedReason TEXT NULL",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ApplicationCatalogItems]', N'IsDeleted') IS NULL
+                BEGIN
+                    ALTER TABLE [ApplicationCatalogItems]
+                    ADD [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ApplicationCatalogItems_IsDeleted] DEFAULT 0;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ApplicationCatalogItems]', N'DeletedUtc') IS NULL
+                BEGIN
+                    ALTER TABLE [ApplicationCatalogItems]
+                    ADD [DeletedUtc] DATETIME2 NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[ApplicationCatalogItems]', N'DeletedReason') IS NULL
+                BEGIN
+                    ALTER TABLE [ApplicationCatalogItems]
+                    ADD [DeletedReason] NVARCHAR(400) NULL;
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureBrmModelSoftDeleteColumnsAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            if (!await SqliteColumnExistsAsync("BrmModels", "IsDeleted", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE BrmModels ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("BrmModels", "DeletedUtc", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE BrmModels ADD COLUMN DeletedUtc TEXT NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("BrmModels", "DeletedReason", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE BrmModels ADD COLUMN DeletedReason TEXT NULL",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[BrmModels]', N'IsDeleted') IS NULL
+                BEGIN
+                    ALTER TABLE [BrmModels]
+                    ADD [IsDeleted] BIT NOT NULL CONSTRAINT [DF_BrmModels_IsDeleted] DEFAULT 0;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[BrmModels]', N'DeletedUtc') IS NULL
+                BEGIN
+                    ALTER TABLE [BrmModels]
+                    ADD [DeletedUtc] DATETIME2 NULL;
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[BrmModels]', N'DeletedReason') IS NULL
+                BEGIN
+                    ALTER TABLE [BrmModels]
                     ADD [DeletedReason] NVARCHAR(400) NULL;
                 END
                 """,

@@ -153,6 +153,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Area).HasMaxLength(120);
             entity.Property(x => x.Description).HasMaxLength(2000);
             entity.Property(x => x.Status).HasMaxLength(80);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
         });
 
         modelBuilder.Entity<BrmDomain>(entity =>
@@ -324,6 +325,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.Description).HasMaxLength(2000);
             entity.Property(x => x.Notes).HasMaxLength(4000);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
         });
 
         modelBuilder.Entity<ApplicationCatalogItemMapping>(entity =>

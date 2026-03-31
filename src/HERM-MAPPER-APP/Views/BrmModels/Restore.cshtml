@@ -1,0 +1,106 @@
+@using HERMMapperApp.Services
+@model BrmModelRestoreViewModel
+@{
+    ViewData["Title"] = "Restore BRM Models";
+    ViewData["AdminNav"] = "RestoreBrmModels";
+    ViewData["BodyClass"] = "admin-page restore-page brm-models-restore-page";
+    var areaCount = Model.Models
+        .Select(model => model.Area)
+        .Where(area => !string.IsNullOrWhiteSpace(area))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Deleted BRM workspaces</span>
+                <h1>Restore BRM models</h1>
+                <p>Restore BRM models back into the business catalogue.</p>
+            </div>
+        </section>
+
+        <section class="stats-grid stats-grid-compact admin-overview-grid">
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Deleted models</span>
+                <span class="stat-value">@Model.Models.Count</span>
+                <span class="stat-meta">currently in the BRM trash</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Areas</span>
+                <span class="stat-value">@areaCount</span>
+                <span class="stat-meta">distinct areas represented</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Capabilities</span>
+                <span class="stat-value">@Model.Models.Sum(model => model.Capabilities.Count)</span>
+                <span class="stat-meta">capability records preserved</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Restore status</span>
+                <span class="stat-value details-overview-value-small">@(string.IsNullOrWhiteSpace(Model.StatusMessage) ? "Ready" : "Updated")</span>
+                <span class="stat-meta">recover deleted BRM models</span>
+            </article>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-success mb-0">@Model.StatusMessage</div>
+            </section>
+        }
+
+        <section class="content-card">
+            @if (Model.Models.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <h3>No deleted BRM models</h3>
+                    <p>The BRM model trash is empty.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Area</th>
+                                <th>Status</th>
+                                <th>Capabilities</th>
+                                <th>Deleted</th>
+                                <th>Reason</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var modelRow in Model.Models)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@modelRow.Name</strong>
+                                    <div class="table-subline">@(string.IsNullOrWhiteSpace(modelRow.Description) ? "No description provided." : modelRow.Description)</div>
+                                </td>
+                                <td>@modelRow.Area</td>
+                                <td>@modelRow.Status</td>
+                                <td>@modelRow.Capabilities.Count</td>
+                                <td>@await TimeZoneDisplay.FormatUtcAsync(modelRow.DeletedUtc)</td>
+                                <td>@(modelRow.DeletedReason ?? "-")</td>
+                                <td class="text-end">
+                                    <form asp-action="RestoreDeleted" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@modelRow.Id" />
+                                        <button class="btn btn-outline-primary btn-sm" type="submit">Restore</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

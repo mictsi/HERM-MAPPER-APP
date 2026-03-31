@@ -31,6 +31,7 @@ public sealed class BrmModelsController(
             StatusMessage = TempData["BrmModelsStatusMessage"] as string,
             Models = await dbContext.BrmModels
                 .AsNoTracking()
+                .Where(x => !x.IsDeleted)
                 .OrderBy(x => x.Name)
                 .ThenBy(x => x.Area)
                 .Select(x => new BrmModelIndexRowViewModel
@@ -56,7 +57,7 @@ public sealed class BrmModelsController(
 
         var brmModel = await dbContext.BrmModels
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (brmModel is null)
         {
             return NotFound();
@@ -88,7 +89,10 @@ public sealed class BrmModelsController(
         {
             var applicationMappings = await dbContext.ApplicationCatalogItemMappings
                 .AsNoTracking()
-                .Where(x => armComponentIds.Contains(x.ArmComponentId))
+                .Where(x =>
+                    armComponentIds.Contains(x.ArmComponentId) &&
+                    x.ApplicationCatalogItem != null &&
+                    !x.ApplicationCatalogItem.IsDeleted)
                 .Select(x => new { x.ApplicationCatalogItemId, x.ArmComponentId, x.ProductCatalogItemId })
                 .ToListAsync();
 
@@ -193,7 +197,7 @@ public sealed class BrmModelsController(
 
         var brmModel = await dbContext.BrmModels
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (brmModel is null)
         {
             return NotFound();
@@ -215,7 +219,7 @@ public sealed class BrmModelsController(
     public async Task<IActionResult> Edit(int id, BrmModelEditViewModel input)
     {
         var brmModel = await dbContext.BrmModels
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (brmModel is null)
         {
             return NotFound();
@@ -246,6 +250,114 @@ public sealed class BrmModelsController(
 
         TempData["BrmModelsStatusMessage"] = $"Updated BRM model {brmModel.Name}.";
         return RedirectToAction(nameof(Details), new { id = brmModel.Id });
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    public async Task<IActionResult> Delete(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var brmModel = await dbContext.BrmModels
+            .AsNoTracking()
+            .Include(x => x.Capabilities)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+
+        return brmModel is null ? NotFound() : View(brmModel);
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    [HttpPost, ActionName(nameof(Delete))]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteConfirmed(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var brmModel = await dbContext.BrmModels.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (brmModel is null)
+        {
+            return NotFound();
+        }
+
+        brmModel.IsDeleted = true;
+        brmModel.DeletedUtc = DateTime.UtcNow;
+        brmModel.DeletedReason = "Moved to trash from the BRM model catalogue.";
+        brmModel.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "BrmModel",
+            "Delete",
+            nameof(BrmModel),
+            id,
+            $"Moved BRM model {brmModel.Name} to trash.",
+            brmModel.DeletedReason);
+
+        TempData["BrmModelsStatusMessage"] = $"Moved BRM model {brmModel.Name} to trash.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> Restore()
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var models = await dbContext.BrmModels
+            .AsNoTracking()
+            .Include(x => x.Capabilities)
+            .Where(x => x.IsDeleted)
+            .OrderByDescending(x => x.DeletedUtc)
+            .ThenBy(x => x.Name)
+            .ThenBy(x => x.Area)
+            .ToListAsync();
+
+        return View(new BrmModelRestoreViewModel
+        {
+            Models = models,
+            StatusMessage = TempData["BrmModelsStatusMessage"] as string
+        });
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreDeleted(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var brmModel = await dbContext.BrmModels.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+        if (brmModel is null)
+        {
+            return NotFound();
+        }
+
+        brmModel.IsDeleted = false;
+        brmModel.DeletedUtc = null;
+        brmModel.DeletedReason = null;
+        brmModel.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "BrmModel",
+            "Restore",
+            nameof(BrmModel),
+            brmModel.Id,
+            $"Restored BRM model {brmModel.Name} from trash.");
+
+        TempData["BrmModelsStatusMessage"] = $"Restored BRM model {brmModel.Name}.";
+        return RedirectToAction(nameof(Restore));
     }
 
     private static void NormalizeInput(BrmModelEditViewModel input)

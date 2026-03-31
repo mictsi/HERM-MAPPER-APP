@@ -27,6 +27,13 @@
     </div>
 </section>
 
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <section class="content-card applications-status-card">
+        <div class="alert alert-success mb-0" role="status">@Model.StatusMessage</div>
+    </section>
+}
+
 <section class="stats-grid stats-grid-compact applications-overview-grid">
     <article class="stat-card applications-overview-card">
         <span class="stat-label">Visible applications</span>
@@ -123,6 +130,14 @@
                                        aria-label="Edit @application.Name">
                                         <partial name="_ActionIcon" model="@("edit")" />
                                         <span class="visually-hidden">Edit</span>
+                                    </a>
+                                    <a class="table-action-button table-action-button-danger"
+                                       asp-action="Delete"
+                                       asp-route-id="@application.Id"
+                                       title="Move @application.Name to trash"
+                                       aria-label="Move @application.Name to trash">
+                                        <partial name="_ActionIcon" model="@("trash")" />
+                                        <span class="visually-hidden">Move to trash</span>
                                     </a>
                                 }
                             </div>

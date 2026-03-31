@@ -126,6 +126,14 @@
                                         <partial name="_ActionIcon" model="@("edit")" />
                                         <span class="visually-hidden">Edit</span>
                                     </a>
+                                    <a class="table-action-button table-action-button-danger"
+                                       asp-action="Delete"
+                                       asp-route-id="@modelRow.Id"
+                                       title="Move @modelRow.Name to trash"
+                                       aria-label="Move @modelRow.Name to trash">
+                                        <partial name="_ActionIcon" model="@("trash")" />
+                                        <span class="visually-hidden">Move to trash</span>
+                                    </a>
                                 }
                             </div>
                         </td>

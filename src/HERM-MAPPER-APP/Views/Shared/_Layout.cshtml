@@ -46,6 +46,10 @@
         && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase);
     var isServiceRestore = string.Equals(currentController, "Services", StringComparison.OrdinalIgnoreCase)
         && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase);
+    var isApplicationRestore = string.Equals(currentController, "Applications", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase);
+    var isBrmModelRestore = string.Equals(currentController, "BrmModels", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase);
     var isReferenceRestore = string.Equals(currentController, "Reference", StringComparison.OrdinalIgnoreCase)
         && (string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentAction, "RestoreArm", StringComparison.OrdinalIgnoreCase)
@@ -63,11 +67,13 @@
     {
         sidebarContext = ("Account", currentPageTitle, "Manage your signed-in profile and update the local workspace password.");
     }
-    else if (isProductRestore || isServiceRestore || isReferenceRestore
+    else if (isProductRestore || isServiceRestore || isApplicationRestore || isBrmModelRestore || isReferenceRestore
         || IsCurrentController("Users", "Configuration", "ChangeLog"))
     {
         var adminCopy = currentAction switch
         {
+            "Restore" when string.Equals(currentController, "Applications", StringComparison.OrdinalIgnoreCase) => "Recover deleted applications and republish them into the ARM catalogue.",
+            "Restore" when string.Equals(currentController, "BrmModels", StringComparison.OrdinalIgnoreCase) => "Recover deleted BRM model workspaces and their attached capabilities.",
             "Restore" when string.Equals(currentController, "Products", StringComparison.OrdinalIgnoreCase) => "Recover deleted products and repopulate the TRM catalogue safely.",
             "Restore" when string.Equals(currentController, "Services", StringComparison.OrdinalIgnoreCase) => "Recover deleted services and restore flow editing history.",
             "Restore" when string.Equals(currentController, "Reference", StringComparison.OrdinalIgnoreCase) => "Reload TRM reference data and recovery tooling.",
@@ -137,6 +143,8 @@
     var adminOpen = IsCurrentController("Users", "Configuration", "ChangeLog")
         || (string.Equals(currentController, "Products", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
         || (string.Equals(currentController, "Services", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
+        || (string.Equals(currentController, "Applications", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
+        || (string.Equals(currentController, "BrmModels", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
         || (string.Equals(currentController, "Reference", StringComparison.OrdinalIgnoreCase)
             && (string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(currentAction, "RestoreArm", StringComparison.OrdinalIgnoreCase)
@@ -339,6 +347,8 @@
                                         <a class="@SubnavLinkClass("ChangeLog")" asp-controller="ChangeLog" asp-action="Index">Change Log</a>
                                         <a class="@SubnavLinkClass("Products", "Restore")" asp-controller="Products" asp-action="Restore">Restore Products</a>
                                         <a class="@SubnavLinkClass("Services", "Restore")" asp-controller="Services" asp-action="Restore">Restore Services</a>
+                                        <a class="@SubnavLinkClass("Applications", "Restore")" asp-controller="Applications" asp-action="Restore">Restore Applications</a>
+                                        <a class="@SubnavLinkClass("BrmModels", "Restore")" asp-controller="BrmModels" asp-action="Restore">Restore BRM Models</a>
                                         <a class="@SubnavLinkClass("Reference", "Restore")" asp-controller="Reference" asp-action="Restore">Restore TRM</a>
                                         <a class="@SubnavLinkClass("Reference", "RestoreArm")" asp-controller="Reference" asp-action="RestoreArm">Restore ARM</a>
                                         <a class="@SubnavLinkClass("Reference", "RestoreBrm")" asp-controller="Reference" asp-action="RestoreBrm">Restore BRM</a>

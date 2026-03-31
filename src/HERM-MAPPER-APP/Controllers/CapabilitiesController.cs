@@ -47,7 +47,7 @@ public sealed class CapabilitiesController(
 
         var brmModelExists = await dbContext.BrmModels
             .AsNoTracking()
-            .AnyAsync(x => x.Id == brmModelId.Value);
+            .AnyAsync(x => x.Id == brmModelId.Value && !x.IsDeleted);
         if (!brmModelExists)
         {
             return RedirectToAction("Index", "BrmModels");
@@ -170,7 +170,7 @@ public sealed class CapabilitiesController(
         var capability = await dbContext.BusinessCapabilityCatalogItems
             .AsNoTracking()
             .Include(x => x.Mappings)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && (x.BrmModel == null || !x.BrmModel.IsDeleted));
         if (capability is null)
         {
             return NotFound();
@@ -208,7 +208,7 @@ public sealed class CapabilitiesController(
     {
         var capability = await dbContext.BusinessCapabilityCatalogItems
             .Include(x => x.Mappings)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && (x.BrmModel == null || !x.BrmModel.IsDeleted));
         if (capability is null)
         {
             return NotFound();
@@ -272,7 +272,7 @@ public sealed class CapabilitiesController(
 
         var model = await dbContext.BusinessCapabilityCatalogItems
             .AsNoTracking()
-            .Where(x => x.Id == id)
+            .Where(x => x.Id == id && (x.BrmModel == null || !x.BrmModel.IsDeleted))
             .Select(x => new CapabilityDeleteViewModel
             {
                 Id = x.Id,
@@ -307,7 +307,7 @@ public sealed class CapabilitiesController(
 
         var capability = await dbContext.BusinessCapabilityCatalogItems
             .Include(x => x.BrmModel)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && (x.BrmModel == null || !x.BrmModel.IsDeleted));
         if (capability is null)
         {
             return NotFound();
@@ -340,7 +340,7 @@ public sealed class CapabilitiesController(
         {
             var brmModel = await dbContext.BrmModels
                 .AsNoTracking()
-                .Where(x => x.Id == model.SelectedBrmModelId.Value)
+                .Where(x => x.Id == model.SelectedBrmModelId.Value && !x.IsDeleted)
                 .Select(x => new
                 {
                     x.Name,
@@ -416,7 +416,7 @@ public sealed class CapabilitiesController(
         {
             var brmModelExists = await dbContext.BrmModels
                 .AsNoTracking()
-                .AnyAsync(x => x.Id == input.SelectedBrmModelId.Value);
+                .AnyAsync(x => x.Id == input.SelectedBrmModelId.Value && !x.IsDeleted);
 
             if (!brmModelExists)
             {
@@ -569,7 +569,7 @@ public sealed class CapabilitiesController(
 
         return await dbContext.BrmModels
             .AsNoTracking()
-            .Where(x => x.Id == brmModelId.Value)
+            .Where(x => x.Id == brmModelId.Value && !x.IsDeleted)
             .Select(x => x.Name)
             .FirstOrDefaultAsync()
             ?? "the selected BRM model";

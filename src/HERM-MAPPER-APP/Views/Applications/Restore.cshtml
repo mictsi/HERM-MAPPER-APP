@@ -1,0 +1,99 @@
+@using HERMMapperApp.Services
+@model ApplicationRestoreViewModel
+@{
+    ViewData["Title"] = "Restore Applications";
+    ViewData["AdminNav"] = "RestoreApplications";
+    ViewData["BodyClass"] = "admin-page restore-page applications-restore-page";
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Deleted ARM catalogue items</span>
+                <h1>Restore applications</h1>
+                <p>Restore applications back into the ARM catalogue.</p>
+            </div>
+        </section>
+
+        <section class="stats-grid stats-grid-compact admin-overview-grid">
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Deleted applications</span>
+                <span class="stat-value">@Model.Applications.Count</span>
+                <span class="stat-meta">currently in the application trash</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">ARM components</span>
+                <span class="stat-value">@Model.Applications.Sum(application => application.Mappings.Select(mapping => mapping.ArmComponentId).Distinct().Count())</span>
+                <span class="stat-meta">linked components preserved</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Products</span>
+                <span class="stat-value">@Model.Applications.Sum(application => application.Mappings.Select(mapping => mapping.ProductCatalogItemId).Distinct().Count())</span>
+                <span class="stat-meta">supporting products preserved</span>
+            </article>
+            <article class="stat-card admin-overview-card">
+                <span class="stat-label">Restore status</span>
+                <span class="stat-value details-overview-value-small">@(string.IsNullOrWhiteSpace(Model.StatusMessage) ? "Ready" : "Updated")</span>
+                <span class="stat-meta">recover deleted applications</span>
+            </article>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-success mb-0">@Model.StatusMessage</div>
+            </section>
+        }
+
+        <section class="content-card">
+            @if (Model.Applications.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <h3>No deleted applications</h3>
+                    <p>The application trash is empty.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Application</th>
+                                <th>ARM</th>
+                                <th>Products</th>
+                                <th>Deleted</th>
+                                <th>Reason</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var application in Model.Applications)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@application.Name</strong>
+                                    <div class="table-subline">@(string.IsNullOrWhiteSpace(application.Description) ? "No description provided." : application.Description)</div>
+                                </td>
+                                <td>@application.Mappings.Select(mapping => mapping.ArmComponentId).Distinct().Count()</td>
+                                <td>@application.Mappings.Select(mapping => mapping.ProductCatalogItemId).Distinct().Count()</td>
+                                <td>@await TimeZoneDisplay.FormatUtcAsync(application.DeletedUtc)</td>
+                                <td>@(application.DeletedReason ?? "-")</td>
+                                <td class="text-end">
+                                    <form asp-action="RestoreDeleted" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@application.Id" />
+                                        <button class="btn btn-outline-primary btn-sm" type="submit">Restore</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

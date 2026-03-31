@@ -1,0 +1,77 @@
+@model BrmModel
+@{
+    ViewData["Title"] = "Trash BRM Model";
+    ViewData["BodyClass"] = "brm-models-page confirmation-page brm-model-delete-page";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Business Layer</span>
+        <h1>Move @Model.Name to trash?</h1>
+        <p>This hides the BRM model from active views. Administrators can restore it later from Admin.</p>
+    </div>
+</section>
+
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Model</span>
+        <span class="stat-value details-overview-value-small">@Model.Name</span>
+        <span class="stat-meta">workspace selected for trash</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Area</span>
+        <span class="stat-value details-overview-value-small">@Model.Area</span>
+        <span class="stat-meta">current business area label</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Capabilities</span>
+        <span class="stat-value">@Model.Capabilities.Count</span>
+        <span class="stat-meta">capability records preserved</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Outcome</span>
+        <span class="stat-value details-overview-value-small">Recoverable</span>
+        <span class="stat-meta">admins can restore it later</span>
+    </article>
+</section>
+
+<section class="row g-4 confirmation-shell">
+    <div class="col-xl-8">
+        <section class="content-card confirmation-main-card mb-0">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Record review</span>
+                    <h2>BRM model details</h2>
+                </div>
+            </div>
+            <dl class="detail-grid mb-0">
+                <dt>Model</dt>
+                <dd>@Model.Name</dd>
+                <dt>Area</dt>
+                <dd>@Model.Area</dd>
+                <dt>Status</dt>
+                <dd>@Model.Status</dd>
+                <dt>Capabilities</dt>
+                <dd>@Model.Capabilities.Count</dd>
+            </dl>
+        </section>
+    </div>
+    <div class="col-xl-4">
+        <aside class="content-card confirmation-side-card mb-0">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Action</span>
+                    <h2>Send to trash</h2>
+                </div>
+            </div>
+            <div class="confirmation-note mb-3">
+                The BRM model is hidden from active authoring views while its linked capabilities remain intact for restore.
+            </div>
+            <form asp-action="Delete" method="post" class="d-grid gap-2">
+                <input type="hidden" asp-for="Id" />
+                <button type="submit" class="btn btn-danger">Move to trash</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </form>
+        </aside>
+    </div>
+</section>

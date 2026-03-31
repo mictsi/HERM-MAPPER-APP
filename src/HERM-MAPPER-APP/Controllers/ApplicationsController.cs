@@ -23,6 +23,7 @@ public sealed class ApplicationsController(
     {
         var query = dbContext.ApplicationCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.ArmComponent)
             .Include(x => x.Mappings)
@@ -60,6 +61,7 @@ public sealed class ApplicationsController(
         return View(new ApplicationsIndexViewModel
         {
             Search = search,
+            StatusMessage = TempData["ApplicationsStatusMessage"] as string,
             Applications = applications
                 .Select(BuildIndexRow)
                 .ToList()
@@ -171,7 +173,7 @@ public sealed class ApplicationsController(
             .AsNoTracking()
             .Include(x => x.Mappings)
             .ThenInclude(x => x.ProductMapping)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (application is null)
         {
             return NotFound();
@@ -206,7 +208,7 @@ public sealed class ApplicationsController(
     {
         var application = await dbContext.ApplicationCatalogItems
             .Include(x => x.Mappings)
-            .FirstOrDefaultAsync(x => x.Id == id);
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (application is null)
         {
             return NotFound();
@@ -252,6 +254,113 @@ public sealed class ApplicationsController(
 
         TempData["ApplicationsStatusMessage"] = $"Updated application {application.Name}.";
         return RedirectToAction(nameof(Details), new { id = application.Id });
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    public async Task<IActionResult> Delete(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var application = await dbContext.ApplicationCatalogItems
+            .AsNoTracking()
+            .Include(x => x.Mappings)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+
+        return application is null ? NotFound() : View(application);
+    }
+
+    [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
+    [HttpPost, ActionName(nameof(Delete))]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteConfirmed(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var application = await dbContext.ApplicationCatalogItems.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (application is null)
+        {
+            return NotFound();
+        }
+
+        application.IsDeleted = true;
+        application.DeletedUtc = DateTime.UtcNow;
+        application.DeletedReason = "Moved to trash from the application catalogue.";
+        application.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Application",
+            "Delete",
+            nameof(ApplicationCatalogItem),
+            id,
+            $"Moved application {application.Name} to trash.",
+            application.DeletedReason);
+
+        TempData["ApplicationsStatusMessage"] = $"Moved application {application.Name} to trash.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> Restore()
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var applications = await dbContext.ApplicationCatalogItems
+            .AsNoTracking()
+            .Include(x => x.Mappings)
+            .Where(x => x.IsDeleted)
+            .OrderByDescending(x => x.DeletedUtc)
+            .ThenBy(x => x.Name)
+            .ToListAsync();
+
+        return View(new ApplicationRestoreViewModel
+        {
+            Applications = applications,
+            StatusMessage = TempData["ApplicationsStatusMessage"] as string
+        });
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RestoreDeleted(int id)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var application = await dbContext.ApplicationCatalogItems.FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+        if (application is null)
+        {
+            return NotFound();
+        }
+
+        application.IsDeleted = false;
+        application.DeletedUtc = null;
+        application.DeletedReason = null;
+        application.UpdatedUtc = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+        await auditLogService.WriteAsync(
+            "Application",
+            "Restore",
+            nameof(ApplicationCatalogItem),
+            application.Id,
+            $"Restored application {application.Name} from trash.");
+
+        TempData["ApplicationsStatusMessage"] = $"Restored application {application.Name}.";
+        return RedirectToAction(nameof(Restore));
     }
 
     private async Task PopulateOptionsAsync(ApplicationEditViewModel model)

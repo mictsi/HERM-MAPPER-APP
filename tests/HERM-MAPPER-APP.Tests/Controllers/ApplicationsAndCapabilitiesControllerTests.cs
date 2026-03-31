@@ -345,6 +345,121 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
+    public async Task ApplicationDeleteConfirmedSoftDeletesApplicationAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        await fixture.DbContext.AddAsync(new ApplicationCatalogItem
+        {
+            Name = "Admissions Hub",
+            Mappings =
+            [
+                new ApplicationCatalogItemMapping
+                {
+                    ArmComponentId = seeded.ArmComponent.Id,
+                    ProductMappingId = seeded.ProductMapping.Id,
+                    ProductCatalogItemId = seeded.Product.Id
+                }
+            ]
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var applicationId = await fixture.DbContext.ApplicationCatalogItems.Select(x => x.Id).SingleAsync();
+
+        using var controller = fixture.CreateApplicationsController();
+        var result = await controller.DeleteConfirmed(applicationId);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ApplicationsController.Index), redirect.ActionName);
+
+        var application = await fixture.DbContext.ApplicationCatalogItems.SingleAsync();
+        Assert.True(application.IsDeleted);
+        Assert.NotNull(application.DeletedUtc);
+        Assert.Equal("Moved to trash from the application catalogue.", application.DeletedReason);
+        Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task ApplicationRestoreDeletedClearsSoftDeleteStateAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        await fixture.DbContext.AddAsync(new ApplicationCatalogItem
+        {
+            Name = "Admissions Hub",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow.AddDays(-1),
+            DeletedReason = "Moved to trash from the application catalogue."
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var applicationId = await fixture.DbContext.ApplicationCatalogItems.Select(x => x.Id).SingleAsync();
+
+        using var controller = fixture.CreateApplicationsController();
+        var result = await controller.RestoreDeleted(applicationId);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(ApplicationsController.Restore), redirect.ActionName);
+
+        var application = await fixture.DbContext.ApplicationCatalogItems.SingleAsync();
+        Assert.False(application.IsDeleted);
+        Assert.Null(application.DeletedUtc);
+        Assert.Null(application.DeletedReason);
+        Assert.Equal("Restore", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task ApplicationIndexExcludesDeletedApplications()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        await fixture.DbContext.AddRangeAsync(
+            new ApplicationCatalogItem
+            {
+                Name = "Active App"
+            },
+            new ApplicationCatalogItem
+            {
+                Name = "Deleted App",
+                IsDeleted = true,
+                DeletedUtc = DateTime.UtcNow,
+                DeletedReason = "Moved to trash from the application catalogue."
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateApplicationsController();
+        var result = await controller.Index(null);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ApplicationsIndexViewModel>(view.Model);
+        var row = Assert.Single(model.Applications);
+        Assert.Equal("Active App", row.Name);
+    }
+
+    [Fact]
+    public async Task ApplicationDetailsReturnsNotFoundWhenApplicationDeleted()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        await fixture.DbContext.AddAsync(new ApplicationCatalogItem
+        {
+            Name = "Admissions Hub",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow,
+            DeletedReason = "Moved to trash from the application catalogue."
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var applicationId = await fixture.DbContext.ApplicationCatalogItems.Select(x => x.Id).SingleAsync();
+
+        using var controller = fixture.CreateApplicationsController();
+        var result = await controller.Details(applicationId);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
     public async Task CapabilityCreateUsesSelectedBrmComponentAndDetailsResolveApplicationsProductsAndTrmPaths()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -436,6 +551,25 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
 
         var applicationNode = Assert.Single(Assert.Single(Assert.Single(armDomainNode.Children).Children).Children);
         Assert.Equal("Admissions Hub", applicationNode.Label);
+    }
+
+    [Fact]
+    public async Task CapabilityCreateRedirectsWhenBrmModelDeleted()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedHermAlignmentAsync();
+
+        seeded.BrmModel.IsDeleted = true;
+        seeded.BrmModel.DeletedUtc = DateTime.UtcNow;
+        seeded.BrmModel.DeletedReason = "Moved to trash from the BRM model catalogue.";
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateCapabilitiesController();
+        var result = await controller.Create(seeded.BrmModel.Id);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(BrmModelsController.Index), redirect.ActionName);
+        Assert.Equal("BrmModels", redirect.ControllerName);
     }
 
     [Fact]
@@ -990,6 +1124,121 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         Assert.False(controller.ModelState.IsValid);
         Assert.Contains(nameof(BrmModelEditViewModel.Status), controller.ModelState.Keys);
         Assert.Equal("Custom", model.Status);
+    }
+
+    [Fact]
+    public async Task BrmModelDeleteConfirmedSoftDeletesModelAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        fixture.DbContext.BrmModels.Add(new BrmModel
+        {
+            Name = "Student BRM",
+            Area = "Student Services",
+            Status = "Production"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var brmModelId = await fixture.DbContext.BrmModels.Select(x => x.Id).SingleAsync();
+
+        using var controller = fixture.CreateBrmModelsController();
+        var result = await controller.DeleteConfirmed(brmModelId);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(BrmModelsController.Index), redirect.ActionName);
+
+        var brmModel = await fixture.DbContext.BrmModels.SingleAsync();
+        Assert.True(brmModel.IsDeleted);
+        Assert.NotNull(brmModel.DeletedUtc);
+        Assert.Equal("Moved to trash from the BRM model catalogue.", brmModel.DeletedReason);
+        Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task BrmModelRestoreDeletedClearsSoftDeleteStateAndWritesAudit()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        fixture.DbContext.BrmModels.Add(new BrmModel
+        {
+            Name = "Student BRM",
+            Area = "Student Services",
+            Status = "Production",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow.AddDays(-1),
+            DeletedReason = "Moved to trash from the BRM model catalogue."
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var brmModelId = await fixture.DbContext.BrmModels.Select(x => x.Id).SingleAsync();
+
+        using var controller = fixture.CreateBrmModelsController();
+        var result = await controller.RestoreDeleted(brmModelId);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(BrmModelsController.Restore), redirect.ActionName);
+
+        var brmModel = await fixture.DbContext.BrmModels.SingleAsync();
+        Assert.False(brmModel.IsDeleted);
+        Assert.Null(brmModel.DeletedUtc);
+        Assert.Null(brmModel.DeletedReason);
+        Assert.Equal("Restore", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
+    }
+
+    [Fact]
+    public async Task BrmModelIndexExcludesDeletedModels()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        await fixture.DbContext.AddRangeAsync(
+            new BrmModel
+            {
+                Name = "Active BRM",
+                Area = "Student Services",
+                Status = "Production"
+            },
+            new BrmModel
+            {
+                Name = "Deleted BRM",
+                Area = "Operations",
+                Status = "Draft",
+                IsDeleted = true,
+                DeletedUtc = DateTime.UtcNow,
+                DeletedReason = "Moved to trash from the BRM model catalogue."
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateBrmModelsController();
+        var result = await controller.Index();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<BrmModelsIndexViewModel>(view.Model);
+        var row = Assert.Single(model.Models);
+        Assert.Equal("Active BRM", row.Name);
+    }
+
+    [Fact]
+    public async Task BrmModelDetailsReturnsNotFoundWhenModelDeleted()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        fixture.DbContext.BrmModels.Add(new BrmModel
+        {
+            Name = "Deleted BRM",
+            Area = "Operations",
+            Status = "Draft",
+            IsDeleted = true,
+            DeletedUtc = DateTime.UtcNow,
+            DeletedReason = "Moved to trash from the BRM model catalogue."
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var brmModelId = await fixture.DbContext.BrmModels.Select(x => x.Id).SingleAsync();
+
+        using var controller = fixture.CreateBrmModelsController();
+        var result = await controller.Details(brmModelId);
+
+        Assert.IsType<NotFoundResult>(result);
     }
 
     private sealed class TestFixture : IAsyncDisposable

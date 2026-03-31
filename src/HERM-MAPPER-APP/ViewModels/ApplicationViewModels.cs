@@ -7,6 +7,8 @@ public sealed class ApplicationsIndexViewModel
 {
     public string? Search { get; init; }
 
+    public string? StatusMessage { get; init; }
+
     public IReadOnlyList<ApplicationIndexRowViewModel> Applications { get; init; } = [];
 }
 

@@ -219,6 +219,7 @@ public sealed class ReportsController(
         var lifecycleProducts = FilterProductsByOwner(products, lifecycleOwner).ToList();
         var brmModels = await dbContext.BrmModels
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Name)
             .ThenBy(x => x.Area)
             .ToListAsync();
@@ -230,6 +231,7 @@ public sealed class ReportsController(
             .ToListAsync();
         var applications = await dbContext.ApplicationCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Name)
             .ToListAsync();
         var selectedBrmModelId = brmModels.Any(x => x.Id == brmModelId)
@@ -745,9 +747,9 @@ public sealed class ReportsController(
     private async Task<ExportDataViewModel> BuildExportDataViewModelAsync()
     {
         var completedMappingCount = await BuildMappingsCsvQuery().CountAsync();
-        var applicationCount = await dbContext.ApplicationCatalogItems.AsNoTracking().CountAsync();
+        var applicationCount = await dbContext.ApplicationCatalogItems.AsNoTracking().CountAsync(x => !x.IsDeleted);
         var serviceCount = await dbContext.ServiceCatalogItems.AsNoTracking().CountAsync(x => !x.IsDeleted);
-        var brmModelCount = await dbContext.BrmModels.AsNoTracking().CountAsync();
+        var brmModelCount = await dbContext.BrmModels.AsNoTracking().CountAsync(x => !x.IsDeleted);
 
         return new ExportDataViewModel
         {
@@ -833,6 +835,7 @@ public sealed class ReportsController(
     {
         var applications = await dbContext.ApplicationCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Name)
             .Select(application => new
             {
@@ -906,6 +909,7 @@ public sealed class ReportsController(
     {
         var models = await dbContext.BrmModels
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .OrderBy(x => x.Name)
             .ThenBy(x => x.Area)
             .Select(model => new

@@ -32,6 +32,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
 
         var mappings = await dbContext.ApplicationCatalogItemMappings
             .AsNoTracking()
+            .Where(x => x.ApplicationCatalogItem != null && !x.ApplicationCatalogItem.IsDeleted)
             .Include(x => x.ArmComponent)
             .ThenInclude(x => x!.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
@@ -92,7 +93,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         var selectedApplication = applicationId is > 0
             ? await dbContext.ApplicationCatalogItems
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == applicationId.Value, cancellationToken)
+                .FirstOrDefaultAsync(x => x.Id == applicationId.Value && !x.IsDeleted, cancellationToken)
             : null;
 
         if (selectedApplication is null)
@@ -252,6 +253,10 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
 
         var mappings = await dbContext.BusinessCapabilityCatalogItemMappings
             .AsNoTracking()
+            .Where(x =>
+                x.BusinessCapabilityCatalogItem == null ||
+                x.BusinessCapabilityCatalogItem.BrmModel == null ||
+                !x.BusinessCapabilityCatalogItem.BrmModel.IsDeleted)
             .Include(x => x.BrmComponent)
             .ThenInclude(x => x!.ParentCapability)
             .ThenInclude(x => x!.ParentDomain)
@@ -296,9 +301,10 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         var selectedBrmModel = brmModelId is > 0
             ? await dbContext.BrmModels
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == brmModelId.Value, cancellationToken)
+                .FirstOrDefaultAsync(x => x.Id == brmModelId.Value && !x.IsDeleted, cancellationToken)
             : await dbContext.BrmModels
                 .AsNoTracking()
+                .Where(x => !x.IsDeleted)
                 .OrderBy(x => x.Name)
                 .ThenBy(x => x.Area)
                 .FirstOrDefaultAsync(cancellationToken);

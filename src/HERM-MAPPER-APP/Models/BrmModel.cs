@@ -18,6 +18,13 @@ public sealed class BrmModel
     [Required, StringLength(80)]
     public string Status { get; set; } = string.Empty;
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedUtc { get; set; }
+
+    [StringLength(400)]
+    public string? DeletedReason { get; set; }
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;

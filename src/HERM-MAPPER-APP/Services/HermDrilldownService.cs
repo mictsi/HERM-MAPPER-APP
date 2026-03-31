@@ -245,7 +245,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
     {
         var brmModel = await dbContext.BrmModels
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == brmModelId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == brmModelId && !x.IsDeleted, cancellationToken);
 
         if (brmModel is null)
         {
@@ -315,6 +315,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
     private IQueryable<ApplicationCatalogItem> BuildApplicationDetailsQuery() =>
         dbContext.ApplicationCatalogItems
             .AsNoTracking()
+            .Where(x => !x.IsDeleted)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.ArmComponent)
             .ThenInclude(x => x!.ParentCapability)
@@ -354,6 +355,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
     private IQueryable<BusinessCapabilityCatalogItem> BuildCapabilityDetailsQuery() =>
         dbContext.BusinessCapabilityCatalogItems
             .AsNoTracking()
+            .Where(x => x.BrmModel == null || !x.BrmModel.IsDeleted)
             .Include(x => x.BrmModel)
             .Include(x => x.Mappings)
             .ThenInclude(x => x.BrmComponent)
@@ -379,7 +381,10 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
 
         return await dbContext.ApplicationCatalogItemMappings
             .AsNoTracking()
-            .Where(x => armComponentIds.Contains(x.ArmComponentId))
+            .Where(x =>
+                armComponentIds.Contains(x.ArmComponentId) &&
+                x.ApplicationCatalogItem != null &&
+                !x.ApplicationCatalogItem.IsDeleted)
             .Include(x => x.ApplicationCatalogItem)
             .Include(x => x.ArmComponent)
             .ThenInclude(x => x!.ParentCapability)
