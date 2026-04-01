@@ -771,11 +771,13 @@ public sealed class ProductsController(
             ProductCount = 1,
             ProductId = product.Id,
             IsExpanded = true,
-            Children = BuildProductHierarchyNodes(paths, 0, $"product-{product.Id}")
+            Children = BuildProductHierarchyNodes(paths, product.Name, product.Id, 0, $"product-{product.Id}")
         };
 
     private static List<ApplicationHierarchyNodeViewModel> BuildProductHierarchyNodes(
         List<ProductDependencyPathViewModel> paths,
+        string productName,
+        int productId,
         int level,
         string keyPrefix)
     {
@@ -792,10 +794,10 @@ public sealed class ProductsController(
         switch (level)
         {
             case 0:
-                nodeType = "TRM domain";
-                cssType = "trm-domain";
-                fallbackLabel = "TRM domain";
-                labelSelector = static path => path.DomainLabel;
+                nodeType = "TRM component";
+                cssType = "trm-component";
+                fallbackLabel = "TRM component";
+                labelSelector = static path => path.ComponentLabel;
                 break;
             case 1:
                 nodeType = "TRM capability";
@@ -803,12 +805,14 @@ public sealed class ProductsController(
                 fallbackLabel = "TRM capability";
                 labelSelector = static path => path.CapabilityLabel;
                 break;
-            default:
-                nodeType = "TRM component";
-                cssType = "trm-component";
-                fallbackLabel = "TRM component";
-                labelSelector = static path => path.ComponentLabel;
+            case 2:
+                nodeType = "TRM domain";
+                cssType = "trm-domain";
+                fallbackLabel = "TRM domain";
+                labelSelector = static path => path.DomainLabel;
                 break;
+            default:
+                return [];
         }
 
         return paths
@@ -826,9 +830,10 @@ public sealed class ProductsController(
                     PathCount = childPaths.Count,
                     ProductCount = 1,
                     IsExpanded = true,
+                    ProductId = null,
                     Children = level >= 2
                         ? []
-                        : BuildProductHierarchyNodes(childPaths, level + 1, $"{keyPrefix}-{cssType}-{index}")
+                        : BuildProductHierarchyNodes(childPaths, productName, productId, level + 1, $"{keyPrefix}-{cssType}-{index}")
                 };
             })
             .ToList();

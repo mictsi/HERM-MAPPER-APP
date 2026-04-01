@@ -143,9 +143,10 @@
             <script type="application/json" data-application-radial-tree-data>@Html.Raw(hierarchyData)</script>
             <div class="application-radial-tree"
                  data-application-radial-tree
+                 data-include-products="true"
                  data-empty-title="No dependency map yet"
                  data-empty-body="Add application mappings first, then complete the TRM product mappings to see the dependency graph."></div>
-            <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The tree now reads from left to right, while product endpoints stay in the mapping table above to keep the diagram readable.</p>
+            <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The tree reads from left to right and now includes the mapped product endpoints.</p>
         </div>
     }
 </section>

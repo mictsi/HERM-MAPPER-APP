@@ -816,12 +816,20 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
                 fallbackLabel = "TRM capability";
                 labelSelector = static path => path.TrmCapabilityLabel;
                 break;
-            default:
+            case 9:
                 nodeType = "TRM component";
                 cssType = "trm-component";
                 fallbackLabel = "TRM component";
                 labelSelector = static path => path.TrmComponentLabel;
                 break;
+            case 10:
+                nodeType = "Product";
+                cssType = "product";
+                fallbackLabel = "Product";
+                labelSelector = static path => path.ProductLabel;
+                break;
+            default:
+                return [];
         }
 
         return paths
@@ -850,7 +858,7 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
         int level,
         string keyPrefix)
     {
-        if (level >= 9)
+        if (level >= 10)
         {
             return [];
         }
@@ -864,6 +872,17 @@ public sealed class HermDrilldownService(AppDbContext dbContext)
             return applicationPaths.Count == 0
                 ? []
                 : BuildCapabilityHierarchyNodes(applicationPaths, level + 1, keyPrefix);
+        }
+
+        if (level == 9)
+        {
+            var productPaths = childPaths
+                .Where(HasResolvedProduct)
+                .ToList();
+
+            return productPaths.Count == 0
+                ? []
+                : BuildCapabilityHierarchyNodes(productPaths, level + 1, keyPrefix);
         }
 
         return BuildCapabilityHierarchyNodes(childPaths, level + 1, keyPrefix);

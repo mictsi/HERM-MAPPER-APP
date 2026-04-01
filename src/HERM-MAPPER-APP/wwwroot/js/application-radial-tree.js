@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const emptyTitle = host.dataset.emptyTitle ?? "No dependency map yet";
     const emptyBody = host.dataset.emptyBody ?? "Add application mappings first, then complete the TRM product mappings to see the dependency graph.";
     const includeProducts = host.dataset.includeProducts === "true";
+    const hideRoot = host.dataset.hideRoot === "true";
     const canToggleFullscreen = shell instanceof HTMLElement
       && typeof shell.requestFullscreen === "function"
       && document.fullscreenEnabled !== false;
@@ -54,6 +55,20 @@ document.addEventListener("DOMContentLoaded", () => {
     if (treeRoot === null || !Array.isArray(treeRoot.children) || treeRoot.children.length === 0) {
       showEmptyState(emptyTitle, emptyBody);
       return;
+    }
+
+    if (hideRoot) {
+      treeRoot.symbolSize = 1;
+      treeRoot.itemStyle = {
+        color: "rgba(0, 0, 0, 0)",
+        borderColor: "rgba(0, 0, 0, 0)"
+      };
+      treeRoot.lineStyle = {
+        color: "rgba(0, 0, 0, 0)"
+      };
+      treeRoot.label = {
+        show: false
+      };
     }
 
     host.innerHTML = "";

@@ -17,20 +17,8 @@
             .Count();
     }
 
-    var layoutMode = "Linear";
-    if (Model.UsesGraphConnections)
-    {
-        layoutMode = Model.SupportsGraphLayout ? "Graph" : "Pairs";
-    }
-    var graphData = JsonSerializer.Serialize(
-        Model.Connections.Select(connection => new
-        {
-            connection.Sequence,
-            connection.FromProductId,
-            connection.ToProductId,
-            connection.FromProductName,
-            connection.ToProductName
-        }),
+    var hierarchyData = JsonSerializer.Serialize(
+        Model.HierarchyRoot,
         new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -65,8 +53,8 @@
     </article>
     <article class="stat-card details-overview-card">
         <span class="stat-label">Layout mode</span>
-        <span class="stat-value details-overview-value-small">@layoutMode</span>
-        <span class="stat-meta">@(Model.UsesGraphConnections ? "rendered from graph connections" : "rendered from linear flow")</span>
+        <span class="stat-value details-overview-value-small">Radial tree</span>
+        <span class="stat-meta">@(Model.UsesGraphConnections ? "rendered from saved graph connections" : "rendered from saved linear flow")</span>
     </article>
     <article class="stat-card details-overview-card">
         <span class="stat-label">Lifecycle</span>
@@ -75,75 +63,75 @@
     </article>
 </section>
 
-<div data-service-graph-host>
-    <section class="content-card details-primary-card">
-        <div class="section-heading">
-            <div>
-                <span class="eyebrow">Service sequence</span>
-                <h2>Visualization</h2>
+<section class="content-card details-primary-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Service sequence</span>
+            <h2>Visualization</h2>
+        </div>
+    </div>
+
+    @if (!Model.HasVisualization)
+    {
+        <div class="empty-state compact">
+            <h3>No complete flow yet</h3>
+            <p>Add at least one connected product pair to visualize the service flow.</p>
+        </div>
+    }
+    else
+    {
+        @if (Model.UsesGraphConnections && !Model.SupportsGraphLayout)
+        {
+            <div class="alert alert-info">
+                This service contains a loop. The radial tree repeats the returning product as a leaf to keep the path readable.
             </div>
+        }
+
+        <div class="application-radial-tree-shell" data-application-radial-tree-shell>
+            <div class="application-radial-tree-toolbar">
+                <button type="button"
+                        class="application-radial-tree-fullscreen-button"
+                        data-application-radial-tree-fullscreen
+                        aria-label="Enter full screen"
+                        title="Enter full screen">
+                    <span class="application-radial-tree-fullscreen-icon" aria-hidden="true"></span>
+                    <span data-application-radial-tree-fullscreen-label>Full screen</span>
+                </button>
+            </div>
+            <script type="application/json" data-application-radial-tree-data>@Html.Raw(hierarchyData)</script>
+            <div class="application-radial-tree"
+                 data-application-radial-tree
+                 data-include-products="true"
+                 data-empty-title="No connected products yet"
+                 data-empty-body="Add at least one connection to preview the service flow."></div>
+            <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The radial tree starts from the service and expands through the connected product flow.</p>
         </div>
 
-        @if (Model.Connections.Count == 0)
-        {
-            <div class="empty-state compact">
-                <h3>No complete flow yet</h3>
-                <p>Add at least one connected product pair to visualize the service flow.</p>
-            </div>
-        }
-        else if (Model.UsesGraphConnections)
-        {
-            @if (!Model.SupportsGraphLayout)
-            {
-                <div class="alert alert-info">
-                    This service contains a loop, so the preview is shown as connection pairs instead of a top-to-bottom graph.
-                </div>
-            }
-
-            <div class="service-graph-preview"
-                 data-service-graph-preview
-                 data-empty-title="No connected products yet"
-                 data-empty-body="Add at least one connection to preview the service flow."
-                 data-loop-title="Loop detected"
-                 data-loop-body="This flow includes a loop, so the preview is shown as connection pairs instead of a top-to-bottom graph.">
-                <script type="application/json" data-service-graph-data>@Html.Raw(graphData)</script>
-            </div>
-
-            <div class="table-responsive mt-4">
-                <table class="table align-middle">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>From</th>
-                            <th>To</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var connection in Model.Connections)
-                    {
-                        <tr>
-                            <td>@connection.Sequence</td>
-                            <td>@connection.FromProductName</td>
-                            <td>@connection.ToProductName</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
-            </div>
-        }
-        else
-        {
-            <div class="service-chain" aria-label="Service product flow">
-                @for (var index = 0; index < Model.ProductNames.Count; index++)
+        <div class="table-responsive mt-4">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>From</th>
+                        <th>To</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var connection in Model.Connections)
                 {
-                    <div class="service-chain-node">@Model.ProductNames[index]</div>
-                    @if (index < Model.ProductNames.Count - 1)
-                    {
-                        <div class="service-chain-arrow" aria-hidden="true">&rarr;</div>
-                    }
+                    <tr>
+                        <td>@connection.Sequence</td>
+                        <td>@connection.FromProductName</td>
+                        <td>@connection.ToProductName</td>
+                    </tr>
                 }
-            </div>
-        }
-    </section>
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
 
-</div>
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/js/application-radial-tree.js" asp-append-version="true"></script>
+}

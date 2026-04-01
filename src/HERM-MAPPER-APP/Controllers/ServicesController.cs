@@ -290,6 +290,7 @@ public sealed class ServicesController(
             Service = service,
             ProductNames = productNames,
             Connections = connections,
+            HierarchyRoot = BuildServiceHierarchy(service, productNames, connections),
             UsesGraphConnections = usesGraphConnections,
             SupportsGraphLayout = usesGraphConnections && CanRenderAsGraph(connections)
         });
@@ -777,6 +778,241 @@ public sealed class ServicesController(
             .Where(labelsById.ContainsKey)
             .Select(id => labelsById[id])
             .ToList();
+    }
+
+    private static ApplicationHierarchyNodeViewModel BuildServiceHierarchy(
+        ServiceCatalogItem service,
+        List<string> productNames,
+        List<ServiceConnectionViewModel> connections)
+    {
+        var productCount = connections.Count == 0
+            ? productNames
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count()
+            : connections
+                .SelectMany(connection => new[] { connection.FromProductId, connection.ToProductId })
+                .Distinct()
+                .Count();
+
+        var children = connections.Count == 0
+            ? BuildLinearServiceHierarchy(productNames, $"service-{service.Id}")
+            : BuildGraphServiceHierarchy(connections, $"service-{service.Id}");
+
+        return new ApplicationHierarchyNodeViewModel
+        {
+            Key = $"service-{service.Id}",
+            NodeType = "Service",
+            CssType = "service",
+            Label = service.Name,
+            PathCount = Math.Max(connections.Count, productNames.Count),
+            ProductCount = productCount,
+            IsExpanded = true,
+            Children = children
+        };
+    }
+
+    private static List<ApplicationHierarchyNodeViewModel> BuildLinearServiceHierarchy(
+        List<string> productNames,
+        string keyPrefix)
+    {
+        if (productNames.Count == 0)
+        {
+            return [];
+        }
+
+        return
+        [
+            BuildLinearServiceNode(productNames, 0, $"{keyPrefix}-product-0")
+        ];
+    }
+
+    private static ApplicationHierarchyNodeViewModel BuildLinearServiceNode(
+        List<string> productNames,
+        int index,
+        string key)
+    {
+        List<ApplicationHierarchyNodeViewModel> children = [];
+        if (index + 1 < productNames.Count)
+        {
+            children.Add(BuildLinearServiceNode(productNames, index + 1, $"{key}-product-{index + 1}"));
+        }
+
+        return new ApplicationHierarchyNodeViewModel
+        {
+            Key = key,
+            NodeType = "Product",
+            CssType = "product",
+            Label = productNames[index],
+            PathCount = Math.Max(1, productNames.Count - index),
+            ProductCount = 1,
+            IsExpanded = true,
+            Children = children
+        };
+    }
+
+    private static List<ApplicationHierarchyNodeViewModel> BuildGraphServiceHierarchy(
+        List<ServiceConnectionViewModel> connections,
+        string keyPrefix)
+    {
+        if (connections.Count == 0)
+        {
+            return [];
+        }
+
+        var orderedConnections = connections
+            .OrderBy(connection => connection.Sequence)
+            .ToList();
+        var firstAppearance = new Dictionary<int, int>();
+        var labelsById = new Dictionary<int, string>();
+        var adjacency = new Dictionary<int, List<int>>();
+        var indegree = new Dictionary<int, int>();
+        var appearanceIndex = 0;
+
+        static void EnsureNode(
+            int productId,
+            string label,
+            Dictionary<int, int> firstAppearance,
+            Dictionary<int, string> labelsById,
+            Dictionary<int, List<int>> adjacency,
+            Dictionary<int, int> indegree,
+            ref int appearanceIndex)
+        {
+            if (!firstAppearance.ContainsKey(productId))
+            {
+                firstAppearance[productId] = appearanceIndex++;
+            }
+
+            labelsById.TryAdd(productId, label);
+            adjacency.TryAdd(productId, []);
+            indegree.TryAdd(productId, 0);
+        }
+
+        foreach (var connection in orderedConnections)
+        {
+            EnsureNode(
+                connection.FromProductId,
+                connection.FromProductName,
+                firstAppearance,
+                labelsById,
+                adjacency,
+                indegree,
+                ref appearanceIndex);
+            EnsureNode(
+                connection.ToProductId,
+                connection.ToProductName,
+                firstAppearance,
+                labelsById,
+                adjacency,
+                indegree,
+                ref appearanceIndex);
+
+            if (!adjacency[connection.FromProductId].Contains(connection.ToProductId))
+            {
+                adjacency[connection.FromProductId].Add(connection.ToProductId);
+                indegree[connection.ToProductId]++;
+            }
+        }
+
+        var orderedProductIds = firstAppearance
+            .OrderBy(pair => pair.Value)
+            .Select(pair => pair.Key)
+            .ToList();
+        var rootIds = indegree
+            .Where(pair => pair.Value == 0)
+            .OrderBy(pair => firstAppearance[pair.Key])
+            .Select(pair => pair.Key)
+            .ToList();
+
+        if (rootIds.Count == 0 && orderedProductIds.Count != 0)
+        {
+            rootIds.Add(orderedProductIds[0]);
+        }
+
+        var reachable = new HashSet<int>();
+        var rootChildren = rootIds
+            .Select((productId, index) => BuildGraphServiceNode(
+                productId,
+                labelsById,
+                adjacency,
+                firstAppearance,
+                reachable,
+                [],
+                $"{keyPrefix}-product-{index}"))
+            .ToList();
+
+        foreach (var productId in orderedProductIds.Where(productId => !reachable.Contains(productId)))
+        {
+            rootChildren.Add(BuildGraphServiceNode(
+                productId,
+                labelsById,
+                adjacency,
+                firstAppearance,
+                reachable,
+                [],
+                $"{keyPrefix}-product-{rootChildren.Count}"));
+        }
+
+        return rootChildren;
+    }
+
+    private static ApplicationHierarchyNodeViewModel BuildGraphServiceNode(
+        int productId,
+        IReadOnlyDictionary<int, string> labelsById,
+        IReadOnlyDictionary<int, List<int>> adjacency,
+        IReadOnlyDictionary<int, int> firstAppearance,
+        ISet<int> reachable,
+        IReadOnlyCollection<int> ancestry,
+        string key)
+    {
+        reachable.Add(productId);
+        var nextAncestry = ancestry.ToHashSet();
+        nextAncestry.Add(productId);
+
+        var children = adjacency.TryGetValue(productId, out var nextProductIds)
+            ? nextProductIds
+                .OrderBy(nextProductId => firstAppearance[nextProductId])
+                .Select((nextProductId, index) =>
+                {
+                    if (nextAncestry.Contains(nextProductId))
+                    {
+                        return new ApplicationHierarchyNodeViewModel
+                        {
+                            Key = $"{key}-loop-{index}",
+                            NodeType = "Product",
+                            CssType = "product",
+                            Label = $"{labelsById[nextProductId]} (loop)",
+                            ProductId = nextProductId,
+                            PathCount = 1,
+                            ProductCount = 1,
+                            IsExpanded = true
+                        };
+                    }
+
+                    return BuildGraphServiceNode(
+                        nextProductId,
+                        labelsById,
+                        adjacency,
+                        firstAppearance,
+                        reachable,
+                        nextAncestry,
+                        $"{key}-product-{index}");
+                })
+                .ToList()
+            : [];
+
+        return new ApplicationHierarchyNodeViewModel
+        {
+            Key = key,
+            NodeType = "Product",
+            CssType = "product",
+            Label = labelsById[productId],
+            ProductId = productId,
+            PathCount = Math.Max(1, children.Count == 0 ? 1 : children.Sum(child => Math.Max(1, child.PathCount))),
+            ProductCount = 1,
+            IsExpanded = true,
+            Children = children
+        };
     }
 
     private static string BuildProductPreview(List<string> productNames) => productNames.Count switch

@@ -200,9 +200,10 @@
             <script type="application/json" data-application-radial-tree-data>@Html.Raw(hierarchyData)</script>
             <div class="application-radial-tree"
                  data-application-radial-tree
+                 data-include-products="true"
                  data-empty-title="No dependency map yet"
                  data-empty-body="Add capabilities to this BRM model, then connect them through ARM, applications, and TRM products to generate the dependency graph."></div>
-            <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The tree reads from left to right, while product endpoints stay out of the diagram to keep the model view readable.</p>
+            <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The tree reads from left to right and now includes the mapped product endpoints.</p>
         </div>
     }
 </section>
