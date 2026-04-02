@@ -79,7 +79,7 @@ jobs:
           }
 
           foreach ($runtimeDirectory in $runtimeDirectories) {
-              $archiveName = "sql-manager-$safeTagName-$($runtimeDirectory.Name).zip"
+              $archiveName = "herm-mapper-$safeTagName-$($runtimeDirectory.Name).zip"
               $archivePath = Join-Path $releaseAssetDirectory $archiveName
 
               if (Test-Path $archivePath) {
