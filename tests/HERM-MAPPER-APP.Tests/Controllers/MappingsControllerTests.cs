@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -929,7 +930,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
         await fixture.SeedAiSettingsAsync();
         await fixture.DbContext.SaveChangesAsync();
-        fixture.AiLookupResponseBody = $"{{\"choices\":[{{\"message\":{{\"content\":\"summary: \\\"Suggested 1 TRM component.\\\"\\nsuggestions[1]{{component_id\\tconfidence\\treason}}:\\n  {component.Id}\\t0.95\\tMatches core identity and directory capabilities.\"}}}}]}}";
+        fixture.SetAiLookupResponseBody($"{{\"choices\":[{{\"message\":{{\"content\":\"summary: \\\"Suggested 1 TRM component.\\\"\\nsuggestions[1]{{component_id\\tconfidence\\treason}}:\\n  {component.Id}\\t0.95\\tMatches core identity and directory capabilities.\"}}}}]}}");
 
         using var controller = fixture.CreateController();
         var result = await controller.LookupWithAi(product.Id);
@@ -1024,18 +1025,17 @@ public sealed class MappingsControllerTests
     {
         private readonly SqliteConnection connection;
         private readonly StubHttpMessageHandler aiHttpMessageHandler = new();
+        private readonly HttpClient aiHttpClient;
 
         private TestFixture(SqliteConnection connection, AppDbContext dbContext)
         {
             this.connection = connection;
+            aiHttpClient = new HttpClient(aiHttpMessageHandler);
             DbContext = dbContext;
         }
 
         public AppDbContext DbContext { get; }
-        public string AiLookupResponseBody
-        {
-            set => aiHttpMessageHandler.ResponseBody = value;
-        }
+        public void SetAiLookupResponseBody(string value) => aiHttpMessageHandler.ResponseBody = value;
 
         public static async Task<TestFixture> CreateAsync()
         {
@@ -1088,7 +1088,7 @@ public sealed class MappingsControllerTests
                 new AppSetting { Key = AppSettingKeys.AiMappingModel, Value = "gpt-oss:latest" },
                 new AppSetting { Key = AppSettingKeys.AiMappingApiKey, Value = "lab-key" },
                 new AppSetting { Key = AppSettingKeys.AiMappingIsEnabled, Value = "true" },
-                new AppSetting { Key = AppSettingKeys.AiMappingTimeoutSeconds, Value = timeoutSeconds.ToString() });
+                new AppSetting { Key = AppSettingKeys.AiMappingTimeoutSeconds, Value = timeoutSeconds.ToString(CultureInfo.InvariantCulture) });
             await DbContext.SaveChangesAsync();
         }
 
@@ -1103,12 +1103,14 @@ public sealed class MappingsControllerTests
                     appSettingsService,
                     NullLogger<ProtectedSettingsService>.Instance),
                 new AuditLogService(DbContext),
-                new HttpClient(aiHttpMessageHandler),
+                aiHttpClient,
                 NullLogger<AiProductMappingService>.Instance);
         }
 
         public async ValueTask DisposeAsync()
         {
+            aiHttpClient.Dispose();
+            aiHttpMessageHandler.Dispose();
             await DbContext.DisposeAsync();
             await connection.DisposeAsync();
         }

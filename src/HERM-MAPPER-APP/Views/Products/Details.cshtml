@@ -14,11 +14,13 @@
     var errorMessage = TempData["ProductsErrorMessage"] as string;
     var ownerCount = product.GetOwnerValues().Count;
     var lifecycleLabel = string.IsNullOrWhiteSpace(product.LifecycleStatus) ? "Unset" : product.LifecycleStatus;
-    var aiButtonTitle = Model.CanUseAiMappingLookup
-        ? "Add mappings with AI"
-        : Model.AiMappingLookupEnabled
+    var aiButtonTitle = "Add mappings with AI";
+    if (!Model.CanUseAiMappingLookup)
+    {
+        aiButtonTitle = Model.AiMappingLookupEnabled
             ? "Add mappings with AI is unavailable until the AI service is fully configured."
             : "Add mappings with AI is disabled in admin configuration.";
+    }
     var hierarchyData = JsonSerializer.Serialize(
         Model.HierarchyRoot,
         new JsonSerializerOptions

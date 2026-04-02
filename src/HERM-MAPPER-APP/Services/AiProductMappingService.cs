@@ -28,6 +28,44 @@ public sealed class AiProductMappingService(
     private const int MaxModelDiscoveryTimeoutSeconds = 15;
     private const string AiMappingCategory = "AiMapping";
     private const string SuggestMappingsRequestKind = "SuggestProductTrmMappings";
+    private const string SystemPrompt =
+        """
+        You map software products to HERM TRM components.
+        Use only the TOON data in the user message.
+        Never invent component ids.
+        A product can map to multiple TRM components.
+        Skip components that are already mapped.
+        Return only TOON in this exact shape:
+        summary: "one short sentence"
+        suggestions[N]{component_id	confidence	reason}:
+          123	0.95	One short sentence with no tabs or newlines.
+        If there are no strong matches, return suggestions[0]{component_id	confidence	reason}: with no rows.
+        """;
+    private static readonly Action<ILogger, string, Exception?> LogModelDiscoveryTimedOut =
+        LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(1, nameof(LogModelDiscoveryTimedOut)),
+            "AI model discovery timed out for provider {ProviderName}.");
+    private static readonly Action<ILogger, string, Exception?> LogModelDiscoveryFailed =
+        LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(2, nameof(LogModelDiscoveryFailed)),
+            "AI model discovery failed for provider {ProviderName}.");
+    private static readonly Action<ILogger, string, Exception?> LogMappingLookupTimedOut =
+        LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(3, nameof(LogMappingLookupTimedOut)),
+            "AI mapping lookup timed out for product {ProductName}.");
+    private static readonly Action<ILogger, string, Exception?> LogMappingLookupCancelledOrAborted =
+        LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(4, nameof(LogMappingLookupCancelledOrAborted)),
+            "AI mapping lookup was cancelled or aborted for product {ProductName}.");
+    private static readonly Action<ILogger, string, Exception?> LogMappingLookupFailed =
+        LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(5, nameof(LogMappingLookupFailed)),
+            "AI mapping lookup failed for product {ProductName}.");
 
     public const string SectionKey = "ai-mapping";
 
@@ -334,13 +372,17 @@ public sealed class AiProductMappingService(
             $"Provider: {GetProviderLabel(provider.ProviderType)}; endpoint: {provider.Endpoint}; model: {provider.Model}; timeout seconds: {provider.TimeoutSeconds}.",
             cancellationToken);
 
-        return AiProviderSaveResult.Success(
-            requiresModelSelection
-                ? "AI provider configuration saved. Choose a model from the dropdown to finish setup."
-                : existingProvider is null
-                    ? "AI provider configuration saved."
-                    : "AI provider configuration updated.",
-            provider.Id);
+        var successMessage = "AI provider configuration updated.";
+        if (requiresModelSelection)
+        {
+            successMessage = "AI provider configuration saved. Choose a model from the dropdown to finish setup.";
+        }
+        else if (existingProvider is null)
+        {
+            successMessage = "AI provider configuration saved.";
+        }
+
+        return AiProviderSaveResult.Success(successMessage, provider.Id);
     }
 
     public async Task<AiOperationResult> SetLookupEnabledAsync(bool isEnabled, CancellationToken cancellationToken = default)
@@ -519,13 +561,13 @@ public sealed class AiProductMappingService(
         }
         catch (TimeoutException exception)
         {
-            logger.LogWarning(exception, "AI model discovery timed out for provider {ProviderName}.", provider.Name);
+            LogModelDiscoveryTimedOut(logger, provider.Name, exception);
             return AiModelDiscoveryResult.Failure(
                 $"AI model discovery timed out after {timeoutSeconds} second{(timeoutSeconds == 1 ? string.Empty : "s")}.");
         }
         catch (InvalidOperationException exception)
         {
-            logger.LogWarning(exception, "AI model discovery failed for provider {ProviderName}.", provider.Name);
+            LogModelDiscoveryFailed(logger, provider.Name, exception);
             return AiModelDiscoveryResult.Failure(exception.Message);
         }
     }
@@ -580,7 +622,7 @@ public sealed class AiProductMappingService(
                             new
                             {
                                 role = "system",
-                                content = BuildSystemPrompt()
+                                content = SystemPrompt
                             },
                             new
                             {
@@ -684,7 +726,7 @@ public sealed class AiProductMappingService(
         }
         catch (TimeoutException exception)
         {
-            logger.LogWarning(exception, "AI mapping lookup timed out for product {ProductName}.", product.Name);
+            LogMappingLookupTimedOut(logger, product.Name, exception);
             errorMessage = $"AI mapping lookup timed out after {settings.TimeoutSeconds} second{(settings.TimeoutSeconds == 1 ? string.Empty : "s")}.";
             outcome = AiRequestOutcome.TimedOut;
             return AiProductMappingSuggestionResult.Failure(errorMessage);
@@ -693,25 +735,20 @@ public sealed class AiProductMappingService(
             when (!cancellationToken.IsCancellationRequested &&
                   timeoutCancellationTokenSource?.IsCancellationRequested == true)
         {
-            logger.LogWarning(exception, "AI mapping lookup timed out for product {ProductName}.", product.Name);
+            LogMappingLookupTimedOut(logger, product.Name, exception);
             errorMessage = $"AI mapping lookup timed out after {settings.TimeoutSeconds} second{(settings.TimeoutSeconds == 1 ? string.Empty : "s")}.";
             outcome = AiRequestOutcome.TimedOut;
             return AiProductMappingSuggestionResult.Failure(errorMessage);
         }
         catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(exception, "AI mapping lookup was cancelled or aborted for product {ProductName}.", product.Name);
-            errorMessage = requestDispatched
-                ? "AI mapping lookup was cancelled before the provider returned a response."
-                : "AI mapping lookup was aborted before the provider request started.";
-            outcome = requestDispatched
-                ? AiRequestOutcome.Cancelled
-                : AiRequestOutcome.Aborted;
+            LogMappingLookupCancelledOrAborted(logger, product.Name, exception);
+            SetCancellationOutcome(requestDispatched, out errorMessage, out outcome);
             throw;
         }
         catch (InvalidOperationException exception)
         {
-            logger.LogWarning(exception, "AI mapping lookup failed for product {ProductName}.", product.Name);
+            LogMappingLookupFailed(logger, product.Name, exception);
             errorMessage = exception.Message;
             outcome = AiRequestOutcome.Aborted;
             return AiProductMappingSuggestionResult.Failure(errorMessage);
@@ -850,7 +887,7 @@ public sealed class AiProductMappingService(
                 TimeoutSeconds = NormalizeTimeoutSeconds(provider.TimeoutSeconds)
             };
 
-    private static IReadOnlyList<SelectListItem> BuildProviderTypeOptions(AiProviderType selectedProviderType) =>
+    private static List<SelectListItem> BuildProviderTypeOptions(AiProviderType selectedProviderType) =>
         Enum.GetValues<AiProviderType>()
             .Select(providerType => new SelectListItem
             {
@@ -964,30 +1001,41 @@ public sealed class AiProductMappingService(
     private static List<string> ParseAvailableModels(string responseBody)
     {
         using var document = JsonDocument.Parse(responseBody);
-        var candidates = new List<JsonElement>();
+        var identifiers = new HashSet<string>(StringComparer.Ordinal);
 
         if (document.RootElement.ValueKind == JsonValueKind.Array)
         {
-            candidates.AddRange(document.RootElement.EnumerateArray());
+            AddModelIdentifiers(document.RootElement, identifiers);
         }
         else if (document.RootElement.ValueKind == JsonValueKind.Object)
         {
             if (document.RootElement.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
             {
-                candidates.AddRange(data.EnumerateArray());
+                AddModelIdentifiers(data, identifiers);
             }
             else if (document.RootElement.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array)
             {
-                candidates.AddRange(models.EnumerateArray());
+                AddModelIdentifiers(models, identifiers);
             }
         }
 
-        return candidates
-            .Select(ExtractModelIdentifier)
-            .Where(model => !string.IsNullOrWhiteSpace(model))
-            .Distinct(StringComparer.Ordinal)
+        return identifiers
             .OrderBy(model => model, StringComparer.OrdinalIgnoreCase)
-            .ToList()!;
+            .ToList();
+    }
+
+    private static void AddModelIdentifiers(JsonElement arrayElement, HashSet<string> identifiers)
+    {
+        using var enumerator = arrayElement.EnumerateArray();
+        while (enumerator.MoveNext())
+        {
+            var element = enumerator.Current;
+            var model = ExtractModelIdentifier(element);
+            if (!string.IsNullOrWhiteSpace(model))
+            {
+                identifiers.Add(model);
+            }
+        }
     }
 
     private static string? ExtractModelIdentifier(JsonElement element)
@@ -1020,47 +1068,33 @@ public sealed class AiProductMappingService(
         return null;
     }
 
-    private static string BuildSystemPrompt() =>
-        """
-        You map software products to HERM TRM components.
-        Use only the TOON data in the user message.
-        Never invent component ids.
-        A product can map to multiple TRM components.
-        Skip components that are already mapped.
-        Return only TOON in this exact shape:
-        summary: "one short sentence"
-        suggestions[N]{component_id	confidence	reason}:
-          123	0.95	One short sentence with no tabs or newlines.
-        If there are no strong matches, return suggestions[0]{component_id	confidence	reason}: with no rows.
-        """;
-
-    private static string BuildUserPrompt(ProductCatalogItem product, IReadOnlyList<TrmComponent> components)
+    private static string BuildUserPrompt(ProductCatalogItem product, List<TrmComponent> components)
     {
         var builder = new StringBuilder();
         builder.AppendLine("request:");
         builder.AppendLine("  action: \"suggest_product_trm_component_mappings\"");
         builder.AppendLine("  format: \"TOON\"");
         builder.AppendLine("product:");
-        builder.AppendLine($"  id: {product.Id}");
-        builder.AppendLine($"  name: {ToonString(product.Name)}");
-        builder.AppendLine($"  vendor: {ToonString(product.Vendor)}");
-        builder.AppendLine($"  version: {ToonString(product.Version)}");
-        builder.AppendLine($"  lifecycle_status: {ToonString(product.LifecycleStatus)}");
-        builder.AppendLine($"  description: {ToonString(product.Description)}");
-        builder.AppendLine($"  notes: {ToonString(product.Notes)}");
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  id: {product.Id}"));
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  name: {ToonString(product.Name)}"));
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  vendor: {ToonString(product.Vendor)}"));
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  version: {ToonString(product.Version)}"));
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  lifecycle_status: {ToonString(product.LifecycleStatus)}"));
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  description: {ToonString(product.Description)}"));
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  notes: {ToonString(product.Notes)}"));
 
         var existingMappings = product.Mappings
             .Where(x => x.TrmComponentId.HasValue && x.TrmComponent is not null)
             .OrderBy(x => x.TrmComponent!.DisplayLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        builder.AppendLine($"existingMappings[{existingMappings.Count}]{{component_id\tcomponent_label}}:");
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"existingMappings[{existingMappings.Count}]{{component_id\tcomponent_label}}:"));
         foreach (var mapping in existingMappings)
         {
-            builder.AppendLine($"  {mapping.TrmComponentId}\t{ToonString(mapping.TrmComponent!.DisplayLabel)}");
+            builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  {mapping.TrmComponentId}\t{ToonString(mapping.TrmComponent!.DisplayLabel)}"));
         }
 
-        builder.AppendLine($"trmComponents[{components.Count}]{{component_id\tcomponent_code\tcomponent_name\tcapability_code\tcapability_name\tdomain_code\tdomain_name\tproduct_examples\tdescription}}:");
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"trmComponents[{components.Count}]{{component_id\tcomponent_code\tcomponent_name\tcapability_code\tcapability_name\tdomain_code\tdomain_name\tproduct_examples\tdescription}}:"));
         foreach (var component in components)
         {
             var capability = component.ParentCapability;
@@ -1105,16 +1139,32 @@ public sealed class AiProductMappingService(
             return string.Empty;
         }
 
-        return content.ValueKind switch
+        if (content.ValueKind == JsonValueKind.String)
         {
-            JsonValueKind.String => content.GetString() ?? string.Empty,
-            JsonValueKind.Array => string.Concat(
-                content.EnumerateArray()
-                    .Where(item => item.ValueKind == JsonValueKind.Object &&
-                                   item.TryGetProperty("text", out _))
-                    .Select(item => item.GetProperty("text").GetString() ?? string.Empty)),
-            _ => string.Empty
-        };
+            return content.GetString() ?? string.Empty;
+        }
+
+        if (content.ValueKind != JsonValueKind.Array)
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder();
+        using var enumerator = content.EnumerateArray();
+        while (enumerator.MoveNext())
+        {
+            var item = enumerator.Current;
+            if (item.ValueKind != JsonValueKind.Object ||
+                !item.TryGetProperty("text", out var text) ||
+                text.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            builder.Append(text.GetString());
+        }
+
+        return builder.ToString();
     }
 
     private static ParsedAiUsage? ParseUsage(string responseBody)
@@ -1171,7 +1221,7 @@ public sealed class AiProductMappingService(
         };
     }
 
-    private static IReadOnlyList<ParsedAiSuggestion> ParseSuggestions(string rawContent)
+    private static List<ParsedAiSuggestion> ParseSuggestions(string rawContent)
     {
         var normalized = StripCodeFence(rawContent);
         var lines = normalized.ReplaceLineEndings("\n").Split('\n');
@@ -1355,6 +1405,16 @@ public sealed class AiProductMappingService(
             return;
         }
 
+        var truncatedErrorMessage = errorMessage;
+        if (string.IsNullOrWhiteSpace(truncatedErrorMessage))
+        {
+            truncatedErrorMessage = null;
+        }
+        else if (truncatedErrorMessage.Length > 2000)
+        {
+            truncatedErrorMessage = truncatedErrorMessage[..2000];
+        }
+
         dbContext.AiRequestUsageLogs.Add(new AiRequestUsageLog
         {
             AiProviderConfigurationId = settings.ActiveProviderId,
@@ -1369,9 +1429,7 @@ public sealed class AiProductMappingService(
             Outcome = outcome,
             WasSuccessful = outcome == AiRequestOutcome.Success,
             DurationMilliseconds = Math.Max(0, (int)Math.Round(duration.TotalMilliseconds, MidpointRounding.AwayFromZero)),
-            ErrorMessage = string.IsNullOrWhiteSpace(errorMessage)
-                ? null
-                : (errorMessage.Length <= 2000 ? errorMessage : errorMessage[..2000]),
+            ErrorMessage = truncatedErrorMessage,
             OccurredUtc = startedUtc
         });
 
@@ -1407,6 +1465,22 @@ public sealed class AiProductMappingService(
 
         return NormalizeTimeoutSeconds(parsedTimeoutSeconds);
     }
+
+    private static void SetCancellationOutcome(
+        bool requestDispatched,
+        out string errorMessage,
+        out AiRequestOutcome outcome)
+    {
+        if (requestDispatched)
+        {
+            errorMessage = "AI mapping lookup was cancelled before the provider returned a response.";
+            outcome = AiRequestOutcome.Cancelled;
+            return;
+        }
+
+        errorMessage = "AI mapping lookup was aborted before the provider request started.";
+        outcome = AiRequestOutcome.Aborted;
+    }
 }
 
 public sealed class AiProductMappingSettingsSnapshot
@@ -1430,13 +1504,23 @@ public sealed class AiProductMappingSettingsSnapshot
         !string.IsNullOrWhiteSpace(ApiKey);
     public bool CanLookup => IsEnabled && IsConfigured;
     public string MaskedApiKey => HasSavedApiKey ? $"Stored ({ApiKey!.Length} chars)" : "Not stored";
-    public string StatusLabel => !HasActiveProvider
-        ? "No active provider"
-        : !IsConfigured
-            ? "Active provider incomplete"
-            : IsEnabled
-                ? "Enabled"
-                : "Disabled";
+    public string StatusLabel
+    {
+        get
+        {
+            if (!HasActiveProvider)
+            {
+                return "No active provider";
+            }
+
+            if (!IsConfigured)
+            {
+                return "Active provider incomplete";
+            }
+
+            return IsEnabled ? "Enabled" : "Disabled";
+        }
+    }
 }
 
 public sealed class AiProductMappingSuggestionResult

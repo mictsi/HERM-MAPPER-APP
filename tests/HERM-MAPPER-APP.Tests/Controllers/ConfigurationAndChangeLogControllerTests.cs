@@ -855,7 +855,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.AppSettings.AddRangeAsync(
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportServerName, Value = "sql.example.com" },
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportDatabaseName, Value = "Herm" },
-            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = true.ToString() });
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = bool.TrueString.ToLowerInvariant() });
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateConfigurationController();
@@ -867,7 +867,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
             "Remote SQL import disabled. Scheduled and manual imports will be skipped until you enable it again.",
             controller.TempData["ConfigurationStatusMessage"]);
         Assert.Equal(
-            false.ToString(),
+            bool.FalseString,
             await fixture.DbContext.AppSettings.Where(x => x.Key == AppSettingKeys.RemoteSqlImportIsEnabled).Select(x => x.Value).SingleAsync());
         Assert.Contains(
             await fixture.DbContext.AuditLogEntries.Select(x => x.Action).ToListAsync(),
@@ -881,7 +881,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.AppSettings.AddRangeAsync(
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportServerName, Value = "sql.example.com" },
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportDatabaseName, Value = "Herm" },
-            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = false.ToString() });
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = bool.FalseString.ToLowerInvariant() });
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateConfigurationController();
@@ -899,7 +899,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.AppSettings.AddRangeAsync(
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportServerName, Value = "sql.example.com" },
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportDatabaseName, Value = "Herm" },
-            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = false.ToString() },
+            new AppSetting { Key = AppSettingKeys.RemoteSqlImportIsEnabled, Value = bool.FalseString.ToLowerInvariant() },
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportScheduleHours, Value = "6" },
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportUserName, Value = "dp:user" },
             new AppSetting { Key = AppSettingKeys.RemoteSqlImportPassword, Value = "dp:password" },
@@ -1128,11 +1128,13 @@ public sealed class ConfigurationAndChangeLogControllerTests
         private readonly SqliteConnection connection;
         private readonly TemporaryDirectory contentRoot;
         private readonly StubHttpMessageHandler aiHttpMessageHandler = new();
+        private readonly HttpClient aiHttpClient;
 
         private TestFixture(SqliteConnection connection, TemporaryDirectory contentRoot, AppDbContext dbContext)
         {
             this.connection = connection;
             this.contentRoot = contentRoot;
+            aiHttpClient = new HttpClient(aiHttpMessageHandler);
             DbContext = dbContext;
         }
 
@@ -1214,12 +1216,14 @@ public sealed class ConfigurationAndChangeLogControllerTests
                     appSettingsService,
                     NullLogger<ProtectedSettingsService>.Instance),
                 new AuditLogService(DbContext),
-                new HttpClient(aiHttpMessageHandler),
+                aiHttpClient,
                 NullLogger<AiProductMappingService>.Instance);
         }
 
         public async ValueTask DisposeAsync()
         {
+            aiHttpClient.Dispose();
+            aiHttpMessageHandler.Dispose();
             await DbContext.DisposeAsync();
             await connection.DisposeAsync();
             contentRoot.Dispose();

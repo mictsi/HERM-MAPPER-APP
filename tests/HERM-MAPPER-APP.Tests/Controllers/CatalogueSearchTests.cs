@@ -305,10 +305,13 @@ public sealed class CatalogueSearchTests
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
+        private readonly StubHttpMessageHandler aiHttpMessageHandler = new();
+        private readonly HttpClient aiHttpClient;
 
         private TestFixture(SqliteConnection connection, AppDbContext dbContext)
         {
             this.connection = connection;
+            aiHttpClient = new HttpClient(aiHttpMessageHandler);
             DbContext = dbContext;
         }
 
@@ -351,6 +354,8 @@ public sealed class CatalogueSearchTests
 
         public async ValueTask DisposeAsync()
         {
+            aiHttpClient.Dispose();
+            aiHttpMessageHandler.Dispose();
             await DbContext.DisposeAsync();
             await connection.DisposeAsync();
         }
@@ -366,7 +371,7 @@ public sealed class CatalogueSearchTests
                     appSettingsService,
                     NullLogger<ProtectedSettingsService>.Instance),
                 new AuditLogService(DbContext),
-                new HttpClient(new StubHttpMessageHandler()),
+                aiHttpClient,
                 NullLogger<AiProductMappingService>.Instance);
         }
     }

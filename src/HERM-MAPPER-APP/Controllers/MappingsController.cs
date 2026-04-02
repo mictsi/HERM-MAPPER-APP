@@ -398,9 +398,14 @@ public sealed class MappingsController(
             return View("AddWithAi", model);
         }
 
+        if (!model.ProductId.HasValue)
+        {
+            return BadRequest(ModelState);
+        }
+
         var product = await dbContext.ProductCatalogItems
             .Include(x => x.Mappings)
-            .FirstOrDefaultAsync(x => x.Id == model.ProductId && !x.IsDeleted);
+            .FirstOrDefaultAsync(x => x.Id == model.ProductId.Value && !x.IsDeleted);
 
         if (product is null)
         {

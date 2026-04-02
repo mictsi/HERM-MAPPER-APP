@@ -2,9 +2,10 @@
 @{
     ViewData["Title"] = "Add Mappings with AI";
     ViewData["BodyClass"] = "products-page";
-    var hasLookupResult = Model.LookupCompleted || Model.Suggestions.Count != 0 || !string.IsNullOrWhiteSpace(Model.LookupError);
-    var lookupPageUrl = Url.Action("AddWithAi", "Mappings", new { productId = Model.ProductId }) ?? string.Empty;
-    var productDetailsUrl = Url.Action("Details", "Products", new { id = Model.ProductId }) ?? string.Empty;
+    var productId = Model.ProductId.GetValueOrDefault();
+    var hasLookupResult = Model.LookupCompleted == true || Model.Suggestions.Count != 0 || !string.IsNullOrWhiteSpace(Model.LookupError);
+    var lookupPageUrl = Url.Action("AddWithAi", "Mappings", new { productId }) ?? string.Empty;
+    var productDetailsUrl = Url.Action("Details", "Products", new { id = productId }) ?? string.Empty;
 }
 
 <section class="page-header">
@@ -13,12 +14,12 @@
         <h1>@Model.ProductName</h1>
         <p>We will look up TRM component suggestions for this product and show the recommended mappings on this page.</p>
     </div>
-    <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId">Back to product</a>
+    <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@productId">Back to product</a>
 </section>
 
 <form id="ai-mapping-lookup-form" asp-action="LookupWithAi" method="post" class="d-none">
     @Html.AntiForgeryToken()
-    <input type="hidden" name="productId" value="@Model.ProductId" />
+    <input type="hidden" name="productId" value="@productId" />
 </form>
 
 <div data-ai-mapping-result-container>
@@ -46,7 +47,7 @@
 </div>
 
 @section Scripts {
-    @if (Model.AutoStartLookup)
+    @if (Model.AutoStartLookup == true)
     {
         <script>
             (() => {

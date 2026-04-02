@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -339,10 +340,10 @@ public sealed class AiProductMappingServiceTests
             .SingleAsync(x => x.Id == product.Id);
 
         using var cancellationTokenSource = new CancellationTokenSource();
-        var lookupTask = fixture.Service.SuggestMappingsAsync(persistedProduct, cancellationTokenSource.Token);
         cancellationTokenSource.CancelAfter(TimeSpan.FromMilliseconds(50));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await lookupTask);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await fixture.Service.SuggestMappingsAsync(persistedProduct, cancellationTokenSource.Token));
 
         var usageLog = await fixture.DbContext.AiRequestUsageLogs.SingleAsync();
         Assert.Equal(AiRequestOutcome.Cancelled, usageLog.Outcome);
@@ -472,15 +473,18 @@ public sealed class AiProductMappingServiceTests
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
+        private readonly HttpClient httpClient;
 
         private TestFixture(
             SqliteConnection connection,
             AppDbContext dbContext,
             CapturingHttpMessageHandler handler,
+            HttpClient httpClient,
             AiProductMappingService service,
             ProtectedSettingsService protectedSettingsService)
         {
             this.connection = connection;
+            this.httpClient = httpClient;
             DbContext = dbContext;
             Handler = handler;
             Service = service;
@@ -510,15 +514,16 @@ public sealed class AiProductMappingServiceTests
                 appSettingsService,
                 NullLogger<ProtectedSettingsService>.Instance);
             var handler = new CapturingHttpMessageHandler();
+            var httpClient = new HttpClient(handler);
             var service = new AiProductMappingService(
                 dbContext,
                 appSettingsService,
                 protectedSettingsService,
                 new AuditLogService(dbContext),
-                new HttpClient(handler),
+                httpClient,
                 NullLogger<AiProductMappingService>.Instance);
 
-            return new TestFixture(connection, dbContext, handler, service, protectedSettingsService);
+            return new TestFixture(connection, dbContext, handler, httpClient, service, protectedSettingsService);
         }
 
         public async Task SeedAiSettingsAsync(int timeoutSeconds = AppSettingDefaults.AiMappingTimeoutSeconds)
@@ -528,7 +533,7 @@ public sealed class AiProductMappingServiceTests
                 new AppSetting { Key = AppSettingKeys.AiMappingModel, Value = "gpt-oss:latest" },
                 new AppSetting { Key = AppSettingKeys.AiMappingApiKey, Value = "lab-key" },
                 new AppSetting { Key = AppSettingKeys.AiMappingIsEnabled, Value = "true" },
-                new AppSetting { Key = AppSettingKeys.AiMappingTimeoutSeconds, Value = timeoutSeconds.ToString() });
+                new AppSetting { Key = AppSettingKeys.AiMappingTimeoutSeconds, Value = timeoutSeconds.ToString(CultureInfo.InvariantCulture) });
             await DbContext.SaveChangesAsync();
         }
 
@@ -537,6 +542,8 @@ public sealed class AiProductMappingServiceTests
 
         public async ValueTask DisposeAsync()
         {
+            httpClient.Dispose();
+            Handler.Dispose();
             await DbContext.DisposeAsync();
             await connection.DisposeAsync();
         }

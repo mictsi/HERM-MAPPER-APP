@@ -37,7 +37,7 @@ public sealed class AiMappingConfigurationInputModel
 public sealed class AiMappingReviewViewModel
 {
     [Required]
-    public int ProductId { get; set; }
+    public int? ProductId { get; set; }
 
     public string ProductName { get; set; } = string.Empty;
     public string? Vendor { get; set; }
@@ -45,8 +45,8 @@ public sealed class AiMappingReviewViewModel
     public string? LookupSummary { get; set; }
     public string? LookupError { get; set; }
     public int TimeoutSeconds { get; set; } = AppSettingDefaults.AiMappingTimeoutSeconds;
-    public bool AutoStartLookup { get; set; }
-    public bool LookupCompleted { get; set; }
+    public bool? AutoStartLookup { get; set; }
+    public bool? LookupCompleted { get; set; }
     public List<AiMappingSuggestionSelectionViewModel> Suggestions { get; set; } = [];
 }
 

@@ -1,4 +1,7 @@
 @model AiMappingReviewViewModel
+@{
+    var productId = Model.ProductId.GetValueOrDefault();
+}
 
 <section class="stats-grid stats-grid-compact details-overview-grid">
     <article class="stat-card details-overview-card">
@@ -32,8 +35,8 @@
             <h3>Lookup did not complete</h3>
             <p>You can try the AI lookup again or return to the product details page.</p>
             <div class="d-flex gap-2 justify-content-center mt-4 flex-wrap">
-                <a class="btn btn-primary" asp-action="AddWithAi" asp-route-productId="@Model.ProductId">Try again</a>
-                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId">Back to product</a>
+                <a class="btn btn-primary" asp-action="AddWithAi" asp-route-productId="@productId">Try again</a>
+                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@productId">Back to product</a>
             </div>
         </div>
     }
@@ -43,8 +46,8 @@
             <h3>No suggestions returned</h3>
             <p>The AI lookup did not return any new TRM component suggestions for this product.</p>
             <div class="d-flex gap-2 justify-content-center mt-4 flex-wrap">
-                <a class="btn btn-primary" asp-action="AddWithAi" asp-route-productId="@Model.ProductId">Run lookup again</a>
-                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId">Back to product</a>
+                <a class="btn btn-primary" asp-action="AddWithAi" asp-route-productId="@productId">Run lookup again</a>
+                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@productId">Back to product</a>
             </div>
         </div>
     }
@@ -99,7 +102,7 @@
 
             <div class="d-flex gap-2 mt-4 flex-wrap">
                 <button class="btn btn-primary" type="submit">Add selected mappings</button>
-                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId">Cancel</a>
+                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@productId">Cancel</a>
             </div>
         </form>
     }
