@@ -33,6 +33,12 @@
     <ProjectReference Include="..\..\src\HERM-MAPPER-APP\HERM-MAPPER-APP.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Model\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <Target Name="VerifyExpandedAppCoverage" AfterTargets="GenerateCoverageResult" Condition="'$(CollectCoverage)' == 'true'">
     <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\VerifyExpandedAppCoverage.ps1&quot; -CoveragePath &quot;$(CoverletOutput)coverage.cobertura.xml&quot; -Threshold $(ExpandedAppCoverageThreshold)" />
   </Target>

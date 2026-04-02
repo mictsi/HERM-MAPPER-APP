@@ -695,7 +695,7 @@ public sealed class ReportsAndDashboardControllerTests
     {
         var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
         {
-            ContentRootPath = ResolveRepositoryRoot()
+            ContentRootPath = ResolvePosterTemplateRoot()
         });
 
         var svg = service.BuildSvg(new ModelDiagramReportViewModel
@@ -721,7 +721,7 @@ public sealed class ReportsAndDashboardControllerTests
     {
         var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
         {
-            ContentRootPath = ResolveRepositoryRoot()
+            ContentRootPath = ResolvePosterTemplateRoot()
         });
 
         var svg = service.BuildSvg(new ModelDiagramReportViewModel
@@ -956,12 +956,13 @@ public sealed class ReportsAndDashboardControllerTests
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
-    private static string ResolveRepositoryRoot()
+    private static string ResolvePosterTemplateRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null)
         {
-            if (File.Exists(Path.Combine(current.FullName, ".local.data", "Model", "HERM-BRM-V320-model.drawio")))
+            if (File.Exists(Path.Combine(current.FullName, "Model", "HERM-BRM-V320-model.drawio")) ||
+                File.Exists(Path.Combine(current.FullName, ".local.data", "Model", "HERM-BRM-V320-model.drawio")))
             {
                 return current.FullName;
             }
@@ -969,7 +970,7 @@ public sealed class ReportsAndDashboardControllerTests
             current = current.Parent;
         }
 
-        throw new DirectoryNotFoundException("Could not locate the repository root for BRM poster template tests.");
+        throw new DirectoryNotFoundException("Could not locate the BRM poster template test data.");
     }
 
     private static string GetSvgWindow(string svg, string marker, int radius = 600)

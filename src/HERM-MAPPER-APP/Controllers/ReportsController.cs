@@ -1225,8 +1225,11 @@ public sealed class ReportsController(
         var fileName = $"HERM-{scope.ToUpperInvariant()}-V320-model.{extension}";
         var candidates = new[]
         {
+            Path.Combine(environment.ContentRootPath, "Model", fileName),
             Path.Combine(environment.ContentRootPath, ".local.data", "Model", fileName),
+            Path.Combine(environment.ContentRootPath, "..", "Model", fileName),
             Path.Combine(environment.ContentRootPath, "..", ".local.data", "Model", fileName),
+            Path.Combine(environment.ContentRootPath, "..", "..", "Model", fileName),
             Path.Combine(environment.ContentRootPath, "..", "..", ".local.data", "Model", fileName)
         };
 

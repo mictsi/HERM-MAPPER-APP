@@ -140,8 +140,11 @@ public sealed partial class ModelDiagramPosterSvgService(IWebHostEnvironment env
     {
         var candidates = new[]
         {
+            Path.Combine(environment.ContentRootPath, "Model", fileName),
             Path.Combine(environment.ContentRootPath, ".local.data", "Model", fileName),
+            Path.Combine(environment.ContentRootPath, "..", "Model", fileName),
             Path.Combine(environment.ContentRootPath, "..", ".local.data", "Model", fileName),
+            Path.Combine(environment.ContentRootPath, "..", "..", "Model", fileName),
             Path.Combine(environment.ContentRootPath, "..", "..", ".local.data", "Model", fileName)
         };
 
