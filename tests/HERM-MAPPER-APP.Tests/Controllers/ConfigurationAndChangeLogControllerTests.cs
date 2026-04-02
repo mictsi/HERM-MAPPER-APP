@@ -13,6 +13,9 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using Xunit;
 
 namespace HERMMapperApp.Tests.Controllers;
@@ -153,6 +156,147 @@ public sealed class ConfigurationAndChangeLogControllerTests
         Assert.Equal(ConfigurableFieldNames.Owner, model.ExpandedFieldName);
         Assert.Equal("UTC", model.DisplayTimeZoneId);
         Assert.NotEmpty(model.Fields);
+    }
+
+    [Fact]
+    public async Task AiConfigurationSaveProviderPersistsProviderAndRedirects()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateAiConfigurationController();
+
+        var result = await controller.SaveProvider(new AiProviderConfigurationInputModel
+        {
+            Name = " Open WebUI Lab ",
+            ProviderType = AiProviderType.OpenWebUi,
+            Endpoint = " http://localhost:3000/api/chat/completions ",
+            Model = " gpt-oss:latest ",
+            ApiKey = "lab-key",
+            TimeoutSeconds = 180
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(AiConfigurationController.Index), redirect.ActionName);
+
+        var provider = await fixture.DbContext.AiProviderConfigurations.SingleAsync();
+        var settings = await fixture.DbContext.AppSettings
+            .OrderBy(x => x.Key)
+            .ToDictionaryAsync(x => x.Key, x => x.Value);
+
+        Assert.Equal("Open WebUI Lab", provider.Name);
+        Assert.Equal(AiProviderType.OpenWebUi, provider.ProviderType);
+        Assert.Equal("http://localhost:3000/api/chat/completions", provider.Endpoint);
+        Assert.Equal("gpt-oss:latest", provider.Model);
+        Assert.Equal(180, provider.TimeoutSeconds);
+        Assert.True(provider.IsActive);
+        Assert.StartsWith("dp:", settings[$"AiProvider.{provider.Id}.ApiKey"], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AiConfigurationSetLookupEnabledRejectsIncompleteConfiguration()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateAiConfigurationController();
+
+        var result = await controller.SetLookupEnabled(true);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(AiConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Save and enable a provider with endpoint, model, and API key before enabling AI mapping lookup.", controller.TempData["AiConfigurationErrorMessage"]);
+    }
+
+    [Fact]
+    public async Task AiConfigurationSetProviderEnabledDisablesOtherProviders()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var providerA = new AiProviderConfiguration
+        {
+            Name = "Open WebUI",
+            ProviderType = AiProviderType.OpenWebUi,
+            Endpoint = "http://localhost:3000/api/chat/completions",
+            Model = "gpt-oss:latest",
+            TimeoutSeconds = 120,
+            IsActive = true
+        };
+        var providerB = new AiProviderConfiguration
+        {
+            Name = "OpenAI",
+            ProviderType = AiProviderType.OpenAiApi,
+            Endpoint = "https://api.openai.com/v1/chat/completions",
+            Model = "gpt-4.1",
+            TimeoutSeconds = 120
+        };
+        await fixture.DbContext.AiProviderConfigurations.AddRangeAsync(providerA, providerB);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateAiConfigurationController();
+
+        var result = await controller.SetProviderEnabled(providerB.Id, true);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(AiConfigurationController.Index), redirect.ActionName);
+
+        var providers = await fixture.DbContext.AiProviderConfigurations
+            .OrderBy(x => x.Id)
+            .ToListAsync();
+
+        Assert.False(providers[0].IsActive);
+        Assert.True(providers[1].IsActive);
+        Assert.Equal("'OpenAI' is now enabled. Other providers were disabled.", controller.TempData["AiConfigurationStatusMessage"]);
+    }
+
+    [Fact]
+    public async Task AiConfigurationIndexHidesEditorUntilAdminStartsEditing()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateAiConfigurationController();
+
+        var result = await controller.Index();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<AiMappingAdminIndexViewModel>(view.Model);
+        Assert.False(model.ShowEditor);
+        Assert.False(model.IsCreatingProvider);
+    }
+
+    [Fact]
+    public async Task AiConfigurationIndexShowsBlankEditorForNewProvider()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        using var controller = fixture.CreateAiConfigurationController();
+
+        var result = await controller.Index(createNewProvider: true);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<AiMappingAdminIndexViewModel>(view.Model);
+        Assert.True(model.ShowEditor);
+        Assert.True(model.IsCreatingProvider);
+        Assert.Null(model.Editor.Id);
+    }
+
+    [Fact]
+    public async Task AiConfigurationIndexShowsSelectedProviderWhenEditing()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var provider = new AiProviderConfiguration
+        {
+            Name = "Open WebUI",
+            ProviderType = AiProviderType.OpenWebUi,
+            Endpoint = "http://localhost:3000/api/chat/completions",
+            Model = "gpt-oss:latest",
+            TimeoutSeconds = 120
+        };
+        await fixture.DbContext.AiProviderConfigurations.AddAsync(provider);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateAiConfigurationController();
+
+        var result = await controller.Index(editProviderId: provider.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<AiMappingAdminIndexViewModel>(view.Model);
+        Assert.True(model.ShowEditor);
+        Assert.False(model.IsCreatingProvider);
+        Assert.Equal(provider.Id, model.Editor.Id);
     }
 
     [Fact]
@@ -983,6 +1127,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     {
         private readonly SqliteConnection connection;
         private readonly TemporaryDirectory contentRoot;
+        private readonly StubHttpMessageHandler aiHttpMessageHandler = new();
 
         private TestFixture(SqliteConnection connection, TemporaryDirectory contentRoot, AppDbContext dbContext)
         {
@@ -1043,6 +1188,36 @@ public sealed class ConfigurationAndChangeLogControllerTests
             return controller;
         }
 
+        public AiConfigurationController CreateAiConfigurationController()
+        {
+            var httpContext = new DefaultHttpContext();
+            var controller = new AiConfigurationController(CreateAiProductMappingService())
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = httpContext
+                },
+                TempData = new TempDataDictionary(httpContext, new TestTempDataProvider())
+            };
+
+            return controller;
+        }
+
+        private AiProductMappingService CreateAiProductMappingService()
+        {
+            var appSettingsService = new AppSettingsService(DbContext);
+            return new AiProductMappingService(
+                DbContext,
+                appSettingsService,
+                new ProtectedSettingsService(
+                    new EphemeralDataProtectionProvider(),
+                    appSettingsService,
+                    NullLogger<ProtectedSettingsService>.Instance),
+                new AuditLogService(DbContext),
+                new HttpClient(aiHttpMessageHandler),
+                NullLogger<AiProductMappingService>.Instance);
+        }
+
         public async ValueTask DisposeAsync()
         {
             await DbContext.DisposeAsync();
@@ -1087,5 +1262,14 @@ public sealed class ConfigurationAndChangeLogControllerTests
                 Directory.Delete(Path, recursive: true);
             }
         }
+    }
+
+    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"summary: \\\"No suggestions\\\"\\nsuggestions[0]{component_id\\tconfidence\\treason}:\"}}]}", Encoding.UTF8, "application/json")
+            });
     }
 }

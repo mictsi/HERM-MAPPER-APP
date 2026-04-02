@@ -779,6 +779,7 @@ public sealed class ConfigurationController(
         bool openRemoteSqlImportSection = false)
     {
         var fields = new List<ConfigurationFieldGroupViewModel>();
+        var effectiveErrorSectionKey = NormalizeSectionKey(errorSectionKey ?? TempData["ConfigurationErrorSection"] as string);
         var displayTimeZoneId = await appSettingsService.GetValueAsync(
             AppSettingKeys.DisplayTimeZone,
             AppSettingDefaults.DisplayTimeZone);
@@ -810,7 +811,7 @@ public sealed class ConfigurationController(
         {
             StatusMessage = statusMessage ?? TempData["ConfigurationStatusMessage"] as string,
             ErrorMessage = errorMessage ?? TempData["ConfigurationError"] as string,
-            ErrorSectionKey = NormalizeSectionKey(errorSectionKey ?? TempData["ConfigurationErrorSection"] as string),
+            ErrorSectionKey = effectiveErrorSectionKey,
             ExpandedFieldName = ConfigurableFieldNames.IsSupported(expandedFieldName)
                 ? expandedFieldName
                 : null,
@@ -927,10 +928,25 @@ public sealed class ConfigurationController(
         }
     }
 
-    private RedirectToActionResult RedirectToIndex(string? expandedFieldName = null) =>
-        ConfigurableFieldNames.IsSupported(NormalizeExpandedFieldName(expandedFieldName))
-            ? RedirectToAction(nameof(Index), new { expandedFieldName = NormalizeExpandedFieldName(expandedFieldName) })
-            : RedirectToAction(nameof(Index));
+    private RedirectToActionResult RedirectToIndex(string? expandedFieldName = null, string? openSection = null)
+    {
+        var normalizedExpandedFieldName = NormalizeExpandedFieldName(expandedFieldName);
+        var normalizedOpenSection = NormalizeSectionKey(openSection);
+
+        if (ConfigurableFieldNames.IsSupported(normalizedExpandedFieldName) && !string.IsNullOrWhiteSpace(normalizedOpenSection))
+        {
+            return RedirectToAction(nameof(Index), new { expandedFieldName = normalizedExpandedFieldName, openSection = normalizedOpenSection });
+        }
+
+        if (ConfigurableFieldNames.IsSupported(normalizedExpandedFieldName))
+        {
+            return RedirectToAction(nameof(Index), new { expandedFieldName = normalizedExpandedFieldName });
+        }
+
+        return string.IsNullOrWhiteSpace(normalizedOpenSection)
+            ? RedirectToAction(nameof(Index))
+            : RedirectToAction(nameof(Index), new { openSection = normalizedOpenSection });
+    }
 
     private RedirectToActionResult RedirectToImportData(string? openSection = null) =>
         string.IsNullOrWhiteSpace(openSection)

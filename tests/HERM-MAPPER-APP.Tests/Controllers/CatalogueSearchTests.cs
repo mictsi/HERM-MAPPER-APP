@@ -3,6 +3,7 @@ using HERMMapperApp.Data;
 using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +11,10 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using Xunit;
 
 namespace HERMMapperApp.Tests.Controllers;
@@ -328,7 +333,8 @@ public sealed class CatalogueSearchTests
             new(
                 DbContext,
                 new AuditLogService(DbContext),
-                new ConfigurableFieldService(DbContext));
+                new ConfigurableFieldService(DbContext),
+                CreateAiProductMappingService());
 
         public ReferenceController CreateReferenceController()
         {
@@ -348,6 +354,21 @@ public sealed class CatalogueSearchTests
             await DbContext.DisposeAsync();
             await connection.DisposeAsync();
         }
+
+        private AiProductMappingService CreateAiProductMappingService()
+        {
+            var appSettingsService = new AppSettingsService(DbContext);
+            return new AiProductMappingService(
+                DbContext,
+                appSettingsService,
+                new ProtectedSettingsService(
+                    new EphemeralDataProtectionProvider(),
+                    appSettingsService,
+                    NullLogger<ProtectedSettingsService>.Instance),
+                new AuditLogService(DbContext),
+                new HttpClient(new StubHttpMessageHandler()),
+                NullLogger<AiProductMappingService>.Instance);
+        }
     }
 
     private sealed class TestTempDataProvider : ITempDataProvider
@@ -357,6 +378,15 @@ public sealed class CatalogueSearchTests
         public void SaveTempData(HttpContext context, IDictionary<string, object> values)
         {
         }
+    }
+
+    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"summary: \\\"No suggestions\\\"\\nsuggestions[0]{component_id\\tconfidence\\treason}:\"}}]}", Encoding.UTF8, "application/json")
+            });
     }
 
     private sealed class TestWebHostEnvironment : IWebHostEnvironment

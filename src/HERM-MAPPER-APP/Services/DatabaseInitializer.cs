@@ -32,6 +32,8 @@ public sealed partial class DatabaseInitializer(
         await EnsureServiceAssetCriticalityScoreColumnAsync(cancellationToken);
         await EnsureServiceConnectionLayoutColumnAsync(cancellationToken);
         await EnsureAppSettingsTableAsync(cancellationToken);
+        await EnsureAiProviderTablesAsync(cancellationToken);
+        await EnsureAiUsageLogTableAsync(cancellationToken);
         await EnsureUsersTableAsync(cancellationToken);
         await EnsureAuditLogUserColumnAsync(cancellationToken);
         await EnsureRoleNormalizationAsync(cancellationToken);
@@ -1923,6 +1925,237 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     CREATE UNIQUE INDEX [IX_AppSettings_Key]
                     ON [AppSettings] ([Key]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureAiProviderTablesAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "AiProviderConfigurations" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_AiProviderConfigurations" PRIMARY KEY AUTOINCREMENT,
+                    "Name" TEXT NOT NULL,
+                    "ProviderType" INTEGER NOT NULL,
+                    "Endpoint" TEXT NOT NULL,
+                    "Model" TEXT NOT NULL,
+                    "ApiVersion" TEXT NULL,
+                    "TimeoutSeconds" INTEGER NOT NULL,
+                    "IsActive" INTEGER NOT NULL DEFAULT 0,
+                    "CreatedUtc" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_AiProviderConfigurations_Name"
+                ON "AiProviderConfigurations" ("Name")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_AiProviderConfigurations_IsActive"
+                ON "AiProviderConfigurations" ("IsActive")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[AiProviderConfigurations]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [AiProviderConfigurations] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_AiProviderConfigurations] PRIMARY KEY,
+                        [Name] NVARCHAR(120) NOT NULL,
+                        [ProviderType] INT NOT NULL,
+                        [Endpoint] NVARCHAR(2048) NOT NULL,
+                        [Model] NVARCHAR(200) NOT NULL,
+                        [ApiVersion] NVARCHAR(80) NULL,
+                        [TimeoutSeconds] INT NOT NULL,
+                        [IsActive] BIT NOT NULL CONSTRAINT [DF_AiProviderConfigurations_IsActive] DEFAULT 0,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_AiProviderConfigurations_Name'
+                      AND object_id = OBJECT_ID(N'[AiProviderConfigurations]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_AiProviderConfigurations_Name]
+                    ON [AiProviderConfigurations] ([Name]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_AiProviderConfigurations_IsActive'
+                      AND object_id = OBJECT_ID(N'[AiProviderConfigurations]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_AiProviderConfigurations_IsActive]
+                    ON [AiProviderConfigurations] ([IsActive]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureAiUsageLogTableAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "AiRequestUsageLogs" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_AiRequestUsageLogs" PRIMARY KEY AUTOINCREMENT,
+                    "AiProviderConfigurationId" INTEGER NULL,
+                    "ProviderName" TEXT NOT NULL,
+                    "ProviderType" INTEGER NOT NULL,
+                    "Model" TEXT NOT NULL,
+                    "RequestKind" TEXT NOT NULL,
+                    "RequestSummary" TEXT NOT NULL,
+                    "PromptTokens" INTEGER NULL,
+                    "CompletionTokens" INTEGER NULL,
+                    "TotalTokens" INTEGER NULL,
+                    "Outcome" INTEGER NOT NULL DEFAULT 2,
+                    "WasSuccessful" INTEGER NOT NULL,
+                    "DurationMilliseconds" INTEGER NOT NULL,
+                    "ErrorMessage" TEXT NULL,
+                    "OccurredUtc" TEXT NOT NULL,
+                    CONSTRAINT "FK_AiRequestUsageLogs_AiProviderConfigurations_AiProviderConfigurationId"
+                        FOREIGN KEY ("AiProviderConfigurationId") REFERENCES "AiProviderConfigurations" ("Id") ON DELETE SET NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_AiRequestUsageLogs_OccurredUtc"
+                ON "AiRequestUsageLogs" ("OccurredUtc")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_AiRequestUsageLogs_AiProviderConfigurationId_OccurredUtc"
+                ON "AiRequestUsageLogs" ("AiProviderConfigurationId", "OccurredUtc")
+                """,
+                cancellationToken);
+
+            if (!await SqliteColumnExistsAsync("AiRequestUsageLogs", "Outcome", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AiRequestUsageLogs ADD COLUMN Outcome INTEGER NOT NULL DEFAULT 2",
+                    cancellationToken);
+
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    """
+                    UPDATE "AiRequestUsageLogs"
+                    SET "Outcome" = CASE
+                        WHEN "WasSuccessful" = 1 THEN 1
+                        ELSE 2
+                    END
+                    """,
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[AiRequestUsageLogs]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [AiRequestUsageLogs] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_AiRequestUsageLogs] PRIMARY KEY,
+                        [AiProviderConfigurationId] INT NULL,
+                        [ProviderName] NVARCHAR(120) NOT NULL,
+                        [ProviderType] INT NOT NULL,
+                        [Model] NVARCHAR(200) NOT NULL,
+                        [RequestKind] NVARCHAR(80) NOT NULL,
+                        [RequestSummary] NVARCHAR(400) NOT NULL,
+                        [PromptTokens] INT NULL,
+                        [CompletionTokens] INT NULL,
+                        [TotalTokens] INT NULL,
+                        [Outcome] INT NOT NULL CONSTRAINT [DF_AiRequestUsageLogs_Outcome] DEFAULT 2,
+                        [WasSuccessful] BIT NOT NULL,
+                        [DurationMilliseconds] INT NOT NULL,
+                        [ErrorMessage] NVARCHAR(2000) NULL,
+                        [OccurredUtc] DATETIME2 NOT NULL,
+                        CONSTRAINT [FK_AiRequestUsageLogs_AiProviderConfigurations_AiProviderConfigurationId]
+                            FOREIGN KEY ([AiProviderConfigurationId]) REFERENCES [AiProviderConfigurations] ([Id]) ON DELETE SET NULL
+                    );
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_AiRequestUsageLogs_OccurredUtc'
+                      AND object_id = OBJECT_ID(N'[AiRequestUsageLogs]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_AiRequestUsageLogs_OccurredUtc]
+                    ON [AiRequestUsageLogs] ([OccurredUtc]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM sys.indexes
+                    WHERE name = N'IX_AiRequestUsageLogs_AiProviderConfigurationId_OccurredUtc'
+                      AND object_id = OBJECT_ID(N'[AiRequestUsageLogs]')
+                )
+                BEGIN
+                    CREATE INDEX [IX_AiRequestUsageLogs_AiProviderConfigurationId_OccurredUtc]
+                    ON [AiRequestUsageLogs] ([AiProviderConfigurationId], [OccurredUtc]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[AiRequestUsageLogs]', N'Outcome') IS NULL
+                BEGIN
+                    ALTER TABLE [AiRequestUsageLogs]
+                    ADD [Outcome] INT NOT NULL CONSTRAINT [DF_AiRequestUsageLogs_Outcome] DEFAULT 2;
+
+                    UPDATE [AiRequestUsageLogs]
+                    SET [Outcome] = CASE
+                        WHEN [WasSuccessful] = 1 THEN 1
+                        ELSE 2
+                    END;
                 END
                 """,
                 cancellationToken);

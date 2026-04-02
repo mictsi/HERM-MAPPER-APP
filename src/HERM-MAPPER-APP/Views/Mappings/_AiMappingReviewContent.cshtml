@@ -1,0 +1,106 @@
+@model AiMappingReviewViewModel
+
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Suggestions</span>
+        <span class="stat-value">@Model.Suggestions.Count</span>
+        <span class="stat-meta">candidate TRM component mappings</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Product</span>
+        <span class="stat-value details-overview-value-small">@Model.ProductName</span>
+        <span class="stat-meta">@Model.Vendor @Model.Version</span>
+    </article>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.LookupSummary))
+{
+    <div class="alert alert-secondary" role="status">@Model.LookupSummary</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.LookupError))
+{
+    <div class="alert alert-danger" role="alert">@Model.LookupError</div>
+}
+
+<section class="content-card">
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.LookupError))
+    {
+        <div class="empty-state compact">
+            <h3>Lookup did not complete</h3>
+            <p>You can try the AI lookup again or return to the product details page.</p>
+            <div class="d-flex gap-2 justify-content-center mt-4 flex-wrap">
+                <a class="btn btn-primary" asp-action="AddWithAi" asp-route-productId="@Model.ProductId">Try again</a>
+                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId">Back to product</a>
+            </div>
+        </div>
+    }
+    else if (Model.Suggestions.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No suggestions returned</h3>
+            <p>The AI lookup did not return any new TRM component suggestions for this product.</p>
+            <div class="d-flex gap-2 justify-content-center mt-4 flex-wrap">
+                <a class="btn btn-primary" asp-action="AddWithAi" asp-route-productId="@Model.ProductId">Run lookup again</a>
+                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId">Back to product</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <form asp-action="CreateFromAi" method="post">
+            @Html.AntiForgeryToken()
+            <input asp-for="ProductId" type="hidden" />
+            <input asp-for="ProductName" type="hidden" />
+            <input asp-for="Vendor" type="hidden" />
+            <input asp-for="Version" type="hidden" />
+            <input asp-for="LookupSummary" type="hidden" />
+            <input asp-for="TimeoutSeconds" type="hidden" />
+            <input asp-for="LookupCompleted" type="hidden" />
+
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Add</th>
+                            <th>Component</th>
+                            <th>Capability</th>
+                            <th>Domain</th>
+                            <th>Confidence</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @for (var index = 0; index < Model.Suggestions.Count; index++)
+                    {
+                        <tr>
+                            <td>
+                                <input asp-for="Suggestions[index].Selected" class="form-check-input" />
+                                <input asp-for="Suggestions[index].ComponentId" type="hidden" />
+                                <input asp-for="Suggestions[index].DomainLabel" type="hidden" />
+                                <input asp-for="Suggestions[index].CapabilityLabel" type="hidden" />
+                                <input asp-for="Suggestions[index].ComponentLabel" type="hidden" />
+                                <input asp-for="Suggestions[index].Confidence" type="hidden" />
+                                <input asp-for="Suggestions[index].ConfidenceLabel" type="hidden" />
+                                <input asp-for="Suggestions[index].Reason" type="hidden" />
+                            </td>
+                            <td><strong>@Model.Suggestions[index].ComponentLabel</strong></td>
+                            <td>@Model.Suggestions[index].CapabilityLabel</td>
+                            <td>@Model.Suggestions[index].DomainLabel</td>
+                            <td>@Model.Suggestions[index].ConfidenceLabel</td>
+                            <td>@Model.Suggestions[index].Reason</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex gap-2 mt-4 flex-wrap">
+                <button class="btn btn-primary" type="submit">Add selected mappings</button>
+                <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId">Cancel</a>
+            </div>
+        </form>
+    }
+</section>

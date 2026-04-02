@@ -7,8 +7,11 @@ public sealed class ProductVisualizationViewModel
     public ProductCatalogItem Product { get; init; } = new();
     public IReadOnlyList<ProductDependencyPathViewModel> Paths { get; init; } = [];
     public ApplicationHierarchyNodeViewModel HierarchyRoot { get; init; } = new();
+    public bool AiMappingLookupEnabled { get; set; }
+    public bool AiMappingLookupConfigured { get; set; }
 
     public bool HasResolvedPaths => Paths.Count != 0;
+    public bool CanUseAiMappingLookup => AiMappingLookupEnabled && AiMappingLookupConfigured;
 }
 
 public sealed class ProductDependencyPathViewModel

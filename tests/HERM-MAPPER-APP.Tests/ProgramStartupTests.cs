@@ -333,6 +333,7 @@ public sealed class ProgramStartupTests
 
         Assert.Equal("Microsoft.EntityFrameworkCore.Sqlite", dbContext.Database.ProviderName);
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AuditLogService>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<AiProductMappingService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AppSettingsService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<AppAuthenticationService>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<ComponentVersioningService>());

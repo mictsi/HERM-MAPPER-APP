@@ -3,9 +3,16 @@ using HERMMapperApp.Data;
 using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using System.Reflection;
 using Xunit;
 
@@ -887,6 +894,108 @@ public sealed class MappingsControllerTests
         Assert.DoesNotContain("Draft Tool", content);
     }
 
+    [Fact]
+    public async Task AddWithAiReturnsLoadingViewWhenLookupStarts()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var capability = new TrmCapability { Code = "TP001", Name = "Identity", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var component = new TrmComponent { Code = "TC001", Name = "Directory Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var product = new ProductCatalogItem { Name = "Active Directory" };
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+        await fixture.SeedAiSettingsAsync();
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.AddWithAi(product.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<AiMappingReviewViewModel>(view.Model);
+        Assert.Equal(product.Id, model.ProductId);
+        Assert.True(model.AutoStartLookup);
+        Assert.False(model.LookupCompleted);
+        Assert.Empty(model.Suggestions);
+        Assert.Equal(AppSettingDefaults.AiMappingTimeoutSeconds, model.TimeoutSeconds);
+    }
+
+    [Fact]
+    public async Task LookupWithAiReturnsReviewPartialWhenSuggestionsAreResolved()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var capability = new TrmCapability { Code = "TP001", Name = "Identity", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var component = new TrmComponent { Code = "TC001", Name = "Directory Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var product = new ProductCatalogItem { Name = "Active Directory" };
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+        await fixture.SeedAiSettingsAsync();
+        await fixture.DbContext.SaveChangesAsync();
+        fixture.AiLookupResponseBody = $"{{\"choices\":[{{\"message\":{{\"content\":\"summary: \\\"Suggested 1 TRM component.\\\"\\nsuggestions[1]{{component_id\\tconfidence\\treason}}:\\n  {component.Id}\\t0.95\\tMatches core identity and directory capabilities.\"}}}}]}}";
+
+        using var controller = fixture.CreateController();
+        var result = await controller.LookupWithAi(product.Id);
+
+        var view = Assert.IsType<PartialViewResult>(result);
+        Assert.Equal("_AiMappingReviewContent", view.ViewName);
+        var model = Assert.IsType<AiMappingReviewViewModel>(view.Model);
+        Assert.Equal(product.Id, model.ProductId);
+        Assert.True(model.LookupCompleted);
+        var suggestion = Assert.Single(model.Suggestions);
+        Assert.Equal(component.Id, suggestion.ComponentId);
+        Assert.Equal(component.DisplayLabel, suggestion.ComponentLabel);
+        Assert.Contains("95", suggestion.ConfidenceLabel);
+    }
+
+    [Fact]
+    public async Task CreateFromAiCreatesSelectedMappingsAsDrafts()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var capability = new TrmCapability { Code = "TP001", Name = "Identity", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var componentA = new TrmComponent { Code = "TC001", Name = "Directory Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var componentB = new TrmComponent { Code = "TC002", Name = "Authentication Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var product = new ProductCatalogItem { Name = "Active Directory" };
+        await fixture.DbContext.AddRangeAsync(domain, capability, componentA, componentB, product);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.CreateFromAi(new AiMappingReviewViewModel
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            Suggestions =
+            [
+                new AiMappingSuggestionSelectionViewModel
+                {
+                    ComponentId = componentA.Id,
+                    Confidence = 0.95m,
+                    ConfidenceLabel = "95 %",
+                    Reason = "Matches the core directory capability.",
+                    Selected = true
+                },
+                new AiMappingSuggestionSelectionViewModel
+                {
+                    ComponentId = componentB.Id,
+                    Confidence = 0.81m,
+                    ConfidenceLabel = "81 %",
+                    Reason = "Supports authentication and sign-in flows.",
+                    Selected = true
+                }
+            ]
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Details", redirect.ActionName);
+        Assert.Equal("Products", redirect.ControllerName);
+
+        var mappings = await fixture.DbContext.ProductMappings
+            .OrderBy(x => x.TrmComponentId)
+            .ToListAsync();
+
+        Assert.Equal(2, mappings.Count);
+        Assert.All(mappings, mapping => Assert.Equal(MappingStatus.Draft, mapping.MappingStatus));
+        Assert.Contains("AI-assisted mapping review", mappings[0].MappingRationale);
+    }
+
     private static List<Dictionary<string, object?>> ToDictionaryList(object? value)
     {
         Assert.NotNull(value);
@@ -914,6 +1023,7 @@ public sealed class MappingsControllerTests
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
+        private readonly StubHttpMessageHandler aiHttpMessageHandler = new();
 
         private TestFixture(SqliteConnection connection, AppDbContext dbContext)
         {
@@ -922,6 +1032,10 @@ public sealed class MappingsControllerTests
         }
 
         public AppDbContext DbContext { get; }
+        public string AiLookupResponseBody
+        {
+            set => aiHttpMessageHandler.ResponseBody = value;
+        }
 
         public static async Task<TestFixture> CreateAsync()
         {
@@ -938,12 +1052,23 @@ public sealed class MappingsControllerTests
             return new TestFixture(connection, dbContext);
         }
 
-        public MappingsController CreateController() =>
-            new(
+        public MappingsController CreateController()
+        {
+            var httpContext = new DefaultHttpContext();
+            var controller = new MappingsController(
                 DbContext,
                 new AuditLogService(DbContext),
                 new ComponentVersioningService(DbContext),
-                new ConfigurableFieldService(DbContext));
+                new ConfigurableFieldService(DbContext),
+                CreateAiProductMappingService());
+
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            };
+            controller.TempData = new TempDataDictionary(httpContext, new TestTempDataProvider());
+            return controller;
+        }
 
         public async Task SeedOwnerOptionsAsync()
         {
@@ -956,10 +1081,57 @@ public sealed class MappingsControllerTests
             await DbContext.SaveChangesAsync();
         }
 
+        public async Task SeedAiSettingsAsync(int timeoutSeconds = AppSettingDefaults.AiMappingTimeoutSeconds)
+        {
+            await DbContext.AppSettings.AddRangeAsync(
+                new AppSetting { Key = AppSettingKeys.AiMappingEndpoint, Value = "http://localhost:3000/api/chat/completions" },
+                new AppSetting { Key = AppSettingKeys.AiMappingModel, Value = "gpt-oss:latest" },
+                new AppSetting { Key = AppSettingKeys.AiMappingApiKey, Value = "lab-key" },
+                new AppSetting { Key = AppSettingKeys.AiMappingIsEnabled, Value = "true" },
+                new AppSetting { Key = AppSettingKeys.AiMappingTimeoutSeconds, Value = timeoutSeconds.ToString() });
+            await DbContext.SaveChangesAsync();
+        }
+
+        private AiProductMappingService CreateAiProductMappingService()
+        {
+            var appSettingsService = new AppSettingsService(DbContext);
+            return new AiProductMappingService(
+                DbContext,
+                appSettingsService,
+                new ProtectedSettingsService(
+                    new EphemeralDataProtectionProvider(),
+                    appSettingsService,
+                    NullLogger<ProtectedSettingsService>.Instance),
+                new AuditLogService(DbContext),
+                new HttpClient(aiHttpMessageHandler),
+                NullLogger<AiProductMappingService>.Instance);
+        }
+
         public async ValueTask DisposeAsync()
         {
             await DbContext.DisposeAsync();
             await connection.DisposeAsync();
+        }
+    }
+
+    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        public string ResponseBody { get; set; } =
+            "{\"choices\":[{\"message\":{\"content\":\"summary: \\\"No suggestions\\\"\\nsuggestions[0]{component_id\\tconfidence\\treason}:\"}}]}";
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ResponseBody, Encoding.UTF8, "application/json")
+            });
+    }
+
+    private sealed class TestTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object> LoadTempData(HttpContext context) => new Dictionary<string, object>();
+
+        public void SaveTempData(HttpContext context, IDictionary<string, object> values)
+        {
         }
     }
 }

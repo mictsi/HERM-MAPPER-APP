@@ -17,7 +17,8 @@ public sealed class MappingsController(
     AppDbContext dbContext,
     AuditLogService auditLogService,
     ComponentVersioningService componentVersioningService,
-    ConfigurableFieldService configurableFieldService) : Controller
+    ConfigurableFieldService configurableFieldService,
+    AiProductMappingService aiProductMappingService) : Controller
 {
     public async Task<IActionResult> Index(string? search, MappingStatus? status, int? domainId, int? capabilityId)
     {
@@ -317,6 +318,165 @@ public sealed class MappingsController(
             .ToListAsync();
 
         return Json(components);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> AddWithAi(int productId)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var product = await GetAiLookupProductAsync(productId);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var settings = await aiProductMappingService.GetSettingsAsync(HttpContext.RequestAborted);
+        if (!settings.IsEnabled)
+        {
+            TempData["ProductsErrorMessage"] = "AI mapping lookup is disabled in configuration.";
+            return RedirectToAction("Details", "Products", new { id = productId });
+        }
+
+        if (!settings.IsConfigured)
+        {
+            TempData["ProductsErrorMessage"] = "AI mapping lookup is not configured yet.";
+            return RedirectToAction("Details", "Products", new { id = productId });
+        }
+
+        return View(BuildAiLookupPageViewModel(product, settings.TimeoutSeconds));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LookupWithAi(int productId)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var product = await GetAiLookupProductAsync(productId);
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var settings = await aiProductMappingService.GetSettingsAsync(HttpContext.RequestAborted);
+        var result = await aiProductMappingService.SuggestMappingsAsync(product, HttpContext.RequestAborted);
+        var model = result.IsSuccess
+            ? BuildAiReviewViewModel(product, result, settings.TimeoutSeconds)
+            : BuildAiLookupFailureViewModel(product, result.Message, settings.TimeoutSeconds);
+
+        return PartialView("_AiMappingReviewContent", model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateFromAi(AiMappingReviewViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        model.Suggestions ??= [];
+        var selectedSuggestions = model.Suggestions
+            .Where(x => x.Selected)
+            .GroupBy(x => x.ComponentId)
+            .Select(group => group.First())
+            .ToList();
+
+        if (selectedSuggestions.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Choose at least one AI suggestion before adding mappings.");
+            model.AutoStartLookup = false;
+            model.LookupCompleted = true;
+            return View("AddWithAi", model);
+        }
+
+        var product = await dbContext.ProductCatalogItems
+            .Include(x => x.Mappings)
+            .FirstOrDefaultAsync(x => x.Id == model.ProductId && !x.IsDeleted);
+
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var selectedComponentIds = selectedSuggestions
+            .Select(x => x.ComponentId)
+            .ToHashSet();
+
+        var components = await dbContext.TrmComponents
+            .Include(x => x.ParentCapability)
+            .ThenInclude(x => x!.ParentDomain)
+            .Where(x => selectedComponentIds.Contains(x.Id) && !x.IsDeleted)
+            .ToDictionaryAsync(x => x.Id);
+
+        var existingComponentIds = product.Mappings
+            .Where(x => x.TrmComponentId.HasValue)
+            .Select(x => x.TrmComponentId!.Value)
+            .ToHashSet();
+
+        var createdMappings = new List<(ProductMapping Mapping, TrmComponent Component)>();
+        var skippedCount = 0;
+        var timestamp = DateTime.UtcNow;
+
+        foreach (var suggestion in selectedSuggestions)
+        {
+            if (!components.TryGetValue(suggestion.ComponentId, out var component) ||
+                component.ParentCapability?.ParentDomain is null ||
+                !existingComponentIds.Add(component.Id))
+            {
+                skippedCount++;
+                continue;
+            }
+
+            var mapping = new ProductMapping
+            {
+                ProductCatalogItemId = product.Id,
+                TrmDomainId = component.ParentCapability.ParentDomain.Id,
+                TrmCapabilityId = component.ParentCapability.Id,
+                TrmComponentId = component.Id,
+                MappingStatus = MappingStatus.Draft,
+                MappingRationale = BuildAiMappingRationale(suggestion.Reason, suggestion.Confidence),
+                LastReviewedUtc = timestamp,
+                CreatedUtc = timestamp,
+                UpdatedUtc = timestamp
+            };
+
+            dbContext.ProductMappings.Add(mapping);
+            createdMappings.Add((mapping, component));
+        }
+
+        if (createdMappings.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "The selected AI suggestions were already mapped or are no longer valid.");
+            model.AutoStartLookup = false;
+            model.LookupCompleted = true;
+            return View("AddWithAi", model);
+        }
+
+        product.UpdatedUtc = timestamp;
+        await dbContext.SaveChangesAsync();
+
+        foreach (var createdMapping in createdMappings)
+        {
+            createdMapping.Mapping.ProductCatalogItem = product;
+            createdMapping.Mapping.TrmComponent = createdMapping.Component;
+            await WriteMappingAuditAsync(createdMapping.Mapping, "Create", "Created mapping from AI suggestion.");
+        }
+
+        TempData["ProductsStatusMessage"] =
+            skippedCount == 0
+                ? $"Added {createdMappings.Count} AI mapping(s) for {product.Name}."
+                : $"Added {createdMappings.Count} AI mapping(s) for {product.Name}. Skipped {skippedCount} suggestion(s) that were already mapped or no longer valid.";
+
+        return RedirectToAction("Details", "Products", new { id = product.Id });
     }
 
     [HttpGet]
@@ -791,6 +951,81 @@ public sealed class MappingsController(
         }
 
         return normalized;
+    }
+
+    private static AiMappingReviewViewModel BuildAiLookupPageViewModel(
+        ProductCatalogItem product,
+        int timeoutSeconds) =>
+        new()
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            Vendor = product.Vendor,
+            Version = product.Version,
+            TimeoutSeconds = timeoutSeconds,
+            AutoStartLookup = true,
+            LookupCompleted = false
+        };
+
+    private static AiMappingReviewViewModel BuildAiLookupFailureViewModel(
+        ProductCatalogItem product,
+        string errorMessage,
+        int timeoutSeconds) =>
+        new()
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            Vendor = product.Vendor,
+            Version = product.Version,
+            LookupError = errorMessage,
+            TimeoutSeconds = timeoutSeconds,
+            AutoStartLookup = false,
+            LookupCompleted = true
+        };
+
+    private static AiMappingReviewViewModel BuildAiReviewViewModel(
+        ProductCatalogItem product,
+        AiProductMappingSuggestionResult result,
+        int timeoutSeconds) =>
+        new()
+        {
+            ProductId = product.Id,
+            ProductName = product.Name,
+            Vendor = product.Vendor,
+            Version = product.Version,
+            LookupSummary = result.Message,
+            TimeoutSeconds = timeoutSeconds,
+            AutoStartLookup = false,
+            LookupCompleted = true,
+            Suggestions = result.Suggestions
+                .Select(suggestion => new AiMappingSuggestionSelectionViewModel
+                {
+                    ComponentId = suggestion.ComponentId,
+                    DomainLabel = suggestion.DomainLabel,
+                    CapabilityLabel = suggestion.CapabilityLabel,
+                    ComponentLabel = suggestion.ComponentLabel,
+                    Confidence = suggestion.Confidence,
+                    ConfidenceLabel = suggestion.Confidence.ToString("P0", CultureInfo.InvariantCulture),
+                    Reason = suggestion.Reason,
+                    Selected = true
+                })
+                .ToList()
+        };
+
+    private async Task<ProductCatalogItem?> GetAiLookupProductAsync(int productId) =>
+        await dbContext.ProductCatalogItems
+            .AsNoTracking()
+            .Include(x => x.Mappings)
+            .ThenInclude(x => x.TrmComponent)
+            .FirstOrDefaultAsync(x => x.Id == productId && !x.IsDeleted);
+
+    private static string BuildAiMappingRationale(string reason, decimal confidence)
+    {
+        var normalizedReason = NormalizeInput(reason) ?? "No rationale was supplied by the AI lookup.";
+        var rationale = $"Added from AI-assisted mapping review (confidence {confidence.ToString("P0", CultureInfo.InvariantCulture)}). Reason: {normalizedReason}";
+        return rationale.Length <= 4000
+            ? rationale
+            : rationale[..3997] + "...";
     }
 
     private async Task WriteMappingAuditAsync(ProductMapping mapping, string action, string details)

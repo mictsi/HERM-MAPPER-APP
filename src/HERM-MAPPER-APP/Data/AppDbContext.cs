@@ -20,6 +20,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<BrmComponent> BrmComponents => Set<BrmComponent>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+    public DbSet<AiProviderConfiguration> AiProviderConfigurations => Set<AiProviderConfiguration>();
+    public DbSet<AiRequestUsageLog> AiRequestUsageLogs => Set<AiRequestUsageLog>();
     public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<ConfigurableFieldOption> ConfigurableFieldOptions => Set<ConfigurableFieldOption>();
     public DbSet<ProductCatalogItem> ProductCatalogItems => Set<ProductCatalogItem>();
@@ -204,6 +206,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(x => x.Key).IsUnique();
             entity.Property(x => x.Key).HasMaxLength(100);
             entity.Property(x => x.Value).HasMaxLength(4000);
+        });
+
+        modelBuilder.Entity<AiProviderConfiguration>(entity =>
+        {
+            entity.ToTable("AiProviderConfigurations");
+            entity.HasIndex(x => x.Name);
+            entity.HasIndex(x => x.IsActive);
+            entity.Property(x => x.Name).HasMaxLength(120);
+            entity.Property(x => x.Endpoint).HasMaxLength(2048);
+            entity.Property(x => x.Model).HasMaxLength(200);
+            entity.Property(x => x.ApiVersion).HasMaxLength(80);
+        });
+
+        modelBuilder.Entity<AiRequestUsageLog>(entity =>
+        {
+            entity.ToTable("AiRequestUsageLogs");
+            entity.HasIndex(x => x.OccurredUtc);
+            entity.HasIndex(x => new { x.AiProviderConfigurationId, x.OccurredUtc });
+            entity.Property(x => x.ProviderName).HasMaxLength(120);
+            entity.Property(x => x.Model).HasMaxLength(200);
+            entity.Property(x => x.RequestKind).HasMaxLength(80);
+            entity.Property(x => x.RequestSummary).HasMaxLength(400);
+            entity.Property(x => x.Outcome).HasDefaultValue(AiRequestOutcome.Failed);
+            entity.Property(x => x.ErrorMessage).HasMaxLength(2000);
+            entity.HasOne(x => x.AiProviderConfiguration)
+                .WithMany(x => x.UsageLogs)
+                .HasForeignKey(x => x.AiProviderConfigurationId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<AppUser>(entity =>

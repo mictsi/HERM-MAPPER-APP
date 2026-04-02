@@ -68,7 +68,7 @@
         sidebarContext = ("Account", currentPageTitle, "Manage your signed-in profile and update the local workspace password.");
     }
     else if (isProductRestore || isServiceRestore || isApplicationRestore || isBrmModelRestore || isReferenceRestore
-        || IsCurrentController("Users", "Configuration", "ChangeLog"))
+        || IsCurrentController("Users", "Configuration", "AiConfiguration", "ChangeLog"))
     {
         var adminCopy = currentAction switch
         {
@@ -85,6 +85,7 @@
             "ResetPassword" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Issue a new local password and hand off updated credentials safely.",
             "Users" or "Index" when string.Equals(currentController, "Users", StringComparison.OrdinalIgnoreCase) => "Manage workspace identities and access.",
             "Index" when string.Equals(currentController, "Configuration", StringComparison.OrdinalIgnoreCase) => "Control workspace display settings and configurable field values.",
+            "Index" when string.Equals(currentController, "AiConfiguration", StringComparison.OrdinalIgnoreCase) => "Manage AI provider profiles, active service selection, and token usage analytics.",
             "ImportData" when string.Equals(currentController, "Configuration", StringComparison.OrdinalIgnoreCase) => "Run workbook, CSV, and remote SQL import workflows from one admin workspace.",
             "Index" when string.Equals(currentController, "ChangeLog", StringComparison.OrdinalIgnoreCase) => "Review catalogue activity and operational audit history.",
             _ => "Workspace administration and recovery tools."
@@ -140,7 +141,7 @@
     var armOpen = IsCurrentController("Applications");
     var brmOpen = IsCurrentController("BrmModels");
     var reportsOpen = IsCurrentController("Reports");
-    var adminOpen = IsCurrentController("Users", "Configuration", "ChangeLog")
+    var adminOpen = IsCurrentController("Users", "Configuration", "AiConfiguration", "ChangeLog")
         || (string.Equals(currentController, "Products", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
         || (string.Equals(currentController, "Services", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
         || (string.Equals(currentController, "Applications", StringComparison.OrdinalIgnoreCase) && string.Equals(currentAction, "Restore", StringComparison.OrdinalIgnoreCase))
@@ -343,6 +344,7 @@
                                     <div class="shell-nav-links">
                                         <a class="@SubnavLinkClass("Users")" asp-controller="Users" asp-action="Index">Users</a>
                                         <a class="@SubnavLinkClass("Configuration")" asp-controller="Configuration" asp-action="Index">Configuration</a>
+                                        <a class="@SubnavLinkClass("AiConfiguration")" asp-controller="AiConfiguration" asp-action="Index">AI configuration</a>
                                         <a class="@SubnavLinkClass("Configuration", "ImportData")" asp-controller="Configuration" asp-action="ImportData">Import data</a>
                                         <a class="@SubnavLinkClass("ChangeLog")" asp-controller="ChangeLog" asp-action="Index">Change Log</a>
                                         <a class="@SubnavLinkClass("Products", "Restore")" asp-controller="Products" asp-action="Restore">Restore Products</a>

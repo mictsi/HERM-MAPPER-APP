@@ -14,6 +14,11 @@ public sealed class AppSetting
 public static class AppSettingKeys
 {
     public const string DisplayTimeZone = "DisplayTimeZone";
+    public const string AiMappingEndpoint = "AiMapping.Endpoint";
+    public const string AiMappingModel = "AiMapping.Model";
+    public const string AiMappingApiKey = "AiMapping.ApiKey";
+    public const string AiMappingIsEnabled = "AiMapping.IsEnabled";
+    public const string AiMappingTimeoutSeconds = "AiMapping.TimeoutSeconds";
     public const string RemoteSqlImportConnectionString = "RemoteSqlImport.ConnectionString";
     public const string RemoteSqlImportIsEnabled = "RemoteSqlImport.IsEnabled";
     public const string RemoteSqlImportServerName = "RemoteSqlImport.ServerName";
@@ -34,6 +39,10 @@ public static class AppSettingKeys
 public static class AppSettingDefaults
 {
     public const string DisplayTimeZone = "UTC";
+    public const string AiMappingEndpoint = "http://localhost:3000/api/chat/completions";
+    public const string AiMappingModel = "gpt-oss:latest";
+    public const bool AiMappingEnabled = false;
+    public const int AiMappingTimeoutSeconds = 120;
     public const bool RemoteSqlImportEnabled = true;
     public const int RemoteSqlImportScheduleHours = 0;
     public const int RemoteSqlImportPort = 1433;

@@ -261,6 +261,7 @@ public partial class Program
             }
         });
         services.AddSingleton(databaseConfiguration);
+        services.AddHttpClient<AiProductMappingService>(client => client.Timeout = System.Threading.Timeout.InfiniteTimeSpan);
         services.AddScoped<TrmWorkbookImportService>();
         services.AddScoped<SampleRelationshipImportService>();
         services.AddScoped<DatabaseInitializer>();

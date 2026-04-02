@@ -3,11 +3,16 @@ using HERMMapperApp.Data;
 using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 using Xunit;
 
 namespace HERMMapperApp.Tests.Controllers;
@@ -107,6 +112,29 @@ public sealed class ProductsControllerCrudTests
         Assert.Equal(component.Id, Assert.Single(model.Product.Mappings).TrmComponentId);
         Assert.Single(model.Paths);
         Assert.Equal(component.DisplayLabel, model.Paths[0].ComponentLabel);
+    }
+
+    [Fact]
+    public async Task DetailsSetsAiLookupFlagsFromStoredSettings()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new ProductCatalogItem { Name = "Sentinel" };
+        await fixture.DbContext.ProductCatalogItems.AddAsync(product);
+        await fixture.DbContext.AppSettings.AddRangeAsync(
+            new AppSetting { Key = AppSettingKeys.AiMappingEndpoint, Value = "http://localhost:3000/api/chat/completions" },
+            new AppSetting { Key = AppSettingKeys.AiMappingModel, Value = "gpt-oss:latest" },
+            new AppSetting { Key = AppSettingKeys.AiMappingApiKey, Value = "lab-key" },
+            new AppSetting { Key = AppSettingKeys.AiMappingIsEnabled, Value = "true" });
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.Details(product.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductVisualizationViewModel>(view.Model);
+        Assert.True(model.AiMappingLookupEnabled);
+        Assert.True(model.AiMappingLookupConfigured);
+        Assert.True(model.CanUseAiMappingLookup);
     }
 
     [Fact]
@@ -758,10 +786,21 @@ public sealed class ProductsControllerCrudTests
 
         public ProductsController CreateProductsController()
         {
+            var appSettingsService = new AppSettingsService(DbContext);
             var controller = new ProductsController(
                 DbContext,
                 new AuditLogService(DbContext),
-                new ConfigurableFieldService(DbContext));
+                new ConfigurableFieldService(DbContext),
+                new AiProductMappingService(
+                    DbContext,
+                    appSettingsService,
+                    new ProtectedSettingsService(
+                        new EphemeralDataProtectionProvider(),
+                        appSettingsService,
+                        NullLogger<ProtectedSettingsService>.Instance),
+                    new AuditLogService(DbContext),
+                    new HttpClient(new StubHttpMessageHandler()),
+                    NullLogger<AiProductMappingService>.Instance));
 
             controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider());
             return controller;
@@ -791,5 +830,14 @@ public sealed class ProductsControllerCrudTests
         public void SaveTempData(HttpContext context, IDictionary<string, object> values)
         {
         }
+    }
+
+    private sealed class StubHttpMessageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"summary: \\\"No suggestions\\\"\\nsuggestions[0]{component_id\\tconfidence\\treason}:\"}}]}", Encoding.UTF8, "application/json")
+            });
     }
 }

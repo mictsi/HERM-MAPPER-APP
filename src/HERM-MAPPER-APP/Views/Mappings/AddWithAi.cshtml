@@ -1,0 +1,143 @@
+@model AiMappingReviewViewModel
+@{
+    ViewData["Title"] = "Add Mappings with AI";
+    ViewData["BodyClass"] = "products-page";
+    var hasLookupResult = Model.LookupCompleted || Model.Suggestions.Count != 0 || !string.IsNullOrWhiteSpace(Model.LookupError);
+    var lookupPageUrl = Url.Action("AddWithAi", "Mappings", new { productId = Model.ProductId }) ?? string.Empty;
+    var productDetailsUrl = Url.Action("Details", "Products", new { id = Model.ProductId }) ?? string.Empty;
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">AI-assisted mapping</span>
+        <h1>@Model.ProductName</h1>
+        <p>We will look up TRM component suggestions for this product and show the recommended mappings on this page.</p>
+    </div>
+    <a class="btn btn-outline-secondary" asp-controller="Products" asp-action="Details" asp-route-id="@Model.ProductId">Back to product</a>
+</section>
+
+<form id="ai-mapping-lookup-form" asp-action="LookupWithAi" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="productId" value="@Model.ProductId" />
+</form>
+
+<div data-ai-mapping-result-container>
+    @if (hasLookupResult)
+    {
+        @await Html.PartialAsync("_AiMappingReviewContent", Model)
+    }
+    else
+    {
+        <section class="content-card text-center py-5" data-ai-mapping-loading>
+            <div class="d-flex flex-column align-items-center gap-3">
+                <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                <div>
+                    <h2 class="h4 mb-2">AI lookup in progress</h2>
+                    <p class="mb-0 text-body-secondary">Searching for TRM component matches for <strong>@Model.ProductName</strong>. This lookup can take up to @Model.TimeoutSeconds second@(Model.TimeoutSeconds == 1 ? string.Empty : "s").</p>
+                </div>
+            </div>
+        </section>
+        <noscript>
+            <section class="content-card mt-4">
+                <div class="alert alert-warning mb-0">JavaScript is required to run the AI lookup from this page.</div>
+            </section>
+        </noscript>
+    }
+</div>
+
+@section Scripts {
+    @if (Model.AutoStartLookup)
+    {
+        <script>
+            (() => {
+                const form = document.getElementById("ai-mapping-lookup-form");
+                const container = document.querySelector("[data-ai-mapping-result-container]");
+                if (!form || !container) {
+                    return;
+                }
+
+                const renderError = (message) => {
+                    const statsGrid = document.createElement("section");
+                    statsGrid.className = "stats-grid stats-grid-compact details-overview-grid";
+
+                    const suggestionsCard = document.createElement("article");
+                    suggestionsCard.className = "stat-card details-overview-card";
+                    suggestionsCard.innerHTML = '<span class="stat-label">Suggestions</span><span class="stat-value">0</span><span class="stat-meta">candidate TRM component mappings</span>';
+
+                    const productCard = document.createElement("article");
+                    productCard.className = "stat-card details-overview-card";
+                    const vendorVersion = [@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Vendor)), @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Version))]
+                        .filter(Boolean)
+                        .join(" ");
+                    productCard.innerHTML = '<span class="stat-label">Product</span><span class="stat-value details-overview-value-small"></span><span class="stat-meta"></span>';
+                    productCard.querySelector(".stat-value").textContent = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ProductName));
+                    productCard.querySelector(".stat-meta").textContent = vendorVersion;
+
+                    statsGrid.appendChild(suggestionsCard);
+                    statsGrid.appendChild(productCard);
+
+                    const alert = document.createElement("div");
+                    alert.className = "alert alert-danger";
+                    alert.setAttribute("role", "alert");
+                    alert.textContent = message;
+
+                    const card = document.createElement("section");
+                    card.className = "content-card";
+
+                    const emptyState = document.createElement("div");
+                    emptyState.className = "empty-state compact";
+
+                    const title = document.createElement("h3");
+                    title.textContent = "Lookup did not complete";
+
+                    const body = document.createElement("p");
+                    body.textContent = "You can try the AI lookup again or return to the product details page.";
+
+                    const actions = document.createElement("div");
+                    actions.className = "d-flex gap-2 justify-content-center mt-4 flex-wrap";
+
+                    const retryLink = document.createElement("a");
+                    retryLink.className = "btn btn-primary";
+                    retryLink.href = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(lookupPageUrl));
+                    retryLink.textContent = "Try again";
+
+                    const backLink = document.createElement("a");
+                    backLink.className = "btn btn-outline-secondary";
+                    backLink.href = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(productDetailsUrl));
+                    backLink.textContent = "Back to product";
+
+                    actions.appendChild(retryLink);
+                    actions.appendChild(backLink);
+                    emptyState.appendChild(title);
+                    emptyState.appendChild(body);
+                    emptyState.appendChild(actions);
+                    card.appendChild(emptyState);
+
+                    container.replaceChildren(statsGrid, alert, card);
+                };
+
+                fetch(form.action, {
+                    method: "POST",
+                    body: new FormData(form),
+                    credentials: "same-origin",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                })
+                    .then((response) => {
+                        if (!response.ok) {
+                            throw new Error(`AI mapping lookup failed with status ${response.status}.`);
+                        }
+
+                        return response.text();
+                    })
+                    .then((html) => {
+                        container.innerHTML = html;
+                    })
+                    .catch((error) => {
+                        renderError(error.message || "AI mapping lookup failed.");
+                    });
+            })();
+        </script>
+    }
+}

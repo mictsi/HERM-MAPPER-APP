@@ -13,7 +13,8 @@ namespace HERMMapperApp.Controllers;
 public sealed class ProductsController(
     AppDbContext dbContext,
     AuditLogService auditLogService,
-    ConfigurableFieldService configurableFieldService) : Controller
+    ConfigurableFieldService configurableFieldService,
+    AiProductMappingService aiProductMappingService) : Controller
 {
     public async Task<IActionResult> Index(string? search, string[]? owners = null, string? lifecycleStatus = null)
     {
@@ -146,7 +147,16 @@ public sealed class ProductsController(
             .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
-        return product is null ? NotFound() : View(BuildProductVisualizationModel(product));
+        if (product is null)
+        {
+            return NotFound();
+        }
+
+        var model = BuildProductVisualizationModel(product);
+        var aiSettings = await aiProductMappingService.GetSettingsAsync();
+        model.AiMappingLookupEnabled = aiSettings.IsEnabled;
+        model.AiMappingLookupConfigured = aiSettings.IsConfigured;
+        return View(model);
     }
 
     public async Task<IActionResult> Visualize(int id)
