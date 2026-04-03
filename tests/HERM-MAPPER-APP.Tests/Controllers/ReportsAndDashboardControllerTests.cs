@@ -16,7 +16,7 @@ namespace HERMMapperApp.Tests.Controllers;
 public sealed class ReportsAndDashboardControllerTests
 {
     [Fact]
-    public async Task ReportsIndexBuildsHierarchySankeyAndLifecycleData()
+    public async Task ReportsIndexBuildsHierarchySankeyAndLifecycleDataAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -106,12 +106,12 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var redirect = await fixture.CreateReportsController().Index("Unassigned owner");
+        var redirect = await fixture.CreateReportsController().IndexAsync("Unassigned owner");
         var redirectResult = Assert.IsType<RedirectToActionResult>(redirect);
-        Assert.Equal(nameof(ReportsController.LifecycleStatusReport), redirectResult.ActionName);
+        Assert.Equal("LifecycleStatusReport", redirectResult.ActionName);
         Assert.Equal("Unassigned owner", redirectResult.RouteValues?["lifecycleOwner"]);
 
-        var result = await fixture.CreateReportsController().LifecycleStatusReport("Unassigned owner");
+        var result = await fixture.CreateReportsController().LifecycleStatusReportAsync("Unassigned owner");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ReportsViewModel>(view.Model);
@@ -175,7 +175,7 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
-    public async Task ReportsDownloadEndpointsReturnDrawIoAndArchiXml()
+    public async Task ReportsDownloadEndpointsReturnDrawIoAndArchiXmlAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -242,7 +242,7 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
-    public async Task ReportsIndexAndPosterUseSelectedBrmModel()
+    public async Task ReportsIndexAndPosterUseSelectedBrmModelAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -374,12 +374,12 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var redirect = await fixture.CreateReportsController().Index(brmModelId: selectedModel.Id, showBrmModelReport: true);
+        var redirect = await fixture.CreateReportsController().IndexAsync(brmModelId: selectedModel.Id, showBrmModelReport: true);
         var redirectResult = Assert.IsType<RedirectToActionResult>(redirect);
-        Assert.Equal(nameof(ReportsController.BrmModelReport), redirectResult.ActionName);
+        Assert.Equal("BrmModelReport", redirectResult.ActionName);
         Assert.Equal(selectedModel.Id, redirectResult.RouteValues?["brmModelId"]);
 
-        var indexResult = await fixture.CreateReportsController().BrmModelReport(selectedModel.Id);
+        var indexResult = await fixture.CreateReportsController().BrmModelReportAsync(selectedModel.Id);
 
         var indexView = Assert.IsType<ViewResult>(indexResult);
         var indexModel = Assert.IsType<ReportsViewModel>(indexView.Model);
@@ -409,7 +409,7 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Contains("Student Recruitment", brmComponentNames);
         Assert.Contains("Case Guidance", brmComponentNames);
 
-        var posterResult = await fixture.CreateReportsController().ModelDiagram("brm", selectedModel.Id);
+        var posterResult = await fixture.CreateReportsController().ModelDiagramAsync("brm", selectedModel.Id);
 
         var posterView = Assert.IsType<ViewResult>(posterResult);
         var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
@@ -419,7 +419,7 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
-    public async Task TrmServiceDiagramReportFiltersDiagramToSelectedService()
+    public async Task TrmServiceDiagramReportFiltersDiagramToSelectedServiceAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -505,7 +505,7 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateReportsController().TrmServiceDiagramReport(selectedService.Id);
+        var result = await fixture.CreateReportsController().TrmServiceDiagramReportAsync(selectedService.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ReportsViewModel>(view.Model);
@@ -526,7 +526,7 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.DoesNotContain("Other Service Product", mappedProducts);
         Assert.Equal(["Needs Mapping"], model.TrmServiceDiagram.UnmappedProducts.Select(x => x.Name).ToArray());
 
-        var posterResult = await fixture.CreateReportsController().ModelDiagram(scope: "trm", serviceId: selectedService.Id);
+        var posterResult = await fixture.CreateReportsController().ModelDiagramAsync(scope: "trm", serviceId: selectedService.Id);
 
         var posterView = Assert.IsType<ViewResult>(posterResult);
         var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
@@ -535,7 +535,7 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
-    public async Task ArmApplicationDiagramReportFiltersDiagramToSelectedApplication()
+    public async Task ArmApplicationDiagramReportFiltersDiagramToSelectedApplicationAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -662,7 +662,7 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateReportsController().ArmApplicationDiagramReport(applicationA.Id);
+        var result = await fixture.CreateReportsController().ArmApplicationDiagramReportAsync(applicationA.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ReportsViewModel>(view.Model);
@@ -682,7 +682,7 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Contains("TD001 Identity", mappedDomains);
         Assert.DoesNotContain("TD002 Finance Tech", mappedDomains);
 
-        var posterResult = await fixture.CreateReportsController().ModelDiagram(scope: "arm", applicationId: applicationA.Id);
+        var posterResult = await fixture.CreateReportsController().ModelDiagramAsync(scope: "arm", applicationId: applicationA.Id);
 
         var posterView = Assert.IsType<ViewResult>(posterResult);
         var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
@@ -767,7 +767,7 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
-    public async Task ReportsExportMappingsCsvReturnsCompletedMappings()
+    public async Task ReportsExportMappingsCsvReturnsCompletedMappingsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -814,7 +814,7 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateReportsController().ExportMappingsCsv();
+        var result = await fixture.CreateReportsController().ExportMappingsCsvAsync();
         var file = Assert.IsType<FileContentResult>(result);
 
         Assert.Equal("text/csv", file.ContentType);
@@ -824,7 +824,7 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
-    public async Task HomeIndexReturnsDashboardCountsAndRecentProducts()
+    public async Task HomeIndexReturnsDashboardCountsAndRecentProductsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -887,7 +887,7 @@ public sealed class ReportsAndDashboardControllerTests
             });
         await fixture.DbContext.SaveChangesAsync();
 
-        var result = await fixture.CreateHomeController().Index();
+        var result = await fixture.CreateHomeController().IndexAsync();
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<HomeDashboardViewModel>(view.Model);

@@ -10,7 +10,7 @@ namespace HERMMapperApp.Tests.Services;
 public sealed class ConfiguredTimeZoneServiceTests
 {
     [Fact]
-    public async Task FormatUtcAsyncTreatsUnspecifiedValuesAsUtcAndUsesConfiguredZone()
+    public async Task FormatUtcAsyncTreatsUnspecifiedValuesAsUtcAndUsesConfiguredZoneAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting
@@ -28,7 +28,7 @@ public sealed class ConfiguredTimeZoneServiceTests
     }
 
     [Fact]
-    public async Task GetTimeZoneAsyncFallsBackToUtcWhenConfiguredZoneIsInvalid()
+    public async Task GetTimeZoneAsyncFallsBackToUtcWhenConfiguredZoneIsInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting
@@ -46,7 +46,7 @@ public sealed class ConfiguredTimeZoneServiceTests
     }
 
     [Fact]
-    public async Task GetTimeZoneIdAsyncUsesCachedConfiguredZone()
+    public async Task GetTimeZoneIdAsyncUsesCachedConfiguredZoneAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting
@@ -72,7 +72,7 @@ public sealed class ConfiguredTimeZoneServiceTests
     }
 
     [Fact]
-    public async Task FormatUtcAsyncReturnsNullWhenNullableValueIsMissing()
+    public async Task FormatUtcAsyncReturnsNullWhenNullableValueIsMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var service = new ConfiguredTimeZoneService(new AppSettingsService(fixture.DbContext));

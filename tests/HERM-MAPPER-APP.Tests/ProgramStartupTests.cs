@@ -297,7 +297,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public async Task ConfigureApplicationServicesRegistersSqliteServicesAndInitializeDatabaseAsyncSeedsDefaults()
+    public async Task ConfigureApplicationServicesRegistersSqliteServicesAndInitializeDatabaseAsyncSeedsDefaultsAsync()
     {
         using var contentRoot = new TemporaryDirectory();
         Directory.CreateDirectory(Path.Combine(contentRoot.Path, "App_Data"));
@@ -359,7 +359,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public async Task ConfigureApplicationServicesRegistersRolePoliciesForRequestedAccessMatrix()
+    public async Task ConfigureApplicationServicesRegistersRolePoliciesForRequestedAccessMatrixAsync()
     {
         using var contentRoot = new TemporaryDirectory();
         Directory.CreateDirectory(Path.Combine(contentRoot.Path, "App_Data"));
@@ -666,7 +666,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public async Task OpenIdConnectOnTokenValidatedRedirectsWhenMappedRolesMissing()
+    public async Task OpenIdConnectOnTokenValidatedRedirectsWhenMappedRolesMissingAsync()
     {
         using var eventFixture = CreateTokenValidatedContext(
             emitDebugDetails: false,
@@ -694,7 +694,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public async Task OpenIdConnectOnTokenValidatedReplacesPrincipalWhenClaimsAreValid()
+    public async Task OpenIdConnectOnTokenValidatedReplacesPrincipalWhenClaimsAreValidAsync()
     {
         using var eventFixture = CreateTokenValidatedContext(
             emitDebugDetails: false,
@@ -725,7 +725,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public async Task OpenIdConnectFailureEventsRedirectToLogin()
+    public async Task OpenIdConnectFailureEventsRedirectToLoginAsync()
     {
         using var eventFixture = CreateTokenValidatedContext(
             emitDebugDetails: false,
@@ -759,7 +759,7 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public async Task OpenIdConnectSignOutRedirectAddsIdTokenHint()
+    public async Task OpenIdConnectSignOutRedirectAddsIdTokenHintAsync()
     {
         using var eventFixture = CreateTokenValidatedContext(
             emitDebugDetails: false,

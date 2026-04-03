@@ -41,7 +41,7 @@ public sealed class AccountController(
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login(LoginViewModel input)
+    public async Task<IActionResult> LoginAsync(LoginViewModel input)
     {
         input.UserName = input.UserName?.Trim() ?? string.Empty;
         var caseInsensitiveCollation = AppDatabaseCollations.GetCaseInsensitive(dbContext.Database);
@@ -168,7 +168,7 @@ public sealed class AccountController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> LogoutAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -205,17 +205,17 @@ public sealed class AccountController(
             return SignOut(
                 new AuthenticationProperties
                 {
-                    RedirectUri = Url.Action(nameof(Login))
+                    RedirectUri = Url.Action("Login")
                 },
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 OpenIdConnectDefaults.AuthenticationScheme);
         }
 
         await HttpContext.SignOutAsync();
-        return RedirectToAction(nameof(Login));
+        return RedirectToAction("Login");
     }
 
-    public async Task<IActionResult> Profile()
+    public async Task<IActionResult> ProfileAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -231,7 +231,7 @@ public sealed class AccountController(
         var user = await GetRequiredCurrentUserAsync();
         if (user is null)
         {
-            return RedirectToAction(nameof(Login));
+            return RedirectToAction("Login");
         }
 
         return View("Profile", BuildPasswordSelfServiceViewModel(user));
@@ -239,7 +239,7 @@ public sealed class AccountController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Profile(PasswordSelfServiceViewModel input)
+    public async Task<IActionResult> ProfileAsync(PasswordSelfServiceViewModel input)
     {
         if (!AppAuthenticationService.IsLocalUser(User))
         {
@@ -250,7 +250,7 @@ public sealed class AccountController(
         var user = await GetRequiredCurrentUserAsync();
         if (user is null)
         {
-            return RedirectToAction(nameof(Login));
+            return RedirectToAction("Login");
         }
 
         if (!ModelState.IsValid)

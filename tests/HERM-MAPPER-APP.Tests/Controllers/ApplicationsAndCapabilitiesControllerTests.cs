@@ -15,27 +15,27 @@ namespace HERMMapperApp.Tests.Controllers;
 public sealed class ApplicationsAndCapabilitiesControllerTests
 {
     [Fact]
-    public async Task CreateFormsStartWithSingleEmptyMappingRow()
+    public async Task CreateFormsStartWithSingleEmptyMappingRowAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
 
         using var applicationsController = fixture.CreateApplicationsController();
-        var applicationCreate = await applicationsController.Create();
+        var applicationCreate = await applicationsController.CreateAsync();
 
         var applicationView = Assert.IsType<ViewResult>(applicationCreate);
         var applicationModel = Assert.IsType<ApplicationEditViewModel>(applicationView.Model);
         Assert.Single(applicationModel.MappingRows);
 
         using var capabilitiesController = fixture.CreateCapabilitiesController();
-        var capabilityCreateWithoutModel = await capabilitiesController.Create();
+        var capabilityCreateWithoutModel = await capabilitiesController.CreateAsync();
 
         var capabilityRedirect = Assert.IsType<RedirectToActionResult>(capabilityCreateWithoutModel);
-        Assert.Equal(nameof(BrmModelsController.Index), capabilityRedirect.ActionName);
+        Assert.Equal("Index", capabilityRedirect.ActionName);
         Assert.Equal("BrmModels", capabilityRedirect.ControllerName);
 
         using var scopedCapabilitiesController = fixture.CreateCapabilitiesController();
-        var capabilityCreate = await scopedCapabilitiesController.Create(seeded.BrmModel.Id);
+        var capabilityCreate = await scopedCapabilitiesController.CreateAsync(seeded.BrmModel.Id);
 
         var capabilityView = Assert.IsType<ViewResult>(capabilityCreate);
         var capabilityModel = Assert.IsType<CapabilityEditViewModel>(capabilityView.Model);
@@ -47,7 +47,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationIndexSearchMatchesMappedProductAndTrmLabels()
+    public async Task ApplicationIndexSearchMatchesMappedProductAndTrmLabelsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -68,7 +68,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateApplicationsController();
-        var result = await controller.Index("Integration Platform");
+        var result = await controller.IndexAsync("Integration Platform");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ApplicationsIndexViewModel>(view.Model);
@@ -78,31 +78,31 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationDetailsReturnsBadRequestWhenModelStateIsInvalid()
+    public async Task ApplicationDetailsReturnsBadRequestWhenModelStateIsInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateApplicationsController();
         controller.ModelState.AddModelError("id", "invalid");
 
-        var result = await controller.Details(42);
+        var result = await controller.DetailsAsync(42);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
-    public async Task ApplicationEditReturnsBadRequestWhenModelStateIsInvalid()
+    public async Task ApplicationEditReturnsBadRequestWhenModelStateIsInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateApplicationsController();
         controller.ModelState.AddModelError("id", "invalid");
 
-        var result = await controller.Edit(42);
+        var result = await controller.EditAsync(42);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
-    public async Task AllDependenciesPagesReturnSharedHierarchyRoots()
+    public async Task AllDependenciesPagesReturnSharedHierarchyRootsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -139,7 +139,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var applicationsController = fixture.CreateApplicationsController();
-        var applicationsResult = await applicationsController.AllDependencies(default);
+        var applicationsResult = await applicationsController.AllDependenciesAsync(default);
 
         var applicationsView = Assert.IsType<ViewResult>(applicationsResult);
         Assert.Equal("~/Views/Shared/HierarchyDiagramPage.cshtml", applicationsView.ViewName);
@@ -149,7 +149,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         Assert.Equal("Admissions Hub", applicationsModel.HierarchyRoot.Children[0].Label);
 
         using var capabilitiesController = fixture.CreateCapabilitiesController();
-        var capabilitiesResult = await capabilitiesController.AllDependencies(default);
+        var capabilitiesResult = await capabilitiesController.AllDependenciesAsync(default);
 
         var capabilitiesView = Assert.IsType<ViewResult>(capabilitiesResult);
         Assert.Equal("~/Views/Shared/HierarchyDiagramPage.cshtml", capabilitiesView.ViewName);
@@ -161,13 +161,13 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationCreatePersistsExactProductMappingAndDetailsResolveDerivedParents()
+    public async Task ApplicationCreatePersistsExactProductMappingAndDetailsResolveDerivedParentsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
 
         using var controller = fixture.CreateApplicationsController();
-        var createResult = await controller.Create(new ApplicationEditViewModel
+        var createResult = await controller.CreateAsync(new ApplicationEditViewModel
         {
             Name = "Admissions Hub",
             Description = "Applicant workflow",
@@ -182,7 +182,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(createResult);
-        Assert.Equal(nameof(ApplicationsController.Details), redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
 
         var application = await fixture.DbContext.ApplicationCatalogItems
             .Include(x => x.Mappings)
@@ -193,7 +193,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         Assert.Equal(seeded.Product.Id, storedMapping.ProductCatalogItemId);
 
         using var detailsController = fixture.CreateApplicationsController();
-        var detailsResult = await detailsController.Details(application.Id);
+        var detailsResult = await detailsController.DetailsAsync(application.Id);
 
         var view = Assert.IsType<ViewResult>(detailsResult);
         var model = Assert.IsType<ApplicationDetailsViewModel>(view.Model);
@@ -243,7 +243,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationDetailsGraphConnectionsDeduplicateSharedDownstreamNodes()
+    public async Task ApplicationDetailsGraphConnectionsDeduplicateSharedDownstreamNodesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -282,7 +282,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateApplicationsController();
-        var result = await controller.Details(application.Id);
+        var result = await controller.DetailsAsync(application.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ApplicationDetailsViewModel>(view.Model);
@@ -300,7 +300,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationCreateRequiresTrmComponentWhenSelectedProductMapsToMultipleComponents()
+    public async Task ApplicationCreateRequiresTrmComponentWhenSelectedProductMapsToMultipleComponentsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -324,7 +324,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateApplicationsController();
-        var result = await controller.Create(new ApplicationEditViewModel
+        var result = await controller.CreateAsync(new ApplicationEditViewModel
         {
             Name = "Admissions Hub",
             MappingRows =
@@ -345,7 +345,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationDeleteConfirmedSoftDeletesApplicationAndWritesAudit()
+    public async Task ApplicationDeleteConfirmedSoftDeletesApplicationAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -368,10 +368,10 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var applicationId = await fixture.DbContext.ApplicationCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateApplicationsController();
-        var result = await controller.DeleteConfirmed(applicationId);
+        var result = await controller.DeleteConfirmedAsync(applicationId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ApplicationsController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
         var application = await fixture.DbContext.ApplicationCatalogItems.SingleAsync();
         Assert.True(application.IsDeleted);
@@ -381,7 +381,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationRestoreDeletedClearsSoftDeleteStateAndWritesAudit()
+    public async Task ApplicationRestoreDeletedClearsSoftDeleteStateAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -397,10 +397,10 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var applicationId = await fixture.DbContext.ApplicationCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateApplicationsController();
-        var result = await controller.RestoreDeleted(applicationId);
+        var result = await controller.RestoreDeletedAsync(applicationId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ApplicationsController.Restore), redirect.ActionName);
+        Assert.Equal("Restore", redirect.ActionName);
 
         var application = await fixture.DbContext.ApplicationCatalogItems.SingleAsync();
         Assert.False(application.IsDeleted);
@@ -410,7 +410,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationIndexExcludesDeletedApplications()
+    public async Task ApplicationIndexExcludesDeletedApplicationsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -429,7 +429,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateApplicationsController();
-        var result = await controller.Index(null);
+        var result = await controller.IndexAsync(null);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ApplicationsIndexViewModel>(view.Model);
@@ -438,7 +438,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task ApplicationDetailsReturnsNotFoundWhenApplicationDeleted()
+    public async Task ApplicationDetailsReturnsNotFoundWhenApplicationDeletedAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -454,13 +454,13 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var applicationId = await fixture.DbContext.ApplicationCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateApplicationsController();
-        var result = await controller.Details(applicationId);
+        var result = await controller.DetailsAsync(applicationId);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task CapabilityCreateUsesSelectedBrmComponentAndDetailsResolveApplicationsProductsAndTrmPaths()
+    public async Task CapabilityCreateUsesSelectedBrmComponentAndDetailsResolveApplicationsProductsAndTrmPathsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -483,7 +483,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var createResult = await controller.Create(seeded.BrmModel.Id, new CapabilityEditViewModel
+        var createResult = await controller.CreateAsync(seeded.BrmModel.Id, new CapabilityEditViewModel
         {
             SelectedBrmModelId = seeded.BrmModel.Id,
             SelectedBrmComponentId = seeded.BrmComponent.Id,
@@ -499,7 +499,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(createResult);
-        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
         Assert.Equal("BrmModels", redirect.ControllerName);
         Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
 
@@ -514,7 +514,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         Assert.Equal(seeded.ArmCapability.Id, storedMapping.ArmCapabilityId);
 
         using var detailsController = fixture.CreateCapabilitiesController();
-        var result = await detailsController.Details(capability.Id);
+        var result = await detailsController.DetailsAsync(capability.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<CapabilityDetailsViewModel>(view.Model);
@@ -554,7 +554,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task CapabilityCreateRedirectsWhenBrmModelDeleted()
+    public async Task CapabilityCreateRedirectsWhenBrmModelDeletedAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -565,15 +565,15 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var result = await controller.Create(seeded.BrmModel.Id);
+        var result = await controller.CreateAsync(seeded.BrmModel.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(BrmModelsController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal("BrmModels", redirect.ControllerName);
     }
 
     [Fact]
-    public async Task CapabilityHierarchyCountsDistinctProductsInsteadOfApplications()
+    public async Task CapabilityHierarchyCountsDistinctProductsInsteadOfApplicationsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -624,7 +624,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var result = await controller.Details(capability.Id);
+        var result = await controller.DetailsAsync(capability.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<CapabilityDetailsViewModel>(view.Model);
@@ -640,45 +640,45 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task CapabilitiesIndexRedirectsToBrmModelsIndex()
+    public async Task CapabilitiesIndexRedirectsToBrmModelsIndexAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHermAlignmentAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var result = await controller.Index("Applicant Portal");
+        var result = await controller.IndexAsync("Applicant Portal");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(BrmModelsController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal("BrmModels", redirect.ControllerName);
     }
 
     [Fact]
-    public async Task CapabilityDetailsReturnsBadRequestWhenModelStateIsInvalid()
+    public async Task CapabilityDetailsReturnsBadRequestWhenModelStateIsInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateCapabilitiesController();
         controller.ModelState.AddModelError("id", "invalid");
 
-        var result = await controller.Details(42);
+        var result = await controller.DetailsAsync(42);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
-    public async Task CapabilityEditReturnsBadRequestWhenModelStateIsInvalid()
+    public async Task CapabilityEditReturnsBadRequestWhenModelStateIsInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateCapabilitiesController();
         controller.ModelState.AddModelError("id", "invalid");
 
-        var result = await controller.Edit(42);
+        var result = await controller.EditAsync(42);
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
-    public async Task CapabilityCreateRequiresCapabilitySelectionWhenArmComponentHasMultipleCapabilityConnections()
+    public async Task CapabilityCreateRequiresCapabilitySelectionWhenArmComponentHasMultipleCapabilityConnectionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -701,7 +701,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var invalidResult = await controller.Create(seeded.BrmModel.Id, new CapabilityEditViewModel
+        var invalidResult = await controller.CreateAsync(seeded.BrmModel.Id, new CapabilityEditViewModel
         {
             SelectedBrmModelId = seeded.BrmModel.Id,
             SelectedBrmComponentId = seeded.BrmComponent.Id,
@@ -721,7 +721,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         Assert.Single(invalidModel.MappingRows);
 
         using var validController = fixture.CreateCapabilitiesController();
-        var validResult = await validController.Create(seeded.BrmModel.Id, new CapabilityEditViewModel
+        var validResult = await validController.CreateAsync(seeded.BrmModel.Id, new CapabilityEditViewModel
         {
             SelectedBrmModelId = seeded.BrmModel.Id,
             SelectedBrmComponentId = seeded.BrmComponent.Id,
@@ -736,7 +736,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(validResult);
-        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
         Assert.Equal("BrmModels", redirect.ControllerName);
         Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
 
@@ -746,7 +746,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task CapabilityCreateUsesRouteBrmModelInsteadOfPostedModelSelection()
+    public async Task CapabilityCreateUsesRouteBrmModelInsteadOfPostedModelSelectionAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -761,7 +761,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var result = await controller.Create(seeded.BrmModel.Id, new CapabilityEditViewModel
+        var result = await controller.CreateAsync(seeded.BrmModel.Id, new CapabilityEditViewModel
         {
             SelectedBrmModelId = otherModel.Id,
             SelectedBrmComponentId = seeded.BrmComponent.Id,
@@ -776,7 +776,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
         Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
 
         var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
@@ -784,7 +784,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task CapabilityEditKeepsExistingBrmModelEvenIfPostedModelChanges()
+    public async Task CapabilityEditKeepsExistingBrmModelEvenIfPostedModelChangesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -815,7 +815,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var result = await controller.Edit(capability.Id, new CapabilityEditViewModel
+        var result = await controller.EditAsync(capability.Id, new CapabilityEditViewModel
         {
             SelectedBrmModelId = otherModel.Id,
             SelectedBrmComponentId = seeded.BrmComponent.Id,
@@ -831,7 +831,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
         Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
 
         var storedCapability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
@@ -840,7 +840,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task CapabilityDeleteRemovesCapabilityAndRedirectsToOwningBrmModel()
+    public async Task CapabilityDeleteRemovesCapabilityAndRedirectsToOwningBrmModelAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -864,10 +864,10 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var capability = await fixture.DbContext.BusinessCapabilityCatalogItems.SingleAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var result = await controller.DeleteConfirmed(capability.Id);
+        var result = await controller.DeleteConfirmedAsync(capability.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
         Assert.Equal("BrmModels", redirect.ControllerName);
         Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
         Assert.False(await fixture.DbContext.BusinessCapabilityCatalogItems.AnyAsync());
@@ -875,28 +875,28 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task CapabilitiesIndexWithBrmModelIdRedirectsToThatModel()
+    public async Task CapabilitiesIndexWithBrmModelIdRedirectsToThatModelAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
 
         using var controller = fixture.CreateCapabilitiesController();
-        var result = await controller.Index(null, seeded.BrmModel.Id);
+        var result = await controller.IndexAsync(null, seeded.BrmModel.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
         Assert.Equal("BrmModels", redirect.ControllerName);
         Assert.Equal(seeded.BrmModel.Id, redirect.RouteValues?["id"]);
     }
 
     [Fact]
-    public async Task BrmModelCreatePersistsAndDetailsShowScopedCapabilities()
+    public async Task BrmModelCreatePersistsAndDetailsShowScopedCapabilitiesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
 
         using var createController = fixture.CreateBrmModelsController();
-        var createResult = await createController.Create(new BrmModelEditViewModel
+        var createResult = await createController.CreateAsync(new BrmModelEditViewModel
         {
             Name = "Operations BRM",
             Area = "Operations",
@@ -905,7 +905,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(createResult);
-        Assert.Equal(nameof(BrmModelsController.Details), redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
 
         var brmModel = await fixture.DbContext.BrmModels
             .OrderByDescending(x => x.Id)
@@ -928,7 +928,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var detailsController = fixture.CreateBrmModelsController();
-        var detailsResult = await detailsController.Details(brmModel.Id);
+        var detailsResult = await detailsController.DetailsAsync(brmModel.Id);
 
         var view = Assert.IsType<ViewResult>(detailsResult);
         var model = Assert.IsType<BrmModelDetailsViewModel>(view.Model);
@@ -940,7 +940,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task BrmModelDetailsBuildDependencyHierarchyForConnectedCapabilities()
+    public async Task BrmModelDetailsBuildDependencyHierarchyForConnectedCapabilitiesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -976,7 +976,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateBrmModelsController();
-        var result = await controller.Details(seeded.BrmModel.Id);
+        var result = await controller.DetailsAsync(seeded.BrmModel.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<BrmModelDetailsViewModel>(view.Model);
@@ -989,7 +989,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task BrmModelDetailsDependencyHierarchyIncludesCapabilitiesWithoutApplications()
+    public async Task BrmModelDetailsDependencyHierarchyIncludesCapabilitiesWithoutApplicationsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var seeded = await fixture.SeedHermAlignmentAsync();
@@ -1085,7 +1085,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateBrmModelsController();
-        var result = await controller.Details(seeded.BrmModel.Id);
+        var result = await controller.DetailsAsync(seeded.BrmModel.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<BrmModelDetailsViewModel>(view.Model);
@@ -1107,12 +1107,12 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task BrmModelCreateRejectsStatusOutsideDropdownOptions()
+    public async Task BrmModelCreateRejectsStatusOutsideDropdownOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateBrmModelsController();
-        var result = await controller.Create(new BrmModelEditViewModel
+        var result = await controller.CreateAsync(new BrmModelEditViewModel
         {
             Name = "Operations BRM",
             Area = "Operations",
@@ -1127,7 +1127,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task BrmModelDeleteConfirmedSoftDeletesModelAndWritesAudit()
+    public async Task BrmModelDeleteConfirmedSoftDeletesModelAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -1142,10 +1142,10 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var brmModelId = await fixture.DbContext.BrmModels.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateBrmModelsController();
-        var result = await controller.DeleteConfirmed(brmModelId);
+        var result = await controller.DeleteConfirmedAsync(brmModelId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(BrmModelsController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
         var brmModel = await fixture.DbContext.BrmModels.SingleAsync();
         Assert.True(brmModel.IsDeleted);
@@ -1155,7 +1155,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task BrmModelRestoreDeletedClearsSoftDeleteStateAndWritesAudit()
+    public async Task BrmModelRestoreDeletedClearsSoftDeleteStateAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -1173,10 +1173,10 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var brmModelId = await fixture.DbContext.BrmModels.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateBrmModelsController();
-        var result = await controller.RestoreDeleted(brmModelId);
+        var result = await controller.RestoreDeletedAsync(brmModelId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(BrmModelsController.Restore), redirect.ActionName);
+        Assert.Equal("Restore", redirect.ActionName);
 
         var brmModel = await fixture.DbContext.BrmModels.SingleAsync();
         Assert.False(brmModel.IsDeleted);
@@ -1186,7 +1186,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task BrmModelIndexExcludesDeletedModels()
+    public async Task BrmModelIndexExcludesDeletedModelsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -1209,7 +1209,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateBrmModelsController();
-        var result = await controller.Index();
+        var result = await controller.IndexAsync();
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<BrmModelsIndexViewModel>(view.Model);
@@ -1218,7 +1218,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
     }
 
     [Fact]
-    public async Task BrmModelDetailsReturnsNotFoundWhenModelDeleted()
+    public async Task BrmModelDetailsReturnsNotFoundWhenModelDeletedAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -1236,7 +1236,7 @@ public sealed class ApplicationsAndCapabilitiesControllerTests
         var brmModelId = await fixture.DbContext.BrmModels.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateBrmModelsController();
-        var result = await controller.Details(brmModelId);
+        var result = await controller.DetailsAsync(brmModelId);
 
         Assert.IsType<NotFoundResult>(result);
     }

@@ -19,7 +19,7 @@ public sealed class ApplicationsController(
 {
     private const int MinimumMappingRowCount = 1;
 
-    public async Task<IActionResult> Index(string? search)
+    public async Task<IActionResult> IndexAsync(string? search)
     {
         var query = dbContext.ApplicationCatalogItems
             .AsNoTracking()
@@ -69,7 +69,7 @@ public sealed class ApplicationsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> CreateAsync()
     {
         var model = new ApplicationEditViewModel();
         EnsureMappingRows(model.MappingRows);
@@ -80,7 +80,7 @@ public sealed class ApplicationsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(ApplicationEditViewModel input)
+    public async Task<IActionResult> CreateAsync(ApplicationEditViewModel input)
     {
         NormalizeInput(input);
         var normalizedMappings = await ValidateMappingsAsync(input);
@@ -122,10 +122,10 @@ public sealed class ApplicationsController(
             $"ARM/product mappings: {application.Mappings.Count}.");
 
         TempData["ApplicationsStatusMessage"] = $"Created application {application.Name}.";
-        return RedirectToAction(nameof(Details), new { id = application.Id });
+        return RedirectToAction("Details", new { id = application.Id });
     }
 
-    public async Task<IActionResult> Details(int id)
+    public async Task<IActionResult> DetailsAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -142,7 +142,7 @@ public sealed class ApplicationsController(
         return View(model);
     }
 
-    public async Task<IActionResult> AllDependencies(CancellationToken cancellationToken)
+    public async Task<IActionResult> AllDependenciesAsync(CancellationToken cancellationToken)
     {
         var model = new HierarchyDiagramPageViewModel
         {
@@ -151,7 +151,7 @@ public sealed class ApplicationsController(
             Heading = "All application dependencies",
             Description = "Explore the full application dependency tree across ARM and TRM with the same left-to-right view used on each application page.",
             BackLabel = "Back to applications",
-            BackAction = nameof(Index),
+            BackAction = "Index",
             HierarchyRoot = await drilldownService.BuildAllApplicationsHierarchyAsync(cancellationToken),
             EmptyTitle = "No application dependency map yet",
             EmptyBody = "Create applications and connect them to ARM components and TRM product mappings to generate the full dependency tree.",
@@ -162,7 +162,7 @@ public sealed class ApplicationsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Edit(int id)
+    public async Task<IActionResult> EditAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -204,7 +204,7 @@ public sealed class ApplicationsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, ApplicationEditViewModel input)
+    public async Task<IActionResult> EditAsync(int id, ApplicationEditViewModel input)
     {
         var application = await dbContext.ApplicationCatalogItems
             .Include(x => x.Mappings)
@@ -253,11 +253,11 @@ public sealed class ApplicationsController(
             $"ARM/product mappings: {application.Mappings.Count}.");
 
         TempData["ApplicationsStatusMessage"] = $"Updated application {application.Name}.";
-        return RedirectToAction(nameof(Details), new { id = application.Id });
+        return RedirectToAction("Details", new { id = application.Id });
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -274,9 +274,9 @@ public sealed class ApplicationsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    [HttpPost, ActionName(nameof(Delete))]
+    [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -304,11 +304,11 @@ public sealed class ApplicationsController(
             application.DeletedReason);
 
         TempData["ApplicationsStatusMessage"] = $"Moved application {application.Name} to trash.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> Restore()
+    public async Task<IActionResult> RestoreAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -333,7 +333,7 @@ public sealed class ApplicationsController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RestoreDeleted(int id)
+    public async Task<IActionResult> RestoreDeletedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -360,7 +360,7 @@ public sealed class ApplicationsController(
             $"Restored application {application.Name} from trash.");
 
         TempData["ApplicationsStatusMessage"] = $"Restored application {application.Name}.";
-        return RedirectToAction(nameof(Restore));
+        return RedirectToAction("Restore");
     }
 
     private async Task PopulateOptionsAsync(ApplicationEditViewModel model)

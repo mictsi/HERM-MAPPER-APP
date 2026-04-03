@@ -17,7 +17,7 @@ public sealed class ReferenceController(
     AuditLogService auditLogService,
     IWebHostEnvironment environment) : Controller
 {
-    public async Task<IActionResult> Index(
+    public async Task<IActionResult> IndexAsync(
         string? search,
         int? domainId,
         int? capabilityId,
@@ -42,7 +42,7 @@ public sealed class ReferenceController(
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> Restore()
+    public async Task<IActionResult> RestoreAsync()
     {
         return View("Restore", await BuildRestoreViewModelAsync(
             ReferenceModelKind.Trm,
@@ -50,7 +50,7 @@ public sealed class ReferenceController(
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> RestoreArm()
+    public async Task<IActionResult> RestoreArmAsync()
     {
         return View("Restore", await BuildRestoreViewModelAsync(
             ReferenceModelKind.Arm,
@@ -58,7 +58,7 @@ public sealed class ReferenceController(
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> RestoreBrm()
+    public async Task<IActionResult> RestoreBrmAsync()
     {
         return View("Restore", await BuildRestoreViewModelAsync(
             ReferenceModelKind.Brm,
@@ -68,7 +68,7 @@ public sealed class ReferenceController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerifyImport(IFormFile? workbook)
+    public async Task<IActionResult> VerifyImportAsync(IFormFile? workbook)
     {
         if (!ModelState.IsValid)
         {
@@ -156,7 +156,7 @@ public sealed class ReferenceController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ImportVerified(string pendingImportToken)
+    public async Task<IActionResult> ImportVerifiedAsync(string pendingImportToken)
     {
         if (!ModelState.IsValid)
         {
@@ -208,7 +208,7 @@ public sealed class ReferenceController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteComponent(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
+    public async Task<IActionResult> DeleteComponentAsync(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
@@ -304,7 +304,7 @@ public sealed class ReferenceController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RestoreComponent(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
+    public async Task<IActionResult> RestoreComponentAsync(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
@@ -397,7 +397,7 @@ public sealed class ReferenceController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PermanentlyDeleteComponent(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
+    public async Task<IActionResult> PermanentlyDeleteComponentAsync(int id, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
@@ -495,7 +495,7 @@ public sealed class ReferenceController(
         return RedirectToAction(GetRestoreActionName(modelKind));
     }
 
-    public async Task<IActionResult> History(int id)
+    public async Task<IActionResult> HistoryAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -1218,9 +1218,9 @@ public sealed class ReferenceController(
 
     private static string GetRestoreActionName(ReferenceModelKind modelKind) => modelKind switch
     {
-        ReferenceModelKind.Arm => nameof(RestoreArm),
-        ReferenceModelKind.Brm => nameof(RestoreBrm),
-        _ => nameof(Restore)
+        ReferenceModelKind.Arm => "RestoreArm",
+        ReferenceModelKind.Brm => "RestoreBrm",
+        _ => "Restore"
     };
 
     private static string GetAdminNavKey(ReferenceModelKind modelKind) => modelKind switch

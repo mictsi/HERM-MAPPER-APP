@@ -12,7 +12,7 @@ namespace HERMMapperApp.Tests.Services;
 public sealed class TrmWorkbookImportServiceTests
 {
     [Fact]
-    public async Task VerifyAsyncReturnsErrorWhenRequiredSheetIsMissing()
+    public async Task VerifyAsyncReturnsErrorWhenRequiredSheetIsMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var workbookPath = fixture.WriteWorkbook(
@@ -36,7 +36,7 @@ public sealed class TrmWorkbookImportServiceTests
     }
 
     [Fact]
-    public async Task VerifyAsyncReturnsCountsAndFirstImportWarningWhenDatabaseIsEmpty()
+    public async Task VerifyAsyncReturnsCountsAndFirstImportWarningWhenDatabaseIsEmptyAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var workbookPath = fixture.WriteWorkbook(
@@ -72,7 +72,7 @@ public sealed class TrmWorkbookImportServiceTests
     }
 
     [Fact]
-    public async Task VerifyAsyncReturnsCountsForArmWorkbookWhenModelSelected()
+    public async Task VerifyAsyncReturnsCountsForArmWorkbookWhenModelSelectedAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var workbookPath = fixture.WriteWorkbook(
@@ -109,7 +109,7 @@ public sealed class TrmWorkbookImportServiceTests
     }
 
     [Fact]
-    public async Task VerifyAsyncReturnsErrorWhenWorkbookDoesNotMatchSelectedModel()
+    public async Task VerifyAsyncReturnsErrorWhenWorkbookDoesNotMatchSelectedModelAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var workbookPath = fixture.WriteWorkbook(
@@ -140,7 +140,7 @@ public sealed class TrmWorkbookImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsyncUpdatesExistingRecordsAddsNewOnesAndRecordsVersions()
+    public async Task ImportAsyncUpdatesExistingRecordsAddsNewOnesAndRecordsVersionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -279,7 +279,7 @@ public sealed class TrmWorkbookImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsyncImportsBrmWorkbookIntoGroupedHierarchy()
+    public async Task ImportAsyncImportsBrmWorkbookIntoGroupedHierarchyAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var workbookPath = fixture.WriteWorkbook(
@@ -319,7 +319,7 @@ public sealed class TrmWorkbookImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsyncImportsArmWorkbookIntoDedicatedTables()
+    public async Task ImportAsyncImportsArmWorkbookIntoDedicatedTablesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var workbookPath = fixture.WriteWorkbook(

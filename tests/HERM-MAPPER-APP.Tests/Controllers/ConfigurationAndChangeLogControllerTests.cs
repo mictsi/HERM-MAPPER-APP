@@ -23,7 +23,7 @@ namespace HERMMapperApp.Tests.Controllers;
 public sealed class ConfigurationAndChangeLogControllerTests
 {
     [Fact]
-    public async Task ChangeLogIndexFiltersBySearchAndOrdersNewestFirst()
+    public async Task ChangeLogIndexFiltersBySearchAndOrdersNewestFirstAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.AuditLogEntries.AddRangeAsync(
@@ -59,7 +59,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateChangeLogController();
-        var result = await controller.Index("Product");
+        var result = await controller.IndexAsync("Product");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ChangeLogIndexViewModel>(view.Model);
@@ -71,7 +71,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task ChangeLogIndexFiltersByActorUserName()
+    public async Task ChangeLogIndexFiltersByActorUserNameAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.AuditLogEntries.AddRangeAsync(
@@ -94,7 +94,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateChangeLogController();
-        var result = await controller.Index("ada");
+        var result = await controller.IndexAsync("ada");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ChangeLogIndexViewModel>(view.Model);
@@ -105,19 +105,19 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AddOptionCreatesOptionAndWritesAuditLog()
+    public async Task AddOptionCreatesOptionAndWritesAuditLogAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.AddOption(new AddConfigurationOptionInputModel
+        var result = await controller.AddOptionAsync(new AddConfigurationOptionInputModel
         {
             FieldName = " Owner ",
             Value = " Team Blue "
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
 
         var option = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync();
@@ -132,7 +132,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task IndexBuildsViewModelFromSettingsAndTempData()
+    public async Task IndexBuildsViewModelFromSettingsAndTempDataAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting
@@ -147,7 +147,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         controller.TempData["ConfigurationStatusMessage"] = "Saved";
         controller.TempData["ConfigurationError"] = "Warning";
 
-        var result = await controller.Index(ConfigurableFieldNames.Owner);
+        var result = await controller.IndexAsync(ConfigurableFieldNames.Owner);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
@@ -159,12 +159,12 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AiConfigurationSaveProviderPersistsProviderAndRedirects()
+    public async Task AiConfigurationSaveProviderPersistsProviderAndRedirectsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateAiConfigurationController();
 
-        var result = await controller.SaveProvider(new AiProviderConfigurationInputModel
+        var result = await controller.SaveProviderAsync(new AiProviderConfigurationInputModel
         {
             Name = " Open WebUI Lab ",
             ProviderType = AiProviderType.OpenWebUi,
@@ -175,7 +175,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(AiConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
         var provider = await fixture.DbContext.AiProviderConfigurations.SingleAsync();
         var settings = await fixture.DbContext.AppSettings
@@ -192,20 +192,20 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AiConfigurationSetLookupEnabledRejectsIncompleteConfiguration()
+    public async Task AiConfigurationSetLookupEnabledRejectsIncompleteConfigurationAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateAiConfigurationController();
 
-        var result = await controller.SetLookupEnabled(true);
+        var result = await controller.SetLookupEnabledAsync(true);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(AiConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal("Save and enable a provider with endpoint, model, and API key before enabling AI mapping lookup.", controller.TempData["AiConfigurationErrorMessage"]);
     }
 
     [Fact]
-    public async Task AiConfigurationSetProviderEnabledDisablesOtherProviders()
+    public async Task AiConfigurationSetProviderEnabledDisablesOtherProvidersAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var providerA = new AiProviderConfiguration
@@ -230,10 +230,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         using var controller = fixture.CreateAiConfigurationController();
 
-        var result = await controller.SetProviderEnabled(providerB.Id, true);
+        var result = await controller.SetProviderEnabledAsync(providerB.Id, true);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(AiConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
         var providers = await fixture.DbContext.AiProviderConfigurations
             .OrderBy(x => x.Id)
@@ -245,12 +245,12 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AiConfigurationIndexHidesEditorUntilAdminStartsEditing()
+    public async Task AiConfigurationIndexHidesEditorUntilAdminStartsEditingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateAiConfigurationController();
 
-        var result = await controller.Index();
+        var result = await controller.IndexAsync();
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<AiMappingAdminIndexViewModel>(view.Model);
@@ -259,12 +259,12 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AiConfigurationIndexShowsBlankEditorForNewProvider()
+    public async Task AiConfigurationIndexShowsBlankEditorForNewProviderAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateAiConfigurationController();
 
-        var result = await controller.Index(createNewProvider: true);
+        var result = await controller.IndexAsync(createNewProvider: true);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<AiMappingAdminIndexViewModel>(view.Model);
@@ -274,7 +274,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AiConfigurationIndexShowsSelectedProviderWhenEditing()
+    public async Task AiConfigurationIndexShowsSelectedProviderWhenEditingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var provider = new AiProviderConfiguration
@@ -290,7 +290,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         using var controller = fixture.CreateAiConfigurationController();
 
-        var result = await controller.Index(editProviderId: provider.Id);
+        var result = await controller.IndexAsync(editProviderId: provider.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<AiMappingAdminIndexViewModel>(view.Model);
@@ -300,29 +300,29 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task VerifyCatalogueImportReturnsErrorReviewWhenWorkbookMissing()
+    public async Task VerifyCatalogueImportReturnsErrorReviewWhenWorkbookMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.VerifyCatalogueImport(null);
+        var result = await controller.VerifyCatalogueImportAsync(null);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("Choose an .xlsx workbook before verifying the import.", Assert.Single(model.CatalogueImportReview.Verification!.Errors));
     }
 
     [Fact]
-    public async Task VerifyCatalogueImportKeepsSelectedModelInErrorReview()
+    public async Task VerifyCatalogueImportKeepsSelectedModelInErrorReviewAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.VerifyCatalogueImport(null, ReferenceModelKind.Brm);
+        var result = await controller.VerifyCatalogueImportAsync(null, ReferenceModelKind.Brm);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal(ReferenceModelKind.Brm, model.CatalogueImportModelKind);
         Assert.Equal(ReferenceModelKind.Brm, model.CatalogueImportReview.ModelKind);
@@ -330,33 +330,33 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task VerifyCatalogueImportReturnsErrorReviewWhenExtensionInvalid()
+    public async Task VerifyCatalogueImportReturnsErrorReviewWhenExtensionInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
         await using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("not-a-workbook"));
         var file = new FormFile(stream, 0, stream.Length, "file", "catalogue.csv");
 
-        var result = await controller.VerifyCatalogueImport(file);
+        var result = await controller.VerifyCatalogueImportAsync(file);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("Only Excel .xlsx workbooks are supported.", Assert.Single(model.CatalogueImportReview.Verification!.Errors));
     }
 
     [Fact]
-    public async Task VerifyCatalogueImportReturnsVerificationErrorsForInvalidWorkbookContent()
+    public async Task VerifyCatalogueImportReturnsVerificationErrorsForInvalidWorkbookContentAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
         await using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("not-a-valid-zip-workbook"));
         var file = new FormFile(stream, 0, stream.Length, "file", "catalogue.xlsx");
 
-        var result = await controller.VerifyCatalogueImport(file);
+        var result = await controller.VerifyCatalogueImportAsync(file);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("catalogue.xlsx", model.CatalogueImportReview.UploadedFileName);
         Assert.Null(model.CatalogueImportReview.PendingImportToken);
@@ -365,33 +365,33 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task ImportVerifiedCatalogueWithMissingTokenRedirectsWithError()
+    public async Task ImportVerifiedCatalogueWithMissingTokenRedirectsWithErrorAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.ImportVerifiedCatalogue("");
+        var result = await controller.ImportVerifiedCatalogueAsync("");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.Equal("Verify a catalogue workbook before importing it.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task ImportVerifiedCatalogueWithMissingFileRedirectsWithError()
+    public async Task ImportVerifiedCatalogueWithMissingFileRedirectsWithErrorAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.ImportVerifiedCatalogue("missing-token");
+        var result = await controller.ImportVerifiedCatalogueAsync("missing-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.Equal("The verified catalogue workbook is no longer available. Upload it again.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task ImportVerifiedCatalogueReturnsViewWhenWorkbookVerificationFails()
+    public async Task ImportVerifiedCatalogueReturnsViewWhenWorkbookVerificationFailsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var pendingPath = Path.Combine(fixture.ContentRootPath, "App_Data", "PendingImports", "catalogue", "bad-token.xlsx");
@@ -399,17 +399,17 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await File.WriteAllTextAsync(pendingPath, "not-a-valid-zip-workbook");
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.ImportVerifiedCatalogue("bad-token");
+        var result = await controller.ImportVerifiedCatalogueAsync("bad-token");
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.NotEmpty(model.CatalogueImportReview.Verification!.Errors);
         Assert.False(File.Exists(pendingPath));
     }
 
     [Fact]
-    public async Task ImportVerifiedCatalogueImportsWorkbookAndWritesStatus()
+    public async Task ImportVerifiedCatalogueImportsWorkbookAndWritesStatusAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var pendingPath = Path.Combine(fixture.ContentRootPath, "App_Data", "PendingImports", "catalogue", "good-token.xlsx");
@@ -435,10 +435,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
                 ]));
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.ImportVerifiedCatalogue("good-token");
+        var result = await controller.ImportVerifiedCatalogueAsync("good-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
             "TRM catalogue imported. Domains +1/0 updated, capabilities +1/0 updated, components +1/0 updated.",
@@ -452,7 +452,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task ImportVerifiedCatalogueImportsArmWorkbookWhenModelSelected()
+    public async Task ImportVerifiedCatalogueImportsArmWorkbookWhenModelSelectedAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var pendingPath = Path.Combine(fixture.ContentRootPath, "App_Data", "PendingImports", "catalogue", "arm-token.xlsx");
@@ -478,10 +478,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
                 ]));
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.ImportVerifiedCatalogue("arm-token", ReferenceModelKind.Arm);
+        var result = await controller.ImportVerifiedCatalogueAsync("arm-token", ReferenceModelKind.Arm);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
             "ARM catalogue imported. Domains +1/0 updated, capabilities +1/0 updated, components +1/0 updated.",
@@ -493,7 +493,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task ImportVerifiedCatalogueImportsBrmWorkbookWhenModelSelected()
+    public async Task ImportVerifiedCatalogueImportsBrmWorkbookWhenModelSelectedAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var pendingPath = Path.Combine(fixture.ContentRootPath, "App_Data", "PendingImports", "catalogue", "brm-token.xlsx");
@@ -508,10 +508,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
                 ]));
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.ImportVerifiedCatalogue("brm-token", ReferenceModelKind.Brm);
+        var result = await controller.ImportVerifiedCatalogueAsync("brm-token", ReferenceModelKind.Brm);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
             "BRM catalogue imported. Groups +1/0 updated, level 1 capabilities +1/0 updated, level 2 capabilities +1/0 updated.",
@@ -523,7 +523,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AbortCatalogueImportDeletesPendingWorkbookAndWritesStatus()
+    public async Task AbortCatalogueImportDeletesPendingWorkbookAndWritesStatusAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var token = "catalogue-token";
@@ -532,43 +532,43 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await File.WriteAllTextAsync(pendingPath, "pending");
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.AbortCatalogueImport(token);
+        var result = await controller.AbortCatalogueImportAsync(token);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal("TRM catalogue import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
     }
 
     [Fact]
-    public async Task AbortCatalogueImportWithBlankTokenStillWritesStatus()
+    public async Task AbortCatalogueImportWithBlankTokenStillWritesStatusAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.AbortCatalogueImport("   ");
+        var result = await controller.AbortCatalogueImportAsync("   ");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.Equal("TRM catalogue import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
     }
 
     [Fact]
-    public async Task VerifyProductImportReturnsErrorReviewWhenFileMissing()
+    public async Task VerifyProductImportReturnsErrorReviewWhenFileMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.VerifyProductImport(null);
+        var result = await controller.VerifyProductImportAsync(null);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("Choose a CSV file before verifying the import.", Assert.Single(model.ProductImportReview.Verification!.Errors));
     }
 
     [Fact]
-    public async Task AddOptionRejectsDuplicateValueIgnoringCase()
+    public async Task AddOptionRejectsDuplicateValueIgnoringCaseAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.Add(new ConfigurableFieldOption
@@ -581,21 +581,21 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.AddOption(new AddConfigurationOptionInputModel
+        var result = await controller.AddOptionAsync(new AddConfigurationOptionInputModel
         {
             FieldName = ConfigurableFieldNames.Owner,
             Value = "team blue"
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
         Assert.Equal(1, await fixture.DbContext.ConfigurableFieldOptions.CountAsync());
         Assert.Equal("Owner value 'team blue' already exists.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task UpdateOptionOrderReordersOptionsAndRenumbersSequentially()
+    public async Task UpdateOptionOrderReordersOptionsAndRenumbersSequentiallyAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
@@ -625,14 +625,14 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var optionToMove = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync(x => x.Value == "Team C");
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.UpdateOptionOrder(new UpdateConfigurationOptionOrderInputModel
+        var result = await controller.UpdateOptionOrderAsync(new UpdateConfigurationOptionOrderInputModel
         {
             Id = optionToMove.Id,
             SortOrder = 1
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
 
         var options = await fixture.DbContext.ConfigurableFieldOptions
@@ -648,7 +648,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task UpdateOptionUpdatesExistingValueAndWritesAuditLog()
+    public async Task UpdateOptionUpdatesExistingValueAndWritesAuditLogAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddAsync(
@@ -663,14 +663,14 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var option = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.UpdateOption(new UpdateConfigurationOptionValueInputModel
+        var result = await controller.UpdateOptionAsync(new UpdateConfigurationOptionValueInputModel
         {
             Id = option.Id,
             Value = " Team Azure "
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
 
         var updated = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync();
@@ -682,7 +682,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task UpdateOptionRejectsDuplicateValueIgnoringCase()
+    public async Task UpdateOptionRejectsDuplicateValueIgnoringCaseAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
@@ -703,20 +703,20 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var option = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync(x => x.Value == "Team Green");
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.UpdateOption(new UpdateConfigurationOptionValueInputModel
+        var result = await controller.UpdateOptionAsync(new UpdateConfigurationOptionValueInputModel
         {
             Id = option.Id,
             Value = "team blue"
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
         Assert.Equal("Owner value 'team blue' already exists.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task ReorderOptionsUsesSubmittedOrderAndRenumbersSequentially()
+    public async Task ReorderOptionsUsesSubmittedOrderAndRenumbersSequentiallyAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
@@ -743,14 +743,14 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var options = await fixture.DbContext.ConfigurableFieldOptions.OrderBy(x => x.SortOrder).ToListAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.ReorderOptions(new ReorderConfigurationOptionsInputModel
+        var result = await controller.ReorderOptionsAsync(new ReorderConfigurationOptionsInputModel
         {
             FieldName = ConfigurableFieldNames.Owner,
             OrderedIds = [options[2].Id, options[0].Id, options[1].Id]
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
 
         var reordered = await fixture.DbContext.ConfigurableFieldOptions
@@ -764,7 +764,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task DeleteOptionRemovesOptionNormalizesSortOrderAndWritesAuditLog()
+    public async Task DeleteOptionRemovesOptionNormalizesSortOrderAndWritesAuditLogAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
@@ -791,10 +791,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
         var option = await fixture.DbContext.ConfigurableFieldOptions.SingleAsync(x => x.Value == "Team B");
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.DeleteOption(option.Id);
+        var result = await controller.DeleteOptionAsync(option.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
 
         var options = await fixture.DbContext.ConfigurableFieldOptions
@@ -810,18 +810,18 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task UpdateDisplayTimeZonePersistsSettingAndWritesAuditLog()
+    public async Task UpdateDisplayTimeZonePersistsSettingAndWritesAuditLogAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.UpdateDisplayTimeZone(new UpdateDisplayTimeZoneInputModel
+        var result = await controller.UpdateDisplayTimeZoneAsync(new UpdateDisplayTimeZoneInputModel
         {
             TimeZoneId = "UTC"
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
         var setting = await fixture.DbContext.AppSettings.SingleAsync(x => x.Key == AppSettingKeys.DisplayTimeZone);
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
@@ -833,23 +833,23 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task UpdateDisplayTimeZoneRejectsUnknownTimeZone()
+    public async Task UpdateDisplayTimeZoneRejectsUnknownTimeZoneAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.UpdateDisplayTimeZone(new UpdateDisplayTimeZoneInputModel
+        var result = await controller.UpdateDisplayTimeZoneAsync(new UpdateDisplayTimeZoneInputModel
         {
             TimeZoneId = "Not/AZone"
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal("The time zone 'Not/AZone' is not available on this server.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task SetRemoteSqlImportEnabledDisablesConfiguredImportAndWritesStatus()
+    public async Task SetRemoteSqlImportEnabledDisablesConfiguredImportAndWritesStatusAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.AppSettings.AddRangeAsync(
@@ -859,10 +859,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.SetRemoteSqlImportEnabled(false);
+        var result = await controller.SetRemoteSqlImportEnabledAsync(false);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.Equal(
             "Remote SQL import disabled. Scheduled and manual imports will be skipped until you enable it again.",
             controller.TempData["ConfigurationStatusMessage"]);
@@ -875,7 +875,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task RunRemoteSqlImportNowReturnsErrorWhenImportIsDisabled()
+    public async Task RunRemoteSqlImportNowReturnsErrorWhenImportIsDisabledAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.AppSettings.AddRangeAsync(
@@ -885,15 +885,15 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.RunRemoteSqlImportNow();
+        var result = await controller.RunRemoteSqlImportNowAsync();
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.Equal("Remote SQL import is disabled. Enable it before running an import.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task ClearRemoteSqlImportConfigurationRemovesStoredSettingsAndCredentials()
+    public async Task ClearRemoteSqlImportConfigurationRemovesStoredSettingsAndCredentialsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.AppSettings.AddRangeAsync(
@@ -907,10 +907,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.ClearRemoteSqlImportConfiguration();
+        var result = await controller.ClearRemoteSqlImportConfigurationAsync();
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.Equal("Remote SQL configuration was cleared from the database.", controller.TempData["ConfigurationStatusMessage"]);
         Assert.Empty(await fixture.DbContext.AppSettings.Where(x => x.Key.StartsWith("RemoteSqlImport.")).ToListAsync());
         Assert.Contains(
@@ -919,7 +919,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task VerifyProductImportReturnsErrorReviewWhenFileExtensionIsInvalid()
+    public async Task VerifyProductImportReturnsErrorReviewWhenFileExtensionIsInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
@@ -927,10 +927,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await using var stream = new MemoryStream(bytes);
         var file = new FormFile(stream, 0, bytes.Length, "file", "relationships.txt");
 
-        var result = await controller.VerifyProductImport(file);
+        var result = await controller.VerifyProductImportAsync(file);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.True(model.ProductImportReview.HasReview);
         Assert.Equal("relationships.txt", model.ProductImportReview.UploadedFileName);
@@ -938,7 +938,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task VerifyProductImportReturnsVerificationErrorsForInvalidCsvHeader()
+    public async Task VerifyProductImportReturnsVerificationErrorsForInvalidCsvHeaderAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
@@ -946,10 +946,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await using var stream = new MemoryStream(bytes);
         var file = new FormFile(stream, 0, bytes.Length, "file", "relationships.csv");
 
-        var result = await controller.VerifyProductImport(file);
+        var result = await controller.VerifyProductImportAsync(file);
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("relationships.csv", model.ProductImportReview.UploadedFileName);
         Assert.Null(model.ProductImportReview.PendingImportToken);
@@ -958,33 +958,33 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task ImportVerifiedProductsWithMissingTokenRedirectsWithError()
+    public async Task ImportVerifiedProductsWithMissingTokenRedirectsWithErrorAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.ImportVerifiedProducts("");
+        var result = await controller.ImportVerifiedProductsAsync("");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.Equal("Verify a product CSV before importing it.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task ImportVerifiedProductsWithMissingFileRedirectsWithError()
+    public async Task ImportVerifiedProductsWithMissingFileRedirectsWithErrorAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.ImportVerifiedProducts("missing-token");
+        var result = await controller.ImportVerifiedProductsAsync("missing-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.Equal("The verified product CSV is no longer available. Upload it again.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task ImportVerifiedProductsReturnsViewWhenCsvVerificationFails()
+    public async Task ImportVerifiedProductsReturnsViewWhenCsvVerificationFailsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var pendingPath = Path.Combine(fixture.ContentRootPath, "App_Data", "PendingImports", "products", "bad-token.csv");
@@ -992,17 +992,17 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await File.WriteAllTextAsync(pendingPath, "wrong;header\nvalue");
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.ImportVerifiedProducts("bad-token");
+        var result = await controller.ImportVerifiedProductsAsync("bad-token");
 
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), view.ViewName);
+        Assert.Equal("ImportData", view.ViewName);
         var model = Assert.IsType<ConfigurationIndexViewModel>(view.Model);
         Assert.Equal("The CSV header must be 'MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT'.", Assert.Single(model.ProductImportReview.Verification!.Errors));
         Assert.False(File.Exists(pendingPath));
     }
 
     [Fact]
-    public async Task ImportVerifiedProductsImportsCsvAndWritesStatus()
+    public async Task ImportVerifiedProductsImportsCsvAndWritesStatusAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Cybersecurity" };
@@ -1018,10 +1018,10 @@ public sealed class ConfigurationAndChangeLogControllerTests
             "MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT\nHERM;TD001 Cybersecurity;TP001 Capability A;TC002 Monitoring & Alerting;Graylog");
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.ImportVerifiedProducts("good-token");
+        var result = await controller.ImportVerifiedProductsAsync("good-token");
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal(
             "Imported 1 new product(s), matched 0 existing product(s), created 1 mapping(s), and left 0 row(s) as product-only because the hierarchy did not match.",
@@ -1034,7 +1034,7 @@ public sealed class ConfigurationAndChangeLogControllerTests
     }
 
     [Fact]
-    public async Task AbortProductImportDeletesPendingCsvAndWritesStatus()
+    public async Task AbortProductImportDeletesPendingCsvAndWritesStatusAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var token = "product-token";
@@ -1043,83 +1043,83 @@ public sealed class ConfigurationAndChangeLogControllerTests
         await File.WriteAllTextAsync(pendingPath, "pending");
 
         using var controller = fixture.CreateConfigurationController();
-        var result = await controller.AbortProductImport(token);
+        var result = await controller.AbortProductImportAsync(token);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.ImportData), redirect.ActionName);
+        Assert.Equal("ImportData", redirect.ActionName);
         Assert.False(File.Exists(pendingPath));
         Assert.Equal("Product import was aborted.", controller.TempData["ConfigurationStatusMessage"]);
     }
 
     [Fact]
-    public async Task AddOptionRejectsUnsupportedField()
+    public async Task AddOptionRejectsUnsupportedFieldAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.AddOption(new AddConfigurationOptionInputModel
+        var result = await controller.AddOptionAsync(new AddConfigurationOptionInputModel
         {
             FieldName = "UnknownField",
             Value = "Team Blue"
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal("That field is not supported.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task AddOptionRejectsBlankValue()
+    public async Task AddOptionRejectsBlankValueAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.AddOption(new AddConfigurationOptionInputModel
+        var result = await controller.AddOptionAsync(new AddConfigurationOptionInputModel
         {
             FieldName = ConfigurableFieldNames.Owner,
             Value = "   "
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(ConfigurableFieldNames.Owner, Assert.IsType<string>(redirect.RouteValues!["expandedFieldName"]));
         Assert.Equal("Enter a value before saving.", controller.TempData["ConfigurationError"]);
     }
 
     [Fact]
-    public async Task UpdateOptionOrderMissingOptionRedirectsWithoutChanges()
+    public async Task UpdateOptionOrderMissingOptionRedirectsWithoutChangesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.UpdateOptionOrder(new UpdateConfigurationOptionOrderInputModel { Id = 999, SortOrder = 1 });
+        var result = await controller.UpdateOptionOrderAsync(new UpdateConfigurationOptionOrderInputModel { Id = 999, SortOrder = 1 });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
     }
 
     [Fact]
-    public async Task DeleteOptionMissingOptionRedirectsWithoutChanges()
+    public async Task DeleteOptionMissingOptionRedirectsWithoutChangesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.DeleteOption(999);
+        var result = await controller.DeleteOptionAsync(999);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
     }
 
     [Fact]
-    public async Task UpdateDisplayTimeZoneRejectsBlankValue()
+    public async Task UpdateDisplayTimeZoneRejectsBlankValueAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateConfigurationController();
 
-        var result = await controller.UpdateDisplayTimeZone(new UpdateDisplayTimeZoneInputModel { TimeZoneId = "   " });
+        var result = await controller.UpdateDisplayTimeZoneAsync(new UpdateDisplayTimeZoneInputModel { TimeZoneId = "   " });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ConfigurationController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal("Choose a time zone before saving.", controller.TempData["ConfigurationError"]);
     }
 

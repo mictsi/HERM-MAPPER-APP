@@ -26,7 +26,7 @@ public sealed class ServicesController(
                 value: score.ToString(CultureInfo.InvariantCulture)))
             .ToList();
 
-    public async Task<IActionResult> Index(
+    public async Task<IActionResult> IndexAsync(
         string? search,
         string? owner = null,
         string? lifecycleStatus = null,
@@ -93,7 +93,7 @@ public sealed class ServicesController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> CreateAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -108,7 +108,7 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(ServiceEditViewModel input)
+    public async Task<IActionResult> CreateAsync(ServiceEditViewModel input)
     {
         NormalizeServiceInput(input);
 
@@ -140,11 +140,11 @@ public sealed class ServicesController(
             $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. ACS: {service.AssetCriticalityScore}. Connections: 0.");
 
         TempData["ServicesStatusMessage"] = $"Created service {service.Name}. Design the connected products below.";
-        return RedirectToAction(nameof(Connections), new { id = service.Id });
+        return RedirectToAction("Connections", new { id = service.Id });
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Edit(int id)
+    public async Task<IActionResult> EditAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -165,7 +165,7 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, ServiceEditViewModel input)
+    public async Task<IActionResult> EditAsync(int id, ServiceEditViewModel input)
     {
         var service = await LoadServiceAsync(id, asNoTracking: false);
         if (service is null)
@@ -199,11 +199,11 @@ public sealed class ServicesController(
             $"Owner: {service.Owner}. Status: {service.LifecycleStatus}. ACS: {service.AssetCriticalityScore}. Connections: {service.ConnectionCount}.");
 
         TempData["ServicesStatusMessage"] = $"Updated service {service.Name}.";
-        return RedirectToAction(nameof(Connections), new { id = service.Id });
+        return RedirectToAction("Connections", new { id = service.Id });
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Connections(int id)
+    public async Task<IActionResult> ConnectionsAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -224,7 +224,7 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Connections(int id, ServiceConnectionEditorViewModel input)
+    public async Task<IActionResult> ConnectionsAsync(int id, ServiceConnectionEditorViewModel input)
     {
         var service = await LoadServiceAsync(id, asNoTracking: false);
         if (service is null)
@@ -263,10 +263,10 @@ public sealed class ServicesController(
             $"Connections: {service.ConnectionCount}. Products: {service.ProductLinks.Count}.");
 
         TempData["ServicesStatusMessage"] = $"Saved connected products for {service.Name}.";
-        return RedirectToAction(nameof(Connections), new { id = service.Id });
+        return RedirectToAction("Connections", new { id = service.Id });
     }
 
-    public async Task<IActionResult> Visualize(int id)
+    public async Task<IActionResult> VisualizeAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -297,7 +297,7 @@ public sealed class ServicesController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -309,9 +309,9 @@ public sealed class ServicesController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    [HttpPost, ActionName(nameof(Delete))]
+    [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -339,11 +339,11 @@ public sealed class ServicesController(
             service.DeletedReason);
 
         TempData["ServicesStatusMessage"] = $"Moved service {service.Name} to trash.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> Restore()
+    public async Task<IActionResult> RestoreAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -373,7 +373,7 @@ public sealed class ServicesController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RestoreDeleted(int id)
+    public async Task<IActionResult> RestoreDeletedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -400,13 +400,13 @@ public sealed class ServicesController(
             $"Restored service {service.Name} from trash.");
 
         TempData["ServicesStatusMessage"] = $"Restored service {service.Name}.";
-        return RedirectToAction(nameof(Restore));
+        return RedirectToAction("Restore");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PermanentDelete(int id)
+    public async Task<IActionResult> PermanentDeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -429,7 +429,7 @@ public sealed class ServicesController(
             $"Permanently deleted service {service.Name}.");
 
         TempData["ServicesStatusMessage"] = $"Permanently deleted service {service.Name}.";
-        return RedirectToAction(nameof(Restore));
+        return RedirectToAction("Restore");
     }
 
     private async Task PopulateServiceOptionsAsync(ServiceEditViewModel model)

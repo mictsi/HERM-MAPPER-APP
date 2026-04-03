@@ -20,7 +20,7 @@ public sealed class MappingsController(
     ConfigurableFieldService configurableFieldService,
     AiProductMappingService aiProductMappingService) : Controller
 {
-    public async Task<IActionResult> Index(string? search, MappingStatus? status, int? domainId, int? capabilityId)
+    public async Task<IActionResult> IndexAsync(string? search, MappingStatus? status, int? domainId, int? capabilityId)
     {
         if (!ModelState.IsValid)
         {
@@ -79,14 +79,14 @@ public sealed class MappingsController(
                 .ForReferenceModel(ReferenceModelKind.Trm)
                 .OrderBy(x => x.Code)
                 .ToListAsync(),
-            Capabilities = await BuildCapabilityFilter(domainId),
+            Capabilities = await BuildCapabilityFilterAsync(domainId),
             Products = await productsQuery.OrderBy(x => x.Name).ToListAsync()
         };
 
         return View(model);
     }
 
-    public async Task<IActionResult> Create(int productId)
+    public async Task<IActionResult> CreateAsync(int productId)
     {
         if (!ModelState.IsValid)
         {
@@ -102,12 +102,12 @@ public sealed class MappingsController(
             return NotFound();
         }
 
-        return View("Edit", await BuildMappingEditViewModel(product, (ProductMapping?)null));
+        return View("Edit", await BuildMappingEditViewModelAsync(product, (ProductMapping?)null));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(MappingEditViewModel model)
+    public async Task<IActionResult> CreateAsync(MappingEditViewModel model)
     {
         if (!ModelState.IsValid)
         {
@@ -131,10 +131,10 @@ public sealed class MappingsController(
             UpdatedUtc = DateTime.UtcNow
         };
 
-        var mappingUpdate = await PopulateAndValidateMapping(model, mapping);
+        var mappingUpdate = await PopulateAndValidateMappingAsync(model, mapping);
         if (mappingUpdate is null)
         {
-            return View("Edit", await BuildMappingEditViewModel(product, model));
+            return View("Edit", await BuildMappingEditViewModelAsync(product, model));
         }
 
         dbContext.ProductMappings.Add(mapping);
@@ -144,10 +144,10 @@ public sealed class MappingsController(
         await WriteMappingAuditAsync(mapping, "Create", "Created mapping.");
         await WriteCustomComponentHistoryAsync(mappingUpdate, mapping.TrmComponent);
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> Edit(int id)
+    public async Task<IActionResult> EditAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -165,12 +165,12 @@ public sealed class MappingsController(
             return NotFound();
         }
 
-        return View(await BuildMappingEditViewModel(mapping.ProductCatalogItem, mapping));
+        return View(await BuildMappingEditViewModelAsync(mapping.ProductCatalogItem, mapping));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, MappingEditViewModel model)
+    public async Task<IActionResult> EditAsync(int id, MappingEditViewModel model)
     {
         if (!ModelState.IsValid)
         {
@@ -188,10 +188,10 @@ public sealed class MappingsController(
         }
 
         model.Owners = NormalizeSelections(model.Owners);
-        var mappingUpdate = await PopulateAndValidateMapping(model, mapping);
+        var mappingUpdate = await PopulateAndValidateMappingAsync(model, mapping);
         if (mappingUpdate is null)
         {
-            return View(await BuildMappingEditViewModel(mapping.ProductCatalogItem, model, mapping.Id));
+            return View(await BuildMappingEditViewModelAsync(mapping.ProductCatalogItem, model, mapping.Id));
         }
 
         mapping.UpdatedUtc = DateTime.UtcNow;
@@ -201,10 +201,10 @@ public sealed class MappingsController(
         await WriteMappingAuditAsync(mapping, "Update", "Updated mapping.");
         await WriteCustomComponentHistoryAsync(mappingUpdate, mapping.TrmComponent);
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -222,9 +222,9 @@ public sealed class MappingsController(
         return mapping is null ? NotFound() : View(mapping);
     }
 
-    [HttpPost, ActionName(nameof(Delete))]
+    [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -262,11 +262,11 @@ public sealed class MappingsController(
             nameof(ProductMapping),
             id,
             $"Deleted mapping for {mapping.ProductCatalogItem?.Name ?? "product"}.");
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [HttpGet]
-    public async Task<IActionResult> Capabilities(int? domainId)
+    public async Task<IActionResult> CapabilitiesAsync(int? domainId)
     {
         if (!ModelState.IsValid)
         {
@@ -291,7 +291,7 @@ public sealed class MappingsController(
     }
 
     [HttpGet]
-    public async Task<IActionResult> Components(int? capabilityId)
+    public async Task<IActionResult> ComponentsAsync(int? capabilityId)
     {
         if (!ModelState.IsValid)
         {
@@ -321,7 +321,7 @@ public sealed class MappingsController(
     }
 
     [HttpGet]
-    public async Task<IActionResult> AddWithAi(int productId)
+    public async Task<IActionResult> AddWithAiAsync(int productId)
     {
         if (!ModelState.IsValid)
         {
@@ -352,7 +352,7 @@ public sealed class MappingsController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> LookupWithAi(int productId)
+    public async Task<IActionResult> LookupWithAiAsync(int productId)
     {
         if (!ModelState.IsValid)
         {
@@ -376,7 +376,7 @@ public sealed class MappingsController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateFromAi(AiMappingReviewViewModel model)
+    public async Task<IActionResult> CreateFromAiAsync(AiMappingReviewViewModel model)
     {
         if (!ModelState.IsValid)
         {
@@ -485,7 +485,7 @@ public sealed class MappingsController(
     }
 
     [HttpGet]
-    public async Task<IActionResult> ExportCsv(string? search, MappingStatus? status, int? domainId, int? capabilityId, bool includeUnfinished = false)
+    public async Task<IActionResult> ExportCsvAsync(string? search, MappingStatus? status, int? domainId, int? capabilityId, bool includeUnfinished = false)
     {
         if (!ModelState.IsValid)
         {
@@ -549,7 +549,7 @@ public sealed class MappingsController(
         return query;
     }
 
-    private async Task<MappingUpdateResult?> PopulateAndValidateMapping(MappingEditViewModel model, ProductMapping mapping)
+    private async Task<MappingUpdateResult?> PopulateAndValidateMappingAsync(MappingEditViewModel model, ProductMapping mapping)
     {
         TrmDomain? domain = null;
         TrmCapability? capability = null;
@@ -693,7 +693,7 @@ public sealed class MappingsController(
         return mappingUpdate;
     }
 
-    private async Task<IReadOnlyList<TrmCapability>> BuildCapabilityFilter(int? domainId)
+    private async Task<IReadOnlyList<TrmCapability>> BuildCapabilityFilterAsync(int? domainId)
     {
         var query = dbContext.TrmCapabilities
             .AsNoTracking()
@@ -707,7 +707,7 @@ public sealed class MappingsController(
         return await query.OrderBy(x => x.Code).ToListAsync();
     }
 
-    private async Task<MappingEditViewModel> BuildMappingEditViewModel(ProductCatalogItem product, ProductMapping? mapping, int? mappingIdOverride = null)
+    private async Task<MappingEditViewModel> BuildMappingEditViewModelAsync(ProductCatalogItem product, ProductMapping? mapping, int? mappingIdOverride = null)
     {
         var selectedDomainId = mapping?.TrmDomainId;
         var selectedCapabilityId = mapping?.TrmCapabilityId;
@@ -773,7 +773,7 @@ public sealed class MappingsController(
         };
     }
 
-    private async Task<MappingEditViewModel> BuildMappingEditViewModel(ProductCatalogItem product, MappingEditViewModel postedModel, int? mappingIdOverride = null)
+    private async Task<MappingEditViewModel> BuildMappingEditViewModelAsync(ProductCatalogItem product, MappingEditViewModel postedModel, int? mappingIdOverride = null)
     {
         var domains = await dbContext.TrmDomains
             .AsNoTracking()

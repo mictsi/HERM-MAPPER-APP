@@ -16,7 +16,7 @@ public sealed class ProductsController(
     ConfigurableFieldService configurableFieldService,
     AiProductMappingService aiProductMappingService) : Controller
 {
-    public async Task<IActionResult> Index(string? search, string[]? owners = null, string? lifecycleStatus = null)
+    public async Task<IActionResult> IndexAsync(string? search, string[]? owners = null, string? lifecycleStatus = null)
     {
         if (!ModelState.IsValid)
         {
@@ -73,7 +73,7 @@ public sealed class ProductsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> CreateAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -88,7 +88,7 @@ public sealed class ProductsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(ProductEditViewModel input)
+    public async Task<IActionResult> CreateAsync(ProductEditViewModel input)
     {
         input.Owners = NormalizeSelections(input.Owners);
         input.LifecycleStatus = NormalizeSelection(input.LifecycleStatus);
@@ -122,10 +122,10 @@ public sealed class ProductsController(
             product.Id,
             $"Created product {product.Name}.");
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> Details(int id)
+    public async Task<IActionResult> DetailsAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -159,7 +159,7 @@ public sealed class ProductsController(
         return View(model);
     }
 
-    public async Task<IActionResult> Visualize(int id)
+    public async Task<IActionResult> VisualizeAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -187,7 +187,7 @@ public sealed class ProductsController(
         return View(BuildProductVisualizationModel(product));
     }
 
-    public async Task<IActionResult> ShowDependencies(int id)
+    public async Task<IActionResult> ShowDependenciesAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -249,7 +249,7 @@ public sealed class ProductsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Edit(int id)
+    public async Task<IActionResult> EditAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -273,7 +273,7 @@ public sealed class ProductsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, ProductEditViewModel input)
+    public async Task<IActionResult> EditAsync(int id, ProductEditViewModel input)
     {
         var product = await dbContext.ProductCatalogItems
             .Include(x => x.Owners)
@@ -309,11 +309,11 @@ public sealed class ProductsController(
             nameof(ProductCatalogItem),
             product.Id,
             $"Updated product {product.Name}.");
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> BulkEdit(int[]? selectedIds, string? returnSearch = null, string[]? returnOwners = null, string? returnLifecycleStatus = null)
+    public async Task<IActionResult> BulkEditAsync(int[]? selectedIds, string? returnSearch = null, string[]? returnOwners = null, string? returnLifecycleStatus = null)
     {
         if (!ModelState.IsValid)
         {
@@ -351,7 +351,7 @@ public sealed class ProductsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> BulkEdit(ProductBulkEditViewModel input)
+    public async Task<IActionResult> BulkEditAsync(ProductBulkEditViewModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -446,7 +446,7 @@ public sealed class ProductsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -464,9 +464,9 @@ public sealed class ProductsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    [HttpPost, ActionName(nameof(Delete))]
+    [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -493,11 +493,11 @@ public sealed class ProductsController(
             $"Moved product {product.Name} to trash.",
             product.DeletedReason);
         TempData["ProductsStatusMessage"] = $"Moved product {product.Name} to trash.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> Restore()
+    public async Task<IActionResult> RestoreAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -523,7 +523,7 @@ public sealed class ProductsController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RestoreDeleted(int id)
+    public async Task<IActionResult> RestoreDeletedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -550,13 +550,13 @@ public sealed class ProductsController(
             $"Restored product {product.Name} from trash.");
 
         TempData["ProductsStatusMessage"] = $"Restored product {product.Name}.";
-        return RedirectToAction(nameof(Restore));
+        return RedirectToAction("Restore");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PermanentDelete(int id)
+    public async Task<IActionResult> PermanentDeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -587,7 +587,7 @@ public sealed class ProductsController(
             $"Permanently deleted product {product.Name}.");
 
         TempData["ProductsStatusMessage"] = $"Permanently deleted product {product.Name}.";
-        return RedirectToAction(nameof(Restore));
+        return RedirectToAction("Restore");
     }
 
     private async Task PopulateFormOptionsAsync(ProductEditViewModel model)

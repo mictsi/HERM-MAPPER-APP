@@ -22,13 +22,13 @@ public sealed class ServicesControllerTests
     };
 
     [Fact]
-    public async Task CreatePostPersistsServiceNormalizesSelectionsAndWritesAudit()
+    public async Task CreatePostPersistsServiceNormalizesSelectionsAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
         using var controller = fixture.CreateController();
 
-        var result = await controller.Create(new ServiceEditViewModel
+        var result = await controller.CreateAsync(new ServiceEditViewModel
         {
             Name = "Security Operations",
             Description = "SOC tooling",
@@ -38,7 +38,7 @@ public sealed class ServicesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
+        Assert.Equal("Connections", redirect.ActionName);
 
         var service = await fixture.DbContext.ServiceCatalogItems.SingleAsync();
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
@@ -52,13 +52,13 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task CreateGetPopulatesOwnerAndLifecycleOptions()
+    public async Task CreateGetPopulatesOwnerAndLifecycleOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create();
+        var result = await controller.CreateAsync();
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceEditViewModel>(view.Model);
@@ -69,14 +69,14 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task CreatePostInvalidModelReturnsViewWithOptions()
+    public async Task CreatePostInvalidModelReturnsViewWithOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError(nameof(ServiceEditViewModel.Name), "Required");
-        var result = await controller.Create(new ServiceEditViewModel
+        var result = await controller.CreateAsync(new ServiceEditViewModel
         {
             Name = string.Empty,
             Owner = "Team Blue",
@@ -90,23 +90,23 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task EditGetReturnsNotFoundWhenServiceMissing()
+    public async Task EditGetReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(999);
+        var result = await controller.EditAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task EditPostReturnsNotFoundWhenServiceMissing()
+    public async Task EditPostReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(999, new ServiceEditViewModel
+        var result = await controller.EditAsync(999, new ServiceEditViewModel
         {
             Name = "Missing",
             Owner = "Team Blue",
@@ -117,7 +117,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task EditPostInvalidModelReturnsViewWithOptions()
+    public async Task EditPostInvalidModelReturnsViewWithOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -132,7 +132,7 @@ public sealed class ServicesControllerTests
 
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError(nameof(ServiceEditViewModel.Name), "Required");
-        var result = await controller.Edit(serviceId, new ServiceEditViewModel
+        var result = await controller.EditAsync(serviceId, new ServiceEditViewModel
         {
             Name = string.Empty,
             Owner = "Team Blue",
@@ -147,7 +147,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task EditGetReturnsExistingServiceView()
+    public async Task EditGetReturnsExistingServiceViewAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -161,7 +161,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(serviceId);
+        var result = await controller.EditAsync(serviceId);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceEditViewModel>(view.Model);
@@ -169,7 +169,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostPersistsBranchingGraphAndWritesAudit()
+    public async Task ConnectionsPostPersistsBranchingGraphAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -204,13 +204,13 @@ public sealed class ServicesControllerTests
             },
             TestJsonSerializerOptions);
 
-        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        var result = await controller.ConnectionsAsync(serviceId, new ServiceConnectionEditorViewModel
         {
             CanvasStateJson = canvasStateJson
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
+        Assert.Equal("Connections", redirect.ActionName);
 
         var service = await fixture.DbContext.ServiceCatalogItems
             .Include(x => x.ProductLinks)
@@ -234,7 +234,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostUsesRouteServiceIdWhenBoundServiceIdIsMissing()
+    public async Task ConnectionsPostUsesRouteServiceIdWhenBoundServiceIdIsMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -267,13 +267,13 @@ public sealed class ServicesControllerTests
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError(nameof(ServiceConnectionEditorViewModel.ServiceId), "The ServiceId field is required.");
 
-        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        var result = await controller.ConnectionsAsync(serviceId, new ServiceConnectionEditorViewModel
         {
             CanvasStateJson = canvasStateJson
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
+        Assert.Equal("Connections", redirect.ActionName);
         Assert.Equal(serviceId, redirect.RouteValues!["id"]);
 
         var service = await fixture.DbContext.ServiceCatalogItems
@@ -288,7 +288,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task EditPostUpdatesServiceMetadataAndWritesAudit()
+    public async Task EditPostUpdatesServiceMetadataAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -305,7 +305,7 @@ public sealed class ServicesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(service.Id, new ServiceEditViewModel
+        var result = await controller.EditAsync(service.Id, new ServiceEditViewModel
         {
             Name = "Payments Revised",
             Description = "Updated flow",
@@ -315,7 +315,7 @@ public sealed class ServicesControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
+        Assert.Equal("Connections", redirect.ActionName);
 
         var updatedService = await fixture.DbContext.ServiceCatalogItems.SingleAsync(x => x.Id == service.Id);
         var audit = await fixture.DbContext.AuditLogEntries.SingleAsync();
@@ -328,7 +328,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsGetBuildsRowsFromLegacyLinearFlow()
+    public async Task ConnectionsGetBuildsRowsFromLegacyLinearFlowAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -349,7 +349,7 @@ public sealed class ServicesControllerTests
 
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
         using var connectionsController = fixture.CreateController();
-        var result = await connectionsController.Connections(serviceId);
+        var result = await connectionsController.ConnectionsAsync(serviceId);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceConnectionEditorViewModel>(view.Model);
@@ -370,7 +370,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsGetBuildsRowsFromStoredGraphConnections()
+    public async Task ConnectionsGetBuildsRowsFromStoredGraphConnectionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -390,7 +390,7 @@ public sealed class ServicesControllerTests
 
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(serviceId);
+        var result = await controller.ConnectionsAsync(serviceId);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceConnectionEditorViewModel>(view.Model);
@@ -410,18 +410,18 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsGetReturnsNotFoundWhenServiceMissing()
+    public async Task ConnectionsGetReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(999);
+        var result = await controller.ConnectionsAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task ConnectionsGetReturnsStatusMessageFromTempData()
+    public async Task ConnectionsGetReturnsStatusMessageFromTempDataAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
@@ -435,7 +435,7 @@ public sealed class ServicesControllerTests
 
         using var controller = fixture.CreateController();
         controller.TempData["ServicesStatusMessage"] = "Saved";
-        var result = await controller.Connections(serviceId);
+        var result = await controller.ConnectionsAsync(serviceId);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceConnectionEditorViewModel>(view.Model);
@@ -443,7 +443,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostRejectsUnreadableCanvasState()
+    public async Task ConnectionsPostRejectsUnreadableCanvasStateAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
@@ -456,7 +456,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        var result = await controller.ConnectionsAsync(serviceId, new ServiceConnectionEditorViewModel
         {
             CanvasStateJson = "{not-json"
         });
@@ -468,7 +468,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostRejectsNullCanvasStatePayload()
+    public async Task ConnectionsPostRejectsNullCanvasStatePayloadAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
@@ -481,7 +481,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        var result = await controller.ConnectionsAsync(serviceId, new ServiceConnectionEditorViewModel
         {
             CanvasStateJson = "null"
         });
@@ -493,7 +493,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostRejectsInvalidConnectionRows()
+    public async Task ConnectionsPostRejectsInvalidConnectionRowsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var products = await fixture.SeedProductsAsync("Portal", "API");
@@ -507,7 +507,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        var result = await controller.ConnectionsAsync(serviceId, new ServiceConnectionEditorViewModel
         {
             ConnectionRows =
             [
@@ -524,7 +524,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostUpdatesExistingConnectionsAndRemovesExtras()
+    public async Task ConnectionsPostUpdatesExistingConnectionsAndRemovesExtrasAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var products = await fixture.SeedProductsAsync("Portal", "API", "Queue");
@@ -549,13 +549,13 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        var result = await controller.ConnectionsAsync(serviceId, new ServiceConnectionEditorViewModel
         {
             ConnectionRows = [new ServiceConnectionRowInputViewModel { FromProductId = products[2].Id, ToProductId = products[0].Id }]
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Connections), redirect.ActionName);
+        Assert.Equal("Connections", redirect.ActionName);
 
         var service = await fixture.DbContext.ServiceCatalogItems
             .Include(x => x.ProductConnections.OrderBy(connection => connection.SortOrder))
@@ -569,7 +569,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostAddsNewConnectionsAndProductLinks()
+    public async Task ConnectionsPostAddsNewConnectionsAndProductLinksAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var products = await fixture.SeedProductsAsync("Portal", "API", "Queue");
@@ -592,7 +592,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        var result = await controller.ConnectionsAsync(serviceId, new ServiceConnectionEditorViewModel
         {
             ConnectionRows =
             [
@@ -611,7 +611,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostRejectsIncompleteConnectionRow()
+    public async Task ConnectionsPostRejectsIncompleteConnectionRowAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var products = await fixture.SeedProductsAsync("Portal", "API");
@@ -625,7 +625,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(serviceId, new ServiceConnectionEditorViewModel
+        var result = await controller.ConnectionsAsync(serviceId, new ServiceConnectionEditorViewModel
         {
             ConnectionRows = [new ServiceConnectionRowInputViewModel { FromProductId = products[0].Id }]
         });
@@ -635,18 +635,18 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task ConnectionsPostReturnsNotFoundWhenServiceMissing()
+    public async Task ConnectionsPostReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Connections(999, new ServiceConnectionEditorViewModel());
+        var result = await controller.ConnectionsAsync(999, new ServiceConnectionEditorViewModel());
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task IndexFiltersBySearchOwnerAndLifecycleStatus()
+    public async Task IndexFiltersBySearchOwnerAndLifecycleStatusAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -678,7 +678,7 @@ public sealed class ServicesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var indexController = fixture.CreateController();
-        var result = await indexController.Index("gateway", "Team Blue", "Production", ServiceSortOptions.NameDesc);
+        var result = await indexController.IndexAsync("gateway", "Team Blue", "Production", ServiceSortOptions.NameDesc);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServicesIndexViewModel>(view.Model);
@@ -691,7 +691,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task IndexSortsByProductCountDescending()
+    public async Task IndexSortsByProductCountDescendingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -722,7 +722,7 @@ public sealed class ServicesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Index(null, null, null, ServiceSortOptions.ProductCountDesc);
+        var result = await controller.IndexAsync(null, null, null, ServiceSortOptions.ProductCountDesc);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServicesIndexViewModel>(view.Model);
@@ -730,7 +730,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task IndexExcludesDeletedServices()
+    public async Task IndexExcludesDeletedServicesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -754,7 +754,7 @@ public sealed class ServicesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var deletedIndexController = fixture.CreateController();
-        var result = await deletedIndexController.Index(null, null, null, null);
+        var result = await deletedIndexController.IndexAsync(null, null, null, null);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServicesIndexViewModel>(view.Model);
@@ -762,7 +762,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task IndexBuildsPreviewForMoreThanThreeProducts()
+    public async Task IndexBuildsPreviewForMoreThanThreeProductsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedConfigurableOptionsAsync();
@@ -783,7 +783,7 @@ public sealed class ServicesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Index(null, null, null, ServiceSortOptions.UpdatedAsc);
+        var result = await controller.IndexAsync(null, null, null, ServiceSortOptions.UpdatedAsc);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServicesIndexViewModel>(view.Model);
@@ -791,7 +791,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task VisualizeReturnsGraphConnectionsInSavedOrder()
+    public async Task VisualizeReturnsGraphConnectionsInSavedOrderAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -820,7 +820,7 @@ public sealed class ServicesControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var visualizeController = fixture.CreateController();
-        var result = await visualizeController.Visualize(service.Id);
+        var result = await visualizeController.VisualizeAsync(service.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceVisualizationViewModel>(view.Model);
@@ -837,18 +837,18 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task VisualizeReturnsNotFoundWhenServiceMissing()
+    public async Task VisualizeReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Visualize(999);
+        var result = await controller.VisualizeAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task VisualizeBuildsLegacyConnectionsWhenGraphConnectionsAbsent()
+    public async Task VisualizeBuildsLegacyConnectionsWhenGraphConnectionsAbsentAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var products = await fixture.SeedProductsAsync("Portal", "API", "Queue");
@@ -868,7 +868,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Visualize(serviceId);
+        var result = await controller.VisualizeAsync(serviceId);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceVisualizationViewModel>(view.Model);
@@ -879,7 +879,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task VisualizeDisablesGraphLayoutForCyclicConnections()
+    public async Task VisualizeDisablesGraphLayoutForCyclicConnectionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var products = await fixture.SeedProductsAsync("Portal", "API");
@@ -903,7 +903,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Visualize(serviceId);
+        var result = await controller.VisualizeAsync(serviceId);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceVisualizationViewModel>(view.Model);
@@ -912,7 +912,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task DeleteGetReturnsViewForExistingService()
+    public async Task DeleteGetReturnsViewForExistingServiceAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
@@ -925,7 +925,7 @@ public sealed class ServicesControllerTests
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Delete(serviceId);
+        var result = await controller.DeleteAsync(serviceId);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceCatalogItem>(view.Model);
@@ -933,18 +933,18 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task DeleteGetReturnsNotFoundWhenServiceMissing()
+    public async Task DeleteGetReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Delete(999);
+        var result = await controller.DeleteAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task RestoreGetReturnsDeletedServicesAndStatusMessage()
+    public async Task RestoreGetReturnsDeletedServicesAndStatusMessageAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ServiceCatalogItems.Add(new ServiceCatalogItem
@@ -960,7 +960,7 @@ public sealed class ServicesControllerTests
 
         using var controller = fixture.CreateController();
         controller.TempData["ServicesStatusMessage"] = "Restored";
-        var result = await controller.Restore();
+        var result = await controller.RestoreAsync();
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ServiceRestoreViewModel>(view.Model);
@@ -969,29 +969,29 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task RestoreDeletedReturnsNotFoundWhenServiceMissing()
+    public async Task RestoreDeletedReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.RestoreDeleted(999);
+        var result = await controller.RestoreDeletedAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task PermanentDeleteReturnsNotFoundWhenServiceMissing()
+    public async Task PermanentDeleteReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.PermanentDelete(999);
+        var result = await controller.PermanentDeleteAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task DeleteConfirmedSoftDeletesServiceAndWritesAudit()
+    public async Task DeleteConfirmedSoftDeletesServiceAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -1005,10 +1005,10 @@ public sealed class ServicesControllerTests
 
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
         using var deleteController = fixture.CreateController();
-        var result = await deleteController.DeleteConfirmed(serviceId);
+        var result = await deleteController.DeleteConfirmedAsync(serviceId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         var deletedService = await fixture.DbContext.ServiceCatalogItems.SingleAsync();
         Assert.True(deletedService.IsDeleted);
         Assert.NotNull(deletedService.DeletedUtc);
@@ -1017,18 +1017,18 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task DeleteConfirmedReturnsNotFoundWhenServiceMissing()
+    public async Task DeleteConfirmedReturnsNotFoundWhenServiceMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.DeleteConfirmed(999);
+        var result = await controller.DeleteConfirmedAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task RestoreDeletedClearsSoftDeleteStateAndWritesAudit()
+    public async Task RestoreDeletedClearsSoftDeleteStateAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -1045,10 +1045,10 @@ public sealed class ServicesControllerTests
 
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
         using var restoreController = fixture.CreateController();
-        var result = await restoreController.RestoreDeleted(serviceId);
+        var result = await restoreController.RestoreDeletedAsync(serviceId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Restore), redirect.ActionName);
+        Assert.Equal("Restore", redirect.ActionName);
 
         var restoredService = await fixture.DbContext.ServiceCatalogItems.SingleAsync();
         Assert.False(restoredService.IsDeleted);
@@ -1058,7 +1058,7 @@ public sealed class ServicesControllerTests
     }
 
     [Fact]
-    public async Task PermanentDeleteRemovesDeletedServiceAndWritesAudit()
+    public async Task PermanentDeleteRemovesDeletedServiceAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -1075,10 +1075,10 @@ public sealed class ServicesControllerTests
 
         var serviceId = await fixture.DbContext.ServiceCatalogItems.Select(x => x.Id).SingleAsync();
         using var permanentDeleteController = fixture.CreateController();
-        var result = await permanentDeleteController.PermanentDelete(serviceId);
+        var result = await permanentDeleteController.PermanentDeleteAsync(serviceId);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(ServicesController.Restore), redirect.ActionName);
+        Assert.Equal("Restore", redirect.ActionName);
         Assert.Empty(await fixture.DbContext.ServiceCatalogItems.ToListAsync());
         Assert.Equal("PermanentDelete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }

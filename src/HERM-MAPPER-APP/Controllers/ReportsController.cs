@@ -63,7 +63,7 @@ public sealed class ReportsController(
         new("updatedUtc", "Updated UTC")
     ];
 
-    public Task<IActionResult> Index(string? lifecycleOwner = null, int? brmModelId = null, bool showBrmModelReport = false)
+    public Task<IActionResult> IndexAsync(string? lifecycleOwner = null, int? brmModelId = null, bool showBrmModelReport = false)
     {
         if (!ModelState.IsValid)
         {
@@ -72,84 +72,84 @@ public sealed class ReportsController(
 
         if (showBrmModelReport || brmModelId.HasValue)
         {
-            return Task.FromResult<IActionResult>(RedirectToAction(nameof(BrmModelReport), new { brmModelId }));
+            return Task.FromResult<IActionResult>(RedirectToAction("BrmModelReport", new { brmModelId }));
         }
 
         if (!string.IsNullOrWhiteSpace(lifecycleOwner))
         {
-            return Task.FromResult<IActionResult>(RedirectToAction(nameof(LifecycleStatusReport), new { lifecycleOwner }));
+            return Task.FromResult<IActionResult>(RedirectToAction("LifecycleStatusReport", new { lifecycleOwner }));
         }
 
-        return Task.FromResult<IActionResult>(RedirectToAction(nameof(TrmModelReport)));
+        return Task.FromResult<IActionResult>(RedirectToAction("TrmModelReport"));
     }
 
-    public async Task<IActionResult> TrmModelReport()
-        => View(nameof(TrmModelReport), await BuildReportsViewModelAsync());
+    public async Task<IActionResult> TrmModelReportAsync()
+        => View("TrmModelReport", await BuildReportsViewModelAsync());
 
-    public async Task<IActionResult> ArmModelReport()
-        => View(nameof(ArmModelReport), await BuildReportsViewModelAsync());
+    public async Task<IActionResult> ArmModelReportAsync()
+        => View("ArmModelReport", await BuildReportsViewModelAsync());
 
-    public async Task<IActionResult> TrmServiceDiagramReport(int? serviceId = null)
+    public async Task<IActionResult> TrmServiceDiagramReportAsync(int? serviceId = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        return View(nameof(TrmServiceDiagramReport), await BuildReportsViewModelAsync(serviceId: serviceId));
+        return View("TrmServiceDiagramReport", await BuildReportsViewModelAsync(serviceId: serviceId));
     }
 
-    public async Task<IActionResult> ArmApplicationDiagramReport(int? applicationId = null)
+    public async Task<IActionResult> ArmApplicationDiagramReportAsync(int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        return View(nameof(ArmApplicationDiagramReport), await BuildReportsViewModelAsync(applicationId: applicationId));
+        return View("ArmApplicationDiagramReport", await BuildReportsViewModelAsync(applicationId: applicationId));
     }
 
-    public async Task<IActionResult> BrmModelReport(int? brmModelId = null)
+    public async Task<IActionResult> BrmModelReportAsync(int? brmModelId = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        return View(nameof(BrmModelReport), await BuildReportsViewModelAsync(brmModelId: brmModelId));
+        return View("BrmModelReport", await BuildReportsViewModelAsync(brmModelId: brmModelId));
     }
 
-    public async Task<IActionResult> MappingByOwnerReport()
-        => View(nameof(MappingByOwnerReport), await BuildReportsViewModelAsync());
+    public async Task<IActionResult> MappingByOwnerReportAsync()
+        => View("MappingByOwnerReport", await BuildReportsViewModelAsync());
 
-    public async Task<IActionResult> SankeyReport()
-        => View(nameof(SankeyReport), await BuildReportsViewModelAsync());
+    public async Task<IActionResult> SankeyReportAsync()
+        => View("SankeyReport", await BuildReportsViewModelAsync());
 
-    public async Task<IActionResult> IncomingConnectionsHeatmapReport()
-        => View(nameof(IncomingConnectionsHeatmapReport), await BuildReportsViewModelAsync());
+    public async Task<IActionResult> IncomingConnectionsHeatmapReportAsync()
+        => View("IncomingConnectionsHeatmapReport", await BuildReportsViewModelAsync());
 
-    public async Task<IActionResult> IncomingConnectionsReport()
-        => View(nameof(IncomingConnectionsReport), await BuildReportsViewModelAsync());
+    public async Task<IActionResult> IncomingConnectionsReportAsync()
+        => View("IncomingConnectionsReport", await BuildReportsViewModelAsync());
 
-    public async Task<IActionResult> LifecycleStatusReport(string? lifecycleOwner = null)
+    public async Task<IActionResult> LifecycleStatusReportAsync(string? lifecycleOwner = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        return View(nameof(LifecycleStatusReport), await BuildReportsViewModelAsync(lifecycleOwner: lifecycleOwner));
+        return View("LifecycleStatusReport", await BuildReportsViewModelAsync(lifecycleOwner: lifecycleOwner));
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> ExportData()
+    public async Task<IActionResult> ExportDataAsync()
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        return View(nameof(ExportData), await BuildExportDataViewModelAsync());
+        return View("ExportData", await BuildExportDataViewModelAsync());
     }
 
     private async Task<ReportsViewModel> BuildReportsViewModelAsync(
@@ -279,7 +279,7 @@ public sealed class ReportsController(
         return model;
     }
 
-    public async Task<IActionResult> ModelDiagram(string? scope = null, int? brmModelId = null, int? serviceId = null, int? applicationId = null)
+    public async Task<IActionResult> ModelDiagramAsync(string? scope = null, int? brmModelId = null, int? serviceId = null, int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
@@ -292,7 +292,7 @@ public sealed class ReportsController(
         return View("ModelDiagram", model);
     }
 
-    public async Task<FileContentResult> DownloadModelDiagramSvg(string? scope = null, int? brmModelId = null, int? serviceId = null, int? applicationId = null)
+    public async Task<FileContentResult> DownloadModelDiagramSvgAsync(string? scope = null, int? brmModelId = null, int? serviceId = null, int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
@@ -305,18 +305,18 @@ public sealed class ReportsController(
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> ExportMappingsCsv()
+    public async Task<IActionResult> ExportMappingsCsvAsync()
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        return await DownloadExport(ExportDataset.CompletedMappings, ExportFileFormat.Csv);
+        return await DownloadExportAsync(ExportDataset.CompletedMappings, ExportFileFormat.Csv);
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> DownloadExport(ExportDataset dataset, ExportFileFormat format)
+    public async Task<IActionResult> DownloadExportAsync(ExportDataset dataset, ExportFileFormat format)
     {
         if (!ModelState.IsValid)
         {

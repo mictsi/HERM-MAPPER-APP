@@ -26,7 +26,7 @@ public sealed class ConfigurationController(
     private const string CatalogueImportSectionKey = "catalogue-import";
     private const string ProductImportSectionKey = "product-import";
 
-    public async Task<IActionResult> Index(string? expandedFieldName = null, string? openSection = null)
+    public async Task<IActionResult> IndexAsync(string? expandedFieldName = null, string? openSection = null)
     {
         if (!ModelState.IsValid)
         {
@@ -38,7 +38,7 @@ public sealed class ConfigurationController(
             openRemoteSqlImportSection: string.Equals(openSection, RemoteSqlImportService.SectionKey, StringComparison.OrdinalIgnoreCase)));
     }
 
-    public async Task<IActionResult> ImportData(string? openSection = null)
+    public async Task<IActionResult> ImportDataAsync(string? openSection = null)
     {
         if (!ModelState.IsValid)
         {
@@ -51,7 +51,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerifyCatalogueImport(IFormFile? workbook, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
+    public async Task<IActionResult> VerifyCatalogueImportAsync(IFormFile? workbook, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
@@ -60,7 +60,7 @@ public sealed class ConfigurationController(
 
         if (workbook is null || workbook.Length == 0)
         {
-            return View(nameof(ImportData), await BuildViewModelAsync(
+            return View("ImportData", await BuildViewModelAsync(
                 catalogueImportReview: BuildCatalogueErrorReview("Choose an .xlsx workbook before verifying the import.", modelKind: modelKind),
                 catalogueImportModelKind: modelKind,
                 errorSectionKey: CatalogueImportSectionKey));
@@ -68,7 +68,7 @@ public sealed class ConfigurationController(
 
         if (!string.Equals(Path.GetExtension(workbook.FileName), ".xlsx", StringComparison.OrdinalIgnoreCase))
         {
-            return View(nameof(ImportData), await BuildViewModelAsync(
+            return View("ImportData", await BuildViewModelAsync(
                 catalogueImportReview: BuildCatalogueErrorReview("Only Excel .xlsx workbooks are supported.", workbook.FileName, modelKind),
                 catalogueImportModelKind: modelKind,
                 errorSectionKey: CatalogueImportSectionKey));
@@ -96,7 +96,7 @@ public sealed class ConfigurationController(
             $"Verified workbook {workbook.FileName}.",
             verification.IsValid ? "Verification passed." : string.Join(" | ", verification.Errors));
 
-        return View(nameof(ImportData), await BuildViewModelAsync(
+        return View("ImportData", await BuildViewModelAsync(
             catalogueImportModelKind: modelKind,
             catalogueImportReview: new WorkbookImportReviewViewModel
             {
@@ -109,7 +109,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ImportVerifiedCatalogue(string pendingImportToken, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
+    public async Task<IActionResult> ImportVerifiedCatalogueAsync(string pendingImportToken, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
@@ -135,7 +135,7 @@ public sealed class ConfigurationController(
         if (!verification.IsValid)
         {
             System.IO.File.Delete(pendingPath);
-            return View(nameof(ImportData), await BuildViewModelAsync(
+            return View("ImportData", await BuildViewModelAsync(
                 catalogueImportModelKind: modelKind,
                 catalogueImportReview: new WorkbookImportReviewViewModel
                 {
@@ -166,7 +166,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AbortCatalogueImport(string pendingImportToken, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
+    public async Task<IActionResult> AbortCatalogueImportAsync(string pendingImportToken, ReferenceModelKind modelKind = ReferenceModelKind.Trm)
     {
         if (!ModelState.IsValid)
         {
@@ -186,7 +186,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerifyProductImport(IFormFile? csvFile)
+    public async Task<IActionResult> VerifyProductImportAsync(IFormFile? csvFile)
     {
         if (!ModelState.IsValid)
         {
@@ -195,14 +195,14 @@ public sealed class ConfigurationController(
 
         if (csvFile is null || csvFile.Length == 0)
         {
-            return View(nameof(ImportData), await BuildViewModelAsync(
+            return View("ImportData", await BuildViewModelAsync(
                 productImportReview: BuildProductErrorReview("Choose a CSV file before verifying the import."),
                 errorSectionKey: ProductImportSectionKey));
         }
 
         if (!string.Equals(Path.GetExtension(csvFile.FileName), ".csv", StringComparison.OrdinalIgnoreCase))
         {
-            return View(nameof(ImportData), await BuildViewModelAsync(
+            return View("ImportData", await BuildViewModelAsync(
                 productImportReview: BuildProductErrorReview("Only .csv files are supported for product import.", csvFile.FileName),
                 errorSectionKey: ProductImportSectionKey));
         }
@@ -229,7 +229,7 @@ public sealed class ConfigurationController(
             $"Verified product import CSV {csvFile.FileName}.",
             verification.IsValid ? $"Rows read: {verification.RowsRead}." : string.Join(" | ", verification.Errors));
 
-        return View(nameof(ImportData), await BuildViewModelAsync(
+        return View("ImportData", await BuildViewModelAsync(
             productImportReview: new ProductImportReviewViewModel
             {
                 PendingImportToken = verification.IsValid ? pendingImportToken : null,
@@ -240,7 +240,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ImportVerifiedProducts(string pendingImportToken)
+    public async Task<IActionResult> ImportVerifiedProductsAsync(string pendingImportToken)
     {
         if (!ModelState.IsValid)
         {
@@ -266,7 +266,7 @@ public sealed class ConfigurationController(
         if (!verification.IsValid)
         {
             System.IO.File.Delete(pendingPath);
-            return View(nameof(ImportData), await BuildViewModelAsync(
+            return View("ImportData", await BuildViewModelAsync(
                 productImportReview: new ProductImportReviewViewModel
                 {
                     Verification = verification
@@ -294,7 +294,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AbortProductImport(string pendingImportToken)
+    public async Task<IActionResult> AbortProductImportAsync(string pendingImportToken)
     {
         if (!ModelState.IsValid)
         {
@@ -314,7 +314,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AddOption(AddConfigurationOptionInputModel input)
+    public async Task<IActionResult> AddOptionAsync(AddConfigurationOptionInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -375,7 +375,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateOptionOrder(UpdateConfigurationOptionOrderInputModel input)
+    public async Task<IActionResult> UpdateOptionOrderAsync(UpdateConfigurationOptionOrderInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -421,7 +421,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateOption(UpdateConfigurationOptionValueInputModel input)
+    public async Task<IActionResult> UpdateOptionAsync(UpdateConfigurationOptionValueInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -473,7 +473,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ReorderOptions(ReorderConfigurationOptionsInputModel input)
+    public async Task<IActionResult> ReorderOptionsAsync(ReorderConfigurationOptionsInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -535,7 +535,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteOption(int id)
+    public async Task<IActionResult> DeleteOptionAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -565,7 +565,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateDisplayTimeZone(UpdateDisplayTimeZoneInputModel input)
+    public async Task<IActionResult> UpdateDisplayTimeZoneAsync(UpdateDisplayTimeZoneInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -578,7 +578,7 @@ public sealed class ConfigurationController(
         {
             TempData["ConfigurationError"] = "Choose a time zone before saving.";
             TempData["ConfigurationErrorSection"] = DisplayTimeZoneSectionKey;
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         try
@@ -589,13 +589,13 @@ public sealed class ConfigurationController(
         {
             TempData["ConfigurationError"] = $"The time zone '{input.TimeZoneId}' is not available on this server.";
             TempData["ConfigurationErrorSection"] = DisplayTimeZoneSectionKey;
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
         catch (InvalidTimeZoneException)
         {
             TempData["ConfigurationError"] = $"The time zone '{input.TimeZoneId}' is invalid on this server.";
             TempData["ConfigurationErrorSection"] = DisplayTimeZoneSectionKey;
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("Index");
         }
 
         await appSettingsService.SetValueAsync(AppSettingKeys.DisplayTimeZone, input.TimeZoneId);
@@ -607,12 +607,12 @@ public sealed class ConfigurationController(
             $"Updated display time zone to '{input.TimeZoneId}'.");
 
         TempData["ConfigurationStatusMessage"] = $"Display time zone updated to '{input.TimeZoneId}'.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveRemoteSqlImportConfiguration(RemoteSqlImportInputModel input)
+    public async Task<IActionResult> SaveRemoteSqlImportConfigurationAsync(RemoteSqlImportInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -624,7 +624,7 @@ public sealed class ConfigurationController(
 
         if (!result.IsSuccess)
         {
-            return View(nameof(ImportData), await BuildViewModelAsync(
+            return View("ImportData", await BuildViewModelAsync(
                 errorMessage: result.Message,
                 errorSectionKey: RemoteSqlImportService.SectionKey,
                 remoteSqlInput: normalizedInput,
@@ -647,7 +647,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> TestRemoteSqlImportConnection(RemoteSqlImportInputModel input)
+    public async Task<IActionResult> TestRemoteSqlImportConnectionAsync(RemoteSqlImportInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -668,7 +668,7 @@ public sealed class ConfigurationController(
             Warnings = result.Warnings
         };
 
-        return View(nameof(ImportData), await BuildViewModelAsync(
+        return View("ImportData", await BuildViewModelAsync(
             statusMessage: result.IsSuccess ? result.Message : null,
             errorMessage: result.IsSuccess ? null : result.Message,
             errorSectionKey: result.IsSuccess ? null : RemoteSqlImportService.SectionKey,
@@ -679,7 +679,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RunRemoteSqlImportNow()
+    public async Task<IActionResult> RunRemoteSqlImportNowAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -702,7 +702,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SetRemoteSqlImportEnabled(bool isEnabled)
+    public async Task<IActionResult> SetRemoteSqlImportEnabledAsync(bool isEnabled)
     {
         if (!ModelState.IsValid)
         {
@@ -715,7 +715,7 @@ public sealed class ConfigurationController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ClearRemoteSqlImportConfiguration()
+    public async Task<IActionResult> ClearRemoteSqlImportConfigurationAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -935,23 +935,23 @@ public sealed class ConfigurationController(
 
         if (ConfigurableFieldNames.IsSupported(normalizedExpandedFieldName) && !string.IsNullOrWhiteSpace(normalizedOpenSection))
         {
-            return RedirectToAction(nameof(Index), new { expandedFieldName = normalizedExpandedFieldName, openSection = normalizedOpenSection });
+            return RedirectToAction("Index", new { expandedFieldName = normalizedExpandedFieldName, openSection = normalizedOpenSection });
         }
 
         if (ConfigurableFieldNames.IsSupported(normalizedExpandedFieldName))
         {
-            return RedirectToAction(nameof(Index), new { expandedFieldName = normalizedExpandedFieldName });
+            return RedirectToAction("Index", new { expandedFieldName = normalizedExpandedFieldName });
         }
 
         return string.IsNullOrWhiteSpace(normalizedOpenSection)
-            ? RedirectToAction(nameof(Index))
-            : RedirectToAction(nameof(Index), new { openSection = normalizedOpenSection });
+            ? RedirectToAction("Index")
+            : RedirectToAction("Index", new { openSection = normalizedOpenSection });
     }
 
     private RedirectToActionResult RedirectToImportData(string? openSection = null) =>
         string.IsNullOrWhiteSpace(openSection)
-            ? RedirectToAction(nameof(ImportData))
-            : RedirectToAction(nameof(ImportData), new { openSection = NormalizeSectionKey(openSection) });
+            ? RedirectToAction("ImportData")
+            : RedirectToAction("ImportData", new { openSection = NormalizeSectionKey(openSection) });
 
     private static string? NormalizeExpandedFieldName(string? expandedFieldName) =>
         string.IsNullOrWhiteSpace(expandedFieldName)

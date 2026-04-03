@@ -11,7 +11,7 @@ namespace HERMMapperApp.Tests;
 public sealed class ProgramHostIntegrationTests
 {
     [Fact]
-    public async Task ApplicationStartupRedirectsAnonymousRootRequestToLogin()
+    public async Task ApplicationStartupRedirectsAnonymousRootRequestToLoginAsync()
     {
         using var factory = new HermAppFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -27,7 +27,7 @@ public sealed class ProgramHostIntegrationTests
     }
 
     [Fact]
-    public async Task ApplicationStartupServesLoginPage()
+    public async Task ApplicationStartupServesLoginPageAsync()
     {
         using var factory = new HermAppFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -43,7 +43,7 @@ public sealed class ProgramHostIntegrationTests
     }
 
     [Fact]
-    public async Task ApplicationStartupServesHealthEndpointWithoutAuthentication()
+    public async Task ApplicationStartupServesHealthEndpointWithoutAuthenticationAsync()
     {
         using var factory = new HermAppFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -59,7 +59,7 @@ public sealed class ProgramHostIntegrationTests
     }
 
     [Fact]
-    public async Task ApplicationStartupCachesHealthEndpointForSixtySeconds()
+    public async Task ApplicationStartupCachesHealthEndpointForSixtySecondsAsync()
     {
         using var factory = new HermAppFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions

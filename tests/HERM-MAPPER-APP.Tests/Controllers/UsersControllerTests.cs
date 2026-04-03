@@ -15,12 +15,12 @@ namespace HERMMapperApp.Tests.Controllers;
 public sealed class UsersControllerTests
 {
     [Fact]
-    public async Task CreatePersistsUserWithRoleAndHashedPassword()
+    public async Task CreatePersistsUserWithRoleAndHashedPasswordAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateController();
 
-        var result = await controller.Create(new UserEditViewModel
+        var result = await controller.CreateAsync(new UserEditViewModel
         {
             GivenName = "Ada",
             LastName = "Lovelace",
@@ -45,19 +45,19 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task IndexReturnsBadRequestWhenModelStateInvalid()
+    public async Task IndexReturnsBadRequestWhenModelStateInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         using var controller = fixture.CreateController();
         controller.ModelState.AddModelError("search", "Invalid");
 
-        var result = await controller.Index("ada");
+        var result = await controller.IndexAsync("ada");
 
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
-    public async Task ResetPasswordUpdatesStoredHash()
+    public async Task ResetPasswordUpdatesStoredHashAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(new AppUser
@@ -74,7 +74,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync();
         using var controller = fixture.CreateController();
 
-        var result = await controller.ResetPassword(new UserResetPasswordViewModel
+        var result = await controller.ResetPasswordAsync(new UserResetPasswordViewModel
         {
             Id = user.Id,
             Password = "UpdatedPass!123",
@@ -89,7 +89,7 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task IndexFiltersUsersBySearchTerm()
+    public async Task IndexFiltersUsersBySearchTermAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.AppUsers.AddRangeAsync(
@@ -99,7 +99,7 @@ public sealed class UsersControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Index("hopper");
+        var result = await controller.IndexAsync("hopper");
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<UsersIndexViewModel>(view.Model);
@@ -111,7 +111,7 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task IndexPagesUsers()
+    public async Task IndexPagesUsersAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -128,7 +128,7 @@ public sealed class UsersControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Index(search: null, page: 2);
+        var result = await controller.IndexAsync(search: null, page: 2);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<UsersIndexViewModel>(view.Model);
@@ -143,7 +143,7 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task CreateReturnsDefaultRoleOptions()
+    public async Task CreateReturnsDefaultRoleOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -156,14 +156,14 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task CreateRejectsDuplicateUserNameAndEmailIgnoringCase()
+    public async Task CreateRejectsDuplicateUserNameAndEmailIgnoringCaseAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(BuildUser("Ada", "Lovelace", "ada@example.com", "adal", AppRoles.Admin));
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new UserEditViewModel
+        var result = await controller.CreateAsync(new UserEditViewModel
         {
             GivenName = "Grace",
             LastName = "Hopper",
@@ -182,12 +182,12 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task CreateRejectsUnsupportedRole()
+    public async Task CreateRejectsUnsupportedRoleAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new UserEditViewModel
+        var result = await controller.CreateAsync(new UserEditViewModel
         {
             GivenName = "Ada",
             LastName = "Lovelace",
@@ -203,7 +203,7 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task EditGetReturnsExistingUserModel()
+    public async Task EditGetReturnsExistingUserModelAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(BuildUser("Ada", "Lovelace", "ada@example.com", "adal", AppRoles.Admin));
@@ -211,7 +211,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(user.Id);
+        var result = await controller.EditAsync(user.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<UserUpdateViewModel>(view.Model);
@@ -220,19 +220,19 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task EditGetRedirectsIndexWhenUserMissing()
+    public async Task EditGetRedirectsIndexWhenUserMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(999);
+        var result = await controller.EditAsync(999);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
     }
 
     [Fact]
-    public async Task EditPostUpdatesUserAndWritesAudit()
+    public async Task EditPostUpdatesUserAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(BuildUser("Ada", "Lovelace", "ada@example.com", "adal", AppRoles.Admin));
@@ -240,7 +240,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(new UserUpdateViewModel
+        var result = await controller.EditAsync(new UserUpdateViewModel
         {
             Id = user.Id,
             GivenName = "Ada",
@@ -260,7 +260,7 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task EditRejectsDuplicateValuesAndPreservesOptions()
+    public async Task EditRejectsDuplicateValuesAndPreservesOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.AppUsers.AddRangeAsync(
@@ -270,7 +270,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync(x => x.UserName == "ghopper");
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(new UserUpdateViewModel
+        var result = await controller.EditAsync(new UserUpdateViewModel
         {
             Id = user.Id,
             GivenName = "Grace",
@@ -288,7 +288,7 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task DeleteGetReturnsDeleteModel()
+    public async Task DeleteGetReturnsDeleteModelAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(BuildUser("Ada", "Lovelace", "ada@example.com", "adal", AppRoles.Admin));
@@ -296,7 +296,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Delete(user.Id);
+        var result = await controller.DeleteAsync(user.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<UserDeleteViewModel>(view.Model);
@@ -304,19 +304,19 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task DeleteGetRedirectsIndexWhenUserMissing()
+    public async Task DeleteGetRedirectsIndexWhenUserMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Delete(999);
+        var result = await controller.DeleteAsync(999);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
     }
 
     [Fact]
-    public async Task DeleteConfirmedPreventsDeletingCurrentUser()
+    public async Task DeleteConfirmedPreventsDeletingCurrentUserAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(BuildUser("Ada", "Lovelace", "ada@example.com", "adal", AppRoles.Admin));
@@ -324,7 +324,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync();
 
         using var controller = fixture.CreateController(userName: "adal");
-        var result = await controller.DeleteConfirmed(user.Id);
+        var result = await controller.DeleteConfirmedAsync(user.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
@@ -333,7 +333,7 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task DeleteConfirmedDeletesDifferentUserAndWritesAudit()
+    public async Task DeleteConfirmedDeletesDifferentUserAndWritesAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(BuildUser("Ada", "Lovelace", "ada@example.com", "adal", AppRoles.Admin));
@@ -341,7 +341,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync();
 
         using var controller = fixture.CreateController(userName: "other-user");
-        var result = await controller.DeleteConfirmed(user.Id);
+        var result = await controller.DeleteConfirmedAsync(user.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
@@ -350,7 +350,7 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task ResetPasswordGetReturnsViewModelForExistingUser()
+    public async Task ResetPasswordGetReturnsViewModelForExistingUserAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(BuildUser("Ada", "Lovelace", "ada@example.com", "adal", AppRoles.Admin));
@@ -358,7 +358,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.ResetPassword(user.Id);
+        var result = await controller.ResetPasswordAsync(user.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<UserResetPasswordViewModel>(view.Model);
@@ -366,19 +366,19 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task ResetPasswordGetRedirectsIndexWhenUserMissing()
+    public async Task ResetPasswordGetRedirectsIndexWhenUserMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.ResetPassword(999);
+        var result = await controller.ResetPasswordAsync(999);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
     }
 
     [Fact]
-    public async Task ResetPasswordRejectsWeakPassword()
+    public async Task ResetPasswordRejectsWeakPasswordAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppUsers.Add(BuildUser("Grace", "Hopper", "grace@example.com", "grace", AppRoles.Admin));
@@ -387,7 +387,7 @@ public sealed class UsersControllerTests
         var user = await fixture.DbContext.AppUsers.SingleAsync();
         using var controller = fixture.CreateController();
 
-        var result = await controller.ResetPassword(new UserResetPasswordViewModel
+        var result = await controller.ResetPasswordAsync(new UserResetPasswordViewModel
         {
             Id = user.Id,
             Password = "short",
@@ -401,12 +401,12 @@ public sealed class UsersControllerTests
     }
 
     [Fact]
-    public async Task ResetPasswordRedirectsIndexWhenUserMissingOnPost()
+    public async Task ResetPasswordRedirectsIndexWhenUserMissingOnPostAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.ResetPassword(new UserResetPasswordViewModel
+        var result = await controller.ResetPasswordAsync(new UserResetPasswordViewModel
         {
             Id = 999,
             Password = "UpdatedPass!123",

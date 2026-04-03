@@ -24,7 +24,7 @@ public sealed class MappingsControllerTests
     private static readonly string[] DuplicateOwnerSelections = [" Team Blue ", "team blue", "", "Team Green"];
 
     [Fact]
-    public async Task IndexFiltersProductsBySearchStatusDomainAndCapability()
+    public async Task IndexFiltersProductsBySearchStatusDomainAndCapabilityAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domainA = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -58,7 +58,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Index("Sentinel", MappingStatus.InReview, domainA.Id, capabilityA.Id);
+        var result = await controller.IndexAsync("Sentinel", MappingStatus.InReview, domainA.Id, capabilityA.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<MappingBoardViewModel>(view.Model);
@@ -71,7 +71,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreateGetReturnsEditViewForExistingProduct()
+    public async Task CreateGetReturnsEditViewForExistingProductAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -80,7 +80,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(product.Id);
+        var result = await controller.CreateAsync(product.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Edit", view.ViewName);
@@ -90,23 +90,23 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreateGetReturnsNotFoundWhenProductMissing()
+    public async Task CreateGetReturnsNotFoundWhenProductMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(999);
+        var result = await controller.CreateAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task CreatePostReturnsNotFoundWhenProductMissing()
+    public async Task CreatePostReturnsNotFoundWhenProductMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = 999,
             MappingStatus = MappingStatus.Draft
@@ -116,7 +116,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsSelectingExistingAndCustomComponentTogether()
+    public async Task CreatePostRejectsSelectingExistingAndCustomComponentTogetherAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -128,7 +128,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedDomainId = domain.Id,
@@ -145,7 +145,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsIncompleteCustomComponentInput()
+    public async Task CreatePostRejectsIncompleteCustomComponentInputAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -154,7 +154,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             CustomTechnologyComponentCode = "TECH-42",
@@ -166,7 +166,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsCustomComponentWhenCapabilityIsMissing()
+    public async Task CreatePostRejectsCustomComponentWhenCapabilityIsMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -175,7 +175,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             CustomTechnologyComponentCode = "TECH-42",
@@ -188,7 +188,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsUnknownCapabilityForCustomComponent()
+    public async Task CreatePostRejectsUnknownCapabilityForCustomComponentAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -197,7 +197,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedCapabilityId = 999,
@@ -211,7 +211,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsCompletedMappingWithoutComponent()
+    public async Task CreatePostRejectsCompletedMappingWithoutComponentAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -221,7 +221,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedDomainId = domain.Id,
@@ -233,7 +233,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsComponentThatDoesNotBelongToSelectedCapability()
+    public async Task CreatePostRejectsComponentThatDoesNotBelongToSelectedCapabilityAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -246,7 +246,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedDomainId = domain.Id,
@@ -260,7 +260,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsCapabilityThatDoesNotBelongToSelectedDomain()
+    public async Task CreatePostRejectsCapabilityThatDoesNotBelongToSelectedDomainAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -272,7 +272,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedDomainId = domainB.Id,
@@ -285,7 +285,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsCustomTechnologyCodeWhenModelComponentAlreadyExists()
+    public async Task CreatePostRejectsCustomTechnologyCodeWhenModelComponentAlreadyExistsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -297,7 +297,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedCapabilityId = capability.Id,
@@ -311,7 +311,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostReusesExistingCustomComponentAndAddsMissingCapabilityLink()
+    public async Task CreatePostReusesExistingCustomComponentAndAddsMissingCapabilityLinkAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -332,7 +332,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             Owners = ["Team Blue"],
@@ -351,7 +351,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsUnknownSelectedCapability()
+    public async Task CreatePostRejectsUnknownSelectedCapabilityAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -360,7 +360,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedCapabilityId = 999,
@@ -372,7 +372,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsUnknownSelectedDomain()
+    public async Task CreatePostRejectsUnknownSelectedDomainAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -381,7 +381,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedDomainId = 999,
@@ -393,7 +393,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsUnknownSelectedComponent()
+    public async Task CreatePostRejectsUnknownSelectedComponentAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -404,7 +404,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedDomainId = domain.Id,
@@ -418,7 +418,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostRejectsComponentWithoutCompleteHierarchy()
+    public async Task CreatePostRejectsComponentWithoutCompleteHierarchyAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -428,7 +428,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             SelectedComponentId = component.Id,
@@ -440,7 +440,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task EditPostSynchronizesOwnersWhenSelectionChanges()
+    public async Task EditPostSynchronizesOwnersWhenSelectionChangesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -454,7 +454,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(mapping.Id, new MappingEditViewModel
+        var result = await controller.EditAsync(mapping.Id, new MappingEditViewModel
         {
             MappingId = mapping.Id,
             ProductId = product.Id,
@@ -471,7 +471,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task EditGetReturnsExistingMapping()
+    public async Task EditGetReturnsExistingMappingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -484,7 +484,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(mapping.Id);
+        var result = await controller.EditAsync(mapping.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<MappingEditViewModel>(view.Model);
@@ -493,18 +493,18 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task EditGetReturnsNotFoundWhenMappingMissing()
+    public async Task EditGetReturnsNotFoundWhenMappingMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(999);
+        var result = await controller.EditAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task EditPostUpdatesExistingCustomComponentName()
+    public async Task EditPostUpdatesExistingCustomComponentNameAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -526,7 +526,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(mapping.Id, new MappingEditViewModel
+        var result = await controller.EditAsync(mapping.Id, new MappingEditViewModel
         {
             MappingId = mapping.Id,
             ProductId = product.Id,
@@ -540,25 +540,25 @@ public sealed class MappingsControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(MappingsController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         var component = await fixture.DbContext.TrmComponents.SingleAsync();
         Assert.Equal("New Name", component.Name);
         Assert.Equal("Updated", (await fixture.DbContext.TrmComponentVersions.SingleAsync()).ChangeType);
     }
 
     [Fact]
-    public async Task EditPostReturnsNotFoundWhenMappingMissing()
+    public async Task EditPostReturnsNotFoundWhenMappingMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(999, new MappingEditViewModel { ProductId = 1, MappingStatus = MappingStatus.Draft });
+        var result = await controller.EditAsync(999, new MappingEditViewModel { ProductId = 1, MappingStatus = MappingStatus.Draft });
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task EditPostReturnsViewWhenMappingValidationFails()
+    public async Task EditPostReturnsViewWhenMappingValidationFailsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -571,7 +571,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Edit(mapping.Id, new MappingEditViewModel
+        var result = await controller.EditAsync(mapping.Id, new MappingEditViewModel
         {
             MappingId = mapping.Id,
             ProductId = product.Id,
@@ -588,18 +588,18 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task DeleteReturnsNotFoundWhenMappingMissing()
+    public async Task DeleteReturnsNotFoundWhenMappingMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Delete(123);
+        var result = await controller.DeleteAsync(123);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task DeleteReturnsViewWhenMappingExists()
+    public async Task DeleteReturnsViewWhenMappingExistsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var product = new ProductCatalogItem { Name = "Sentinel" };
@@ -608,7 +608,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Delete(mapping.Id);
+        var result = await controller.DeleteAsync(mapping.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ProductMapping>(view.Model);
@@ -616,18 +616,18 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task DeleteConfirmedReturnsNotFoundWhenMappingMissing()
+    public async Task DeleteConfirmedReturnsNotFoundWhenMappingMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.DeleteConfirmed(999);
+        var result = await controller.DeleteConfirmedAsync(999);
 
         Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]
-    public async Task DeleteConfirmedRemovesMappingAndUpdatesProductTimestamp()
+    public async Task DeleteConfirmedRemovesMappingAndUpdatesProductTimestampAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var product = new ProductCatalogItem { Name = "Sentinel", UpdatedUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
@@ -636,17 +636,17 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.DeleteConfirmed(mapping.Id);
+        var result = await controller.DeleteConfirmedAsync(mapping.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(MappingsController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(0, await fixture.DbContext.ProductMappings.CountAsync());
         Assert.True((await fixture.DbContext.ProductCatalogItems.SingleAsync()).UpdatedUtc > new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
     }
 
     [Fact]
-    public async Task DeleteConfirmedRemovesDependentApplicationMappings()
+    public async Task DeleteConfirmedRemovesDependentApplicationMappingsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -677,16 +677,16 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.DeleteConfirmed(mapping.Id);
+        var result = await controller.DeleteConfirmedAsync(mapping.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(MappingsController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
         Assert.Equal(0, await fixture.DbContext.ProductMappings.CountAsync());
         Assert.Equal(0, await fixture.DbContext.ApplicationCatalogItemMappings.CountAsync());
     }
 
     [Fact]
-    public async Task ExportCsvIncludesUnfinishedMappingsWhenRequestedAndAppliesFilters()
+    public async Task ExportCsvIncludesUnfinishedMappingsWhenRequestedAndAppliesFiltersAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -717,7 +717,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.ExportCsv("Sentinel", MappingStatus.Draft, domain.Id, capability.Id, includeUnfinished: true);
+        var result = await controller.ExportCsvAsync("Sentinel", MappingStatus.Draft, domain.Id, capability.Id, includeUnfinished: true);
 
         var file = Assert.IsType<FileContentResult>(result);
         var content = System.Text.Encoding.UTF8.GetString(file.FileContents);
@@ -725,7 +725,7 @@ public sealed class MappingsControllerTests
         Assert.DoesNotContain("Atlas", content);
     }
     [Fact]
-    public async Task CapabilitiesReturnsFilteredCapabilities()
+    public async Task CapabilitiesReturnsFilteredCapabilitiesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domainA = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -736,7 +736,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Capabilities(domainA.Id);
+        var result = await controller.CapabilitiesAsync(domainA.Id);
 
         var json = Assert.IsType<JsonResult>(result);
         var items = ToDictionaryList(json.Value);
@@ -746,7 +746,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task ComponentsExcludesDeletedComponentsAndOrdersModelBeforeCustom()
+    public async Task ComponentsExcludesDeletedComponentsAndOrdersModelBeforeCustomAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -773,7 +773,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Components(capability.Id);
+        var result = await controller.ComponentsAsync(capability.Id);
 
         var json = Assert.IsType<JsonResult>(result);
         var items = ToDictionaryList(json.Value);
@@ -783,7 +783,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task ComponentsReturnsAllNonDeletedComponentsWhenCapabilityMissing()
+    public async Task ComponentsReturnsAllNonDeletedComponentsWhenCapabilityMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -796,7 +796,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Components(null);
+        var result = await controller.ComponentsAsync(null);
 
         var json = Assert.IsType<JsonResult>(result);
         var items = ToDictionaryList(json.Value);
@@ -806,7 +806,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreatePostWithCustomComponentCreatesMappingComponentHistoryAndAudit()
+    public async Task CreatePostWithCustomComponentCreatesMappingComponentHistoryAndAuditAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedOwnerOptionsAsync();
@@ -818,7 +818,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.Create(new MappingEditViewModel
+        var result = await controller.CreateAsync(new MappingEditViewModel
         {
             ProductId = product.Id,
             Owners = ["Team Blue"],
@@ -831,7 +831,7 @@ public sealed class MappingsControllerTests
         });
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal(nameof(MappingsController.Index), redirect.ActionName);
+        Assert.Equal("Index", redirect.ActionName);
 
         var mapping = await fixture.DbContext.ProductMappings.SingleAsync();
         var component = await fixture.DbContext.TrmComponents
@@ -856,7 +856,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task ExportCsvReturnsOnlyCompletedMappingsWhenIncludeUnfinishedIsFalse()
+    public async Task ExportCsvReturnsOnlyCompletedMappingsWhenIncludeUnfinishedIsFalseAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -886,7 +886,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.ExportCsv(null, null, null, null, includeUnfinished: false);
+        var result = await controller.ExportCsvAsync(null, null, null, null, includeUnfinished: false);
 
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("text/csv", file.ContentType);
@@ -896,7 +896,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task AddWithAiReturnsLoadingViewWhenLookupStarts()
+    public async Task AddWithAiReturnsLoadingViewWhenLookupStartsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -908,7 +908,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.AddWithAi(product.Id);
+        var result = await controller.AddWithAiAsync(product.Id);
 
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<AiMappingReviewViewModel>(view.Model);
@@ -920,7 +920,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task LookupWithAiReturnsReviewPartialWhenSuggestionsAreResolved()
+    public async Task LookupWithAiReturnsReviewPartialWhenSuggestionsAreResolvedAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -933,7 +933,7 @@ public sealed class MappingsControllerTests
         fixture.SetAiLookupResponseBody($"{{\"choices\":[{{\"message\":{{\"content\":\"summary: \\\"Suggested 1 TRM component.\\\"\\nsuggestions[1]{{component_id\\tconfidence\\treason}}:\\n  {component.Id}\\t0.95\\tMatches core identity and directory capabilities.\"}}}}]}}");
 
         using var controller = fixture.CreateController();
-        var result = await controller.LookupWithAi(product.Id);
+        var result = await controller.LookupWithAiAsync(product.Id);
 
         var view = Assert.IsType<PartialViewResult>(result);
         Assert.Equal("_AiMappingReviewContent", view.ViewName);
@@ -947,7 +947,7 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
-    public async Task CreateFromAiCreatesSelectedMappingsAsDrafts()
+    public async Task CreateFromAiCreatesSelectedMappingsAsDraftsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -959,7 +959,7 @@ public sealed class MappingsControllerTests
         await fixture.DbContext.SaveChangesAsync();
 
         using var controller = fixture.CreateController();
-        var result = await controller.CreateFromAi(new AiMappingReviewViewModel
+        var result = await controller.CreateFromAiAsync(new AiMappingReviewViewModel
         {
             ProductId = product.Id,
             ProductName = product.Name,

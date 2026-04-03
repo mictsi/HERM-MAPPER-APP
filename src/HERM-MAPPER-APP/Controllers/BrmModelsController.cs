@@ -24,7 +24,7 @@ public sealed class BrmModelsController(
         "Retired"
     ];
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> IndexAsync()
     {
         return View(new BrmModelsIndexViewModel
         {
@@ -48,7 +48,7 @@ public sealed class BrmModelsController(
         });
     }
 
-    public async Task<IActionResult> Details(int id)
+    public async Task<IActionResult> DetailsAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -154,7 +154,7 @@ public sealed class BrmModelsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(BrmModelEditViewModel input)
+    public async Task<IActionResult> CreateAsync(BrmModelEditViewModel input)
     {
         NormalizeInput(input);
         ValidateStatus(input);
@@ -184,11 +184,11 @@ public sealed class BrmModelsController(
             $"Area: {brmModel.Area}. Status: {brmModel.Status}.");
 
         TempData["BrmModelsStatusMessage"] = $"Created BRM model {brmModel.Name}.";
-        return RedirectToAction(nameof(Details), new { id = brmModel.Id });
+        return RedirectToAction("Details", new { id = brmModel.Id });
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Edit(int id)
+    public async Task<IActionResult> EditAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -216,7 +216,7 @@ public sealed class BrmModelsController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, BrmModelEditViewModel input)
+    public async Task<IActionResult> EditAsync(int id, BrmModelEditViewModel input)
     {
         var brmModel = await dbContext.BrmModels
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
@@ -249,11 +249,11 @@ public sealed class BrmModelsController(
             $"Area: {brmModel.Area}. Status: {brmModel.Status}.");
 
         TempData["BrmModelsStatusMessage"] = $"Updated BRM model {brmModel.Name}.";
-        return RedirectToAction(nameof(Details), new { id = brmModel.Id });
+        return RedirectToAction("Details", new { id = brmModel.Id });
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -270,9 +270,9 @@ public sealed class BrmModelsController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    [HttpPost, ActionName(nameof(Delete))]
+    [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -300,11 +300,11 @@ public sealed class BrmModelsController(
             brmModel.DeletedReason);
 
         TempData["BrmModelsStatusMessage"] = $"Moved BRM model {brmModel.Name} to trash.";
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
-    public async Task<IActionResult> Restore()
+    public async Task<IActionResult> RestoreAsync()
     {
         if (!ModelState.IsValid)
         {
@@ -330,7 +330,7 @@ public sealed class BrmModelsController(
     [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RestoreDeleted(int id)
+    public async Task<IActionResult> RestoreDeletedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -357,7 +357,7 @@ public sealed class BrmModelsController(
             $"Restored BRM model {brmModel.Name} from trash.");
 
         TempData["BrmModelsStatusMessage"] = $"Restored BRM model {brmModel.Name}.";
-        return RedirectToAction(nameof(Restore));
+        return RedirectToAction("Restore");
     }
 
     private static void NormalizeInput(BrmModelEditViewModel input)

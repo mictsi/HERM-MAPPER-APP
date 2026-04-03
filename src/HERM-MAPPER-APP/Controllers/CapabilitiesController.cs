@@ -18,7 +18,7 @@ public sealed class CapabilitiesController(
 {
     private const int MinimumMappingRowCount = 1;
 
-    public Task<IActionResult> Index(string? search, int? brmModelId = null)
+    public Task<IActionResult> IndexAsync(string? search, int? brmModelId = null)
     {
         if (!ModelState.IsValid)
         {
@@ -33,7 +33,7 @@ public sealed class CapabilitiesController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Create(int? brmModelId = null)
+    public async Task<IActionResult> CreateAsync(int? brmModelId = null)
     {
         if (!ModelState.IsValid)
         {
@@ -65,7 +65,7 @@ public sealed class CapabilitiesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(int brmModelId, CapabilityEditViewModel input)
+    public async Task<IActionResult> CreateAsync(int brmModelId, CapabilityEditViewModel input)
     {
         if (brmModelId <= 0)
         {
@@ -122,7 +122,7 @@ public sealed class CapabilitiesController(
         return RedirectToAction("Details", "BrmModels", new { id = capability.BrmModelId });
     }
 
-    public async Task<IActionResult> Details(int id)
+    public async Task<IActionResult> DetailsAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -139,7 +139,7 @@ public sealed class CapabilitiesController(
         return View(model);
     }
 
-    public async Task<IActionResult> AllDependencies(CancellationToken cancellationToken)
+    public async Task<IActionResult> AllDependenciesAsync(CancellationToken cancellationToken)
     {
         var model = new HierarchyDiagramPageViewModel
         {
@@ -148,7 +148,7 @@ public sealed class CapabilitiesController(
             Heading = "All capability dependencies",
             Description = "Explore the full capability drilldown from BRM into ARM, applications, and TRM with the same dependency map settings used on each capability page.",
             BackLabel = "Back to BRM models",
-            BackAction = nameof(Index),
+            BackAction = "Index",
             HierarchyRoot = await drilldownService.BuildAllCapabilitiesHierarchyAsync(cancellationToken),
             EmptyTitle = "No capability dependency map yet",
             EmptyBody = "Create capabilities and connect them to ARM components, applications, and TRM mappings to generate the full dependency tree.",
@@ -160,7 +160,7 @@ public sealed class CapabilitiesController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Edit(int id)
+    public async Task<IActionResult> EditAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -204,7 +204,7 @@ public sealed class CapabilitiesController(
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, CapabilityEditViewModel input)
+    public async Task<IActionResult> EditAsync(int id, CapabilityEditViewModel input)
     {
         var capability = await dbContext.BusinessCapabilityCatalogItems
             .Include(x => x.Mappings)
@@ -263,7 +263,7 @@ public sealed class CapabilitiesController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -296,9 +296,9 @@ public sealed class CapabilitiesController(
     }
 
     [Authorize(Policy = AppPolicies.ProductsAndServicesWrite)]
-    [HttpPost, ActionName(nameof(Delete))]
+    [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id)
     {
         if (!ModelState.IsValid)
         {

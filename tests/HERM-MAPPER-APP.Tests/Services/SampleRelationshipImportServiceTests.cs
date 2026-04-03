@@ -10,7 +10,7 @@ namespace HERMMapperApp.Tests.Services;
 public sealed class SampleRelationshipImportServiceTests
 {
     [Fact]
-    public async Task VerifyAsyncShowsPreviewActionsForEachRow()
+    public async Task VerifyAsyncShowsPreviewActionsForEachRowAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
@@ -57,7 +57,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task VerifyAsyncFailsWhenHeaderIsInvalid()
+    public async Task VerifyAsyncFailsWhenHeaderIsInvalidAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var csvPath = fixture.WriteCsv(
@@ -75,7 +75,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsyncCreatesProductAndMappingWhenHierarchyMatches()
+    public async Task ImportAsyncCreatesProductAndMappingWhenHierarchyMatchesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
@@ -103,7 +103,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsyncCreatesOnlyProductWhenHierarchyDoesNotMatch()
+    public async Task ImportAsyncCreatesOnlyProductWhenHierarchyDoesNotMatchAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHierarchyAsync("Infrastructure", "Capability A", "Monitoring & Alerting", "TC002");
@@ -129,7 +129,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsyncCreatesOnlyProductWhenDomainDoesNotMatchCapabilityParentDomain()
+    public async Task ImportAsyncCreatesOnlyProductWhenDomainDoesNotMatchCapabilityParentDomainAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");
@@ -154,7 +154,7 @@ public sealed class SampleRelationshipImportServiceTests
     }
 
     [Fact]
-    public async Task ImportAsyncImportsIntoExistingCatalogueAndSkipsDuplicateMapping()
+    public async Task ImportAsyncImportsIntoExistingCatalogueAndSkipsDuplicateMappingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var hierarchy = await fixture.SeedHierarchyAsync("Cybersecurity", "Capability A", "Monitoring & Alerting", "TC002");

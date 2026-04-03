@@ -16,7 +16,7 @@ namespace HERMMapperApp.Tests.Services;
 public sealed class AiProductMappingServiceTests
 {
     [Fact]
-    public async Task SuggestMappingsAsyncBuildsToonPromptAndReturnsResolvedSuggestions()
+    public async Task SuggestMappingsAsyncBuildsToonPromptAndReturnsResolvedSuggestionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -49,7 +49,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task SuggestMappingsAsyncSkipsAlreadyMappedComponentsFromAiResponse()
+    public async Task SuggestMappingsAsyncSkipsAlreadyMappedComponentsFromAiResponseAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -75,7 +75,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task SuggestMappingsAsyncUsesEnabledProviderModelInRequestPayload()
+    public async Task SuggestMappingsAsyncUsesEnabledProviderModelInRequestPayloadAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -131,7 +131,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task GetSettingsAsyncReturnsSavedTimeoutSeconds()
+    public async Task GetSettingsAsyncReturnsSavedTimeoutSecondsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedAiSettingsAsync(timeoutSeconds: 180);
@@ -143,7 +143,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task SuggestMappingsAsyncReturnsFailureWhenLookupTimesOut()
+    public async Task SuggestMappingsAsyncReturnsFailureWhenLookupTimesOutAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -172,7 +172,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task GetAvailableModelsAsyncReturnsOpenWebUiModels()
+    public async Task GetAvailableModelsAsyncReturnsOpenWebUiModelsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedAiSettingsAsync();
@@ -190,7 +190,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task GetAvailableModelsAsyncReturnsOpenWebUiModelsWhenModelIsBlank()
+    public async Task GetAvailableModelsAsyncReturnsOpenWebUiModelsWhenModelIsBlankAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var provider = new AiProviderConfiguration
@@ -222,7 +222,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task SuggestMappingsAsyncWritesUsageLogFromUsagePayload()
+    public async Task SuggestMappingsAsyncWritesUsageLogFromUsagePayloadAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -258,7 +258,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task SuggestMappingsAsyncWritesUsageLogFromOpenWebUiUsageFields()
+    public async Task SuggestMappingsAsyncWritesUsageLogFromOpenWebUiUsageFieldsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -290,7 +290,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task BuildAdminViewModelAsyncDoesNotReorderProvidersByActiveState()
+    public async Task BuildAdminViewModelAsyncDoesNotReorderProvidersByActiveStateAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var betaProvider = new AiProviderConfiguration
@@ -322,7 +322,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task SuggestMappingsAsyncWritesUsageLogForCancelledRequests()
+    public async Task SuggestMappingsAsyncWritesUsageLogForCancelledRequestsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -352,7 +352,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task SuggestMappingsAsyncWritesUsageLogForAbortedRequests()
+    public async Task SuggestMappingsAsyncWritesUsageLogForAbortedRequestsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
@@ -381,7 +381,7 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
-    public async Task BuildAdminViewModelAsyncAggregatesOutcomeStats()
+    public async Task BuildAdminViewModelAsyncAggregatesOutcomeStatsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.SeedAiSettingsAsync();

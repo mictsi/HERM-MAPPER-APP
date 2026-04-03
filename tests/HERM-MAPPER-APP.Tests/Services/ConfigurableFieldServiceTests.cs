@@ -11,7 +11,7 @@ namespace HERMMapperApp.Tests.Services;
 public sealed class ConfigurableFieldServiceTests
 {
     [Fact]
-    public async Task GetMultiSelectListAsyncIncludesUnknownSelectedValuesOnlyOnce()
+    public async Task GetMultiSelectListAsyncIncludesUnknownSelectedValuesOnlyOnceAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
@@ -40,7 +40,7 @@ public sealed class ConfigurableFieldServiceTests
     }
 
     [Fact]
-    public async Task GetSelectListAsyncAddsUnknownSelectionAfterConfiguredOptions()
+    public async Task GetSelectListAsyncAddsUnknownSelectionAfterConfiguredOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
@@ -69,7 +69,7 @@ public sealed class ConfigurableFieldServiceTests
     }
 
     [Fact]
-    public async Task InvalidateOptionsCausesNextReadToReloadFromDatabase()
+    public async Task InvalidateOptionsCausesNextReadToReloadFromDatabaseAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddAsync(new ConfigurableFieldOption
@@ -98,7 +98,7 @@ public sealed class ConfigurableFieldServiceTests
     }
 
     [Fact]
-    public async Task RefreshCachedOptionsAsyncReloadsUpdatedFieldOptions()
+    public async Task RefreshCachedOptionsAsyncReloadsUpdatedFieldOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddAsync(new ConfigurableFieldOption

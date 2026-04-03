@@ -10,7 +10,7 @@ namespace HERMMapperApp.Controllers;
 [Authorize(Policy = AppPolicies.AdminOnly)]
 public sealed class ChangeLogController(AppDbContext dbContext) : Controller
 {
-    public async Task<IActionResult> Index(string? search)
+    public async Task<IActionResult> IndexAsync(string? search)
     {
         if (!ModelState.IsValid)
         {

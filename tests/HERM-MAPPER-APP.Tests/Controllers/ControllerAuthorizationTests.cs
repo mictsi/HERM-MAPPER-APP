@@ -32,72 +32,72 @@ public sealed class ControllerAuthorizationTests
     [Fact]
     public void ProductWriteActionsRequireProductsAndServicesWritePolicy()
     {
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.Create), AppPolicies.ProductsAndServicesWrite, 0);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.Create), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.BulkEdit), AppPolicies.ProductsAndServicesWrite, 4);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.BulkEdit), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.Delete), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.DeleteConfirmed), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.Restore), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.RestoreDeleted), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ProductsController>(nameof(ProductsController.PermanentDelete), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ProductsController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 0);
+        AssertMethodPolicy<ProductsController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ProductsController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ProductsController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<ProductsController>("BulkEditAsync", AppPolicies.ProductsAndServicesWrite, 4);
+        AssertMethodPolicy<ProductsController>("BulkEditAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ProductsController>("DeleteAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ProductsController>("DeleteConfirmedAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ProductsController>("RestoreAsync", AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ProductsController>("RestoreDeletedAsync", AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ProductsController>("PermanentDeleteAsync", AppPolicies.AdminOnly, 1);
     }
 
     [Fact]
     public void ServiceWriteActionsRequireProductsAndServicesWritePolicy()
     {
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Create), AppPolicies.ProductsAndServicesWrite, 0);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Create), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Connections), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Connections), AppPolicies.ProductsAndServicesWrite, 2);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Delete), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.DeleteConfirmed), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.Restore), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.RestoreDeleted), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ServicesController>(nameof(ServicesController.PermanentDelete), AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ServicesController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 0);
+        AssertMethodPolicy<ServicesController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ServicesController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ServicesController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<ServicesController>("ConnectionsAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ServicesController>("ConnectionsAsync", AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<ServicesController>("DeleteAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ServicesController>("DeleteConfirmedAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ServicesController>("RestoreAsync", AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ServicesController>("RestoreDeletedAsync", AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ServicesController>("PermanentDeleteAsync", AppPolicies.AdminOnly, 1);
     }
 
     [Fact]
     public void ApplicationAndCapabilityWriteActionsRequireProductsAndServicesWritePolicy()
     {
-        AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Create), AppPolicies.ProductsAndServicesWrite, 0);
-        AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Create), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<ApplicationsController>(nameof(ApplicationsController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<ApplicationsController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 0);
+        AssertMethodPolicy<ApplicationsController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ApplicationsController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<ApplicationsController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 2);
 
-        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Create), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Create), AppPolicies.ProductsAndServicesWrite, 2);
-        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
-        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.Delete), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<CapabilitiesController>(nameof(CapabilitiesController.DeleteConfirmed), AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<CapabilitiesController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<CapabilitiesController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<CapabilitiesController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<CapabilitiesController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<CapabilitiesController>("DeleteAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<CapabilitiesController>("DeleteConfirmedAsync", AppPolicies.ProductsAndServicesWrite, 1);
     }
 
     [Fact]
     public void BrmModelWriteActionsRequireProductsAndServicesWritePolicy()
     {
-        AssertMethodPolicy<BrmModelsController>(nameof(BrmModelsController.Create), AppPolicies.ProductsAndServicesWrite, 0);
-        AssertMethodPolicy<BrmModelsController>(nameof(BrmModelsController.Create), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<BrmModelsController>(nameof(BrmModelsController.Edit), AppPolicies.ProductsAndServicesWrite, 1);
-        AssertMethodPolicy<BrmModelsController>(nameof(BrmModelsController.Edit), AppPolicies.ProductsAndServicesWrite, 2);
+        AssertMethodPolicy<BrmModelsController>("Create", AppPolicies.ProductsAndServicesWrite, 0);
+        AssertMethodPolicy<BrmModelsController>("CreateAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<BrmModelsController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 1);
+        AssertMethodPolicy<BrmModelsController>("EditAsync", AppPolicies.ProductsAndServicesWrite, 2);
     }
 
     [Fact]
     public void ReferenceWriteActionsRequireAdminOnlyPolicy()
     {
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.VerifyImport), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.ImportVerified), AppPolicies.AdminOnly, 1);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.Restore), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreArm), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreBrm), AppPolicies.AdminOnly, 0);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.DeleteComponent), AppPolicies.AdminOnly, 2);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.RestoreComponent), AppPolicies.AdminOnly, 2);
-        AssertMethodPolicy<ReferenceController>(nameof(ReferenceController.PermanentlyDeleteComponent), AppPolicies.AdminOnly, 2);
-        AssertMethodPolicy<ReportsController>(nameof(ReportsController.ExportMappingsCsv), AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>("VerifyImportAsync", AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>("ImportVerifiedAsync", AppPolicies.AdminOnly, 1);
+        AssertMethodPolicy<ReferenceController>("RestoreAsync", AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>("RestoreArmAsync", AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>("RestoreBrmAsync", AppPolicies.AdminOnly, 0);
+        AssertMethodPolicy<ReferenceController>("DeleteComponentAsync", AppPolicies.AdminOnly, 2);
+        AssertMethodPolicy<ReferenceController>("RestoreComponentAsync", AppPolicies.AdminOnly, 2);
+        AssertMethodPolicy<ReferenceController>("PermanentlyDeleteComponentAsync", AppPolicies.AdminOnly, 2);
+        AssertMethodPolicy<ReportsController>("ExportMappingsCsvAsync", AppPolicies.AdminOnly, 0);
     }
 
     private static void AssertClassPolicy<TController>(string expectedPolicy)

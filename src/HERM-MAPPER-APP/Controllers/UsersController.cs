@@ -17,7 +17,7 @@ public sealed class UsersController(
 {
     private const int UsersPageSize = 10;
 
-    public async Task<IActionResult> Index(string? search, int page = 1)
+    public async Task<IActionResult> IndexAsync(string? search, int page = 1)
     {
         if (!ModelState.IsValid)
         {
@@ -69,7 +69,7 @@ public sealed class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(UserEditViewModel input)
+    public async Task<IActionResult> CreateAsync(UserEditViewModel input)
     {
         Normalize(input);
 
@@ -123,7 +123,7 @@ public sealed class UsersController(
         return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> Edit(int id)
+    public async Task<IActionResult> EditAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -150,7 +150,7 @@ public sealed class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(UserUpdateViewModel input)
+    public async Task<IActionResult> EditAsync(UserUpdateViewModel input)
     {
         Normalize(input);
 
@@ -196,7 +196,7 @@ public sealed class UsersController(
         return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> Delete(int id)
+    public async Task<IActionResult> DeleteAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -222,7 +222,7 @@ public sealed class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -255,7 +255,7 @@ public sealed class UsersController(
         return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> ResetPassword(int id)
+    public async Task<IActionResult> ResetPasswordAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -278,7 +278,7 @@ public sealed class UsersController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ResetPassword(UserResetPasswordViewModel input)
+    public async Task<IActionResult> ResetPasswordAsync(UserResetPasswordViewModel input)
     {
         if (!ModelState.IsValid)
         {

@@ -11,7 +11,7 @@ namespace HERMMapperApp.Tests.Services;
 public sealed class AppSettingsServiceTests
 {
     [Fact]
-    public async Task GetValueAsyncReturnsFallbackWhenSettingDoesNotExist()
+    public async Task GetValueAsyncReturnsFallbackWhenSettingDoesNotExistAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -21,7 +21,7 @@ public sealed class AppSettingsServiceTests
     }
 
     [Fact]
-    public async Task GetValueAsyncReturnsFallbackWhenStoredValueIsWhitespace()
+    public async Task GetValueAsyncReturnsFallbackWhenStoredValueIsWhitespaceAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting
@@ -38,7 +38,7 @@ public sealed class AppSettingsServiceTests
     }
 
     [Fact]
-    public async Task SetValueAsyncCreatesNewSettingWhenKeyIsMissing()
+    public async Task SetValueAsyncCreatesNewSettingWhenKeyIsMissingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
 
@@ -51,7 +51,7 @@ public sealed class AppSettingsServiceTests
     }
 
     [Fact]
-    public async Task SetValueAsyncUpdatesExistingSetting()
+    public async Task SetValueAsyncUpdatesExistingSettingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting
@@ -71,7 +71,7 @@ public sealed class AppSettingsServiceTests
     }
 
     [Fact]
-    public async Task SetValueAsyncInvalidatesCachedValues()
+    public async Task SetValueAsyncInvalidatesCachedValuesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting
@@ -96,7 +96,7 @@ public sealed class AppSettingsServiceTests
     }
 
     [Fact]
-    public async Task RefreshCachedValueAsyncReloadsSettingFromDatabase()
+    public async Task RefreshCachedValueAsyncReloadsSettingFromDatabaseAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.AppSettings.Add(new AppSetting

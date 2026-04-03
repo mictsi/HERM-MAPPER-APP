@@ -13,7 +13,7 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
     private const string StatusTempDataKey = "AiConfigurationStatusMessage";
     private const string ErrorTempDataKey = "AiConfigurationErrorMessage";
 
-    public async Task<IActionResult> Index(int? editProviderId = null, bool createNewProvider = false)
+    public async Task<IActionResult> IndexAsync(int? editProviderId = null, bool createNewProvider = false)
     {
         if (!ModelState.IsValid)
         {
@@ -30,11 +30,11 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SaveProvider([Bind(Prefix = nameof(AiMappingAdminIndexViewModel.Editor))] AiProviderConfigurationInputModel input)
+    public async Task<IActionResult> SaveProviderAsync([Bind(Prefix = nameof(AiMappingAdminIndexViewModel.Editor))] AiProviderConfigurationInputModel input)
     {
         if (!ModelState.IsValid)
         {
-            return View(nameof(Index), await aiProductMappingService.BuildAdminViewModelAsync(
+            return View("Index", await aiProductMappingService.BuildAdminViewModelAsync(
                 editProviderId: input.Id,
                 createNewProvider: !input.Id.HasValue,
                 editorOverride: input,
@@ -45,7 +45,7 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
         var result = await aiProductMappingService.SaveProviderAsync(input, HttpContext.RequestAborted);
         if (!result.IsSuccess)
         {
-            return View(nameof(Index), await aiProductMappingService.BuildAdminViewModelAsync(
+            return View("Index", await aiProductMappingService.BuildAdminViewModelAsync(
                 editProviderId: input.Id,
                 createNewProvider: !input.Id.HasValue,
                 editorOverride: input,
@@ -54,12 +54,12 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
         }
 
         TempData[StatusTempDataKey] = result.Message;
-        return RedirectToAction(nameof(Index), new { editProviderId = result.ProviderId });
+        return RedirectToAction("Index", new { editProviderId = result.ProviderId });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SetLookupEnabled(bool isEnabled)
+    public async Task<IActionResult> SetLookupEnabledAsync(bool isEnabled)
     {
         if (!ModelState.IsValid)
         {
@@ -68,12 +68,12 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
 
         var result = await aiProductMappingService.SetLookupEnabledAsync(isEnabled, HttpContext.RequestAborted);
         TempData[result.IsSuccess ? StatusTempDataKey : ErrorTempDataKey] = result.Message;
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SetProviderEnabled(int id, bool isEnabled)
+    public async Task<IActionResult> SetProviderEnabledAsync(int id, bool isEnabled)
     {
         if (!ModelState.IsValid)
         {
@@ -82,12 +82,12 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
 
         var result = await aiProductMappingService.SetProviderEnabledAsync(id, isEnabled, HttpContext.RequestAborted);
         TempData[result.IsSuccess ? StatusTempDataKey : ErrorTempDataKey] = result.Message;
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteProvider(int id)
+    public async Task<IActionResult> DeleteProviderAsync(int id)
     {
         if (!ModelState.IsValid)
         {
@@ -96,6 +96,6 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
 
         var result = await aiProductMappingService.DeleteProviderAsync(id, HttpContext.RequestAborted);
         TempData[result.IsSuccess ? StatusTempDataKey : ErrorTempDataKey] = result.Message;
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction("Index");
     }
 }

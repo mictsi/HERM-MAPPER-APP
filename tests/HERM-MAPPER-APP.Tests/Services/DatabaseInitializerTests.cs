@@ -12,7 +12,7 @@ namespace HERMMapperApp.Tests.Services;
 public sealed class DatabaseInitializerTests
 {
     [Fact]
-    public async Task InitializeAsyncSeedsDefaultLifecycleStatuses()
+    public async Task InitializeAsyncSeedsDefaultLifecycleStatusesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         var initializer = fixture.CreateInitializer();
@@ -34,7 +34,7 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
-    public async Task InitializeAsyncDoesNotDuplicateDefaultLifecycleStatuses()
+    public async Task InitializeAsyncDoesNotDuplicateDefaultLifecycleStatusesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         fixture.DbContext.ConfigurableFieldOptions.Add(new ConfigurableFieldOption
@@ -57,7 +57,7 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
-    public async Task InitializeAsyncBackfillsAndNormalizesSortOrderForExistingOptions()
+    public async Task InitializeAsyncBackfillsAndNormalizesSortOrderForExistingOptionsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.ConfigurableFieldOptions.AddRangeAsync(
@@ -89,7 +89,7 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
-    public async Task InitializeAsyncNormalizesLegacyUserRoles()
+    public async Task InitializeAsyncNormalizesLegacyUserRolesAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.AppUsers.AddRangeAsync(
@@ -127,7 +127,7 @@ public sealed class DatabaseInitializerTests
     }
 
     [Fact]
-    public async Task InitializeAsyncBackfillsLegacyCapabilitiesIntoPrimaryBrmModel()
+    public async Task InitializeAsyncBackfillsLegacyCapabilitiesIntoPrimaryBrmModelAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
         await fixture.DbContext.BusinessCapabilityCatalogItems.AddAsync(new BusinessCapabilityCatalogItem
