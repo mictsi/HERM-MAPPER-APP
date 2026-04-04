@@ -131,6 +131,79 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
+    public async Task SuggestMappingsAsyncRetriesAzureAiFoundryRequestsAgainstResponsesApiAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var capability = new TrmCapability { Code = "TP001", Name = "Identity", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var component = new TrmComponent { Code = "TC001", Name = "Directory Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var product = new ProductCatalogItem { Name = "Active Directory", Description = "Identity directory and authentication service." };
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+
+        var provider = new AiProviderConfiguration
+        {
+            Name = "Azure AI Foundry",
+            ProviderType = AiProviderType.AzureAiFoundry,
+            Endpoint = "https://ai-lab-foundry-local.openai.azure.com/openai/v1/chat/completions",
+            Model = "gpt-5.4-nano",
+            TimeoutSeconds = 120,
+            IsActive = true
+        };
+
+        await fixture.DbContext.AiProviderConfigurations.AddAsync(provider);
+        await fixture.DbContext.AppSettings.AddAsync(new AppSetting
+        {
+            Key = AppSettingKeys.AiMappingIsEnabled,
+            Value = "true"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+        await fixture.SetProtectedValueAsync($"AiProvider.{provider.Id}.ApiKey", "foundry-key");
+
+        fixture.Handler.EnqueueResponse(
+            "/openai/v1/chat/completions",
+            HttpStatusCode.BadRequest,
+            """
+            {"error":{"message":"Unsupported parameter: 'messages'. In the Responses API, this parameter has moved to 'input'. Try again with the new parameter.","type":"invalid_request_error"}}
+            """);
+        fixture.Handler.EnqueueResponse(
+            "/openai/v1/responses",
+            HttpStatusCode.OK,
+            "{" +
+            "\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"summary: \\\"Suggested 1 TRM component.\\\"\\nsuggestions[1]{component_id\\tconfidence\\treason}:\\n  " +
+            component.Id +
+            "\\t0.91\\tMatches the core directory capability.\"}]}]," +
+            "\"usage\":{\"input_tokens\":81,\"output_tokens\":19,\"total_tokens\":100}}"
+        );
+
+        var persistedProduct = await fixture.DbContext.ProductCatalogItems
+            .Include(x => x.Mappings)
+            .ThenInclude(x => x.TrmComponent)
+            .SingleAsync(x => x.Id == product.Id);
+
+        var result = await fixture.Service.SuggestMappingsAsync(persistedProduct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Suggested 1 TRM component.", result.Message);
+        var suggestion = Assert.Single(result.Suggestions);
+        Assert.Equal(component.Id, suggestion.ComponentId);
+        Assert.Equal(0.91m, suggestion.Confidence);
+        Assert.Equal(["/openai/v1/chat/completions", "/openai/v1/responses"], fixture.Handler.RequestPaths);
+        Assert.Contains("\"input\"", fixture.Handler.LastRequestBody);
+        Assert.DoesNotContain("\"messages\"", fixture.Handler.LastRequestBody);
+        Assert.Contains("\"instructions\"", fixture.Handler.LastRequestBody);
+        Assert.Contains("\"input\":\"request:", fixture.Handler.LastRequestBody);
+        Assert.Equal("Bearer", fixture.Handler.LastAuthorizationScheme);
+        Assert.Equal("foundry-key", fixture.Handler.LastAuthorizationParameter);
+        Assert.Null(fixture.Handler.LastApiKeyHeader);
+
+        var usageLog = await fixture.DbContext.AiRequestUsageLogs.SingleAsync();
+        Assert.Equal(81, usageLog.PromptTokens);
+        Assert.Equal(19, usageLog.CompletionTokens);
+        Assert.Equal(100, usageLog.TotalTokens);
+        Assert.Equal(AiRequestOutcome.Success, usageLog.Outcome);
+    }
+
+    [Fact]
     public async Task GetSettingsAsyncReturnsSavedTimeoutSecondsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -232,6 +305,11 @@ public sealed class AiProductMappingServiceTests
         await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
         await fixture.DbContext.SaveChangesAsync();
         await fixture.SeedAiSettingsAsync();
+        await fixture.Service.GetSettingsAsync();
+        var provider = await fixture.DbContext.AiProviderConfigurations.SingleAsync();
+        provider.InputCostPerMillionTokensSek = 10m;
+        provider.OutputCostPerMillionTokensSek = 20m;
+        await fixture.DbContext.SaveChangesAsync();
         fixture.Handler.ResponseBody =
             "{\"choices\":[{\"message\":{\"content\":\"summary: \\\"Suggested 1 TRM component.\\\"\\nsuggestions[1]{component_id\\tconfidence\\treason}:\\n  " +
             component.Id +
@@ -252,6 +330,9 @@ public sealed class AiProductMappingServiceTests
         Assert.Equal(120, usageLog.PromptTokens);
         Assert.Equal(34, usageLog.CompletionTokens);
         Assert.Equal(154, usageLog.TotalTokens);
+        Assert.Equal(0.0012m, usageLog.EstimatedInputCostSek);
+        Assert.Equal(0.00068m, usageLog.EstimatedOutputCostSek);
+        Assert.Equal(0.00188m, usageLog.EstimatedTotalCostSek);
         Assert.Equal(AiRequestOutcome.Success, usageLog.Outcome);
         Assert.True(usageLog.WasSuccessful);
         Assert.Contains("Active Directory", usageLog.RequestSummary);
@@ -403,6 +484,9 @@ public sealed class AiProductMappingServiceTests
                 PromptTokens = 80,
                 CompletionTokens = 20,
                 TotalTokens = 100,
+                EstimatedInputCostSek = 0.0008m,
+                EstimatedOutputCostSek = 0.0004m,
+                EstimatedTotalCostSek = 0.0012m,
                 Outcome = AiRequestOutcome.Success,
                 WasSuccessful = true,
                 DurationMilliseconds = 1500,
@@ -459,15 +543,122 @@ public sealed class AiProductMappingServiceTests
         Assert.Equal(100, model.Dashboard.TokensToday);
         Assert.Equal(100, model.Dashboard.TokensLast7Days);
         Assert.Equal(100, model.Dashboard.AverageTokensPerRequestLast7Days);
+        Assert.Equal(0.0012m, model.Dashboard.CostTodaySek);
+        Assert.Equal(0.0012m, model.Dashboard.CostLast7DaysSek);
         Assert.Equal(1, model.Dashboard.TimedOutRequestsToday);
         Assert.Equal(1, model.Dashboard.TimedOutRequestsLast7Days);
         Assert.Equal(0, model.Dashboard.CancelledRequestsToday);
         Assert.Equal(1, model.Dashboard.CancelledRequestsLast7Days);
         Assert.Equal(0, model.Dashboard.AbortedRequestsToday);
         Assert.Equal(1, model.Dashboard.AbortedRequestsLast7Days);
+        Assert.Equal(0.0012m, Assert.Single(model.Providers).TotalCostLast7DaysSek);
         Assert.Contains(model.RecentUsage, entry => entry.Outcome == AiRequestOutcome.TimedOut && entry.OutcomeLabel == "Timed out");
         Assert.Contains(model.RecentUsage, entry => entry.Outcome == AiRequestOutcome.Cancelled && entry.OutcomeLabel == "Cancelled");
         Assert.Contains(model.RecentUsage, entry => entry.Outcome == AiRequestOutcome.Aborted && entry.OutcomeLabel == "Aborted");
+    }
+
+    [Fact]
+    public async Task BuildAdminViewModelAsyncAggregatesEstimatedCostWindowsAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedAiSettingsAsync();
+        var settings = await fixture.Service.GetSettingsAsync();
+
+        var today = DateTime.UtcNow.Date.AddHours(9);
+        var tenDaysAgo = today.AddDays(-10);
+        var twoHundredDaysAgo = today.AddDays(-200);
+        var fourHundredDaysAgo = today.AddDays(-400);
+
+        await fixture.DbContext.AiRequestUsageLogs.AddRangeAsync(
+            new AiRequestUsageLog
+            {
+                AiProviderConfigurationId = settings.ActiveProviderId,
+                ProviderName = settings.ActiveProviderName ?? "Open WebUI",
+                ProviderType = settings.ActiveProviderType!.Value,
+                Model = settings.Model,
+                RequestKind = "SuggestProductTrmMappings",
+                RequestSummary = "SuggestProductTrmMappings: Active Directory",
+                PromptTokens = 100,
+                CompletionTokens = 25,
+                TotalTokens = 125,
+                EstimatedInputCostSek = 0.10m,
+                EstimatedOutputCostSek = 0.05m,
+                EstimatedTotalCostSek = 0.15m,
+                Outcome = AiRequestOutcome.Success,
+                WasSuccessful = true,
+                DurationMilliseconds = 800,
+                OccurredUtc = today
+            },
+            new AiRequestUsageLog
+            {
+                AiProviderConfigurationId = settings.ActiveProviderId,
+                ProviderName = settings.ActiveProviderName ?? "Open WebUI",
+                ProviderType = settings.ActiveProviderType!.Value,
+                Model = settings.Model,
+                RequestKind = "SuggestProductTrmMappings",
+                RequestSummary = "SuggestProductTrmMappings: Exchange",
+                PromptTokens = 80,
+                CompletionTokens = 20,
+                TotalTokens = 100,
+                EstimatedInputCostSek = 0.12m,
+                EstimatedOutputCostSek = 0.08m,
+                EstimatedTotalCostSek = 0.20m,
+                Outcome = AiRequestOutcome.Success,
+                WasSuccessful = true,
+                DurationMilliseconds = 900,
+                OccurredUtc = tenDaysAgo
+            },
+            new AiRequestUsageLog
+            {
+                AiProviderConfigurationId = settings.ActiveProviderId,
+                ProviderName = settings.ActiveProviderName ?? "Open WebUI",
+                ProviderType = settings.ActiveProviderType!.Value,
+                Model = settings.Model,
+                RequestKind = "SuggestProductTrmMappings",
+                RequestSummary = "SuggestProductTrmMappings: Teams",
+                PromptTokens = 60,
+                CompletionTokens = 15,
+                TotalTokens = 75,
+                EstimatedInputCostSek = 0.18m,
+                EstimatedOutputCostSek = 0.12m,
+                EstimatedTotalCostSek = 0.30m,
+                Outcome = AiRequestOutcome.Success,
+                WasSuccessful = true,
+                DurationMilliseconds = 700,
+                OccurredUtc = twoHundredDaysAgo
+            },
+            new AiRequestUsageLog
+            {
+                AiProviderConfigurationId = settings.ActiveProviderId,
+                ProviderName = settings.ActiveProviderName ?? "Open WebUI",
+                ProviderType = settings.ActiveProviderType!.Value,
+                Model = settings.Model,
+                RequestKind = "SuggestProductTrmMappings",
+                RequestSummary = "SuggestProductTrmMappings: Legacy",
+                PromptTokens = 40,
+                CompletionTokens = 10,
+                TotalTokens = 50,
+                EstimatedInputCostSek = 0.24m,
+                EstimatedOutputCostSek = 0.16m,
+                EstimatedTotalCostSek = 0.40m,
+                Outcome = AiRequestOutcome.Success,
+                WasSuccessful = true,
+                DurationMilliseconds = 600,
+                OccurredUtc = fourHundredDaysAgo
+            });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var model = await fixture.Service.BuildAdminViewModelAsync();
+
+        Assert.Equal(0.15m, model.Dashboard.CostTodaySek);
+        Assert.Equal(0.15m, model.Dashboard.CostLast7DaysSek);
+        Assert.Equal(0.35m, model.Dashboard.CostLast30DaysSek);
+        Assert.Equal(0.65m, model.Dashboard.CostLast365DaysSek);
+
+        var latestUsage = model.RecentUsage[0];
+        Assert.Equal(0.10m, latestUsage.EstimatedInputCostSek);
+        Assert.Equal(0.05m, latestUsage.EstimatedOutputCostSek);
+        Assert.Equal(0.15m, latestUsage.EstimatedTotalCostSek);
     }
 
     private sealed class TestFixture : IAsyncDisposable
@@ -551,16 +742,32 @@ public sealed class AiProductMappingServiceTests
 
     public sealed class CapturingHttpMessageHandler : HttpMessageHandler
     {
+        private sealed record QueuedResponse(HttpStatusCode StatusCode, string ResponseBody);
+
         public string ResponseBody { get; set; } =
             "{\"choices\":[{\"message\":{\"content\":\"summary: \\\"No suggestions\\\"\\nsuggestions[0]{component_id\\tconfidence\\treason}:\"}}]}";
 
         public Dictionary<string, string> ResponseByPath { get; } = new(StringComparer.OrdinalIgnoreCase);
+        private Dictionary<string, Queue<QueuedResponse>> QueuedResponsesByPath { get; } = new(StringComparer.OrdinalIgnoreCase);
         public bool BlockUntilCanceled { get; set; }
         public Exception? ExceptionToThrow { get; set; }
         public string LastRequestBody { get; private set; } = string.Empty;
         public string? LastAuthorizationScheme { get; private set; }
         public string? LastAuthorizationParameter { get; private set; }
+        public string? LastApiKeyHeader { get; private set; }
         public string LastRequestPath { get; private set; } = string.Empty;
+        public List<string> RequestPaths { get; } = [];
+
+        public void EnqueueResponse(string path, HttpStatusCode statusCode, string responseBody)
+        {
+            if (!QueuedResponsesByPath.TryGetValue(path, out var responses))
+            {
+                responses = new Queue<QueuedResponse>();
+                QueuedResponsesByPath[path] = responses;
+            }
+
+            responses.Enqueue(new QueuedResponse(statusCode, responseBody));
+        }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -569,7 +776,11 @@ public sealed class AiProductMappingServiceTests
                 : await request.Content.ReadAsStringAsync(cancellationToken);
             LastAuthorizationScheme = request.Headers.Authorization?.Scheme;
             LastAuthorizationParameter = request.Headers.Authorization?.Parameter;
+            LastApiKeyHeader = request.Headers.TryGetValues("api-key", out var apiKeyValues)
+                ? apiKeyValues.SingleOrDefault()
+                : null;
             LastRequestPath = request.RequestUri?.AbsolutePath ?? string.Empty;
+            RequestPaths.Add(LastRequestPath);
 
             if (BlockUntilCanceled)
             {
@@ -581,11 +792,24 @@ public sealed class AiProductMappingServiceTests
                 throw ExceptionToThrow;
             }
 
-            var responseBody = ResponseByPath.TryGetValue(LastRequestPath, out var mappedResponseBody)
-                ? mappedResponseBody
-                : ResponseBody;
+            HttpStatusCode statusCode;
+            string responseBody;
 
-            return new HttpResponseMessage(HttpStatusCode.OK)
+            if (QueuedResponsesByPath.TryGetValue(LastRequestPath, out var queuedResponses) && queuedResponses.Count > 0)
+            {
+                var queuedResponse = queuedResponses.Dequeue();
+                statusCode = queuedResponse.StatusCode;
+                responseBody = queuedResponse.ResponseBody;
+            }
+            else
+            {
+                statusCode = HttpStatusCode.OK;
+                responseBody = ResponseByPath.TryGetValue(LastRequestPath, out var mappedResponseBody)
+                    ? mappedResponseBody
+                    : ResponseBody;
+            }
+
+            return new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
             };

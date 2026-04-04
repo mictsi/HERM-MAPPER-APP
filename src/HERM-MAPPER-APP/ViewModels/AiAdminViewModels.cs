@@ -40,6 +40,10 @@ public sealed class AiUsageDashboardViewModel
     public int CancelledRequestsLast7Days { get; init; }
     public int AbortedRequestsToday { get; init; }
     public int AbortedRequestsLast7Days { get; init; }
+    public decimal? CostTodaySek { get; init; }
+    public decimal? CostLast7DaysSek { get; init; }
+    public decimal? CostLast30DaysSek { get; init; }
+    public decimal? CostLast365DaysSek { get; init; }
     public DateTime? LastRequestUtc { get; init; }
 }
 
@@ -57,8 +61,11 @@ public sealed class AiProviderSummaryViewModel
     public bool IsConfigured { get; init; }
     public bool HasSavedApiKey { get; init; }
     public string SavedApiKeyDisplay { get; init; } = "Not stored";
+    public decimal? InputCostPerMillionTokensSek { get; init; }
+    public decimal? OutputCostPerMillionTokensSek { get; init; }
     public int RequestsLast7Days { get; init; }
     public int TokensLast7Days { get; init; }
+    public decimal? TotalCostLast7DaysSek { get; init; }
 }
 
 public sealed class AiProviderConfigurationInputModel
@@ -73,7 +80,7 @@ public sealed class AiProviderConfigurationInputModel
     public AiProviderType ProviderType { get; set; } = AiProviderType.OpenWebUi;
 
     [Required, StringLength(2048)]
-    [Display(Name = "Chat completion endpoint")]
+    [Display(Name = "Chat or responses endpoint")]
     public string Endpoint { get; set; } = string.Empty;
 
     [StringLength(200)]
@@ -83,6 +90,14 @@ public sealed class AiProviderConfigurationInputModel
     [StringLength(80)]
     [Display(Name = "API version")]
     public string? ApiVersion { get; set; }
+
+    [Range(typeof(decimal), "0", "1000000000")]
+    [Display(Name = "Input cost per 1 million tokens (SEK)")]
+    public decimal? InputCostPerMillionTokensSek { get; set; }
+
+    [Range(typeof(decimal), "0", "1000000000")]
+    [Display(Name = "Output cost per 1 million tokens (SEK)")]
+    public decimal? OutputCostPerMillionTokensSek { get; set; }
 
     [StringLength(4000)]
     [DataType(DataType.Password)]
@@ -109,5 +124,8 @@ public sealed class AiUsageEntryViewModel
     public AiRequestOutcome Outcome { get; init; } = AiRequestOutcome.Failed;
     public string OutcomeLabel { get; init; } = "Failed";
     public string OutcomeBadgeClass { get; init; } = "text-bg-danger";
+    public decimal? EstimatedInputCostSek { get; init; }
+    public decimal? EstimatedOutputCostSek { get; init; }
+    public decimal? EstimatedTotalCostSek { get; init; }
     public string? ErrorMessage { get; init; }
 }

@@ -14,12 +14,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="obj\**\*.cs" />
     <Compile Remove="artifacts\**\*.cs" />
     <Compile Remove=".artifacts\**\*.cs" />
+    <Content Remove="obj\**" />
     <Content Remove="artifacts\**" />
     <Content Remove=".artifacts\**" />
+    <EmbeddedResource Remove="obj\**" />
     <EmbeddedResource Remove="artifacts\**" />
     <EmbeddedResource Remove=".artifacts\**" />
+    <None Remove="obj\**" />
     <None Remove="artifacts\**" />
     <None Remove=".artifacts\**" />
   </ItemGroup>

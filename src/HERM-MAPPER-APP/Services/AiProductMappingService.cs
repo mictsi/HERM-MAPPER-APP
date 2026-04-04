@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -66,6 +67,14 @@ public sealed class AiProductMappingService(
             LogLevel.Warning,
             new EventId(5, nameof(LogMappingLookupFailed)),
             "AI mapping lookup failed for product {ProductName}.");
+    private enum AiRequestApiMode
+    {
+        ChatCompletions = 1,
+        Responses = 2
+    }
+
+    private readonly record struct AiProviderResponse(HttpStatusCode StatusCode, string Body);
+    private readonly record struct ProviderUsageStats(int Requests, int Tokens, decimal? TotalCost);
 
     public const string SectionKey = "ai-mapping";
 
@@ -93,6 +102,8 @@ public sealed class AiProductMappingService(
             Endpoint = provider.Endpoint.Trim(),
             Model = provider.Model.Trim(),
             ApiVersion = provider.ApiVersion?.Trim(),
+            InputCostPerMillionTokensSek = provider.InputCostPerMillionTokensSek,
+            OutputCostPerMillionTokensSek = provider.OutputCostPerMillionTokensSek,
             ApiKey = apiKey,
             IsEnabled = isEnabled,
             TimeoutSeconds = NormalizeTimeoutSeconds(provider.TimeoutSeconds)
@@ -116,18 +127,40 @@ public sealed class AiProductMappingService(
             .ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
 
-        var sevenDaysAgoUtc = DateTime.UtcNow.Date.AddDays(-6);
-        var usageStats = await dbContext.AiRequestUsageLogs
+        var todayUtc = DateTime.UtcNow.Date;
+        var sevenDaysAgoUtc = todayUtc.AddDays(-6);
+        var thirtyDaysAgoUtc = todayUtc.AddDays(-29);
+        var threeHundredSixtyFiveDaysAgoUtc = todayUtc.AddDays(-364);
+
+        var usageWindowLogs = await dbContext.AiRequestUsageLogs
             .AsNoTracking()
-            .Where(x => x.AiProviderConfigurationId.HasValue && x.OccurredUtc >= sevenDaysAgoUtc)
-            .GroupBy(x => x.AiProviderConfigurationId)
-            .Select(group => new
-            {
-                ProviderId = group.Key!.Value,
-                Requests = group.Count(),
-                Tokens = group.Sum(x => x.TotalTokens ?? 0)
-            })
-            .ToDictionaryAsync(x => x.ProviderId, cancellationToken);
+            .Where(x => x.OccurredUtc >= sevenDaysAgoUtc)
+            .ToListAsync(cancellationToken);
+        var recentUsageLogs = await dbContext.AiRequestUsageLogs
+            .AsNoTracking()
+            .OrderByDescending(x => x.OccurredUtc)
+            .Take(40)
+            .ToListAsync(cancellationToken);
+        var last30DayCostValues = await dbContext.AiRequestUsageLogs
+            .AsNoTracking()
+            .Where(x => x.OccurredUtc >= thirtyDaysAgoUtc)
+            .Select(x => x.EstimatedTotalCostSek)
+            .ToListAsync(cancellationToken);
+        var last365DayCostValues = await dbContext.AiRequestUsageLogs
+            .AsNoTracking()
+            .Where(x => x.OccurredUtc >= threeHundredSixtyFiveDaysAgoUtc)
+            .Select(x => x.EstimatedTotalCostSek)
+            .ToListAsync(cancellationToken);
+
+        var usageStats = usageWindowLogs
+            .Where(x => x.AiProviderConfigurationId.HasValue)
+            .GroupBy(x => x.AiProviderConfigurationId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => new ProviderUsageStats(
+                    group.Count(),
+                    group.Sum(x => x.TotalTokens ?? 0),
+                    SumEstimatedCostOrNull(group)));
 
         var providerSummaries = new List<AiProviderSummaryViewModel>();
         foreach (var provider in providers)
@@ -149,8 +182,11 @@ public sealed class AiProductMappingService(
                 IsConfigured = IsProviderConfigured(provider.Endpoint, provider.Model, apiKey),
                 HasSavedApiKey = !string.IsNullOrWhiteSpace(apiKey),
                 SavedApiKeyDisplay = string.IsNullOrWhiteSpace(apiKey) ? "Not stored" : $"Stored ({apiKey.Length} chars)",
-                RequestsLast7Days = usage?.Requests ?? 0,
-                TokensLast7Days = usage?.Tokens ?? 0
+                InputCostPerMillionTokensSek = provider.InputCostPerMillionTokensSek,
+                OutputCostPerMillionTokensSek = provider.OutputCostPerMillionTokensSek,
+                RequestsLast7Days = usage.Requests,
+                TokensLast7Days = usage.Tokens,
+                TotalCostLast7DaysSek = usage.TotalCost
             });
         }
 
@@ -195,17 +231,6 @@ public sealed class AiProductMappingService(
             }
         }
 
-        var todayUtc = DateTime.UtcNow.Date;
-        var usageWindowLogs = await dbContext.AiRequestUsageLogs
-            .AsNoTracking()
-            .Where(x => x.OccurredUtc >= sevenDaysAgoUtc)
-            .ToListAsync(cancellationToken);
-        var recentUsageLogs = await dbContext.AiRequestUsageLogs
-            .AsNoTracking()
-            .OrderByDescending(x => x.OccurredUtc)
-            .Take(40)
-            .ToListAsync(cancellationToken);
-
         var requestsToday = usageWindowLogs.Count(x => x.OccurredUtc >= todayUtc);
         var requestsLast7Days = usageWindowLogs.Count;
         var tokensToday = usageWindowLogs
@@ -224,6 +249,10 @@ public sealed class AiProductMappingService(
         var cancelledRequestsLast7Days = usageWindowLogs.Count(x => x.Outcome == AiRequestOutcome.Cancelled);
         var abortedRequestsToday = usageWindowLogs.Count(x => x.OccurredUtc >= todayUtc && x.Outcome == AiRequestOutcome.Aborted);
         var abortedRequestsLast7Days = usageWindowLogs.Count(x => x.Outcome == AiRequestOutcome.Aborted);
+        var costTodaySek = SumEstimatedCostOrNull(usageWindowLogs.Where(x => x.OccurredUtc >= todayUtc));
+        var costLast7DaysSek = SumEstimatedCostOrNull(usageWindowLogs);
+        var costLast30DaysSek = SumEstimatedCostOrNull(last30DayCostValues);
+        var costLast365DaysSek = SumEstimatedCostOrNull(last365DayCostValues);
 
         return new AiMappingAdminIndexViewModel
         {
@@ -253,6 +282,10 @@ public sealed class AiProductMappingService(
                 CancelledRequestsLast7Days = cancelledRequestsLast7Days,
                 AbortedRequestsToday = abortedRequestsToday,
                 AbortedRequestsLast7Days = abortedRequestsLast7Days,
+                CostTodaySek = costTodaySek,
+                CostLast7DaysSek = costLast7DaysSek,
+                CostLast30DaysSek = costLast30DaysSek,
+                CostLast365DaysSek = costLast365DaysSek,
                 LastRequestUtc = recentUsageLogs.FirstOrDefault()?.OccurredUtc
             },
             Providers = providerSummaries,
@@ -277,6 +310,9 @@ public sealed class AiProductMappingService(
                     Outcome = log.Outcome,
                     OutcomeLabel = GetOutcomeLabel(log.Outcome),
                     OutcomeBadgeClass = GetOutcomeBadgeClass(log.Outcome),
+                    EstimatedInputCostSek = log.EstimatedInputCostSek,
+                    EstimatedOutputCostSek = log.EstimatedOutputCostSek,
+                    EstimatedTotalCostSek = log.EstimatedTotalCostSek,
                     ErrorMessage = log.ErrorMessage
                 })
                 .ToList()
@@ -304,7 +340,7 @@ public sealed class AiProductMappingService(
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri) ||
             (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps))
         {
-            return AiProviderSaveResult.Failure("Enter a valid HTTP or HTTPS chat completion endpoint.");
+            return AiProviderSaveResult.Failure("Enter a valid HTTP or HTTPS chat or responses endpoint.");
         }
 
         if (string.IsNullOrWhiteSpace(input.Name))
@@ -349,7 +385,9 @@ public sealed class AiProductMappingService(
         provider.ProviderType = input.ProviderType;
         provider.Endpoint = endpoint;
         provider.Model = input.Model;
-        provider.ApiVersion = NormalizeApiVersion(input.ProviderType, input.ApiVersion);
+        provider.ApiVersion = NormalizeApiVersion(input.ProviderType, endpoint, input.ApiVersion);
+        provider.InputCostPerMillionTokensSek = input.InputCostPerMillionTokensSek;
+        provider.OutputCostPerMillionTokensSek = input.OutputCostPerMillionTokensSek;
         provider.TimeoutSeconds = NormalizeTimeoutSeconds(input.TimeoutSeconds);
         provider.UpdatedUtc = DateTime.UtcNow;
 
@@ -369,7 +407,7 @@ public sealed class AiProductMappingService(
             nameof(AiProviderConfiguration),
             provider.Id,
             $"{(existingProvider is null ? "Created" : "Updated")} AI provider configuration '{provider.Name}'.",
-            $"Provider: {GetProviderLabel(provider.ProviderType)}; endpoint: {provider.Endpoint}; model: {provider.Model}; timeout seconds: {provider.TimeoutSeconds}.",
+            $"Provider: {GetProviderLabel(provider.ProviderType)}; endpoint: {provider.Endpoint}; model: {provider.Model}; timeout seconds: {provider.TimeoutSeconds}; input cost per 1M tokens (SEK): {(provider.InputCostPerMillionTokensSek?.ToString("0.######", CultureInfo.InvariantCulture) ?? "not set")}; output cost per 1M tokens (SEK): {(provider.OutputCostPerMillionTokensSek?.ToString("0.######", CultureInfo.InvariantCulture) ?? "not set")}.",
             cancellationToken);
 
         var successMessage = "AI provider configuration updated.";
@@ -532,7 +570,7 @@ public sealed class AiProductMappingService(
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, modelsEndpoint);
-        ApplyAuthentication(request, provider.ProviderType, apiKey!);
+        ApplyAuthentication(request, provider.ProviderType, apiKey!, modelsEndpoint);
 
         var timeoutSeconds = Math.Min(MaxModelDiscoveryTimeoutSeconds, NormalizeTimeoutSeconds(provider.TimeoutSeconds));
         using var timeoutCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -611,46 +649,24 @@ public sealed class AiProductMappingService(
                 .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
                 .ToListAsync(cancellationToken);
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, BuildChatCompletionEndpoint(settings))
-            {
-                Content = new StringContent(
-                    JsonSerializer.Serialize(new
-                    {
-                        model = settings.Model,
-                        messages = new object[]
-                        {
-                            new
-                            {
-                                role = "system",
-                                content = SystemPrompt
-                            },
-                            new
-                            {
-                                role = "user",
-                                content = BuildUserPrompt(product, components)
-                            }
-                        }
-                    }),
-                    Encoding.UTF8,
-                    "application/json")
-            };
-            ApplyAuthentication(request, settings.ActiveProviderType!.Value, settings.ApiKey!);
+            var userPrompt = BuildUserPrompt(product, components);
 
             timeoutCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(settings.TimeoutSeconds));
 
             requestDispatched = true;
-            using var response = await SendRequestAsync(
-                request,
+            var response = await SendProviderRequestWithFallbackAsync(
+                settings,
+                userPrompt,
                 $"mapping lookup for product '{product.Name}'",
                 settings.TimeoutSeconds,
                 cancellationToken,
                 timeoutCancellationTokenSource.Token);
 
-            var responseBody = await response.Content.ReadAsStringAsync(timeoutCancellationTokenSource.Token);
+            var responseBody = response.Body;
             usage = ParseUsage(responseBody);
 
-            if (!response.IsSuccessStatusCode)
+            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
             {
                 errorMessage = $"AI mapping lookup failed with status {(int)response.StatusCode}: {responseBody}";
                 outcome = AiRequestOutcome.Failed;
@@ -773,7 +789,7 @@ public sealed class AiProductMappingService(
         providerType switch
         {
             AiProviderType.OpenAiApi => "OpenAI API",
-            AiProviderType.AzureAiFoundry => "Azure AI Foundry",
+            AiProviderType.AzureAiFoundry => "Azure AI Foundry - OpenAI Endpoint",
             _ => "Open WebUI"
         };
 
@@ -884,6 +900,8 @@ public sealed class AiProductMappingService(
                 Endpoint = provider.Endpoint,
                 Model = provider.Model,
                 ApiVersion = provider.ApiVersion,
+                InputCostPerMillionTokensSek = provider.InputCostPerMillionTokensSek,
+                OutputCostPerMillionTokensSek = provider.OutputCostPerMillionTokensSek,
                 TimeoutSeconds = NormalizeTimeoutSeconds(provider.TimeoutSeconds)
             };
 
@@ -903,12 +921,16 @@ public sealed class AiProductMappingService(
         input.Endpoint = input.Endpoint?.Trim() ?? string.Empty;
         input.Model = input.Model?.Trim() ?? string.Empty;
         input.ApiVersion = string.IsNullOrWhiteSpace(input.ApiVersion) ? null : input.ApiVersion.Trim();
+        input.InputCostPerMillionTokensSek = NormalizeTokenCostPerMillionSek(input.InputCostPerMillionTokensSek);
+        input.OutputCostPerMillionTokensSek = NormalizeTokenCostPerMillionSek(input.OutputCostPerMillionTokensSek);
         input.ApiKey = string.IsNullOrWhiteSpace(input.ApiKey) ? null : input.ApiKey.Trim();
         input.TimeoutSeconds = NormalizeTimeoutSeconds(input.TimeoutSeconds);
     }
 
-    private static string? NormalizeApiVersion(AiProviderType providerType, string? apiVersion) =>
-        providerType == AiProviderType.AzureAiFoundry && !string.IsNullOrWhiteSpace(apiVersion)
+    private static string? NormalizeApiVersion(AiProviderType providerType, string endpoint, string? apiVersion) =>
+        providerType == AiProviderType.AzureAiFoundry &&
+        !IsOpenAiV1Endpoint(endpoint) &&
+        !string.IsNullOrWhiteSpace(apiVersion)
             ? apiVersion.Trim()
             : null;
 
@@ -922,17 +944,125 @@ public sealed class AiProductMappingService(
             ? timeoutSeconds
             : AppSettingDefaults.AiMappingTimeoutSeconds;
 
+    private static decimal? NormalizeTokenCostPerMillionSek(decimal? costPerMillionTokensSek) =>
+        costPerMillionTokensSek.HasValue
+            ? Math.Round(Math.Max(0m, costPerMillionTokensSek.Value), 6, MidpointRounding.AwayFromZero)
+            : null;
+
     private static string BuildProviderApiKeySettingKey(int providerId) =>
         $"AiProvider.{providerId}.ApiKey";
 
-    private static string BuildChatCompletionEndpoint(AiProductMappingSettingsSnapshot settings)
+    private static HttpRequestMessage BuildAiProviderRequest(
+        AiProductMappingSettingsSnapshot settings,
+        AiRequestApiMode requestApiMode,
+        string userPrompt)
     {
-        if (settings.ActiveProviderType != AiProviderType.AzureAiFoundry || string.IsNullOrWhiteSpace(settings.ApiVersion))
+        var endpoint = BuildProviderRequestEndpoint(settings, requestApiMode);
+        var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
-            return settings.Endpoint;
+            Content = new StringContent(
+                BuildRequestPayload(settings, requestApiMode, userPrompt),
+                Encoding.UTF8,
+                "application/json")
+        };
+
+        ApplyAuthentication(request, settings.ActiveProviderType!.Value, settings.ApiKey!, endpoint);
+        return request;
+    }
+
+    private async Task<AiProviderResponse> SendProviderRequestWithFallbackAsync(
+        AiProductMappingSettingsSnapshot settings,
+        string userPrompt,
+        string operationTarget,
+        int timeoutSeconds,
+        CancellationToken callerCancellationToken,
+        CancellationToken requestCancellationToken)
+    {
+        var requestApiMode = DetermineRequestApiMode(settings.Endpoint);
+        var response = await SendProviderRequestAsync(
+            settings,
+            requestApiMode,
+            userPrompt,
+            operationTarget,
+            timeoutSeconds,
+            callerCancellationToken,
+            requestCancellationToken);
+
+        if (!ShouldRetryWithResponses(settings.ActiveProviderType!.Value, settings.Endpoint, requestApiMode, response.StatusCode, response.Body))
+        {
+            return response;
         }
 
-        var endpointUri = new Uri(settings.Endpoint, UriKind.Absolute);
+        return await SendProviderRequestAsync(
+            settings,
+            AiRequestApiMode.Responses,
+            userPrompt,
+            operationTarget,
+            timeoutSeconds,
+            callerCancellationToken,
+            requestCancellationToken);
+    }
+
+    private async Task<AiProviderResponse> SendProviderRequestAsync(
+        AiProductMappingSettingsSnapshot settings,
+        AiRequestApiMode requestApiMode,
+        string userPrompt,
+        string operationTarget,
+        int timeoutSeconds,
+        CancellationToken callerCancellationToken,
+        CancellationToken requestCancellationToken)
+    {
+        using var request = BuildAiProviderRequest(settings, requestApiMode, userPrompt);
+        using var response = await SendRequestAsync(
+            request,
+            operationTarget,
+            timeoutSeconds,
+            callerCancellationToken,
+            requestCancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(requestCancellationToken);
+        return new AiProviderResponse(response.StatusCode, responseBody);
+    }
+
+    private static AiRequestApiMode DetermineRequestApiMode(string endpoint) =>
+        IsResponsesEndpoint(endpoint)
+            ? AiRequestApiMode.Responses
+            : AiRequestApiMode.ChatCompletions;
+
+    private static bool ShouldRetryWithResponses(
+        AiProviderType providerType,
+        string endpoint,
+        AiRequestApiMode requestApiMode,
+        HttpStatusCode statusCode,
+        string responseBody)
+    {
+        if (requestApiMode == AiRequestApiMode.Responses ||
+            statusCode != HttpStatusCode.BadRequest ||
+            providerType == AiProviderType.OpenWebUi)
+        {
+            return false;
+        }
+
+        return !string.Equals(BuildResponsesEndpoint(endpoint), endpoint, StringComparison.OrdinalIgnoreCase) &&
+               (responseBody.Contains("Unsupported parameter: 'messages'", StringComparison.OrdinalIgnoreCase) ||
+                responseBody.Contains("In the Responses API", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string BuildProviderRequestEndpoint(
+        AiProductMappingSettingsSnapshot settings,
+        AiRequestApiMode requestApiMode)
+    {
+        var endpoint = requestApiMode == AiRequestApiMode.Responses
+            ? BuildResponsesEndpoint(settings.Endpoint)
+            : settings.Endpoint;
+
+        if (settings.ActiveProviderType != AiProviderType.AzureAiFoundry ||
+            string.IsNullOrWhiteSpace(settings.ApiVersion) ||
+            IsOpenAiV1Endpoint(endpoint))
+        {
+            return endpoint;
+        }
+
+        var endpointUri = new Uri(endpoint, UriKind.Absolute);
         var builder = new UriBuilder(endpointUri);
         var querySegments = builder.Query.TrimStart('?')
             .Split('&', StringSplitOptions.RemoveEmptyEntries)
@@ -943,9 +1073,44 @@ public sealed class AiProductMappingService(
         return builder.Uri.ToString();
     }
 
-    private static void ApplyAuthentication(HttpRequestMessage request, AiProviderType providerType, string apiKey)
+    private static string BuildRequestPayload(
+        AiProductMappingSettingsSnapshot settings,
+        AiRequestApiMode requestApiMode,
+        string userPrompt)
     {
-        if (providerType == AiProviderType.AzureAiFoundry)
+        object payload = requestApiMode switch
+        {
+            AiRequestApiMode.Responses => new
+            {
+                model = settings.Model,
+                instructions = SystemPrompt,
+                input = userPrompt
+            },
+            _ => new
+            {
+                model = settings.Model,
+                messages = new object[]
+                {
+                    new
+                    {
+                        role = "system",
+                        content = SystemPrompt
+                    },
+                    new
+                    {
+                        role = "user",
+                        content = userPrompt
+                    }
+                }
+            }
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
+    private static void ApplyAuthentication(HttpRequestMessage request, AiProviderType providerType, string apiKey, string endpoint)
+    {
+        if (providerType == AiProviderType.AzureAiFoundry && !IsOpenAiV1Endpoint(endpoint))
         {
             request.Headers.TryAddWithoutValidation("api-key", apiKey);
             return;
@@ -956,6 +1121,48 @@ public sealed class AiProductMappingService(
 
     private static bool SupportsModelDiscovery(AiProviderType providerType) =>
         providerType is AiProviderType.OpenWebUi or AiProviderType.OpenAiApi;
+
+    private static bool IsResponsesEndpoint(string endpoint)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
+        {
+            return false;
+        }
+
+        return endpointUri.AbsolutePath.EndsWith("/responses", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsOpenAiV1Endpoint(string endpoint)
+    {
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
+        {
+            return false;
+        }
+
+        return endpointUri.AbsolutePath.StartsWith("/openai/v1/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildResponsesEndpoint(string endpoint)
+    {
+        var endpointUri = new Uri(endpoint, UriKind.Absolute);
+        var builder = new UriBuilder(endpointUri)
+        {
+            Path = BuildResponsesPath(endpointUri.AbsolutePath)
+        };
+        return builder.Uri.ToString();
+    }
+
+    private static string BuildResponsesPath(string currentPath)
+    {
+        const string chatCompletionsSuffix = "/chat/completions";
+
+        if (currentPath.EndsWith(chatCompletionsSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return currentPath[..^chatCompletionsSuffix.Length] + "/responses";
+        }
+
+        return currentPath;
+    }
 
     private static bool TryBuildModelsEndpoint(AiProviderConfiguration provider, out string endpoint)
     {
@@ -1126,45 +1333,146 @@ public sealed class AiProductMappingService(
     private static string ExtractAssistantContent(string responseBody)
     {
         using var document = JsonDocument.Parse(responseBody);
-        if (!document.RootElement.TryGetProperty("choices", out var choices) ||
+        if (TryExtractChatCompletionContent(document.RootElement, out var chatCompletionContent))
+        {
+            return chatCompletionContent;
+        }
+
+        return TryExtractResponsesContent(document.RootElement, out var responsesContent)
+            ? responsesContent
+            : string.Empty;
+    }
+
+    private static bool TryExtractChatCompletionContent(JsonElement rootElement, out string contentText)
+    {
+        contentText = string.Empty;
+
+        if (!rootElement.TryGetProperty("choices", out var choices) ||
             choices.ValueKind != JsonValueKind.Array ||
             choices.GetArrayLength() == 0)
         {
-            return string.Empty;
+            return false;
         }
 
         if (!choices[0].TryGetProperty("message", out var message) ||
             !message.TryGetProperty("content", out var content))
         {
-            return string.Empty;
+            return false;
         }
 
         if (content.ValueKind == JsonValueKind.String)
         {
-            return content.GetString() ?? string.Empty;
+            var value = content.GetString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            contentText = value;
+            return true;
         }
 
         if (content.ValueKind != JsonValueKind.Array)
         {
-            return string.Empty;
+            return false;
         }
 
         var builder = new StringBuilder();
-        using var enumerator = content.EnumerateArray();
+        AppendContentText(builder, content);
+        var output = builder.ToString();
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return false;
+        }
+
+        contentText = output;
+        return true;
+    }
+
+    private static bool TryExtractResponsesContent(JsonElement rootElement, out string contentText)
+    {
+        contentText = string.Empty;
+
+        if (rootElement.TryGetProperty("output_text", out var outputText) && outputText.ValueKind == JsonValueKind.String)
+        {
+            var value = outputText.GetString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                contentText = value;
+                return true;
+            }
+        }
+
+        if (!rootElement.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var builder = new StringBuilder();
+        using var enumerator = output.EnumerateArray();
         while (enumerator.MoveNext())
         {
             var item = enumerator.Current;
-            if (item.ValueKind != JsonValueKind.Object ||
-                !item.TryGetProperty("text", out var text) ||
-                text.ValueKind != JsonValueKind.String)
+            if (item.ValueKind != JsonValueKind.Object)
             {
                 continue;
             }
 
-            builder.Append(text.GetString());
+            if (item.TryGetProperty("content", out var content))
+            {
+                AppendContentText(builder, content);
+            }
         }
 
-        return builder.ToString();
+        var valueFromOutput = builder.ToString();
+        if (string.IsNullOrWhiteSpace(valueFromOutput))
+        {
+            return false;
+        }
+
+        contentText = valueFromOutput;
+        return true;
+    }
+
+    private static void AppendContentText(StringBuilder builder, JsonElement content)
+    {
+        if (content.ValueKind == JsonValueKind.String)
+        {
+            builder.Append(content.GetString());
+            return;
+        }
+
+        if (content.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        using var enumerator = content.EnumerateArray();
+        while (enumerator.MoveNext())
+        {
+            var item = enumerator.Current;
+            if (item.ValueKind == JsonValueKind.String)
+            {
+                builder.Append(item.GetString());
+                continue;
+            }
+
+            if (item.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            if (item.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+            {
+                builder.Append(text.GetString());
+                continue;
+            }
+
+            if (item.TryGetProperty("content", out var nestedContent))
+            {
+                AppendContentText(builder, nestedContent);
+            }
+        }
     }
 
     private static ParsedAiUsage? ParseUsage(string responseBody)
@@ -1415,6 +1723,10 @@ public sealed class AiProductMappingService(
             truncatedErrorMessage = truncatedErrorMessage[..2000];
         }
 
+        var estimatedInputCostSek = CalculateEstimatedTokenCostSek(settings.InputCostPerMillionTokensSek, usage?.PromptTokens);
+        var estimatedOutputCostSek = CalculateEstimatedTokenCostSek(settings.OutputCostPerMillionTokensSek, usage?.CompletionTokens);
+        var estimatedTotalCostSek = SumEstimatedCostOrNull([estimatedInputCostSek, estimatedOutputCostSek]);
+
         dbContext.AiRequestUsageLogs.Add(new AiRequestUsageLog
         {
             AiProviderConfigurationId = settings.ActiveProviderId,
@@ -1426,6 +1738,9 @@ public sealed class AiProductMappingService(
             PromptTokens = usage?.PromptTokens,
             CompletionTokens = usage?.CompletionTokens,
             TotalTokens = usage?.TotalTokens,
+            EstimatedInputCostSek = estimatedInputCostSek,
+            EstimatedOutputCostSek = estimatedOutputCostSek,
+            EstimatedTotalCostSek = estimatedTotalCostSek,
             Outcome = outcome,
             WasSuccessful = outcome == AiRequestOutcome.Success,
             DurationMilliseconds = Math.Max(0, (int)Math.Round(duration.TotalMilliseconds, MidpointRounding.AwayFromZero)),
@@ -1455,6 +1770,31 @@ public sealed class AiProductMappingService(
             AiRequestOutcome.Aborted => "text-bg-dark",
             _ => "text-bg-danger"
         };
+
+    private static decimal? CalculateEstimatedTokenCostSek(decimal? costPerMillionTokensSek, int? tokenCount)
+    {
+        if (!costPerMillionTokensSek.HasValue || !tokenCount.HasValue || tokenCount.Value < 0)
+        {
+            return null;
+        }
+
+        return Math.Round(tokenCount.Value * costPerMillionTokensSek.Value / 1_000_000m, 6, MidpointRounding.AwayFromZero);
+    }
+
+    private static decimal? SumEstimatedCostOrNull(IEnumerable<AiRequestUsageLog> logs) =>
+        SumEstimatedCostOrNull(logs.Select(x => x.EstimatedTotalCostSek));
+
+    private static decimal? SumEstimatedCostOrNull(IEnumerable<decimal?> costValues)
+    {
+        var pricedValues = costValues
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .ToList();
+
+        return pricedValues.Count == 0
+            ? null
+            : pricedValues.Sum();
+    }
 
     private static int TryParseTimeoutSeconds(string? value)
     {
@@ -1491,6 +1831,8 @@ public sealed class AiProductMappingSettingsSnapshot
     public string Endpoint { get; init; } = string.Empty;
     public string Model { get; init; } = string.Empty;
     public string? ApiVersion { get; init; }
+    public decimal? InputCostPerMillionTokensSek { get; init; }
+    public decimal? OutputCostPerMillionTokensSek { get; init; }
     public string? ApiKey { get; init; }
     public bool IsEnabled { get; init; }
     public int TimeoutSeconds { get; init; } = AppSettingDefaults.AiMappingTimeoutSeconds;

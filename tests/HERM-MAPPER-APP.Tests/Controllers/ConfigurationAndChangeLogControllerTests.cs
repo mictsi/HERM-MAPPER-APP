@@ -170,6 +170,8 @@ public sealed class ConfigurationAndChangeLogControllerTests
             ProviderType = AiProviderType.OpenWebUi,
             Endpoint = " http://localhost:3000/api/chat/completions ",
             Model = " gpt-oss:latest ",
+            InputCostPerMillionTokensSek = 8.5m,
+            OutputCostPerMillionTokensSek = 24.75m,
             ApiKey = "lab-key",
             TimeoutSeconds = 180
         });
@@ -186,6 +188,8 @@ public sealed class ConfigurationAndChangeLogControllerTests
         Assert.Equal(AiProviderType.OpenWebUi, provider.ProviderType);
         Assert.Equal("http://localhost:3000/api/chat/completions", provider.Endpoint);
         Assert.Equal("gpt-oss:latest", provider.Model);
+        Assert.Equal(8.5m, provider.InputCostPerMillionTokensSek);
+        Assert.Equal(24.75m, provider.OutputCostPerMillionTokensSek);
         Assert.Equal(180, provider.TimeoutSeconds);
         Assert.True(provider.IsActive);
         Assert.StartsWith("dp:", settings[$"AiProvider.{provider.Id}.ApiKey"], StringComparison.Ordinal);

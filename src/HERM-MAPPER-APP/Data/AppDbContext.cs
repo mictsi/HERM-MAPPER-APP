@@ -217,6 +217,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Endpoint).HasMaxLength(2048);
             entity.Property(x => x.Model).HasMaxLength(200);
             entity.Property(x => x.ApiVersion).HasMaxLength(80);
+            entity.Property(x => x.InputCostPerMillionTokensSek).HasPrecision(18, 6);
+            entity.Property(x => x.OutputCostPerMillionTokensSek).HasPrecision(18, 6);
         });
 
         modelBuilder.Entity<AiRequestUsageLog>(entity =>
@@ -228,7 +230,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Model).HasMaxLength(200);
             entity.Property(x => x.RequestKind).HasMaxLength(80);
             entity.Property(x => x.RequestSummary).HasMaxLength(400);
-            entity.Property(x => x.Outcome).HasDefaultValue(AiRequestOutcome.Failed);
+            entity.Property(x => x.EstimatedInputCostSek).HasPrecision(18, 6);
+            entity.Property(x => x.EstimatedOutputCostSek).HasPrecision(18, 6);
+            entity.Property(x => x.EstimatedTotalCostSek).HasPrecision(18, 6);
             entity.Property(x => x.ErrorMessage).HasMaxLength(2000);
             entity.HasOne(x => x.AiProviderConfiguration)
                 .WithMany(x => x.UsageLogs)

@@ -20,6 +20,8 @@ public sealed class MappingsController(
     ConfigurableFieldService configurableFieldService,
     AiProductMappingService aiProductMappingService) : Controller
 {
+    private const decimal AiSuggestionAutoSelectThreshold = 0.8m;
+
     public async Task<IActionResult> IndexAsync(string? search, MappingStatus? status, int? domainId, int? capabilityId)
     {
         if (!ModelState.IsValid)
@@ -1012,7 +1014,7 @@ public sealed class MappingsController(
                     Confidence = suggestion.Confidence,
                     ConfidenceLabel = suggestion.Confidence.ToString("P0", CultureInfo.InvariantCulture),
                     Reason = suggestion.Reason,
-                    Selected = true
+                    Selected = suggestion.Confidence >= AiSuggestionAutoSelectThreshold
                 })
                 .ToList()
         };

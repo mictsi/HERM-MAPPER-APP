@@ -926,11 +926,12 @@ public sealed class MappingsControllerTests
         var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
         var capability = new TrmCapability { Code = "TP001", Name = "Identity", ParentDomain = domain, ParentDomainCode = domain.Code };
         var component = new TrmComponent { Code = "TC001", Name = "Directory Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var secondaryComponent = new TrmComponent { Code = "TC002", Name = "Authentication Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
         var product = new ProductCatalogItem { Name = "Active Directory" };
-        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, secondaryComponent, product);
         await fixture.SeedAiSettingsAsync();
         await fixture.DbContext.SaveChangesAsync();
-        fixture.SetAiLookupResponseBody($"{{\"choices\":[{{\"message\":{{\"content\":\"summary: \\\"Suggested 1 TRM component.\\\"\\nsuggestions[1]{{component_id\\tconfidence\\treason}}:\\n  {component.Id}\\t0.95\\tMatches core identity and directory capabilities.\"}}}}]}}");
+        fixture.SetAiLookupResponseBody($"{{\"choices\":[{{\"message\":{{\"content\":\"summary: \\\"Suggested 2 TRM components.\\\"\\nsuggestions[2]{{component_id\\tconfidence\\treason}}:\\n  {component.Id}\\t0.95\\tMatches core identity and directory capabilities.\\n  {secondaryComponent.Id}\\t0.79\\tSupports sign-in flows but is less direct.\"}}}}]}}");
 
         using var controller = fixture.CreateController();
         var result = await controller.LookupWithAiAsync(product.Id);
@@ -940,10 +941,16 @@ public sealed class MappingsControllerTests
         var model = Assert.IsType<AiMappingReviewViewModel>(view.Model);
         Assert.Equal(product.Id, model.ProductId);
         Assert.True(model.LookupCompleted);
-        var suggestion = Assert.Single(model.Suggestions);
-        Assert.Equal(component.Id, suggestion.ComponentId);
-        Assert.Equal(component.DisplayLabel, suggestion.ComponentLabel);
-        Assert.Contains("95", suggestion.ConfidenceLabel);
+        Assert.Equal(2, model.Suggestions.Count);
+
+        var primarySuggestion = model.Suggestions.Single(x => x.ComponentId == component.Id);
+        Assert.Equal(component.DisplayLabel, primarySuggestion.ComponentLabel);
+        Assert.Contains("95", primarySuggestion.ConfidenceLabel);
+        Assert.True(primarySuggestion.Selected);
+
+        var secondarySuggestion = model.Suggestions.Single(x => x.ComponentId == secondaryComponent.Id);
+        Assert.Contains("79", secondarySuggestion.ConfidenceLabel);
+        Assert.False(secondarySuggestion.Selected);
     }
 
     [Fact]

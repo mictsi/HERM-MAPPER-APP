@@ -63,6 +63,8 @@
             <input asp-for="TimeoutSeconds" type="hidden" />
             <input asp-for="LookupCompleted" type="hidden" />
 
+            <div class="alert alert-secondary" role="status">Suggestions with confidence below 80% are shown, but only suggestions at or above 80% are preselected.</div>
+
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>

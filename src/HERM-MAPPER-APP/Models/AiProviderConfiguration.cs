@@ -30,6 +30,10 @@ public sealed class AiProviderConfiguration
 
     public string? ApiVersion { get; set; }
 
+    public decimal? InputCostPerMillionTokensSek { get; set; }
+
+    public decimal? OutputCostPerMillionTokensSek { get; set; }
+
     public int TimeoutSeconds { get; set; } = AppSettingDefaults.AiMappingTimeoutSeconds;
 
     public bool IsActive { get; set; }
@@ -64,6 +68,12 @@ public sealed class AiRequestUsageLog
     public int? CompletionTokens { get; set; }
 
     public int? TotalTokens { get; set; }
+
+    public decimal? EstimatedInputCostSek { get; set; }
+
+    public decimal? EstimatedOutputCostSek { get; set; }
+
+    public decimal? EstimatedTotalCostSek { get; set; }
 
     public AiRequestOutcome Outcome { get; set; } = AiRequestOutcome.Failed;
 

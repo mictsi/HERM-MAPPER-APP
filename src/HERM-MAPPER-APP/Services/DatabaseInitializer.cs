@@ -1944,6 +1944,8 @@ public sealed partial class DatabaseInitializer(
                     "Endpoint" TEXT NOT NULL,
                     "Model" TEXT NOT NULL,
                     "ApiVersion" TEXT NULL,
+                    "InputCostPerMillionTokensSek" REAL NULL,
+                    "OutputCostPerMillionTokensSek" REAL NULL,
                     "TimeoutSeconds" INTEGER NOT NULL,
                     "IsActive" INTEGER NOT NULL DEFAULT 0,
                     "CreatedUtc" TEXT NOT NULL,
@@ -1966,6 +1968,32 @@ public sealed partial class DatabaseInitializer(
                 """,
                 cancellationToken);
 
+            if (!await SqliteColumnExistsAsync("AiProviderConfigurations", "InputCostPerMillionTokensSek", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AiProviderConfigurations ADD COLUMN InputCostPerMillionTokensSek REAL NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("AiProviderConfigurations", "OutputCostPerMillionTokensSek", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AiProviderConfigurations ADD COLUMN OutputCostPerMillionTokensSek REAL NULL",
+                    cancellationToken);
+            }
+
+            if (await SqliteColumnExistsAsync("AiProviderConfigurations", "CostPerMillionTokensSek", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    """
+                    UPDATE "AiProviderConfigurations"
+                    SET "InputCostPerMillionTokensSek" = COALESCE("InputCostPerMillionTokensSek", "CostPerMillionTokensSek"),
+                        "OutputCostPerMillionTokensSek" = COALESCE("OutputCostPerMillionTokensSek", "CostPerMillionTokensSek")
+                    WHERE "CostPerMillionTokensSek" IS NOT NULL
+                    """,
+                    cancellationToken);
+            }
+
             return;
         }
 
@@ -1982,6 +2010,8 @@ public sealed partial class DatabaseInitializer(
                         [Endpoint] NVARCHAR(2048) NOT NULL,
                         [Model] NVARCHAR(200) NOT NULL,
                         [ApiVersion] NVARCHAR(80) NULL,
+                        [InputCostPerMillionTokensSek] DECIMAL(18,6) NULL,
+                        [OutputCostPerMillionTokensSek] DECIMAL(18,6) NULL,
                         [TimeoutSeconds] INT NOT NULL,
                         [IsActive] BIT NOT NULL CONSTRAINT [DF_AiProviderConfigurations_IsActive] DEFAULT 0,
                         [CreatedUtc] DATETIME2 NOT NULL,
@@ -2020,6 +2050,30 @@ public sealed partial class DatabaseInitializer(
                 END
                 """,
                 cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[AiProviderConfigurations]', N'InputCostPerMillionTokensSek') IS NULL
+                BEGIN
+                    ALTER TABLE [AiProviderConfigurations]
+                    ADD [InputCostPerMillionTokensSek] DECIMAL(18,6) NULL;
+                END
+
+                IF COL_LENGTH(N'[AiProviderConfigurations]', N'OutputCostPerMillionTokensSek') IS NULL
+                BEGIN
+                    ALTER TABLE [AiProviderConfigurations]
+                    ADD [OutputCostPerMillionTokensSek] DECIMAL(18,6) NULL;
+                END
+
+                IF COL_LENGTH(N'[AiProviderConfigurations]', N'CostPerMillionTokensSek') IS NOT NULL
+                BEGIN
+                    UPDATE [AiProviderConfigurations]
+                    SET [InputCostPerMillionTokensSek] = COALESCE([InputCostPerMillionTokensSek], [CostPerMillionTokensSek]),
+                        [OutputCostPerMillionTokensSek] = COALESCE([OutputCostPerMillionTokensSek], [CostPerMillionTokensSek])
+                    WHERE [CostPerMillionTokensSek] IS NOT NULL;
+                END
+                """,
+                cancellationToken);
         }
     }
 
@@ -2040,6 +2094,9 @@ public sealed partial class DatabaseInitializer(
                     "PromptTokens" INTEGER NULL,
                     "CompletionTokens" INTEGER NULL,
                     "TotalTokens" INTEGER NULL,
+                    "EstimatedInputCostSek" REAL NULL,
+                    "EstimatedOutputCostSek" REAL NULL,
+                    "EstimatedTotalCostSek" REAL NULL,
                     "Outcome" INTEGER NOT NULL DEFAULT 2,
                     "WasSuccessful" INTEGER NOT NULL,
                     "DurationMilliseconds" INTEGER NOT NULL,
@@ -2062,6 +2119,47 @@ public sealed partial class DatabaseInitializer(
                 """
                 CREATE INDEX IF NOT EXISTS "IX_AiRequestUsageLogs_AiProviderConfigurationId_OccurredUtc"
                 ON "AiRequestUsageLogs" ("AiProviderConfigurationId", "OccurredUtc")
+                """,
+                cancellationToken);
+
+            if (!await SqliteColumnExistsAsync("AiRequestUsageLogs", "EstimatedInputCostSek", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AiRequestUsageLogs ADD COLUMN EstimatedInputCostSek REAL NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("AiRequestUsageLogs", "EstimatedOutputCostSek", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AiRequestUsageLogs ADD COLUMN EstimatedOutputCostSek REAL NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("AiRequestUsageLogs", "EstimatedTotalCostSek", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AiRequestUsageLogs ADD COLUMN EstimatedTotalCostSek REAL NULL",
+                    cancellationToken);
+            }
+
+            if (await SqliteColumnExistsAsync("AiRequestUsageLogs", "EstimatedCostSek", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    """
+                    UPDATE "AiRequestUsageLogs"
+                    SET "EstimatedTotalCostSek" = COALESCE("EstimatedTotalCostSek", "EstimatedCostSek")
+                    WHERE "EstimatedCostSek" IS NOT NULL
+                    """,
+                    cancellationToken);
+            }
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                UPDATE "AiRequestUsageLogs"
+                SET "EstimatedTotalCostSek" = COALESCE("EstimatedTotalCostSek", COALESCE("EstimatedInputCostSek", 0) + COALESCE("EstimatedOutputCostSek", 0))
+                WHERE "EstimatedTotalCostSek" IS NULL
+                  AND ("EstimatedInputCostSek" IS NOT NULL OR "EstimatedOutputCostSek" IS NOT NULL)
                 """,
                 cancellationToken);
 
@@ -2102,6 +2200,9 @@ public sealed partial class DatabaseInitializer(
                         [PromptTokens] INT NULL,
                         [CompletionTokens] INT NULL,
                         [TotalTokens] INT NULL,
+                        [EstimatedInputCostSek] DECIMAL(18,6) NULL,
+                        [EstimatedOutputCostSek] DECIMAL(18,6) NULL,
+                        [EstimatedTotalCostSek] DECIMAL(18,6) NULL,
                         [Outcome] INT NOT NULL CONSTRAINT [DF_AiRequestUsageLogs_Outcome] DEFAULT 2,
                         [WasSuccessful] BIT NOT NULL,
                         [DurationMilliseconds] INT NOT NULL,
@@ -2141,6 +2242,40 @@ public sealed partial class DatabaseInitializer(
                     CREATE INDEX [IX_AiRequestUsageLogs_AiProviderConfigurationId_OccurredUtc]
                     ON [AiRequestUsageLogs] ([AiProviderConfigurationId], [OccurredUtc]);
                 END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF COL_LENGTH(N'[AiRequestUsageLogs]', N'EstimatedInputCostSek') IS NULL
+                BEGIN
+                    ALTER TABLE [AiRequestUsageLogs]
+                    ADD [EstimatedInputCostSek] DECIMAL(18,6) NULL;
+                END
+
+                IF COL_LENGTH(N'[AiRequestUsageLogs]', N'EstimatedOutputCostSek') IS NULL
+                BEGIN
+                    ALTER TABLE [AiRequestUsageLogs]
+                    ADD [EstimatedOutputCostSek] DECIMAL(18,6) NULL;
+                END
+
+                IF COL_LENGTH(N'[AiRequestUsageLogs]', N'EstimatedTotalCostSek') IS NULL
+                BEGIN
+                    ALTER TABLE [AiRequestUsageLogs]
+                    ADD [EstimatedTotalCostSek] DECIMAL(18,6) NULL;
+                END
+
+                IF COL_LENGTH(N'[AiRequestUsageLogs]', N'EstimatedCostSek') IS NOT NULL
+                BEGIN
+                    UPDATE [AiRequestUsageLogs]
+                    SET [EstimatedTotalCostSek] = COALESCE([EstimatedTotalCostSek], [EstimatedCostSek])
+                    WHERE [EstimatedCostSek] IS NOT NULL;
+                END
+
+                UPDATE [AiRequestUsageLogs]
+                SET [EstimatedTotalCostSek] = COALESCE([EstimatedTotalCostSek], COALESCE([EstimatedInputCostSek], 0) + COALESCE([EstimatedOutputCostSek], 0))
+                WHERE [EstimatedTotalCostSek] IS NULL
+                  AND ([EstimatedInputCostSek] IS NOT NULL OR [EstimatedOutputCostSek] IS NOT NULL);
                 """,
                 cancellationToken);
 

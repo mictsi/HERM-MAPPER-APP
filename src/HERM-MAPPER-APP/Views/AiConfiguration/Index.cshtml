@@ -1,3 +1,4 @@
+@using System.Globalization
 @using HERMMapperApp.Services
 @using HERMMapperApp.ViewModels
 @model AiMappingAdminIndexViewModel
@@ -8,6 +9,15 @@
     var editor = Model.Editor;
     var isEditing = Model.ShowEditor && !Model.IsCreatingProvider && editor.Id.HasValue;
     var editorHasStoredApiKey = Model.EditorHasStoredApiKey;
+    var sekCulture = CultureInfo.GetCultureInfo("sv-SE");
+
+    string FormatSekAmount(decimal? value, int decimals = 2) => value.HasValue
+        ? $"{value.Value.ToString($"N{decimals}", sekCulture)} SEK"
+        : "Not priced";
+
+    string FormatSekRate(decimal? value) => value.HasValue
+        ? $"{value.Value.ToString("N2", sekCulture)} SEK / 1M"
+        : "Not set";
 }
 
 <div class="admin-shell">
@@ -17,7 +27,7 @@
             <div>
                 <span class="eyebrow">Admin</span>
                 <h1>AI configuration</h1>
-                <p>Manage multiple AI provider configurations, enable one service at a time, and review token usage for AI-assisted mapping requests.</p>
+                <p>Manage multiple AI provider configurations, enable one service at a time, and review token and estimated input, output, and total cost usage for AI-assisted mapping requests.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
                 <a class="btn btn-outline-secondary" asp-controller="Configuration" asp-action="Index">Back to configuration</a>
@@ -79,6 +89,26 @@
                 <span class="stat-label">7-day average</span>
                 <span class="stat-value">@Model.Dashboard.AverageTokensPerRequestLast7Days</span>
                 <span class="stat-meta">tokens per successful request</span>
+            </article>
+            <article class="stat-card import-status-card-success">
+                <span class="stat-label">Cost today</span>
+                <span class="stat-value">@FormatSekAmount(Model.Dashboard.CostTodaySek)</span>
+                <span class="stat-meta">estimated from configured input and output token pricing</span>
+            </article>
+            <article class="stat-card import-status-card-success">
+                <span class="stat-label">Cost last 7 days</span>
+                <span class="stat-value">@FormatSekAmount(Model.Dashboard.CostLast7DaysSek)</span>
+                <span class="stat-meta">rolling weekly estimate</span>
+            </article>
+            <article class="stat-card import-status-card-success">
+                <span class="stat-label">Cost last 30 days</span>
+                <span class="stat-value">@FormatSekAmount(Model.Dashboard.CostLast30DaysSek)</span>
+                <span class="stat-meta">rolling monthly estimate</span>
+            </article>
+            <article class="stat-card import-status-card-success">
+                <span class="stat-label">Cost last 365 days</span>
+                <span class="stat-value">@FormatSekAmount(Model.Dashboard.CostLast365DaysSek)</span>
+                <span class="stat-meta">rolling yearly estimate</span>
             </article>
             <article class="stat-card import-status-card-warning">
                 <span class="stat-label">Timed out</span>
@@ -217,8 +247,14 @@
                                 <dd>@provider.SavedApiKeyDisplay</dd>
                                 <dt>Timeout</dt>
                                 <dd>@provider.TimeoutSeconds seconds</dd>
+                                <dt>Input pricing</dt>
+                                <dd>@FormatSekRate(provider.InputCostPerMillionTokensSek)</dd>
+                                <dt>Output pricing</dt>
+                                <dd>@FormatSekRate(provider.OutputCostPerMillionTokensSek)</dd>
                                 <dt>Last 7 days</dt>
                                 <dd>@provider.RequestsLast7Days request(s), @provider.TokensLast7Days token(s)</dd>
+                                <dt>7-day total cost</dt>
+                                <dd>@FormatSekAmount(provider.TotalCostLast7DaysSek)</dd>
                                 @if (!string.IsNullOrWhiteSpace(provider.ApiVersion))
                                 {
                                     <dt>API version</dt>
@@ -242,7 +278,7 @@
                     <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
                 </div>
 
-                <p class="mb-3">Use OpenAI-compatible chat completion endpoints. Open WebUI and OpenAI use bearer authentication. Azure AI Foundry uses the <code>api-key</code> header and can optionally append an <code>api-version</code> query string.</p>
+                <p class="mb-3">Use OpenAI-compatible chat completion or responses endpoints. Open WebUI and OpenAI use bearer authentication. Azure AI Foundry - OpenAI Endpoint v1 endpoints use bearer authentication, while older Foundry inference endpoints use the <code>api-key</code> header and can optionally append an <code>api-version</code> query string.</p>
                 <p class="text-muted small mb-3">For Open WebUI, save the endpoint and API key first. This page then refreshes the model dropdown by calling <code>/api/models</code> with the stored bearer token.</p>
 
                 <form asp-action="SaveProvider" method="post" class="row g-3">
@@ -270,16 +306,16 @@
                     <div class="col-lg-8">
                         <label class="form-label" asp-for="Editor.Endpoint"></label>
                         <input class="form-control" asp-for="Editor.Endpoint" autocomplete="off" />
-                        <div class="form-text">Examples: <code>http://localhost:3000/api/chat/completions</code>, <code>https://api.openai.com/v1/chat/completions</code>, or an Azure AI Foundry chat completion endpoint.</div>
+                        <div class="form-text">Examples: <code>http://localhost:3000/api/chat/completions</code>, <code>https://api.openai.com/v1/chat/completions</code>, <code>https://api.openai.com/v1/responses</code>, or an Azure AI Foundry - OpenAI Endpoint v1 endpoint.</div>
                         <span class="text-danger" asp-validation-for="Editor.Endpoint"></span>
                     </div>
                     <div class="col-lg-4">
                         <label class="form-label" asp-for="Editor.ApiVersion"></label>
                         <input class="form-control" asp-for="Editor.ApiVersion" autocomplete="off" />
-                        <div class="form-text">Optional. Used for Azure AI Foundry endpoints that require <code>api-version</code>.</div>
+                        <div class="form-text">Optional. Used for Azure AI Foundry - OpenAI Endpoint variants that require <code>api-version</code>; OpenAI v1 endpoints do not need it.</div>
                         <span class="text-danger" asp-validation-for="Editor.ApiVersion"></span>
                     </div>
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
                         <label class="form-label" asp-for="Editor.Model"></label>
                         @if (Model.ModelOptions.Count != 0)
                         {
@@ -296,7 +332,19 @@
                         }
                         <span class="text-danger" asp-validation-for="Editor.Model"></span>
                     </div>
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
+                        <label class="form-label" asp-for="Editor.InputCostPerMillionTokensSek"></label>
+                        <input class="form-control" asp-for="Editor.InputCostPerMillionTokensSek" type="number" min="0" step="0.000001" />
+                        <div class="form-text">Optional. Used with prompt tokens to estimate input cost per query.</div>
+                        <span class="text-danger" asp-validation-for="Editor.InputCostPerMillionTokensSek"></span>
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label" asp-for="Editor.OutputCostPerMillionTokensSek"></label>
+                        <input class="form-control" asp-for="Editor.OutputCostPerMillionTokensSek" type="number" min="0" step="0.000001" />
+                        <div class="form-text">Optional. Used with completion tokens to estimate output and total query cost.</div>
+                        <span class="text-danger" asp-validation-for="Editor.OutputCostPerMillionTokensSek"></span>
+                    </div>
+                    <div class="col-lg-4">
                         <div class="d-flex align-items-center gap-2 flex-wrap">
                             <label class="form-label mb-0" asp-for="Editor.ApiKey"></label>
                             @if (editorHasStoredApiKey)
@@ -352,6 +400,9 @@
                                 <th>Prompt</th>
                                 <th>Completion</th>
                                 <th>Total</th>
+                                <th>Input cost</th>
+                                <th>Output cost</th>
+                                <th>Total cost</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
@@ -372,6 +423,9 @@
                                 <td>@(entry.PromptTokens?.ToString() ?? "-")</td>
                                 <td>@(entry.CompletionTokens?.ToString() ?? "-")</td>
                                 <td>@(entry.TotalTokens?.ToString() ?? "-")</td>
+                                <td>@FormatSekAmount(entry.EstimatedInputCostSek, 4)</td>
+                                <td>@FormatSekAmount(entry.EstimatedOutputCostSek, 4)</td>
+                                <td>@FormatSekAmount(entry.EstimatedTotalCostSek, 4)</td>
                                 <td>
                                     <span class="badge @entry.OutcomeBadgeClass">@entry.OutcomeLabel</span>
                                     @if (!entry.WasSuccessful && !string.IsNullOrWhiteSpace(entry.ErrorMessage))
