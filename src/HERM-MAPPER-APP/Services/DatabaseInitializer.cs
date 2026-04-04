@@ -2067,10 +2067,12 @@ public sealed partial class DatabaseInitializer(
 
                 IF COL_LENGTH(N'[AiProviderConfigurations]', N'CostPerMillionTokensSek') IS NOT NULL
                 BEGIN
-                    UPDATE [AiProviderConfigurations]
-                    SET [InputCostPerMillionTokensSek] = COALESCE([InputCostPerMillionTokensSek], [CostPerMillionTokensSek]),
-                        [OutputCostPerMillionTokensSek] = COALESCE([OutputCostPerMillionTokensSek], [CostPerMillionTokensSek])
-                    WHERE [CostPerMillionTokensSek] IS NOT NULL;
+                    EXEC(N'
+                        UPDATE [AiProviderConfigurations]
+                        SET [InputCostPerMillionTokensSek] = COALESCE([InputCostPerMillionTokensSek], [CostPerMillionTokensSek]),
+                            [OutputCostPerMillionTokensSek] = COALESCE([OutputCostPerMillionTokensSek], [CostPerMillionTokensSek])
+                        WHERE [CostPerMillionTokensSek] IS NOT NULL;
+                    ');
                 END
                 """,
                 cancellationToken);
@@ -2267,9 +2269,11 @@ public sealed partial class DatabaseInitializer(
 
                 IF COL_LENGTH(N'[AiRequestUsageLogs]', N'EstimatedCostSek') IS NOT NULL
                 BEGIN
-                    UPDATE [AiRequestUsageLogs]
-                    SET [EstimatedTotalCostSek] = COALESCE([EstimatedTotalCostSek], [EstimatedCostSek])
-                    WHERE [EstimatedCostSek] IS NOT NULL;
+                    EXEC(N'
+                        UPDATE [AiRequestUsageLogs]
+                        SET [EstimatedTotalCostSek] = COALESCE([EstimatedTotalCostSek], [EstimatedCostSek])
+                        WHERE [EstimatedCostSek] IS NOT NULL;
+                    ');
                 END
 
                 UPDATE [AiRequestUsageLogs]
