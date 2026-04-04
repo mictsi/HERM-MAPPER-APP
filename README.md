@@ -102,6 +102,10 @@ Two deployment scripts exist under `scripts/`:
 - Publishes the project under `src/HERM-MAPPER-APP`, zips the publish output and deploys via `az webapp deploy`.
 - Loads the provided appsettings JSON file, flattens nested keys using `Section__Key` naming, and applies them as App Settings (in chunks).
 
+Release packaging:
+- `./build.ps1 -Target Prod -Runtime All` now produces runtime-specific binaries under `artifacts/prod` for `linux-x64`, `linux-arm64`, `win-x64`, and `win-arm64`.
+- The GitHub release workflow packages each runtime directory as a separate zip asset.
+
 Usage (run from the repository root):
 ```powershell
 .\scripts\deploy-appservice-azcli.ps1 \

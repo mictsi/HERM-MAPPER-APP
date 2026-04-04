@@ -2276,10 +2276,12 @@ public sealed partial class DatabaseInitializer(
                     ');
                 END
 
-                UPDATE [AiRequestUsageLogs]
-                SET [EstimatedTotalCostSek] = COALESCE([EstimatedTotalCostSek], COALESCE([EstimatedInputCostSek], 0) + COALESCE([EstimatedOutputCostSek], 0))
-                WHERE [EstimatedTotalCostSek] IS NULL
-                  AND ([EstimatedInputCostSek] IS NOT NULL OR [EstimatedOutputCostSek] IS NOT NULL);
+                                EXEC(N'
+                                        UPDATE [AiRequestUsageLogs]
+                                        SET [EstimatedTotalCostSek] = COALESCE([EstimatedTotalCostSek], COALESCE([EstimatedInputCostSek], 0) + COALESCE([EstimatedOutputCostSek], 0))
+                                        WHERE [EstimatedTotalCostSek] IS NULL
+                                            AND ([EstimatedInputCostSek] IS NOT NULL OR [EstimatedOutputCostSek] IS NOT NULL);
+                                ');
                 """,
                 cancellationToken);
 

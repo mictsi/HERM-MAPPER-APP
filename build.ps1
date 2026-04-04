@@ -80,7 +80,7 @@ function Resolve-Runtimes {
     param([string]$RuntimeArgument)
 
     if ($RuntimeArgument -eq "All") {
-        return @("linux-x64", "win-x64")
+        return @("linux-x64", "linux-arm64", "win-x64", "win-arm64")
     }
 
     return @(
