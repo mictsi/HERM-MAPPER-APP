@@ -206,7 +206,7 @@ public sealed class MappingsController(
         return RedirectToAction("Index");
     }
 
-    public async Task<IActionResult> DeleteAsync(int id)
+    public async Task<IActionResult> DeleteAsync(int id, string? returnUrl = null)
     {
         if (!ModelState.IsValid)
         {
@@ -221,12 +221,18 @@ public sealed class MappingsController(
             .Include(x => x.TrmComponent)
             .FirstOrDefaultAsync(x => x.Id == id);
 
-        return mapping is null ? NotFound() : View(mapping);
+        if (mapping is null)
+        {
+            return NotFound();
+        }
+
+        ViewData["ReturnUrl"] = ResolveMappingReturnUrl(returnUrl, mapping.ProductCatalogItemId);
+        return View(mapping);
     }
 
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteConfirmedAsync(int id)
+    public async Task<IActionResult> DeleteConfirmedAsync(int id, string? returnUrl = null)
     {
         if (!ModelState.IsValid)
         {
@@ -264,7 +270,12 @@ public sealed class MappingsController(
             nameof(ProductMapping),
             id,
             $"Deleted mapping for {mapping.ProductCatalogItem?.Name ?? "product"}.");
-        return RedirectToAction("Index");
+        if (IsSafeLocalReturnUrl(returnUrl))
+        {
+            return LocalRedirect(returnUrl!);
+        }
+
+        return RedirectToAction("Details", "Products", new { id = mapping.ProductCatalogItemId });
     }
 
     [HttpGet]
@@ -1033,6 +1044,26 @@ public sealed class MappingsController(
         return rationale.Length <= 4000
             ? rationale
             : rationale[..3997] + "...";
+    }
+
+    private static string ResolveMappingReturnUrl(string? returnUrl, int productId)
+    {
+        if (IsSafeLocalReturnUrl(returnUrl))
+        {
+            return returnUrl!;
+        }
+
+        return $"/Products/Details/{productId}";
+    }
+
+    private static bool IsSafeLocalReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.TryCreate(returnUrl, UriKind.Relative, out _))
+        {
+            return false;
+        }
+
+        return returnUrl[0] == '/' && (returnUrl.Length == 1 || (returnUrl[1] != '/' && returnUrl[1] != '\\'));
     }
 
     private async Task WriteMappingAuditAsync(ProductMapping mapping, string action, string details)

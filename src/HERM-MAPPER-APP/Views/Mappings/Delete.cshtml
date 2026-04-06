@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Delete Mapping";
     ViewData["BodyClass"] = "confirmation-page mapping-delete-page";
+    var returnUrl = ViewData["ReturnUrl"] as string ?? "/Products";
 }
 
 <section class="page-header">
@@ -69,8 +70,9 @@
             </div>
             <form asp-action="Delete" method="post" class="d-grid gap-2">
                 <input type="hidden" asp-for="Id" />
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
                 <button type="submit" class="btn btn-danger">Delete mapping</button>
-                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+                <a class="btn btn-outline-secondary" href="@returnUrl">Cancel</a>
             </form>
         </aside>
     </div>

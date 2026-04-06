@@ -613,6 +613,7 @@ public sealed class MappingsControllerTests
         var view = Assert.IsType<ViewResult>(result);
         var model = Assert.IsType<ProductMapping>(view.Model);
         Assert.Equal(mapping.Id, model.Id);
+        Assert.Equal($"/Products/Details/{product.Id}", view.ViewData["ReturnUrl"]);
     }
 
     [Fact]
@@ -639,7 +640,9 @@ public sealed class MappingsControllerTests
         var result = await controller.DeleteConfirmedAsync(mapping.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
+        Assert.Equal("Products", redirect.ControllerName);
+        Assert.Equal(product.Id, redirect.RouteValues!["id"]);
         Assert.Equal(0, await fixture.DbContext.ProductMappings.CountAsync());
         Assert.True((await fixture.DbContext.ProductCatalogItems.SingleAsync()).UpdatedUtc > new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
         Assert.Equal("Delete", (await fixture.DbContext.AuditLogEntries.SingleAsync()).Action);
@@ -680,9 +683,27 @@ public sealed class MappingsControllerTests
         var result = await controller.DeleteConfirmedAsync(mapping.Id);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
-        Assert.Equal("Index", redirect.ActionName);
+        Assert.Equal("Details", redirect.ActionName);
+        Assert.Equal("Products", redirect.ControllerName);
+        Assert.Equal(product.Id, redirect.RouteValues!["id"]);
         Assert.Equal(0, await fixture.DbContext.ProductMappings.CountAsync());
         Assert.Equal(0, await fixture.DbContext.ApplicationCatalogItemMappings.CountAsync());
+    }
+
+    [Fact]
+    public async Task DeleteConfirmedRedirectsToSuppliedReturnUrlWhenItIsLocalAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var product = new ProductCatalogItem { Name = "Sentinel" };
+        var mapping = new ProductMapping { ProductCatalogItem = product, MappingStatus = MappingStatus.Draft };
+        await fixture.DbContext.AddRangeAsync(product, mapping);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.DeleteConfirmedAsync(mapping.Id, "/Products/Details/42?tab=mappings");
+
+        var redirect = Assert.IsType<LocalRedirectResult>(result);
+        Assert.Equal("/Products/Details/42?tab=mappings", redirect.Url);
     }
 
     [Fact]
