@@ -3,128 +3,100 @@
 > **⚠️ WARNING: Use this project at your own risk.**
 
 ## Overview
-HERM-MAPPER-APP is a .NET web application for mapping product relationships and capabilities. It provides dashboards, import/export services, and reference catalogues for managing product mappings.
 
-The web application now lives under `src/HERM-MAPPER-APP` and automated tests live under `tests/HERM-MAPPER-APP.Tests`.
+HERM-MAPPER-APP is a .NET web application for mapping product relationships and capabilities. It includes reference catalogues, import/export workflows, dashboards, and AI-assisted mapping features.
+
+The web application lives under `src/HERM-MAPPER-APP` and automated tests live under `tests/HERM-MAPPER-APP.Tests`.
+
+## Contents
+
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [Documentation](#documentation)
+- [License](#license)
 
 ## Features
+
 - Product mapping and relationship management
 - CSV export and workbook import services
 - Dashboard and catalogue views
+- AI-assisted mapping with configurable providers
 - Experimental status: subject to change
 
 ## Project Structure
+
 - `src/HERM-MAPPER-APP/`: ASP.NET Core MVC application
 - `tests/HERM-MAPPER-APP.Tests/`: unit tests
 - `scripts/`: deployment and automation scripts
-- `src/HERM-MAPPER-APP/Controllers/`: MVC controllers for app logic
-- `src/HERM-MAPPER-APP/Data/`: Entity Framework database context
-- `src/HERM-MAPPER-APP/Models/`: data models
-- `src/HERM-MAPPER-APP/Services/`: business logic and import/export services
-- `src/HERM-MAPPER-APP/ViewModels/`: view model classes
-- `src/HERM-MAPPER-APP/Views/`: Razor views for UI
-- `src/HERM-MAPPER-APP/wwwroot/`: static assets
+- `docs/`: project documentation
 
-## Getting Started
-1. Clone the repository
-2. Open in Visual Studio or VS Code
-3. Restore NuGet packages
-4. Build and run the project
+Key application folders:
 
-## Installation Instructions
+- `src/HERM-MAPPER-APP/Controllers/`
+- `src/HERM-MAPPER-APP/Data/`
+- `src/HERM-MAPPER-APP/Models/`
+- `src/HERM-MAPPER-APP/Services/`
+- `src/HERM-MAPPER-APP/ViewModels/`
+- `src/HERM-MAPPER-APP/Views/`
+- `src/HERM-MAPPER-APP/wwwroot/`
 
-### Windows
-1. Install [.NET SDK](https://dotnet.microsoft.com/download) (version 10.0 or later)
-2. Open a terminal in the project directory
-3. Run:
-	```powershell
-	dotnet restore .\HERM-MAPPER-APP.sln
-	dotnet build .\HERM-MAPPER-APP.sln
-	dotnet run --project .\src\HERM-MAPPER-APP\HERM-MAPPER-APP.csproj
-	```
-4. Access the app at the displayed local URL
+## Quick Start
 
-### macOS
-1. Install [.NET SDK](https://dotnet.microsoft.com/download) (version 10.0 or later)
-2. Open Terminal and navigate to the project directory
-3. Run:
-	```bash
-	dotnet restore ./HERM-MAPPER-APP.sln
-	dotnet build ./HERM-MAPPER-APP.sln
-	dotnet run --project ./src/HERM-MAPPER-APP/HERM-MAPPER-APP.csproj
-	```
-4. Access the app at the displayed local URL
+1. Clone the repository.
+2. Install the .NET SDK 10.0 or later.
+3. Restore and build the solution.
+4. Run the web app.
 
-### Linux
-1. Install [.NET SDK](https://dotnet.microsoft.com/download) (version 10.0 or later)
-2. Open Terminal and navigate to the project directory
-3. Run:
-	```bash
-	dotnet restore ./HERM-MAPPER-APP.sln
-	dotnet build ./HERM-MAPPER-APP.sln
-	dotnet run --project ./src/HERM-MAPPER-APP/HERM-MAPPER-APP.csproj
-	```
-4. Access the app at the displayed local URL
+Windows:
 
-> For all platforms, you can also use Visual Studio or VS Code for a graphical experience.
-
-## Development
-- Configuration files: `src/HERM-MAPPER-APP/appsettings.json`, `src/HERM-MAPPER-APP/appsettings.Development.json`
-- Main entry point: `src/HERM-MAPPER-APP/Program.cs`
-- Solution file: `HERM-MAPPER-APP.sln`
-
-## Configuration
-- Database provider is selected with `Database:Provider` or `HERM_Database__Provider`
-- SQLite uses `Database:SqliteFilePath`, `ConnectionStrings:Sqlite`, or `ConnectionStrings:DefaultConnection`
-- SQL Server uses `Database:ConnectionString`, `ConnectionStrings:SqlServer`, or `ConnectionStrings:DefaultConnection`
-- SQLite paths support `|DataDirectory|` and `|HomeDirectory|` tokens; `|HomeDirectory|/data/...` is suitable for durable Azure App Service storage
-- Console logging can be controlled with `Diagnostics:Console:*` or `HERM_Diagnostics__Console__*`
-- SQL command logging can be controlled with `Diagnostics:Sql:*` or `HERM_Diagnostics__Sql__*`
-- Microsoft Entra ID app registration and role-group setup steps are documented in `docs/entra-app-registration-setup.md`
-
-Example environment variables:
 ```powershell
-$env:HERM_Database__Provider = "SqlServer"
-$env:HERM_Database__ConnectionString = "Server=localhost;Database=HermMapper;Trusted_Connection=True;TrustServerCertificate=True"
-$env:HERM_Diagnostics__Sql__Enabled = "true"
-$env:HERM_Diagnostics__Sql__LogLevel = "Information"
+dotnet restore .\HERM-MAPPER-APP.sln
+dotnet build .\HERM-MAPPER-APP.sln
+dotnet run --project .\src\HERM-MAPPER-APP\HERM-MAPPER-APP.csproj
 ```
 
-## Azure App Service Deploy
-Two deployment scripts exist under `scripts/`:
+macOS / Linux:
 
-- `deploy-appservice.ps1`: original script (keeps legacy behavior).
-- `deploy-appservice-azcli.ps1`: recommended. Uses Azure CLI and is runnable from the repository root.
-
-`deploy-appservice-azcli.ps1` behavior:
-- Uses an existing App Service plan specified by `-AppPlan` (errors if not found).
-- Creates the Web App if it does not exist, using the provided plan.
-- Publishes the project under `src/HERM-MAPPER-APP`, zips the publish output and deploys via `az webapp deploy`.
-- Loads the provided appsettings JSON file, flattens nested keys using `Section__Key` naming, and applies them as App Settings (in chunks).
-
-Release packaging:
-- `./build.ps1 -Target Prod -Runtime All` now produces runtime-specific binaries under `artifacts/prod` for `linux-x64`, `linux-arm64`, `win-x64`, and `win-arm64`.
-- The GitHub release workflow packages each runtime directory as a separate zip asset.
-
-Usage (run from the repository root):
-```powershell
-.\scripts\deploy-appservice-azcli.ps1 \
-	-SubscriptionId $SUBID \
-	-Region 'eastus' \
-	-ResourceGroupName $RG \
-	-WebAppName 'my-app' \
-	-SettingsFile '.\src\HERM-MAPPER-APP\appsettings.Production.json' \
-	-AppEnvironment 'Production' \
-	-AppPlan $appplan
+```bash
+dotnet restore ./HERM-MAPPER-APP.sln
+dotnet build ./HERM-MAPPER-APP.sln
+dotnet run --project ./src/HERM-MAPPER-APP/HERM-MAPPER-APP.csproj
 ```
 
-Notes:
-- The resource group must already exist because the script derives the region from it.
-- `deploy-appservice-azcli.ps1` requires the `az` CLI and `dotnet` SDK on PATH.
-- Settings are flattened into App Service environment variables using `Section__Key` naming.
+## Documentation
+
+### Installation
+
+- [Installation Guide](docs/installation.md)
+
+### Development
+
+- [Development Guide](docs/development.md)
+
+### Configuration
+
+- [Configuration Guide](docs/configuration.md)
+- [Microsoft Entra App Registration Setup](docs/entra-app-registration-setup.md)
+
+### Deployment
+
+- [Azure App Service Deployment](docs/deployment-appservice.md)
+
+### AI
+
+- [AI Overview](docs/ai.md)
+- [Azure AI Foundry Agent Setup](docs/azure-ai-foundry-agent.md)
+- TRM markdown reference files:
+  - [01-TRM-Domain.md](docs/trm_model/3.2/01-TRM-Domain.md)
+  - [02-TRM-Capability.md](docs/trm_model/3.2/02-TRM-Capability.md)
+  - [03-TRM-Component.md](docs/trm_model/3.2/03-TRM-Component.md)
+  - [HERM-TRM-V320-explainer.md](docs/trm_model/3.2/HERM-TRM-V320-explainer.md)
+  - [TRM-LLM-Instructions-v2.md](docs/trm_model/3.2/TRM-LLM-Instructions-v2.md)
 
 ## License
-See LICENSE for details.
+
+See [LICENSE](LICENSE) for details.
 
 ---
 

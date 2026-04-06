@@ -1,0 +1,250 @@
+@using System.Text.Json
+@using HERMMapperApp.Models
+@using HERMMapperApp.Services
+@using HERMMapperApp.ViewModels
+@model AiMappingAdminIndexViewModel
+@{
+    var editor = Model.Editor;
+    var isEditing = !Model.IsCreatingProvider && editor.Id.HasValue;
+    var providerType = editor.ProviderType;
+    var showVersionField = providerType is AiProviderType.AzureAiFoundry or AiProviderType.AzureAiFoundryAgent;
+    var modelInputList = Model.ModelOptions.Count != 0 && Model.SupportsModelDiscovery
+        ? "ai-provider-model-options"
+        : null;
+
+    string endpointLabel = providerType == AiProviderType.AzureAiFoundryAgent
+        ? "Project endpoint"
+        : "Chat or responses endpoint";
+    string endpointHelp = providerType switch
+    {
+        AiProviderType.AzureAiFoundry =>
+            "Use an Azure AI Foundry OpenAI endpoint. Older inference endpoints can also use an API version.",
+        AiProviderType.AzureAiFoundryAgent =>
+            "Use the Foundry project endpoint from Azure AI Foundry, for example https://...services.ai.azure.com/api/projects/....",
+        _ =>
+            "Use an OpenAI-compatible endpoint such as https://api.openai.com/v1/chat/completions or https://api.openai.com/v1/responses."
+    };
+    string endpointPlaceholder = providerType switch
+    {
+        AiProviderType.AzureAiFoundry => "https://my-project.openai.azure.com/openai/v1/chat/completions",
+        AiProviderType.AzureAiFoundryAgent => "https://my-project.services.ai.azure.com/api/projects/proj-default",
+        _ => "https://api.openai.com/v1/chat/completions"
+    };
+
+    string modelLabel = providerType == AiProviderType.AzureAiFoundryAgent
+        ? "Agent name"
+        : "Model or deployment";
+    string modelHelp = providerType switch
+    {
+        AiProviderType.AzureAiFoundry =>
+            "Enter the deployment name used by the Foundry OpenAI endpoint.",
+        AiProviderType.AzureAiFoundryAgent =>
+            "Use the agent name configured in Azure AI Foundry.",
+        _ =>
+            "Enter a model id, or save the provider first and then choose from the discovered models when supported."
+    };
+    string modelPlaceholder = providerType switch
+    {
+        AiProviderType.AzureAiFoundry => "gpt-4.1-mini",
+        AiProviderType.AzureAiFoundryAgent => "herm-agent-5-4-mini",
+        _ => "gpt-5.4-mini"
+    };
+
+    string versionLabel = providerType == AiProviderType.AzureAiFoundryAgent
+        ? "Agent version"
+        : "API version";
+    string versionHelp = providerType == AiProviderType.AzureAiFoundryAgent
+        ? "Optional. Leave blank to use the latest published agent version."
+        : "Optional. Used for legacy Azure AI Foundry inference endpoints that require api-version; OpenAI v1 endpoints do not need it.";
+    string versionPlaceholder = providerType == AiProviderType.AzureAiFoundryAgent
+        ? "9"
+        : "2024-05-01-preview";
+}
+
+<form asp-action="SaveProvider" method="post" class="row g-3 ai-provider-editor-form" data-ai-provider-editor>
+    @Html.AntiForgeryToken()
+    <input asp-for="Editor.Id" type="hidden" />
+
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger @(ViewData.ModelState.IsValid ? "d-none" : null)"></div>
+
+    <div class="col-12">
+        <div class="ai-provider-type-note @(providerType == AiProviderType.OpenAiApi ? null : "d-none")" data-ai-provider-note="@AiProviderType.OpenAiApi">
+            OpenAI-compatible provider using bearer authentication and standard chat or responses endpoints.
+        </div>
+        <div class="ai-provider-type-note @(providerType == AiProviderType.AzureAiFoundry ? null : "d-none")" data-ai-provider-note="@AiProviderType.AzureAiFoundry">
+            Azure AI Foundry OpenAI endpoint provider. OpenAI v1 endpoints use bearer authentication; older inference endpoints can use an <code>api-key</code> header and optional <code>api-version</code>.
+        </div>
+        <div class="ai-provider-type-note @(providerType == AiProviderType.AzureAiFoundryAgent ? null : "d-none")" data-ai-provider-note="@AiProviderType.AzureAiFoundryAgent">
+            Azure AI Foundry agent provider using the project endpoint plus agent name/version. Upload the TRM markdown files from <code>docs/trm_model/3.2</code> to the agent knowledge store for file search, then use the saved query prompt and system prompt together.
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <label class="form-label" asp-for="Editor.Name"></label>
+        <input class="form-control" asp-for="Editor.Name" autocomplete="off" />
+        <span class="text-danger" asp-validation-for="Editor.Name"></span>
+    </div>
+    <div class="col-lg-4">
+        <label class="form-label" asp-for="Editor.ProviderType"></label>
+        <select class="form-select" asp-for="Editor.ProviderType" asp-items="Model.ProviderTypeOptions" data-ai-provider-type-select></select>
+        <span class="text-danger" asp-validation-for="Editor.ProviderType"></span>
+    </div>
+    <div class="col-lg-4">
+        <label class="form-label" asp-for="Editor.TimeoutSeconds"></label>
+        <input class="form-control" asp-for="Editor.TimeoutSeconds" type="number" min="1" max="3600" />
+        <div class="form-text">Default: 120 seconds.</div>
+        <span class="text-danger" asp-validation-for="Editor.TimeoutSeconds"></span>
+    </div>
+
+    <div class="col-lg-8">
+        <label class="form-label" asp-for="Editor.Endpoint" data-ai-endpoint-label>@endpointLabel</label>
+        <input class="form-control" asp-for="Editor.Endpoint" autocomplete="off" placeholder="@endpointPlaceholder" data-ai-endpoint-input />
+        <div class="form-text" data-ai-endpoint-help>@endpointHelp</div>
+        <span class="text-danger" asp-validation-for="Editor.Endpoint"></span>
+    </div>
+    <div class="col-lg-4 @(showVersionField ? null : "d-none")" data-ai-version-field>
+        <label class="form-label" asp-for="Editor.ApiVersion" data-ai-version-label>@versionLabel</label>
+        <input class="form-control" asp-for="Editor.ApiVersion" autocomplete="off" placeholder="@versionPlaceholder" data-ai-version-input />
+        <div class="form-text" data-ai-version-help>@versionHelp</div>
+        <span class="text-danger" asp-validation-for="Editor.ApiVersion"></span>
+    </div>
+
+    <div class="col-lg-4">
+        <label class="form-label" asp-for="Editor.Model" data-ai-model-label>@modelLabel</label>
+        <input class="form-control" asp-for="Editor.Model" autocomplete="off" placeholder="@modelPlaceholder" data-ai-model-input list="@modelInputList" />
+        <div class="form-text" data-ai-model-help>@modelHelp</div>
+        @if (Model.CanLoadModelOptions)
+        {
+            <div class="form-text">
+                <a asp-action="Index"
+                   asp-route-editProviderId="@editor.Id"
+                   asp-route-loadAvailableModels="true">
+                    Load available models
+                </a>
+                <span class="text-muted">Loads provider models on demand so the editor opens immediately.</span>
+            </div>
+        }
+        @if (Model.ModelOptions.Count != 0 && Model.SupportsModelDiscovery)
+        {
+            <div class="form-text" data-ai-model-discovery-note>Available models were loaded from the provider and can be chosen from the field suggestions.</div>
+            <datalist id="ai-provider-model-options">
+                @foreach (var option in Model.ModelOptions.Where(option => !string.IsNullOrWhiteSpace(option.Value)))
+                {
+                    <option value="@option.Value"></option>
+                }
+            </datalist>
+        }
+        <span class="text-danger" asp-validation-for="Editor.Model"></span>
+    </div>
+    <div class="col-lg-4">
+        <label class="form-label" asp-for="Editor.InputCostPerMillionTokensSek"></label>
+        <input class="form-control" asp-for="Editor.InputCostPerMillionTokensSek" type="number" min="0" step="0.000001" />
+        <div class="form-text">Optional. Used with prompt tokens to estimate input cost per request.</div>
+        <span class="text-danger" asp-validation-for="Editor.InputCostPerMillionTokensSek"></span>
+    </div>
+    <div class="col-lg-4">
+        <label class="form-label" asp-for="Editor.OutputCostPerMillionTokensSek"></label>
+        <input class="form-control" asp-for="Editor.OutputCostPerMillionTokensSek" type="number" min="0" step="0.000001" />
+        <div class="form-text">Optional. Used with completion tokens to estimate output and total cost.</div>
+        <span class="text-danger" asp-validation-for="Editor.OutputCostPerMillionTokensSek"></span>
+    </div>
+    <div class="col-lg-4">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <label class="form-label mb-0" asp-for="Editor.ApiKey"></label>
+            @if (Model.EditorHasStoredApiKey)
+            {
+                <span class="small text-success">(Key is stored in database)</span>
+            }
+        </div>
+        <input class="form-control" asp-for="Editor.ApiKey" type="password" autocomplete="new-password" />
+        <div class="form-text">Leave this blank when editing to keep the stored key.</div>
+        <span class="text-danger" asp-validation-for="Editor.ApiKey"></span>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label" asp-for="Editor.SystemPrompt"></label>
+        <textarea class="form-control font-monospace" asp-for="Editor.SystemPrompt" rows="6" spellcheck="false"></textarea>
+        <div class="form-text">Saved per provider. New providers start from the shared generic system prompt.</div>
+        <span class="text-danger" asp-validation-for="Editor.SystemPrompt"></span>
+    </div>
+
+    <div class="col-12">
+        <label class="form-label" asp-for="Editor.PromptTemplate" data-ai-prompt-label>Query / prompt template</label>
+        <textarea class="form-control font-monospace" asp-for="Editor.PromptTemplate" rows="18" spellcheck="false" data-ai-prompt-input></textarea>
+        <div class="form-text" data-ai-prompt-help>
+            Saved per provider. Supports placeholders like <code>{{VendorProduct}}</code>, <code>{{ProductNameToon}}</code>, <code>{{VendorToon}}</code>, <code>{{ProductDescriptionToon}}</code>, <code>{{ExistingMappingsBlock}}</code>, and <code>{{TrmComponentsBlock}}</code>.
+        </div>
+        <span class="text-danger" asp-validation-for="Editor.PromptTemplate"></span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ModelDiscoveryError) && Model.SupportsModelDiscovery)
+    {
+        <div class="col-12">
+            <div class="alert alert-warning mb-0">@Model.ModelDiscoveryError</div>
+        </div>
+    }
+
+    <div class="col-12 d-flex gap-2 flex-wrap">
+        <button class="btn btn-primary" type="submit">@(isEditing ? "Save provider" : "Create provider")</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+    </div>
+</form>
+
+<script type="application/json" data-ai-provider-profiles>
+{
+  "OpenAiApi": {
+    "note": "OpenAiApi",
+    "endpointLabel": "Chat or responses endpoint",
+    "endpointHelp": "Use an OpenAI-compatible endpoint such as https://api.openai.com/v1/chat/completions or https://api.openai.com/v1/responses.",
+    "endpointPlaceholder": "https://api.openai.com/v1/chat/completions",
+    "modelLabel": "Model or deployment",
+    "modelHelp": "Enter a model id, or save the provider first and then choose from the discovered models when supported.",
+    "modelPlaceholder": "gpt-5.4-mini",
+    "versionVisible": false,
+    "versionLabel": "API version",
+    "versionHelp": "",
+    "versionPlaceholder": "",
+    "showDiscoveryNote": true,
+    "promptLabel": "Query / prompt template",
+    "promptHelp": "Saved per provider. This becomes the user prompt sent with the TRM catalogue and expects TOON output with component ids.",
+    "defaultSystemPrompt": @Html.Raw(JsonSerializer.Serialize(AiProductMappingService.GetDefaultSystemPromptText(AiProviderType.OpenAiApi))),
+    "defaultPromptTemplate": @Html.Raw(JsonSerializer.Serialize(AiProductMappingService.GetDefaultPromptTemplateText(AiProviderType.OpenAiApi)))
+  },
+  "AzureAiFoundry": {
+    "note": "AzureAiFoundry",
+    "endpointLabel": "Chat or responses endpoint",
+    "endpointHelp": "Use an Azure AI Foundry OpenAI endpoint. Older inference endpoints can also use an API version.",
+    "endpointPlaceholder": "https://my-project.openai.azure.com/openai/v1/chat/completions",
+    "modelLabel": "Model or deployment",
+    "modelHelp": "Enter the deployment name used by the Foundry OpenAI endpoint.",
+    "modelPlaceholder": "gpt-4.1-mini",
+    "versionVisible": true,
+    "versionLabel": "API version",
+    "versionHelp": "Optional. Used for legacy Azure AI Foundry inference endpoints that require api-version; OpenAI v1 endpoints do not need it.",
+    "versionPlaceholder": "2024-05-01-preview",
+    "showDiscoveryNote": true,
+    "promptLabel": "Query / prompt template",
+    "promptHelp": "Saved per provider. This becomes the user prompt sent with the TRM catalogue and expects TOON output with component ids.",
+    "defaultSystemPrompt": @Html.Raw(JsonSerializer.Serialize(AiProductMappingService.GetDefaultSystemPromptText(AiProviderType.AzureAiFoundry))),
+    "defaultPromptTemplate": @Html.Raw(JsonSerializer.Serialize(AiProductMappingService.GetDefaultPromptTemplateText(AiProviderType.AzureAiFoundry)))
+  },
+  "AzureAiFoundryAgent": {
+    "note": "AzureAiFoundryAgent",
+    "endpointLabel": "Project endpoint",
+    "endpointHelp": "Use the Foundry project endpoint from Azure AI Foundry, for example https://...services.ai.azure.com/api/projects/....",
+    "endpointPlaceholder": "https://my-project.services.ai.azure.com/api/projects/proj-default",
+    "modelLabel": "Agent name",
+    "modelHelp": "Use the agent name configured in Azure AI Foundry.",
+    "modelPlaceholder": "herm-agent-5-4-mini",
+    "versionVisible": true,
+    "versionLabel": "Agent version",
+    "versionHelp": "Optional. Leave blank to use the latest published agent version.",
+    "versionPlaceholder": "9",
+    "showDiscoveryNote": false,
+    "promptLabel": "Query / prompt template",
+    "promptHelp": "Saved per provider. Upload the markdown files from docs/trm_model/3.2 to agent file search and use this query template for JSON mappings keyed by component code or name.",
+    "defaultSystemPrompt": @Html.Raw(JsonSerializer.Serialize(AiProductMappingService.GetDefaultSystemPromptText(AiProviderType.AzureAiFoundryAgent))),
+    "defaultPromptTemplate": @Html.Raw(JsonSerializer.Serialize(AiProductMappingService.GetDefaultPromptTemplateText(AiProviderType.AzureAiFoundryAgent)))
+  }
+}
+</script>

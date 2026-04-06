@@ -1944,6 +1944,8 @@ public sealed partial class DatabaseInitializer(
                     "Endpoint" TEXT NOT NULL,
                     "Model" TEXT NOT NULL,
                     "ApiVersion" TEXT NULL,
+                    "SystemPrompt" TEXT NOT NULL DEFAULT '',
+                    "PromptTemplate" TEXT NOT NULL DEFAULT '',
                     "InputCostPerMillionTokensSek" REAL NULL,
                     "OutputCostPerMillionTokensSek" REAL NULL,
                     "TimeoutSeconds" INTEGER NOT NULL,
@@ -1982,6 +1984,20 @@ public sealed partial class DatabaseInitializer(
                     cancellationToken);
             }
 
+            if (!await SqliteColumnExistsAsync("AiProviderConfigurations", "SystemPrompt", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AiProviderConfigurations ADD COLUMN SystemPrompt TEXT NOT NULL DEFAULT ''",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync("AiProviderConfigurations", "PromptTemplate", cancellationToken))
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE AiProviderConfigurations ADD COLUMN PromptTemplate TEXT NOT NULL DEFAULT ''",
+                    cancellationToken);
+            }
+
             if (await SqliteColumnExistsAsync("AiProviderConfigurations", "CostPerMillionTokensSek", cancellationToken))
             {
                 await dbContext.Database.ExecuteSqlRawAsync(
@@ -2010,6 +2026,8 @@ public sealed partial class DatabaseInitializer(
                         [Endpoint] NVARCHAR(2048) NOT NULL,
                         [Model] NVARCHAR(200) NOT NULL,
                         [ApiVersion] NVARCHAR(80) NULL,
+                        [SystemPrompt] NVARCHAR(MAX) NOT NULL CONSTRAINT [DF_AiProviderConfigurations_SystemPrompt] DEFAULT N'',
+                        [PromptTemplate] NVARCHAR(MAX) NOT NULL CONSTRAINT [DF_AiProviderConfigurations_PromptTemplate] DEFAULT N'',
                         [InputCostPerMillionTokensSek] DECIMAL(18,6) NULL,
                         [OutputCostPerMillionTokensSek] DECIMAL(18,6) NULL,
                         [TimeoutSeconds] INT NOT NULL,
@@ -2063,6 +2081,18 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     ALTER TABLE [AiProviderConfigurations]
                     ADD [OutputCostPerMillionTokensSek] DECIMAL(18,6) NULL;
+                END
+
+                IF COL_LENGTH(N'[AiProviderConfigurations]', N'SystemPrompt') IS NULL
+                BEGIN
+                    ALTER TABLE [AiProviderConfigurations]
+                    ADD [SystemPrompt] NVARCHAR(MAX) NOT NULL CONSTRAINT [DF_AiProviderConfigurations_SystemPrompt_Legacy] DEFAULT N'';
+                END
+
+                IF COL_LENGTH(N'[AiProviderConfigurations]', N'PromptTemplate') IS NULL
+                BEGIN
+                    ALTER TABLE [AiProviderConfigurations]
+                    ADD [PromptTemplate] NVARCHAR(MAX) NOT NULL CONSTRAINT [DF_AiProviderConfigurations_PromptTemplate_Legacy] DEFAULT N'';
                 END
 
                 IF COL_LENGTH(N'[AiProviderConfigurations]', N'CostPerMillionTokensSek') IS NOT NULL

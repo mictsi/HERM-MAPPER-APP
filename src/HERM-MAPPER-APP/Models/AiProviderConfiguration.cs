@@ -4,7 +4,8 @@ public enum AiProviderType
 {
     OpenWebUi = 1,
     OpenAiApi = 2,
-    AzureAiFoundry = 3
+    AzureAiFoundry = 3,
+    AzureAiFoundryAgent = 4
 }
 
 public enum AiRequestOutcome
@@ -22,13 +23,17 @@ public sealed class AiProviderConfiguration
 
     public string Name { get; set; } = string.Empty;
 
-    public AiProviderType ProviderType { get; set; } = AiProviderType.OpenWebUi;
+    public AiProviderType ProviderType { get; set; } = AiProviderType.OpenAiApi;
 
     public string Endpoint { get; set; } = string.Empty;
 
     public string Model { get; set; } = string.Empty;
 
     public string? ApiVersion { get; set; }
+
+    public string SystemPrompt { get; set; } = string.Empty;
+
+    public string PromptTemplate { get; set; } = string.Empty;
 
     public decimal? InputCostPerMillionTokensSek { get; set; }
 

@@ -166,8 +166,8 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         var result = await controller.SaveProviderAsync(new AiProviderConfigurationInputModel
         {
-            Name = " Open WebUI Lab ",
-            ProviderType = AiProviderType.OpenWebUi,
+            Name = " OpenAI API Lab ",
+            ProviderType = AiProviderType.OpenAiApi,
             Endpoint = " http://localhost:3000/api/chat/completions ",
             Model = " gpt-oss:latest ",
             InputCostPerMillionTokensSek = 8.5m,
@@ -178,16 +178,19 @@ public sealed class ConfigurationAndChangeLogControllerTests
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal("Index", redirect.ActionName);
+        Assert.True(redirect.RouteValues is null || redirect.RouteValues.Count == 0);
 
         var provider = await fixture.DbContext.AiProviderConfigurations.SingleAsync();
         var settings = await fixture.DbContext.AppSettings
             .OrderBy(x => x.Key)
             .ToDictionaryAsync(x => x.Key, x => x.Value);
 
-        Assert.Equal("Open WebUI Lab", provider.Name);
-        Assert.Equal(AiProviderType.OpenWebUi, provider.ProviderType);
+        Assert.Equal("OpenAI API Lab", provider.Name);
+        Assert.Equal(AiProviderType.OpenAiApi, provider.ProviderType);
         Assert.Equal("http://localhost:3000/api/chat/completions", provider.Endpoint);
         Assert.Equal("gpt-oss:latest", provider.Model);
+        Assert.Equal(AiProductMappingService.GetDefaultSystemPromptText(), provider.SystemPrompt);
+        Assert.Equal(AiProductMappingService.GetDefaultPromptTemplateText(AiProviderType.OpenAiApi), provider.PromptTemplate);
         Assert.Equal(8.5m, provider.InputCostPerMillionTokensSek);
         Assert.Equal(24.75m, provider.OutputCostPerMillionTokensSek);
         Assert.Equal(180, provider.TimeoutSeconds);
@@ -275,6 +278,8 @@ public sealed class ConfigurationAndChangeLogControllerTests
         Assert.True(model.ShowEditor);
         Assert.True(model.IsCreatingProvider);
         Assert.Null(model.Editor.Id);
+        Assert.Equal(AiProductMappingService.GetDefaultSystemPromptText(), model.Editor.SystemPrompt);
+        Assert.Equal(AiProductMappingService.GetDefaultPromptTemplateText(AiProviderType.OpenAiApi), model.Editor.PromptTemplate);
     }
 
     [Fact]
@@ -301,6 +306,34 @@ public sealed class ConfigurationAndChangeLogControllerTests
         Assert.True(model.ShowEditor);
         Assert.False(model.IsCreatingProvider);
         Assert.Equal(provider.Id, model.Editor.Id);
+    }
+
+    [Fact]
+    public async Task AiConfigurationIndexUsesAgentSpecificDefaultPromptValuesWhenBlankAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var provider = new AiProviderConfiguration
+        {
+            Name = "Foundry Agent",
+            ProviderType = AiProviderType.AzureAiFoundryAgent,
+            Endpoint = "https://ai-lab-foundry-local.services.ai.azure.com/api/projects/proj-default",
+            Model = "herm-agent-5-4-mini",
+            ApiVersion = "9",
+            SystemPrompt = string.Empty,
+            PromptTemplate = string.Empty,
+            TimeoutSeconds = 120
+        };
+        await fixture.DbContext.AiProviderConfigurations.AddAsync(provider);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateAiConfigurationController();
+
+        var result = await controller.IndexAsync(editProviderId: provider.Id);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<AiMappingAdminIndexViewModel>(view.Model);
+        Assert.Equal(AiProductMappingService.GetDefaultSystemPromptText(AiProviderType.AzureAiFoundryAgent), model.Editor.SystemPrompt);
+        Assert.Equal(AiProductMappingService.GetDefaultPromptTemplateText(AiProviderType.AzureAiFoundryAgent), model.Editor.PromptTemplate);
     }
 
     [Fact]

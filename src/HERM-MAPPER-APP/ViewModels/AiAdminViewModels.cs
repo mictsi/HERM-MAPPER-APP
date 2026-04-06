@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 using HERMMapperApp.Models;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
@@ -19,6 +20,7 @@ public sealed class AiMappingAdminIndexViewModel
     public IReadOnlyList<SelectListItem> ProviderTypeOptions { get; init; } = [];
     public IReadOnlyList<SelectListItem> ModelOptions { get; init; } = [];
     public bool SupportsModelDiscovery { get; init; }
+    public bool CanLoadModelOptions { get; init; }
     public string? ModelDiscoveryError { get; init; }
     public IReadOnlyList<AiUsageEntryViewModel> RecentUsage { get; init; } = [];
 }
@@ -68,7 +70,7 @@ public sealed class AiProviderSummaryViewModel
     public decimal? TotalCostLast7DaysSek { get; init; }
 }
 
-public sealed class AiProviderConfigurationInputModel
+public sealed class AiProviderConfigurationInputModel : IValidatableObject
 {
     public int? Id { get; set; }
 
@@ -77,19 +79,27 @@ public sealed class AiProviderConfigurationInputModel
     public string Name { get; set; } = string.Empty;
 
     [Display(Name = "Provider")]
-    public AiProviderType ProviderType { get; set; } = AiProviderType.OpenWebUi;
+    public AiProviderType ProviderType { get; set; } = AiProviderType.OpenAiApi;
 
-    [Required, StringLength(2048)]
-    [Display(Name = "Chat or responses endpoint")]
+    [StringLength(2048)]
+    [Display(Name = "Endpoint")]
     public string Endpoint { get; set; } = string.Empty;
 
     [StringLength(200)]
-    [Display(Name = "Model or deployment")]
+    [Display(Name = "Model, deployment, or agent name")]
     public string Model { get; set; } = string.Empty;
 
     [StringLength(80)]
     [Display(Name = "API version")]
     public string? ApiVersion { get; set; }
+
+    [StringLength(8000)]
+    [Display(Name = "System prompt")]
+    public string SystemPrompt { get; set; } = string.Empty;
+
+    [StringLength(32000)]
+    [Display(Name = "Query / prompt template")]
+    public string PromptTemplate { get; set; } = string.Empty;
 
     [Range(typeof(decimal), "0", "1000000000")]
     [Display(Name = "Input cost per 1 million tokens (SEK)")]
@@ -107,6 +117,33 @@ public sealed class AiProviderConfigurationInputModel
     [Range(1, 3600)]
     [Display(Name = "Lookup timeout (seconds)")]
     public int TimeoutSeconds { get; set; } = AppSettingDefaults.AiMappingTimeoutSeconds;
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            yield return new ValidationResult(
+                "Enter a configuration name before saving.",
+                [nameof(Name)]);
+        }
+
+        if (string.IsNullOrWhiteSpace(Endpoint))
+        {
+            yield return new ValidationResult(
+                ProviderType == AiProviderType.AzureAiFoundryAgent
+                    ? "Enter a project endpoint before saving."
+                    : "Enter a chat or responses endpoint before saving.",
+                [nameof(Endpoint)]);
+        }
+
+        if (ProviderType == AiProviderType.AzureAiFoundryAgent &&
+            string.IsNullOrWhiteSpace(Model))
+        {
+            yield return new ValidationResult(
+                "Enter an agent name before saving.",
+                [nameof(Model)]);
+        }
+    }
 }
 
 public sealed class AiUsageEntryViewModel

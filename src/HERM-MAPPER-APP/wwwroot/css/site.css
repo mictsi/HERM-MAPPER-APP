@@ -4462,10 +4462,9 @@ a {
 
 .ai-configuration-page .ai-provider-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(21.5rem, 28rem));
-  gap: 0.75rem;
-  justify-content: start;
-  align-items: stretch;
+  grid-template-columns: repeat(auto-fit, minmax(21.5rem, 1fr));
+  gap: 0.9rem;
+  align-items: start;
 }
 
 .ai-configuration-page .ai-provider-card-title {
@@ -4565,6 +4564,50 @@ a {
 .ai-configuration-page .ai-provider-grid .ai-provider-card {
   width: 100%;
   margin-bottom: 0;
+  height: auto;
+}
+
+.ai-configuration-page .ai-provider-card-editor {
+  grid-column: 1 / -1;
+  border-color: rgba(29, 92, 129, 0.24);
+  background: linear-gradient(180deg, rgba(252, 254, 255, 0.98), rgba(245, 249, 252, 0.98));
+}
+
+.ai-configuration-page .ai-provider-card-create {
+  border-style: dashed;
+  border-color: rgba(29, 92, 129, 0.32);
+}
+
+.ai-configuration-page .ai-provider-card-editing {
+  border-color: rgba(29, 92, 129, 0.38);
+  box-shadow:
+    0 16px 34px rgba(15, 23, 34, 0.06),
+    0 0 0 4px rgba(29, 92, 129, 0.12);
+}
+
+.ai-configuration-page .ai-provider-card-editor .ai-provider-card-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid rgba(29, 92, 129, 0.12);
+}
+
+.ai-configuration-page .ai-provider-editor-form {
+  margin-top: 0.1rem;
+  max-width: 74rem;
+}
+
+.ai-configuration-page .ai-provider-type-note {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(29, 92, 129, 0.14);
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.ai-configuration-page .ai-provider-type-note code {
+  font-size: 0.78rem;
 }
 
 .ai-configuration-page .ai-runtime-toggle-form {
@@ -4697,6 +4740,10 @@ a {
 @media (max-width: 575.98px) {
   .ai-configuration-page .ai-provider-grid {
     grid-template-columns: 1fr;
+  }
+
+  .ai-configuration-page .ai-provider-card-editor {
+    grid-column: auto;
   }
 
   .ai-configuration-page .ai-runtime-toggle-button {

@@ -20,7 +20,8 @@ public sealed class AiProductMappingService(
     ProtectedSettingsService protectedSettingsService,
     AuditLogService auditLogService,
     HttpClient httpClient,
-    ILogger<AiProductMappingService> logger)
+    ILogger<AiProductMappingService> logger,
+    IAiFoundryAgentClient? aiFoundryAgentClient = null)
 {
     private const int MaxSuggestions = 8;
     private const int MaxTextCellLength = 240;
@@ -29,18 +30,74 @@ public sealed class AiProductMappingService(
     private const int MaxModelDiscoveryTimeoutSeconds = 15;
     private const string AiMappingCategory = "AiMapping";
     private const string SuggestMappingsRequestKind = "SuggestProductTrmMappings";
-    private const string SystemPrompt =
+    private const string DefaultSystemPrompt =
         """
         You map software products to HERM TRM components.
-        Use only the TOON data in the user message.
-        Never invent component ids.
+        Use only the catalogue and mapping context supplied in the request.
+        Never invent component ids, codes, or names.
         A product can map to multiple TRM components.
         Skip components that are already mapped.
-        Return only TOON in this exact shape:
+        Return only the requested output format with no extra prose.
+        """;
+    private const string DefaultFoundryAgentSystemPrompt =
+        """
+        Never invent component ids, codes, or names.
+        Return only the requested output format with no extra prose.
+        """;
+    private const string DefaultStructuredPromptTemplate =
+        """
+        request:
+          action: "suggest_product_trm_component_mappings"
+          format: "TOON"
+
+        Requirements:
+        - Use only the TRM data provided below.
+        - Never invent component ids.
+        - Return only TOON in this exact shape:
         summary: "one short sentence"
         suggestions[N]{component_id	confidence	reason}:
           123	0.95	One short sentence with no tabs or newlines.
-        If there are no strong matches, return suggestions[0]{component_id	confidence	reason}: with no rows.
+        - confidence must be a number between 0 and 1 or a percentage.
+        - If there are no strong matches, return suggestions[0]{component_id	confidence	reason}: with no rows.
+
+        product:
+          name: {{ProductNameToon}}
+          vendor: {{VendorToon}}
+
+        {{ExistingMappingsBlock}}
+
+        {{TrmComponentsBlock}}
+        """;
+    private const string DefaultFoundryAgentPromptTemplate =
+        """
+        Return all TRM mappings for {{VendorProduct}}.
+
+        Requirements:
+        - Use only the TRM catalogue provided below.
+        - Do not invent TRM component codes or names.
+        - Return JSON only, with no markdown fence and no prose before or after the JSON object.
+        - Use this JSON shape:
+        {
+          "summary": "one short sentence",
+          "mappings": [
+            {
+              "component_code": "TC001",
+              "component_name": "Directory Service",
+              "confidence": 0.95,
+              "reason": "one short sentence"
+            }
+          ]
+        }
+        - confidence must be a number between 0 and 1.
+
+        product:
+          name: {{ProductNameToon}}
+          vendor: {{VendorToon}}
+          description: {{ProductDescriptionToon}}
+
+        {{ExistingMappingsBlock}}
+
+        {{TrmComponentsBlock}}
         """;
     private static readonly Action<ILogger, string, Exception?> LogModelDiscoveryTimedOut =
         LoggerMessage.Define<string>(
@@ -75,6 +132,8 @@ public sealed class AiProductMappingService(
 
     private readonly record struct AiProviderResponse(HttpStatusCode StatusCode, string Body);
     private readonly record struct ProviderUsageStats(int Requests, int Tokens, decimal? TotalCost);
+    private sealed record FoundryAgentParsedResponse(string? Summary, IReadOnlyList<FoundryAgentParsedSuggestion> Mappings);
+    private sealed record FoundryAgentParsedSuggestion(string? ComponentCode, string? ComponentName, decimal Confidence, string Reason);
 
     public const string SectionKey = "ai-mapping";
 
@@ -98,10 +157,12 @@ public sealed class AiProductMappingService(
         {
             ActiveProviderId = provider.Id,
             ActiveProviderName = provider.Name,
-            ActiveProviderType = provider.ProviderType,
+            ActiveProviderType = NormalizeProviderType(provider.ProviderType),
             Endpoint = provider.Endpoint.Trim(),
             Model = provider.Model.Trim(),
             ApiVersion = provider.ApiVersion?.Trim(),
+            SystemPrompt = GetEffectiveSystemPrompt(provider.ProviderType, provider.SystemPrompt),
+            PromptTemplate = GetEffectivePromptTemplate(provider.ProviderType, provider.PromptTemplate),
             InputCostPerMillionTokensSek = provider.InputCostPerMillionTokensSek,
             OutputCostPerMillionTokensSek = provider.OutputCostPerMillionTokensSek,
             ApiKey = apiKey,
@@ -113,6 +174,7 @@ public sealed class AiProductMappingService(
     public async Task<AiMappingAdminIndexViewModel> BuildAdminViewModelAsync(
         int? editProviderId = null,
         bool createNewProvider = false,
+        bool loadAvailableModels = false,
         AiProviderConfigurationInputModel? editorOverride = null,
         string? statusMessage = null,
         string? errorMessage = null,
@@ -167,13 +229,14 @@ public sealed class AiProductMappingService(
         {
             var apiKey = await protectedSettingsService.GetValueAsync(BuildProviderApiKeySettingKey(provider.Id), cancellationToken);
             usageStats.TryGetValue(provider.Id, out var usage);
+            var providerType = NormalizeProviderType(provider.ProviderType);
 
             providerSummaries.Add(new AiProviderSummaryViewModel
             {
                 Id = provider.Id,
                 Name = provider.Name,
-                ProviderType = provider.ProviderType,
-                ProviderLabel = GetProviderLabel(provider.ProviderType),
+                ProviderType = providerType,
+                ProviderLabel = GetProviderLabel(providerType),
                 Endpoint = provider.Endpoint,
                 Model = provider.Model,
                 ApiVersion = provider.ApiVersion,
@@ -195,6 +258,7 @@ public sealed class AiProductMappingService(
         var isCreatingProvider = showEditor && !EditorModelExists(editorOverride, editorEntity);
         var editorModel = editorOverride ?? (showEditor ? BuildEditorInputModel(editorEntity) : BuildEditorInputModel(null));
         var supportsModelDiscovery = showEditor && SupportsModelDiscovery(editorModel.ProviderType);
+        var canLoadModelOptions = supportsModelDiscovery && editorModel.Id.HasValue;
         var editorHasStoredApiKey = showEditor &&
             editorEntity is not null &&
             !string.IsNullOrWhiteSpace(await protectedSettingsService.GetValueAsync(
@@ -203,9 +267,9 @@ public sealed class AiProductMappingService(
 
         List<SelectListItem> modelOptions = [];
         string? modelDiscoveryError = null;
-        if (showEditor && editorModel.Id.HasValue && supportsModelDiscovery)
+        if (loadAvailableModels && supportsModelDiscovery && editorModel.Id is int editorProviderId)
         {
-            var modelDiscovery = await GetAvailableModelsAsync(editorModel.Id.Value, cancellationToken);
+            var modelDiscovery = await GetAvailableModelsAsync(editorProviderId, cancellationToken);
             if (modelDiscovery.IsSuccess)
             {
                 modelOptions =
@@ -293,6 +357,7 @@ public sealed class AiProductMappingService(
             ProviderTypeOptions = BuildProviderTypeOptions(editorModel.ProviderType),
             ModelOptions = modelOptions,
             SupportsModelDiscovery = supportsModelDiscovery,
+            CanLoadModelOptions = canLoadModelOptions,
             ModelDiscoveryError = modelDiscoveryError,
             RecentUsage = recentUsageLogs
                 .Select(log => new AiUsageEntryViewModel
@@ -340,12 +405,21 @@ public sealed class AiProductMappingService(
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri) ||
             (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps))
         {
-            return AiProviderSaveResult.Failure("Enter a valid HTTP or HTTPS chat or responses endpoint.");
+            return AiProviderSaveResult.Failure(
+                input.ProviderType == AiProviderType.AzureAiFoundryAgent
+                    ? "Enter a valid HTTP or HTTPS project endpoint."
+                    : "Enter a valid HTTP or HTTPS chat or responses endpoint.");
         }
 
         if (string.IsNullOrWhiteSpace(input.Name))
         {
             return AiProviderSaveResult.Failure("Enter a configuration name before saving.");
+        }
+
+        if (input.ProviderType == AiProviderType.AzureAiFoundryAgent &&
+            string.IsNullOrWhiteSpace(input.Model))
+        {
+            return AiProviderSaveResult.Failure("Enter an agent name before saving.");
         }
 
         if (input.TimeoutSeconds < MinTimeoutSeconds || input.TimeoutSeconds > MaxTimeoutSeconds)
@@ -386,6 +460,8 @@ public sealed class AiProductMappingService(
         provider.Endpoint = endpoint;
         provider.Model = input.Model;
         provider.ApiVersion = NormalizeApiVersion(input.ProviderType, endpoint, input.ApiVersion);
+        provider.SystemPrompt = GetEffectiveSystemPrompt(input.ProviderType, input.SystemPrompt);
+        provider.PromptTemplate = GetEffectivePromptTemplate(input.ProviderType, input.PromptTemplate);
         provider.InputCostPerMillionTokensSek = input.InputCostPerMillionTokensSek;
         provider.OutputCostPerMillionTokensSek = input.OutputCostPerMillionTokensSek;
         provider.TimeoutSeconds = NormalizeTimeoutSeconds(input.TimeoutSeconds);
@@ -407,13 +483,13 @@ public sealed class AiProductMappingService(
             nameof(AiProviderConfiguration),
             provider.Id,
             $"{(existingProvider is null ? "Created" : "Updated")} AI provider configuration '{provider.Name}'.",
-            $"Provider: {GetProviderLabel(provider.ProviderType)}; endpoint: {provider.Endpoint}; model: {provider.Model}; timeout seconds: {provider.TimeoutSeconds}; input cost per 1M tokens (SEK): {(provider.InputCostPerMillionTokensSek?.ToString("0.######", CultureInfo.InvariantCulture) ?? "not set")}; output cost per 1M tokens (SEK): {(provider.OutputCostPerMillionTokensSek?.ToString("0.######", CultureInfo.InvariantCulture) ?? "not set")}.",
+            $"Provider: {GetProviderLabel(provider.ProviderType)}; endpoint: {provider.Endpoint}; model: {provider.Model}; timeout seconds: {provider.TimeoutSeconds}; system prompt chars: {provider.SystemPrompt.Length}; prompt template chars: {provider.PromptTemplate.Length}; input cost per 1M tokens (SEK): {(provider.InputCostPerMillionTokensSek?.ToString("0.######", CultureInfo.InvariantCulture) ?? "not set")}; output cost per 1M tokens (SEK): {(provider.OutputCostPerMillionTokensSek?.ToString("0.######", CultureInfo.InvariantCulture) ?? "not set")}.",
             cancellationToken);
 
         var successMessage = "AI provider configuration updated.";
         if (requiresModelSelection)
         {
-            successMessage = "AI provider configuration saved. Choose a model from the dropdown to finish setup.";
+            successMessage = "AI provider configuration saved. Enter a model or deployment to finish setup.";
         }
         else if (existingProvider is null)
         {
@@ -648,27 +724,59 @@ public sealed class AiProductMappingService(
                 .ThenBy(x => x.ParentCapability!.Code)
                 .ThenBy(x => x.TechnologyComponentCode ?? x.Code)
                 .ToListAsync(cancellationToken);
-
-            var userPrompt = BuildUserPrompt(product, components);
+            var existingComponentIds = product.Mappings
+                .Where(x => x.TrmComponentId.HasValue)
+                .Select(x => x.TrmComponentId!.Value)
+                .ToHashSet();
 
             timeoutCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(settings.TimeoutSeconds));
 
+            var providerPrompt = BuildProviderPrompt(settings, product, components);
             requestDispatched = true;
-            var response = await SendProviderRequestWithFallbackAsync(
+            if (settings.ActiveProviderType == AiProviderType.AzureAiFoundryAgent)
+            {
+                var response = await SendFoundryAgentRequestAsync(
+                    settings,
+                    providerPrompt,
+                    timeoutCancellationTokenSource.Token);
+                FoundryAgentParsedResponse parsedAgentResponse;
+                try
+                {
+                    parsedAgentResponse = ParseFoundryAgentResponse(response.OutputText);
+                }
+                catch (InvalidOperationException exception)
+                {
+                    errorMessage = exception.Message;
+                    outcome = AiRequestOutcome.Failed;
+                    return AiProductMappingSuggestionResult.Failure(errorMessage);
+                }
+
+                var suggestions = ResolveFoundryAgentSuggestions(parsedAgentResponse, components, existingComponentIds);
+
+                outcome = AiRequestOutcome.Success;
+                return AiProductMappingSuggestionResult.Success(
+                    parsedAgentResponse.Summary ??
+                    (suggestions.Count == 0
+                        ? "No new TRM component suggestions were returned."
+                        : $"AI suggested {suggestions.Count} TRM component mapping(s)."),
+                    suggestions);
+            }
+
+            var providerResponse = await SendProviderRequestWithFallbackAsync(
                 settings,
-                userPrompt,
+                providerPrompt,
                 $"mapping lookup for product '{product.Name}'",
                 settings.TimeoutSeconds,
                 cancellationToken,
                 timeoutCancellationTokenSource.Token);
 
-            var responseBody = response.Body;
+            var responseBody = providerResponse.Body;
             usage = ParseUsage(responseBody);
 
-            if ((int)response.StatusCode < 200 || (int)response.StatusCode >= 300)
+            if ((int)providerResponse.StatusCode < 200 || (int)providerResponse.StatusCode >= 300)
             {
-                errorMessage = $"AI mapping lookup failed with status {(int)response.StatusCode}: {responseBody}";
+                errorMessage = $"AI mapping lookup failed with status {(int)providerResponse.StatusCode}: {responseBody}";
                 outcome = AiRequestOutcome.Failed;
                 return AiProductMappingSuggestionResult.Failure(errorMessage);
             }
@@ -681,64 +789,18 @@ public sealed class AiProductMappingService(
                 return AiProductMappingSuggestionResult.Failure(errorMessage);
             }
 
-            var parsedSuggestions = ParseSuggestions(rawContent);
-            var existingComponentIds = product.Mappings
-                .Where(x => x.TrmComponentId.HasValue)
-                .Select(x => x.TrmComponentId!.Value)
-                .ToHashSet();
-
-            var suggestedIds = parsedSuggestions
-                .Select(x => x.ComponentId)
-                .Distinct()
-                .Where(id => !existingComponentIds.Contains(id))
-                .Take(MaxSuggestions)
-                .ToList();
-
-            if (suggestedIds.Count == 0)
-            {
-                outcome = AiRequestOutcome.Success;
-                return AiProductMappingSuggestionResult.Success(
-                    ExtractSummary(rawContent) ?? "No new TRM component suggestions were returned.",
-                    []);
-            }
-
-            var componentLookup = await dbContext.TrmComponents
-                .AsNoTracking()
-                .Where(x => suggestedIds.Contains(x.Id) && !x.IsDeleted)
-                .Include(x => x.ParentCapability)
-                .ThenInclude(x => x!.ParentDomain)
-                .ToDictionaryAsync(x => x.Id, timeoutCancellationTokenSource.Token);
-
-            var suggestions = new List<AiProductMappingSuggestion>();
-            foreach (var parsedSuggestion in parsedSuggestions)
-            {
-                if (!componentLookup.TryGetValue(parsedSuggestion.ComponentId, out var component) ||
-                    component.ParentCapability?.ParentDomain is null)
-                {
-                    continue;
-                }
-
-                if (existingComponentIds.Contains(component.Id) ||
-                    suggestions.Any(existing => existing.ComponentId == component.Id))
-                {
-                    continue;
-                }
-
-                suggestions.Add(new AiProductMappingSuggestion
-                {
-                    ComponentId = component.Id,
-                    DomainLabel = $"{component.ParentCapability.ParentDomain.Code} {component.ParentCapability.ParentDomain.Name}",
-                    CapabilityLabel = $"{component.ParentCapability.Code} {component.ParentCapability.Name}",
-                    ComponentLabel = component.DisplayLabel,
-                    Confidence = parsedSuggestion.Confidence,
-                    Reason = parsedSuggestion.Reason
-                });
-            }
+            var suggestionsFromOpenAi = ResolveOpenAiSuggestions(
+                ParseSuggestions(rawContent),
+                components,
+                existingComponentIds);
 
             outcome = AiRequestOutcome.Success;
             return AiProductMappingSuggestionResult.Success(
-                ExtractSummary(rawContent) ?? $"AI suggested {suggestions.Count} TRM component mapping(s).",
-                suggestions);
+                ExtractSummary(rawContent) ??
+                (suggestionsFromOpenAi.Count == 0
+                    ? "No new TRM component suggestions were returned."
+                    : $"AI suggested {suggestionsFromOpenAi.Count} TRM component mapping(s)."),
+                suggestionsFromOpenAi);
         }
         catch (TimeoutException exception)
         {
@@ -786,18 +848,78 @@ public sealed class AiProductMappingService(
     }
 
     public static string GetProviderLabel(AiProviderType providerType) =>
-        providerType switch
+        NormalizeProviderType(providerType) switch
         {
             AiProviderType.OpenAiApi => "OpenAI API",
             AiProviderType.AzureAiFoundry => "Azure AI Foundry - OpenAI Endpoint",
-            _ => "Open WebUI"
+            AiProviderType.AzureAiFoundryAgent => "Azure AI Foundry - Agent",
+            _ => "OpenAI API"
         };
+
+    public static string GetDefaultSystemPromptText() => DefaultSystemPrompt;
+
+    public static string GetDefaultSystemPromptText(AiProviderType providerType) =>
+        GetDefaultSystemPrompt(providerType);
+
+    public static string GetDefaultPromptTemplateText(AiProviderType providerType) =>
+        GetDefaultPromptTemplate(providerType);
 
     private async Task EnsureLegacyConfigurationMigratedAsync(CancellationToken cancellationToken)
     {
         var providers = await dbContext.AiProviderConfigurations
             .OrderBy(x => x.Id)
             .ToListAsync(cancellationToken);
+
+        var migratedLegacyProviders = false;
+        foreach (var legacyProvider in providers)
+        {
+            var changed = false;
+
+            if (legacyProvider.ProviderType == AiProviderType.OpenWebUi)
+            {
+                legacyProvider.ProviderType = AiProviderType.OpenAiApi;
+                if (string.Equals(legacyProvider.Name, "Open WebUI (Migrated)", StringComparison.Ordinal))
+                {
+                    legacyProvider.Name = "OpenAI API (Migrated)";
+                }
+
+                changed = true;
+            }
+
+            var effectiveSystemPrompt = GetEffectiveSystemPrompt(legacyProvider.ProviderType, legacyProvider.SystemPrompt);
+            if (!string.Equals(legacyProvider.SystemPrompt, effectiveSystemPrompt, StringComparison.Ordinal))
+            {
+                legacyProvider.SystemPrompt = effectiveSystemPrompt;
+                changed = true;
+            }
+
+            var effectivePromptTemplate = GetEffectivePromptTemplate(legacyProvider.ProviderType, legacyProvider.PromptTemplate);
+            if (!string.Equals(legacyProvider.PromptTemplate, effectivePromptTemplate, StringComparison.Ordinal))
+            {
+                legacyProvider.PromptTemplate = effectivePromptTemplate;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                legacyProvider.UpdatedUtc = DateTime.UtcNow;
+                migratedLegacyProviders = true;
+            }
+        }
+
+        if (migratedLegacyProviders)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            await auditLogService.WriteAsync(
+                AiMappingCategory,
+                "MigrateOpenWebProviders",
+                nameof(AiProviderConfiguration),
+                null,
+                "Normalized legacy AI provider configurations.",
+                "Existing provider configurations now use supported provider types and include default system prompt and prompt template values when those fields were blank.",
+                cancellationToken);
+        }
 
         if (providers.Count > 0)
         {
@@ -818,10 +940,12 @@ public sealed class AiProductMappingService(
 
         var provider = new AiProviderConfiguration
         {
-            Name = "Open WebUI (Migrated)",
-            ProviderType = AiProviderType.OpenWebUi,
+            Name = "OpenAI API (Migrated)",
+            ProviderType = AiProviderType.OpenAiApi,
             Endpoint = string.IsNullOrWhiteSpace(legacyEndpoint) ? AppSettingDefaults.AiMappingEndpoint : legacyEndpoint.Trim(),
             Model = string.IsNullOrWhiteSpace(legacyModel) ? AppSettingDefaults.AiMappingModel : legacyModel.Trim(),
+            SystemPrompt = GetDefaultSystemPrompt(AiProviderType.OpenAiApi),
+            PromptTemplate = GetDefaultPromptTemplate(AiProviderType.OpenAiApi),
             TimeoutSeconds = TryParseTimeoutSeconds(legacyTimeoutValue),
             IsActive = true,
             CreatedUtc = DateTime.UtcNow,
@@ -886,20 +1010,24 @@ public sealed class AiProductMappingService(
         provider is null
             ? new AiProviderConfigurationInputModel
             {
-                Name = "Open WebUI",
-                ProviderType = AiProviderType.OpenWebUi,
-                Endpoint = AppSettingDefaults.AiMappingEndpoint,
-                Model = AppSettingDefaults.AiMappingModel,
+                Name = "OpenAI API",
+                ProviderType = AiProviderType.OpenAiApi,
+                Endpoint = "https://api.openai.com/v1/chat/completions",
+                Model = string.Empty,
+                SystemPrompt = GetDefaultSystemPrompt(AiProviderType.OpenAiApi),
+                PromptTemplate = GetDefaultPromptTemplate(AiProviderType.OpenAiApi),
                 TimeoutSeconds = AppSettingDefaults.AiMappingTimeoutSeconds
             }
             : new AiProviderConfigurationInputModel
             {
                 Id = provider.Id,
                 Name = provider.Name,
-                ProviderType = provider.ProviderType,
+                ProviderType = NormalizeProviderType(provider.ProviderType),
                 Endpoint = provider.Endpoint,
                 Model = provider.Model,
                 ApiVersion = provider.ApiVersion,
+                SystemPrompt = GetEffectiveSystemPrompt(provider.ProviderType, provider.SystemPrompt),
+                PromptTemplate = GetEffectivePromptTemplate(provider.ProviderType, provider.PromptTemplate),
                 InputCostPerMillionTokensSek = provider.InputCostPerMillionTokensSek,
                 OutputCostPerMillionTokensSek = provider.OutputCostPerMillionTokensSek,
                 TimeoutSeconds = NormalizeTimeoutSeconds(provider.TimeoutSeconds)
@@ -907,20 +1035,53 @@ public sealed class AiProductMappingService(
 
     private static List<SelectListItem> BuildProviderTypeOptions(AiProviderType selectedProviderType) =>
         Enum.GetValues<AiProviderType>()
+            .Where(providerType => providerType != AiProviderType.OpenWebUi)
             .Select(providerType => new SelectListItem
             {
                 Value = providerType.ToString(),
                 Text = GetProviderLabel(providerType),
-                Selected = providerType == selectedProviderType
+                Selected = providerType == NormalizeProviderType(selectedProviderType)
             })
             .ToList();
 
+    private static AiProviderType NormalizeProviderType(AiProviderType providerType) =>
+        providerType == AiProviderType.OpenWebUi
+            ? AiProviderType.OpenAiApi
+            : providerType;
+
+    private static string GetEffectiveSystemPrompt(AiProviderType providerType, string? systemPrompt) =>
+        string.IsNullOrWhiteSpace(systemPrompt)
+            ? GetDefaultSystemPrompt(providerType)
+            : systemPrompt.Trim();
+
+    private static string GetDefaultSystemPrompt(AiProviderType providerType) =>
+        NormalizeProviderType(providerType) switch
+        {
+            AiProviderType.AzureAiFoundryAgent => DefaultFoundryAgentSystemPrompt,
+            _ => DefaultSystemPrompt
+        };
+
+    private static string GetEffectivePromptTemplate(AiProviderType providerType, string? promptTemplate) =>
+        string.IsNullOrWhiteSpace(promptTemplate)
+            ? GetDefaultPromptTemplate(providerType)
+            : promptTemplate.Trim();
+
+    private static string GetDefaultPromptTemplate(AiProviderType providerType) =>
+        NormalizeProviderType(providerType) switch
+        {
+            AiProviderType.AzureAiFoundryAgent => DefaultFoundryAgentPromptTemplate,
+            _ => DefaultStructuredPromptTemplate
+        };
+
     private static void NormalizeProviderInput(AiProviderConfigurationInputModel input)
     {
+        input.ProviderType = NormalizeProviderType(input.ProviderType);
         input.Name = input.Name?.Trim() ?? string.Empty;
         input.Endpoint = input.Endpoint?.Trim() ?? string.Empty;
         input.Model = input.Model?.Trim() ?? string.Empty;
         input.ApiVersion = string.IsNullOrWhiteSpace(input.ApiVersion) ? null : input.ApiVersion.Trim();
+        input.SystemPrompt = GetEffectiveSystemPrompt(input.ProviderType, input.SystemPrompt);
+        input.PromptTemplate = GetEffectivePromptTemplate(input.ProviderType, input.PromptTemplate);
         input.InputCostPerMillionTokensSek = NormalizeTokenCostPerMillionSek(input.InputCostPerMillionTokensSek);
         input.OutputCostPerMillionTokensSek = NormalizeTokenCostPerMillionSek(input.OutputCostPerMillionTokensSek);
         input.ApiKey = string.IsNullOrWhiteSpace(input.ApiKey) ? null : input.ApiKey.Trim();
@@ -928,11 +1089,12 @@ public sealed class AiProductMappingService(
     }
 
     private static string? NormalizeApiVersion(AiProviderType providerType, string endpoint, string? apiVersion) =>
-        providerType == AiProviderType.AzureAiFoundry &&
-        !IsOpenAiV1Endpoint(endpoint) &&
-        !string.IsNullOrWhiteSpace(apiVersion)
-            ? apiVersion.Trim()
-            : null;
+        NormalizeProviderType(providerType) switch
+        {
+            AiProviderType.AzureAiFoundry when !IsOpenAiV1Endpoint(endpoint) && !string.IsNullOrWhiteSpace(apiVersion) => apiVersion.Trim(),
+            AiProviderType.AzureAiFoundryAgent when !string.IsNullOrWhiteSpace(apiVersion) => apiVersion.Trim(),
+            _ => null
+        };
 
     private static bool IsProviderConfigured(string endpoint, string model, string? apiKey) =>
         !string.IsNullOrWhiteSpace(endpoint) &&
@@ -988,7 +1150,7 @@ public sealed class AiProductMappingService(
             callerCancellationToken,
             requestCancellationToken);
 
-        if (!ShouldRetryWithResponses(settings.ActiveProviderType!.Value, settings.Endpoint, requestApiMode, response.StatusCode, response.Body))
+        if (!ShouldRetryWithResponses(settings.Endpoint, requestApiMode, response.StatusCode, response.Body))
         {
             return response;
         }
@@ -1029,15 +1191,13 @@ public sealed class AiProductMappingService(
             : AiRequestApiMode.ChatCompletions;
 
     private static bool ShouldRetryWithResponses(
-        AiProviderType providerType,
         string endpoint,
         AiRequestApiMode requestApiMode,
         HttpStatusCode statusCode,
         string responseBody)
     {
         if (requestApiMode == AiRequestApiMode.Responses ||
-            statusCode != HttpStatusCode.BadRequest ||
-            providerType == AiProviderType.OpenWebUi)
+            statusCode != HttpStatusCode.BadRequest)
         {
             return false;
         }
@@ -1083,7 +1243,7 @@ public sealed class AiProductMappingService(
             AiRequestApiMode.Responses => new
             {
                 model = settings.Model,
-                instructions = SystemPrompt,
+                instructions = settings.SystemPrompt,
                 input = userPrompt
             },
             _ => new
@@ -1094,7 +1254,7 @@ public sealed class AiProductMappingService(
                     new
                     {
                         role = "system",
-                        content = SystemPrompt
+                        content = settings.SystemPrompt
                     },
                     new
                     {
@@ -1110,7 +1270,7 @@ public sealed class AiProductMappingService(
 
     private static void ApplyAuthentication(HttpRequestMessage request, AiProviderType providerType, string apiKey, string endpoint)
     {
-        if (providerType == AiProviderType.AzureAiFoundry && !IsOpenAiV1Endpoint(endpoint))
+        if (NormalizeProviderType(providerType) == AiProviderType.AzureAiFoundry && !IsOpenAiV1Endpoint(endpoint))
         {
             request.Headers.TryAddWithoutValidation("api-key", apiKey);
             return;
@@ -1120,7 +1280,7 @@ public sealed class AiProductMappingService(
     }
 
     private static bool SupportsModelDiscovery(AiProviderType providerType) =>
-        providerType is AiProviderType.OpenWebUi or AiProviderType.OpenAiApi;
+        NormalizeProviderType(providerType) == AiProviderType.OpenAiApi;
 
     private static bool IsResponsesEndpoint(string endpoint)
     {
@@ -1172,10 +1332,9 @@ public sealed class AiProductMappingService(
             return false;
         }
 
-        var path = provider.ProviderType switch
+        var path = NormalizeProviderType(provider.ProviderType) switch
         {
             AiProviderType.OpenAiApi => BuildOpenAiModelsPath(endpointUri.AbsolutePath),
-            AiProviderType.OpenWebUi => "/api/models",
             _ => null
         };
 
@@ -1275,54 +1434,367 @@ public sealed class AiProductMappingService(
         return null;
     }
 
-    private static string BuildUserPrompt(ProductCatalogItem product, List<TrmComponent> components)
+    private async Task<AiFoundryAgentResponse> SendFoundryAgentRequestAsync(
+        AiProductMappingSettingsSnapshot settings,
+        string prompt,
+        CancellationToken cancellationToken)
+    {
+        if (aiFoundryAgentClient is null)
+        {
+            throw new InvalidOperationException("Azure AI Foundry agent support is not available in this environment.");
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        {
+            throw new InvalidOperationException("Save an API key before using the Azure AI Foundry agent provider.");
+        }
+
+        return await aiFoundryAgentClient.GetResponseAsync(
+            settings.Endpoint,
+            settings.Model,
+            settings.ApiVersion,
+            settings.ApiKey,
+            BuildFoundryAgentRequestPrompt(settings.SystemPrompt, prompt),
+            cancellationToken);
+    }
+
+    private static IReadOnlyList<AiProductMappingSuggestion> ResolveOpenAiSuggestions(
+        IReadOnlyList<ParsedAiSuggestion> parsedSuggestions,
+        IReadOnlyList<TrmComponent> components,
+        IReadOnlySet<int> existingComponentIds)
+    {
+        var componentLookup = components
+            .Where(component => component.ParentCapability?.ParentDomain is not null)
+            .ToDictionary(component => component.Id);
+        var suggestions = new List<AiProductMappingSuggestion>();
+
+        foreach (var parsedSuggestion in parsedSuggestions)
+        {
+            if (!componentLookup.TryGetValue(parsedSuggestion.ComponentId, out var component) ||
+                existingComponentIds.Contains(component.Id) ||
+                suggestions.Any(existing => existing.ComponentId == component.Id))
+            {
+                continue;
+            }
+
+            suggestions.Add(CreateSuggestion(component, parsedSuggestion.Confidence, parsedSuggestion.Reason));
+            if (suggestions.Count >= MaxSuggestions)
+            {
+                break;
+            }
+        }
+
+        return suggestions;
+    }
+
+    private static IReadOnlyList<AiProductMappingSuggestion> ResolveFoundryAgentSuggestions(
+        FoundryAgentParsedResponse parsedResponse,
+        IReadOnlyList<TrmComponent> components,
+        IReadOnlySet<int> existingComponentIds)
+    {
+        var eligibleComponents = components
+            .Where(component => component.ParentCapability?.ParentDomain is not null)
+            .ToList();
+        var componentsByCode = eligibleComponents
+            .GroupBy(component => component.DisplayCode, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var componentsByName = eligibleComponents
+            .GroupBy(component => component.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var suggestions = new List<AiProductMappingSuggestion>();
+
+        foreach (var mapping in parsedResponse.Mappings)
+        {
+            TrmComponent? component = null;
+
+            if (!string.IsNullOrWhiteSpace(mapping.ComponentCode))
+            {
+                componentsByCode.TryGetValue(mapping.ComponentCode, out component);
+            }
+
+            if (component is null && !string.IsNullOrWhiteSpace(mapping.ComponentName))
+            {
+                componentsByName.TryGetValue(mapping.ComponentName, out component);
+            }
+
+            if (component is null ||
+                existingComponentIds.Contains(component.Id) ||
+                suggestions.Any(existing => existing.ComponentId == component.Id))
+            {
+                continue;
+            }
+
+            suggestions.Add(CreateSuggestion(component, mapping.Confidence, mapping.Reason));
+            if (suggestions.Count >= MaxSuggestions)
+            {
+                break;
+            }
+        }
+
+        return suggestions;
+    }
+
+    private static AiProductMappingSuggestion CreateSuggestion(TrmComponent component, decimal confidence, string reason) =>
+        new()
+        {
+            ComponentId = component.Id,
+            DomainLabel = $"{component.ParentCapability!.ParentDomain!.Code} {component.ParentCapability.ParentDomain.Name}",
+            CapabilityLabel = $"{component.ParentCapability.Code} {component.ParentCapability.Name}",
+            ComponentLabel = component.DisplayLabel,
+            Confidence = confidence,
+            Reason = string.IsNullOrWhiteSpace(reason)
+                ? "Matched by the configured AI provider."
+                : reason
+        };
+
+    private static FoundryAgentParsedResponse ParseFoundryAgentResponse(string rawContent)
+    {
+        var normalizedJson = ExtractJsonObjectText(rawContent);
+        using var document = JsonDocument.Parse(normalizedJson);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("The Azure AI Foundry agent returned JSON in an unsupported shape.");
+        }
+
+        var summary = ReadJsonString(root, "summary");
+        var mappings = new List<FoundryAgentParsedSuggestion>();
+
+        if (root.TryGetProperty("mappings", out var mappingsElement) &&
+            mappingsElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var mapping in mappingsElement.EnumerateArray())
+            {
+                if (mapping.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var componentCode = ReadJsonString(mapping, "component_code") ?? ReadJsonString(mapping, "componentCode");
+                var componentName = ReadJsonString(mapping, "component_name") ?? ReadJsonString(mapping, "componentName");
+                if (string.IsNullOrWhiteSpace(componentCode) && string.IsNullOrWhiteSpace(componentName))
+                {
+                    continue;
+                }
+
+                var reason = ReadJsonString(mapping, "reason") ?? string.Empty;
+                var confidenceValue = mapping.TryGetProperty("confidence", out var confidenceElement)
+                    ? confidenceElement.ToString()
+                    : null;
+
+                mappings.Add(new FoundryAgentParsedSuggestion(
+                    componentCode,
+                    componentName,
+                    ParseConfidence(confidenceValue ?? "0.5"),
+                    reason));
+            }
+        }
+
+        return new FoundryAgentParsedResponse(summary, mappings);
+    }
+
+    private static string ExtractJsonObjectText(string rawContent)
+    {
+        var normalized = StripCodeFence(rawContent).Trim();
+        if (TryParseJsonObject(normalized))
+        {
+            return normalized;
+        }
+
+        var startIndex = normalized.IndexOf('{');
+        var endIndex = normalized.LastIndexOf('}');
+        if (startIndex >= 0 && endIndex > startIndex)
+        {
+            var candidate = normalized[startIndex..(endIndex + 1)];
+            if (TryParseJsonObject(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException("The Azure AI Foundry agent returned content that did not match the expected JSON output.");
+    }
+
+    private static bool TryParseJsonObject(string candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(candidate);
+            return document.RootElement.ValueKind == JsonValueKind.Object;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static string? ReadJsonString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var propertyValue))
+        {
+            return null;
+        }
+
+        return propertyValue.ValueKind switch
+        {
+            JsonValueKind.String => propertyValue.GetString(),
+            JsonValueKind.Number => propertyValue.ToString(),
+            _ => null
+        };
+    }
+
+    private static string BuildProviderPrompt(
+        AiProductMappingSettingsSnapshot settings,
+        ProductCatalogItem product,
+        IReadOnlyList<TrmComponent> components)
+    {
+        var includeComponentIds = settings.ActiveProviderType != AiProviderType.AzureAiFoundryAgent;
+        return RenderPromptTemplate(settings.PromptTemplate, product, components, includeComponentIds);
+    }
+
+    private static string BuildFoundryAgentProductLabel(ProductCatalogItem product)
+    {
+        var parts = new[] { product.Vendor?.Trim(), product.Name?.Trim() }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+
+        return parts.Length == 0
+            ? "the supplied product"
+            : string.Join(' ', parts);
+    }
+
+    private static string BuildFoundryAgentRequestPrompt(string systemPrompt, string prompt)
+    {
+        var trimmedPrompt = prompt.Trim();
+        var trimmedSystemPrompt = systemPrompt.Trim();
+        return string.IsNullOrWhiteSpace(trimmedSystemPrompt)
+            ? trimmedPrompt
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"{trimmedPrompt}{Environment.NewLine}{Environment.NewLine}Shared instructions:{Environment.NewLine}{trimmedSystemPrompt}");
+    }
+
+    private static string RenderPromptTemplate(
+        string template,
+        ProductCatalogItem product,
+        IReadOnlyList<TrmComponent> components,
+        bool includeComponentIds)
+    {
+        var rendered = template;
+        var replacements = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["{{VendorProduct}}"] = BuildFoundryAgentProductLabel(product),
+            ["{{ProductName}}"] = NormalizeTextCell(product.Name, MaxTextCellLength),
+            ["{{Vendor}}"] = NormalizeTextCell(product.Vendor, MaxTextCellLength),
+            ["{{ProductDescription}}"] = NormalizeTextCell(product.Description, MaxTextCellLength),
+            ["{{ProductNameToon}}"] = ToonString(product.Name),
+            ["{{VendorToon}}"] = ToonString(product.Vendor),
+            ["{{ProductDescriptionToon}}"] = ToonString(product.Description, MaxTextCellLength),
+            ["{{ExistingMappingsBlock}}"] = BuildExistingMappingsBlock(product, includeComponentIds),
+            ["{{TrmComponentsBlock}}"] = BuildTrmComponentsBlock(components, includeComponentIds)
+        };
+
+        foreach (var replacement in replacements)
+        {
+            rendered = rendered.Replace(replacement.Key, replacement.Value, StringComparison.Ordinal);
+        }
+
+        return rendered.Trim();
+    }
+
+    private static string BuildExistingMappingsBlock(ProductCatalogItem product, bool includeComponentIds)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("request:");
-        builder.AppendLine("  action: \"suggest_product_trm_component_mappings\"");
-        builder.AppendLine("  format: \"TOON\"");
-        builder.AppendLine("product:");
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  name: {ToonString(product.Name)}"));
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  vendor: {ToonString(product.Vendor)}"));
 
-        var existingMappings = product.Mappings
-            .Where(x => x.TrmComponentId.HasValue && x.TrmComponent is not null)
+        if (includeComponentIds)
+        {
+            var existingMappings = product.Mappings
+                .Where(x => x.TrmComponentId.HasValue && x.TrmComponent is not null)
+                .OrderBy(x => x.TrmComponent!.DisplayLabel, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"existingMappings[{existingMappings.Count}]{{component_id\tcomponent_label}}:"));
+            foreach (var mapping in existingMappings)
+            {
+                builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  {mapping.TrmComponentId}\t{ToonString(mapping.TrmComponent!.DisplayLabel)}"));
+            }
+
+            return builder.ToString().TrimEnd();
+        }
+
+        var existingCodeMappings = product.Mappings
+            .Where(x => x.TrmComponent is not null)
             .OrderBy(x => x.TrmComponent!.DisplayLabel, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"existingMappings[{existingMappings.Count}]{{component_id\tcomponent_label}}:"));
-        foreach (var mapping in existingMappings)
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"existingMappings[{existingCodeMappings.Count}]{{component_code\tcomponent_name}}:"));
+        foreach (var mapping in existingCodeMappings)
         {
-            builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  {mapping.TrmComponentId}\t{ToonString(mapping.TrmComponent!.DisplayLabel)}"));
+            builder.AppendLine(string.Create(
+                CultureInfo.InvariantCulture,
+                $"  {ToonString(mapping.TrmComponent!.DisplayCode)}\t{ToonString(mapping.TrmComponent.Name)}"));
         }
 
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"trmComponents[{components.Count}]{{component_id\tcomponent_code\tcomponent_name\tcapability_code\tcapability_name\tdomain_code\tdomain_name\tproduct_examples\tdescription}}:"));
+        return builder.ToString().TrimEnd();
+    }
+
+    private static string BuildTrmComponentsBlock(IReadOnlyList<TrmComponent> components, bool includeComponentIds)
+    {
+        var builder = new StringBuilder();
+
+        if (includeComponentIds)
+        {
+            builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"trmComponents[{components.Count}]{{component_id\tcomponent_code\tcomponent_name\tcapability_code\tcapability_name\tdomain_code\tdomain_name\tproduct_examples\tdescription}}:"));
+            foreach (var component in components)
+            {
+                AppendTrmComponentRow(builder, component, includeComponentIds: true);
+            }
+
+            return builder.ToString().TrimEnd();
+        }
+
+        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"trmComponents[{components.Count}]{{component_code\tcomponent_name\tcapability_code\tcapability_name\tdomain_code\tdomain_name\tproduct_examples\tdescription}}:"));
         foreach (var component in components)
         {
-            var capability = component.ParentCapability;
-            var domain = capability?.ParentDomain;
-            builder.Append("  ");
-            builder.Append(component.Id);
-            builder.Append('\t');
-            builder.Append(ToonString(component.DisplayCode));
-            builder.Append('\t');
-            builder.Append(ToonString(component.Name));
-            builder.Append('\t');
-            builder.Append(ToonString(capability?.Code));
-            builder.Append('\t');
-            builder.Append(ToonString(capability?.Name));
-            builder.Append('\t');
-            builder.Append(ToonString(domain?.Code));
-            builder.Append('\t');
-            builder.Append(ToonString(domain?.Name));
-            builder.Append('\t');
-            builder.Append(ToonString(component.ProductExamples, MaxTextCellLength));
-            builder.Append('\t');
-            builder.Append(ToonString(component.Description, MaxTextCellLength));
-            builder.AppendLine();
+            AppendTrmComponentRow(builder, component, includeComponentIds: false);
         }
 
-        return builder.ToString();
+        return builder.ToString().TrimEnd();
+    }
+
+    private static void AppendTrmComponentRow(StringBuilder builder, TrmComponent component, bool includeComponentIds)
+    {
+        var capability = component.ParentCapability;
+        var domain = capability?.ParentDomain;
+
+        builder.Append("  ");
+        if (includeComponentIds)
+        {
+            builder.Append(component.Id);
+            builder.Append('\t');
+        }
+
+        builder.Append(ToonString(component.DisplayCode));
+        builder.Append('\t');
+        builder.Append(ToonString(component.Name));
+        builder.Append('\t');
+        builder.Append(ToonString(capability?.Code));
+        builder.Append('\t');
+        builder.Append(ToonString(capability?.Name));
+        builder.Append('\t');
+        builder.Append(ToonString(domain?.Code));
+        builder.Append('\t');
+        builder.Append(ToonString(domain?.Name));
+        builder.Append('\t');
+        builder.Append(ToonString(component.ProductExamples, MaxTextCellLength));
+        builder.Append('\t');
+        builder.Append(ToonString(component.Description, MaxTextCellLength));
+        builder.AppendLine();
     }
 
     private static string ExtractAssistantContent(string responseBody)
@@ -1826,6 +2298,8 @@ public sealed class AiProductMappingSettingsSnapshot
     public string Endpoint { get; init; } = string.Empty;
     public string Model { get; init; } = string.Empty;
     public string? ApiVersion { get; init; }
+    public string SystemPrompt { get; init; } = string.Empty;
+    public string PromptTemplate { get; init; } = string.Empty;
     public decimal? InputCostPerMillionTokensSek { get; init; }
     public decimal? OutputCostPerMillionTokensSek { get; init; }
     public string? ApiKey { get; init; }

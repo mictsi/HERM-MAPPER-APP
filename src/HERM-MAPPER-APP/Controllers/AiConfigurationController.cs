@@ -13,7 +13,7 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
     private const string StatusTempDataKey = "AiConfigurationStatusMessage";
     private const string ErrorTempDataKey = "AiConfigurationErrorMessage";
 
-    public async Task<IActionResult> IndexAsync(int? editProviderId = null, bool createNewProvider = false)
+    public async Task<IActionResult> IndexAsync(int? editProviderId = null, bool createNewProvider = false, bool loadAvailableModels = false)
     {
         if (!ModelState.IsValid)
         {
@@ -23,6 +23,7 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
         return View(await aiProductMappingService.BuildAdminViewModelAsync(
             editProviderId: editProviderId,
             createNewProvider: createNewProvider,
+            loadAvailableModels: loadAvailableModels,
             statusMessage: TempData[StatusTempDataKey] as string,
             errorMessage: TempData[ErrorTempDataKey] as string,
             cancellationToken: HttpContext.RequestAborted));
@@ -54,7 +55,7 @@ public sealed class AiConfigurationController(AiProductMappingService aiProductM
         }
 
         TempData[StatusTempDataKey] = result.Message;
-        return RedirectToAction("Index", new { editProviderId = result.ProviderId });
+        return RedirectToAction("Index");
     }
 
     [HttpPost]

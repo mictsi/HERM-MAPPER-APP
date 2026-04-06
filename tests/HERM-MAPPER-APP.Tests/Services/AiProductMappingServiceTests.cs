@@ -209,6 +209,163 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
+    public async Task SuggestMappingsAsyncUsesAzureAiFoundryAgentPromptAndResolvesMappingsByComponentCodeAsync()
+    {
+        var foundryClient = new FakeFoundryAgentClient();
+        await using var fixture = await TestFixture.CreateAsync(foundryClient);
+        var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var capability = new TrmCapability { Code = "TP001", Name = "Identity", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var component = new TrmComponent { Code = "TC001", Name = "Directory Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var product = new ProductCatalogItem
+        {
+            Name = "Active Directory",
+            Vendor = "Microsoft",
+            Description = "Identity directory and authentication service."
+        };
+
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+
+        var provider = new AiProviderConfiguration
+        {
+            Name = "Foundry Agent",
+            ProviderType = AiProviderType.AzureAiFoundryAgent,
+            Endpoint = "https://ai-lab-foundry-local.services.ai.azure.com/api/projects/proj-default",
+            Model = "herm-agent-5-4-mini",
+            ApiVersion = "9",
+            SystemPrompt = "Use only the supplied TRM catalogue and return JSON only.",
+            PromptTemplate =
+                """
+                Return all TRM mappings for {{VendorProduct}}.
+
+                Use this JSON shape:
+                {
+                  "summary": "one short sentence",
+                  "mappings": [
+                    {
+                      "component_code": "TC001",
+                      "component_name": "Directory Service",
+                      "confidence": 0.95,
+                      "reason": "one short sentence"
+                    }
+                  ]
+                }
+
+                {{ExistingMappingsBlock}}
+
+                {{TrmComponentsBlock}}
+                """,
+            TimeoutSeconds = 120,
+            IsActive = true
+        };
+
+        await fixture.DbContext.AiProviderConfigurations.AddAsync(provider);
+        await fixture.DbContext.AppSettings.AddAsync(new AppSetting
+        {
+            Key = AppSettingKeys.AiMappingIsEnabled,
+            Value = "true"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+        await fixture.SetProtectedValueAsync($"AiProvider.{provider.Id}.ApiKey", "foundry-agent-key");
+
+        foundryClient.ResponseText =
+            """
+            {
+              "summary": "Suggested 1 TRM component.",
+              "mappings": [
+                {
+                  "component_code": "TC001",
+                  "component_name": "Directory Service",
+                  "confidence": 0.94,
+                  "reason": "Matches the core directory capability."
+                }
+              ]
+            }
+            """;
+
+        var persistedProduct = await fixture.DbContext.ProductCatalogItems
+            .Include(x => x.Mappings)
+            .ThenInclude(x => x.TrmComponent)
+            .SingleAsync(x => x.Id == product.Id);
+
+        var result = await fixture.Service.SuggestMappingsAsync(persistedProduct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Suggested 1 TRM component.", result.Message);
+        var suggestion = Assert.Single(result.Suggestions);
+        Assert.Equal(component.Id, suggestion.ComponentId);
+        Assert.Equal(0.94m, suggestion.Confidence);
+        Assert.Equal("https://ai-lab-foundry-local.services.ai.azure.com/api/projects/proj-default", foundryClient.LastProjectEndpoint);
+        Assert.Equal("herm-agent-5-4-mini", foundryClient.LastAgentName);
+        Assert.Equal("9", foundryClient.LastAgentVersion);
+        Assert.Equal("foundry-agent-key", foundryClient.LastApiKey);
+        Assert.Contains("Return all TRM mappings for Microsoft Active Directory.", foundryClient.LastPrompt);
+        Assert.Contains("Shared instructions:", foundryClient.LastPrompt);
+        Assert.Contains("Use only the supplied TRM catalogue and return JSON only.", foundryClient.LastPrompt);
+        Assert.Contains("component_code", foundryClient.LastPrompt);
+        Assert.Contains("TC001", foundryClient.LastPrompt);
+    }
+
+    [Fact]
+    public async Task SuggestMappingsAsyncUsesConfiguredSystemPromptAndPromptTemplateForOpenAiProvidersAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var capability = new TrmCapability { Code = "TP001", Name = "Identity", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var component = new TrmComponent { Code = "TC001", Name = "Directory Service", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var product = new ProductCatalogItem { Name = "Active Directory", Vendor = "Microsoft" };
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+
+        var provider = new AiProviderConfiguration
+        {
+            Name = "Configured OpenAI",
+            ProviderType = AiProviderType.OpenAiApi,
+            Endpoint = "https://api.openai.com/v1/chat/completions",
+            Model = "gpt-5.4-mini",
+            SystemPrompt = "Always answer in TOON and never add prose.",
+            PromptTemplate =
+                """
+                request:
+                  action: "custom_prompt"
+                  product: {{VendorProduct}}
+
+                {{ExistingMappingsBlock}}
+
+                {{TrmComponentsBlock}}
+                """,
+            TimeoutSeconds = 120,
+            IsActive = true
+        };
+
+        await fixture.DbContext.AiProviderConfigurations.AddAsync(provider);
+        await fixture.DbContext.AppSettings.AddAsync(new AppSetting
+        {
+            Key = AppSettingKeys.AiMappingIsEnabled,
+            Value = "true"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+        await fixture.SetProtectedValueAsync($"AiProvider.{provider.Id}.ApiKey", "openai-key");
+
+        fixture.Handler.ResponseBody =
+            "{\"choices\":[{\"message\":{\"content\":\"summary: \\\"Suggested 1 TRM component.\\\"\\nsuggestions[1]{component_id\\tconfidence\\treason}:\\n  " +
+            component.Id +
+            "\\t0.95\\tMatches the core directory capability.\"}}]}";
+
+        var persistedProduct = await fixture.DbContext.ProductCatalogItems
+            .Include(x => x.Mappings)
+            .ThenInclude(x => x.TrmComponent)
+            .SingleAsync(x => x.Id == product.Id);
+
+        var result = await fixture.Service.SuggestMappingsAsync(persistedProduct);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Always answer in TOON and never add prose.", fixture.Handler.LastRequestBody);
+        Assert.Contains("custom_prompt", fixture.Handler.LastRequestBody);
+        Assert.Contains("product: Microsoft Active Directory", fixture.Handler.LastRequestBody);
+        Assert.Contains("trmComponents[1]", fixture.Handler.LastRequestBody);
+        Assert.DoesNotContain("description:", fixture.Handler.LastRequestBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetSettingsAsyncReturnsSavedTimeoutSecondsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -300,6 +457,45 @@ public sealed class AiProductMappingServiceTests
     }
 
     [Fact]
+    public async Task BuildAdminViewModelAsyncDoesNotLoadModelsUntilRequestedAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var provider = new AiProviderConfiguration
+        {
+            Name = "OpenAI API",
+            ProviderType = AiProviderType.OpenAiApi,
+            Endpoint = "http://localhost:3000/api/chat/completions",
+            Model = "gpt-oss:latest",
+            TimeoutSeconds = 120,
+            IsActive = true
+        };
+
+        await fixture.DbContext.AiProviderConfigurations.AddAsync(provider);
+        await fixture.DbContext.AppSettings.AddAsync(new AppSetting
+        {
+            Key = AppSettingKeys.AiMappingIsEnabled,
+            Value = "true"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+        await fixture.SetProtectedValueAsync($"AiProvider.{provider.Id}.ApiKey", "lab-key");
+
+        fixture.Handler.ResponseByPath["/api/models"] = "{\"data\":[{\"id\":\"gpt-oss:latest\"},{\"id\":\"llama3.3:70b\"}]}";
+
+        var editModel = await fixture.Service.BuildAdminViewModelAsync(editProviderId: provider.Id);
+
+        Assert.True(editModel.ShowEditor);
+        Assert.True(editModel.SupportsModelDiscovery);
+        Assert.True(editModel.CanLoadModelOptions);
+        Assert.Empty(editModel.ModelOptions);
+        Assert.Empty(fixture.Handler.RequestPaths);
+
+        var loadedModel = await fixture.Service.BuildAdminViewModelAsync(editProviderId: provider.Id, loadAvailableModels: true);
+
+        Assert.NotEmpty(loadedModel.ModelOptions);
+        Assert.Equal("/api/models", fixture.Handler.LastRequestPath);
+    }
+
+    [Fact]
     public async Task SuggestMappingsAsyncWritesUsageLogFromUsagePayloadAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -330,7 +526,7 @@ public sealed class AiProductMappingServiceTests
         Assert.True(result.IsSuccess);
 
         var usageLog = await fixture.DbContext.AiRequestUsageLogs.SingleAsync();
-        Assert.Equal("Open WebUI (Migrated)", usageLog.ProviderName);
+        Assert.Equal("OpenAI API (Migrated)", usageLog.ProviderName);
         Assert.Equal("gpt-oss:latest", usageLog.Model);
         Assert.Equal(120, usageLog.PromptTokens);
         Assert.Equal(34, usageLog.CompletionTokens);
@@ -692,7 +888,7 @@ public sealed class AiProductMappingServiceTests
         public AiProductMappingService Service { get; }
         public ProtectedSettingsService ProtectedSettings { get; }
 
-        public static async Task<TestFixture> CreateAsync()
+        public static async Task<TestFixture> CreateAsync(IAiFoundryAgentClient? foundryAgentClient = null)
         {
             var connection = new SqliteConnection("Data Source=:memory:");
             await connection.OpenAsync();
@@ -717,7 +913,8 @@ public sealed class AiProductMappingServiceTests
                 protectedSettingsService,
                 new AuditLogService(dbContext),
                 httpClient,
-                NullLogger<AiProductMappingService>.Instance);
+                NullLogger<AiProductMappingService>.Instance,
+                foundryAgentClient);
 
             return new TestFixture(connection, dbContext, handler, httpClient, service, protectedSettingsService);
         }
@@ -818,6 +1015,32 @@ public sealed class AiProductMappingServiceTests
             {
                 Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
             };
+        }
+    }
+
+    private sealed class FakeFoundryAgentClient : IAiFoundryAgentClient
+    {
+        public string ResponseText { get; set; } = "{}";
+        public string LastProjectEndpoint { get; private set; } = string.Empty;
+        public string LastAgentName { get; private set; } = string.Empty;
+        public string? LastAgentVersion { get; private set; }
+        public string LastApiKey { get; private set; } = string.Empty;
+        public string LastPrompt { get; private set; } = string.Empty;
+
+        public Task<AiFoundryAgentResponse> GetResponseAsync(
+            string projectEndpoint,
+            string agentName,
+            string? agentVersion,
+            string apiKey,
+            string prompt,
+            CancellationToken cancellationToken = default)
+        {
+            LastProjectEndpoint = projectEndpoint;
+            LastAgentName = agentName;
+            LastAgentVersion = agentVersion;
+            LastApiKey = apiKey;
+            LastPrompt = prompt;
+            return Task.FromResult(new AiFoundryAgentResponse(ResponseText));
         }
     }
 }

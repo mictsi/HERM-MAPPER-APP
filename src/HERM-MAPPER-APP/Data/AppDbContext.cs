@@ -217,6 +217,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Endpoint).HasMaxLength(2048);
             entity.Property(x => x.Model).HasMaxLength(200);
             entity.Property(x => x.ApiVersion).HasMaxLength(80);
+            entity.Property(x => x.SystemPrompt);
+            entity.Property(x => x.PromptTemplate);
             entity.Property(x => x.InputCostPerMillionTokensSek).HasPrecision(18, 6);
             entity.Property(x => x.OutputCostPerMillionTokensSek).HasPrecision(18, 6);
         });
