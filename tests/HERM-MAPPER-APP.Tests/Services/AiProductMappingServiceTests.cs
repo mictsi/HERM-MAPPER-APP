@@ -42,6 +42,11 @@ public sealed class AiProductMappingServiceTests
         Assert.Contains("Active Directory", fixture.Handler.LastRequestBody);
         Assert.Contains("trmComponents[2]", fixture.Handler.LastRequestBody);
         Assert.Contains("existingMappings[0]", fixture.Handler.LastRequestBody);
+        Assert.DoesNotContain("id:", fixture.Handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("version:", fixture.Handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("lifecycle_status:", fixture.Handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("description:", fixture.Handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("notes:", fixture.Handler.LastRequestBody, StringComparison.Ordinal);
         Assert.Equal("Bearer", fixture.Handler.LastAuthorizationScheme);
         Assert.Equal("lab-key", fixture.Handler.LastAuthorizationParameter);
         Assert.Equal(componentA.Id, result.Suggestions[0].ComponentId);

@@ -1282,13 +1282,8 @@ public sealed class AiProductMappingService(
         builder.AppendLine("  action: \"suggest_product_trm_component_mappings\"");
         builder.AppendLine("  format: \"TOON\"");
         builder.AppendLine("product:");
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  id: {product.Id}"));
         builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  name: {ToonString(product.Name)}"));
         builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  vendor: {ToonString(product.Vendor)}"));
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  version: {ToonString(product.Version)}"));
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  lifecycle_status: {ToonString(product.LifecycleStatus)}"));
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  description: {ToonString(product.Description)}"));
-        builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"  notes: {ToonString(product.Notes)}"));
 
         var existingMappings = product.Mappings
             .Where(x => x.TrmComponentId.HasValue && x.TrmComponent is not null)
