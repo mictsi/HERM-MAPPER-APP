@@ -94,8 +94,15 @@
                 <div class="bulk-edit-grid">
                     <section class="bulk-edit-field" data-bulk-edit-section>
                         <div class="form-check form-switch mb-3">
-                            <input asp-for="ApplyVendor" class="form-check-input" data-bulk-edit-toggle />
-                            <label asp-for="ApplyVendor" class="form-check-label"></label>
+                            <input type="hidden" name="ApplyVendor" value="false" />
+                            <input class="form-check-input"
+                                   data-bulk-edit-toggle
+                                   type="checkbox"
+                                   id="ApplyVendor"
+                                   name="ApplyVendor"
+                                   value="true"
+                                   @(Model.ApplyVendor == true ? "checked" : null) />
+                            <label class="form-check-label" for="ApplyVendor">Update vendor</label>
                         </div>
                         <label asp-for="Vendor" class="form-label"></label>
                         <input asp-for="Vendor" class="form-control" data-bulk-edit-control />
@@ -105,8 +112,15 @@
 
                     <section class="bulk-edit-field" data-bulk-edit-section>
                         <div class="form-check form-switch mb-3">
-                            <input asp-for="ApplyOwners" class="form-check-input" data-bulk-edit-toggle />
-                            <label asp-for="ApplyOwners" class="form-check-label"></label>
+                            <input type="hidden" name="ApplyOwners" value="false" />
+                            <input class="form-check-input"
+                                   data-bulk-edit-toggle
+                                   type="checkbox"
+                                   id="ApplyOwners"
+                                   name="ApplyOwners"
+                                   value="true"
+                                   @(Model.ApplyOwners == true ? "checked" : null) />
+                            <label class="form-check-label" for="ApplyOwners">Update owners</label>
                         </div>
                         <div class="d-flex flex-wrap gap-3 mb-3">
                             <div class="form-check">
@@ -151,8 +165,15 @@
 
                     <section class="bulk-edit-field" data-bulk-edit-section>
                         <div class="form-check form-switch mb-3">
-                            <input asp-for="ApplyLifecycleStatus" class="form-check-input" data-bulk-edit-toggle />
-                            <label asp-for="ApplyLifecycleStatus" class="form-check-label"></label>
+                            <input type="hidden" name="ApplyLifecycleStatus" value="false" />
+                            <input class="form-check-input"
+                                   data-bulk-edit-toggle
+                                   type="checkbox"
+                                   id="ApplyLifecycleStatus"
+                                   name="ApplyLifecycleStatus"
+                                   value="true"
+                                   @(Model.ApplyLifecycleStatus == true ? "checked" : null) />
+                            <label class="form-check-label" for="ApplyLifecycleStatus">Update lifecycle status</label>
                         </div>
                         <label asp-for="LifecycleStatus" class="form-label"></label>
                         <select asp-for="LifecycleStatus"
