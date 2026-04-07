@@ -353,11 +353,6 @@ public sealed class ProductsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> BulkEditAsync(ProductBulkEditViewModel input)
     {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
         input.SelectedProductIds = NormalizeIds(input.SelectedProductIds);
         input.ReturnOwners = NormalizeSelections(input.ReturnOwners);
         input.Owners = NormalizeSelections(input.Owners);

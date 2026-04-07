@@ -94,7 +94,6 @@
                 <div class="bulk-edit-grid">
                     <section class="bulk-edit-field" data-bulk-edit-section>
                         <div class="form-check form-switch mb-3">
-                            <input type="hidden" name="ApplyVendor" value="false" />
                             <input class="form-check-input"
                                    data-bulk-edit-toggle
                                    type="checkbox"
@@ -102,6 +101,7 @@
                                    name="ApplyVendor"
                                    value="true"
                                    @(Model.ApplyVendor == true ? "checked" : null) />
+                            <input type="hidden" name="ApplyVendor" value="false" />
                             <label class="form-check-label" for="ApplyVendor">Update vendor</label>
                         </div>
                         <label asp-for="Vendor" class="form-label"></label>
@@ -112,7 +112,6 @@
 
                     <section class="bulk-edit-field" data-bulk-edit-section>
                         <div class="form-check form-switch mb-3">
-                            <input type="hidden" name="ApplyOwners" value="false" />
                             <input class="form-check-input"
                                    data-bulk-edit-toggle
                                    type="checkbox"
@@ -120,6 +119,7 @@
                                    name="ApplyOwners"
                                    value="true"
                                    @(Model.ApplyOwners == true ? "checked" : null) />
+                            <input type="hidden" name="ApplyOwners" value="false" />
                             <label class="form-check-label" for="ApplyOwners">Update owners</label>
                         </div>
                         <div class="d-flex flex-wrap gap-3 mb-3">
@@ -165,7 +165,6 @@
 
                     <section class="bulk-edit-field" data-bulk-edit-section>
                         <div class="form-check form-switch mb-3">
-                            <input type="hidden" name="ApplyLifecycleStatus" value="false" />
                             <input class="form-check-input"
                                    data-bulk-edit-toggle
                                    type="checkbox"
@@ -173,6 +172,7 @@
                                    name="ApplyLifecycleStatus"
                                    value="true"
                                    @(Model.ApplyLifecycleStatus == true ? "checked" : null) />
+                            <input type="hidden" name="ApplyLifecycleStatus" value="false" />
                             <label class="form-check-label" for="ApplyLifecycleStatus">Update lifecycle status</label>
                         </div>
                         <label asp-for="LifecycleStatus" class="form-label"></label>

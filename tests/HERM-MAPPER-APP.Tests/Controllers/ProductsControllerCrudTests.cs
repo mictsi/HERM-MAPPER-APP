@@ -474,6 +474,37 @@ public sealed class ProductsControllerCrudTests
     }
 
     [Fact]
+    public async Task BulkEditPostInvalidModelReturnsViewWithOptionsAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedConfigurableOptionsAsync();
+
+        var sentinel = new ProductCatalogItem
+        {
+            Name = "Sentinel",
+            Owners = [new ProductCatalogItemOwner { OwnerValue = "Team Blue" }]
+        };
+
+        await fixture.DbContext.ProductCatalogItems.AddAsync(sentinel);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        controller.ModelState.AddModelError(nameof(ProductBulkEditViewModel.ApplyVendor), "Choose at least one field to update.");
+
+        var result = await controller.BulkEditAsync(new ProductBulkEditViewModel
+        {
+            SelectedProductIds = [sentinel.Id]
+        });
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<ProductBulkEditViewModel>(view.Model);
+
+        Assert.Single(model.SelectedProducts);
+        Assert.Contains(model.OwnerOptions, option => option.Value == "Team Blue");
+        Assert.Contains(model.LifecycleStatusOptions, option => option.Value == "Production");
+    }
+
+    [Fact]
     public async Task VisualizeReturnsDistinctPathsUsingFallbackHierarchyAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
