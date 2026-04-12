@@ -248,7 +248,7 @@
                                    asp-controller="Mappings"
                                    asp-action="Delete"
                                    asp-route-id="@mapping.Id"
-                                   asp-route-returnUrl="@($"{Context.Request.Path}{Context.Request.QueryString}")"
+                                   asp-route-returnUrl="@Model.MappingReturnUrl"
                                    aria-label="Delete mapping"
                                    title="Delete mapping">
                                     <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">

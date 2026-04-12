@@ -7,6 +7,7 @@ public sealed class ProductVisualizationViewModel
     public ProductCatalogItem Product { get; init; } = new();
     public IReadOnlyList<ProductDependencyPathViewModel> Paths { get; init; } = [];
     public ApplicationHierarchyNodeViewModel HierarchyRoot { get; init; } = new();
+    public string MappingReturnUrl { get; init; } = "/Products";
     public bool AiMappingLookupEnabled { get; set; }
     public bool AiMappingLookupConfigured { get; set; }
 

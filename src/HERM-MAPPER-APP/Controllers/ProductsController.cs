@@ -759,7 +759,8 @@ public sealed class ProductsController(
         {
             Product = product,
             Paths = paths,
-            HierarchyRoot = BuildProductHierarchy(product, paths)
+            HierarchyRoot = BuildProductHierarchy(product, paths),
+            MappingReturnUrl = $"/Products/Details/{product.Id}"
         };
     }
 
