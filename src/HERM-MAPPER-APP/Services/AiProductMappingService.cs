@@ -1458,21 +1458,22 @@ public sealed class AiProductMappingService(
             cancellationToken);
     }
 
-    private static IReadOnlyList<AiProductMappingSuggestion> ResolveOpenAiSuggestions(
+    private static List<AiProductMappingSuggestion> ResolveOpenAiSuggestions(
         IReadOnlyList<ParsedAiSuggestion> parsedSuggestions,
         IReadOnlyList<TrmComponent> components,
-        IReadOnlySet<int> existingComponentIds)
+        HashSet<int> existingComponentIds)
     {
         var componentLookup = components
             .Where(component => component.ParentCapability?.ParentDomain is not null)
             .ToDictionary(component => component.Id);
         var suggestions = new List<AiProductMappingSuggestion>();
+        var suggestedComponentIds = new HashSet<int>();
 
         foreach (var parsedSuggestion in parsedSuggestions)
         {
             if (!componentLookup.TryGetValue(parsedSuggestion.ComponentId, out var component) ||
                 existingComponentIds.Contains(component.Id) ||
-                suggestions.Any(existing => existing.ComponentId == component.Id))
+                !suggestedComponentIds.Add(component.Id))
             {
                 continue;
             }
@@ -1487,10 +1488,10 @@ public sealed class AiProductMappingService(
         return suggestions;
     }
 
-    private static IReadOnlyList<AiProductMappingSuggestion> ResolveFoundryAgentSuggestions(
+    private static List<AiProductMappingSuggestion> ResolveFoundryAgentSuggestions(
         FoundryAgentParsedResponse parsedResponse,
         IReadOnlyList<TrmComponent> components,
-        IReadOnlySet<int> existingComponentIds)
+        HashSet<int> existingComponentIds)
     {
         var eligibleComponents = components
             .Where(component => component.ParentCapability?.ParentDomain is not null)
@@ -1502,6 +1503,7 @@ public sealed class AiProductMappingService(
             .GroupBy(component => component.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
         var suggestions = new List<AiProductMappingSuggestion>();
+        var suggestedComponentIds = new HashSet<int>();
 
         foreach (var mapping in parsedResponse.Mappings)
         {
@@ -1519,7 +1521,7 @@ public sealed class AiProductMappingService(
 
             if (component is null ||
                 existingComponentIds.Contains(component.Id) ||
-                suggestions.Any(existing => existing.ComponentId == component.Id))
+                !suggestedComponentIds.Add(component.Id))
             {
                 continue;
             }
@@ -1563,8 +1565,10 @@ public sealed class AiProductMappingService(
         if (root.TryGetProperty("mappings", out var mappingsElement) &&
             mappingsElement.ValueKind == JsonValueKind.Array)
         {
-            foreach (var mapping in mappingsElement.EnumerateArray())
+            using var mappingsEnumerator = mappingsElement.EnumerateArray();
+            while (mappingsEnumerator.MoveNext())
             {
+                var mapping = mappingsEnumerator.Current;
                 if (mapping.ValueKind != JsonValueKind.Object)
                 {
                     continue;
@@ -1733,11 +1737,11 @@ public sealed class AiProductMappingService(
             .ToList();
 
         builder.AppendLine(string.Create(CultureInfo.InvariantCulture, $"existingMappings[{existingCodeMappings.Count}]{{component_code\tcomponent_name}}:"));
-        foreach (var mapping in existingCodeMappings)
+        foreach (var component in existingCodeMappings.Select(mapping => mapping.TrmComponent!))
         {
             builder.AppendLine(string.Create(
                 CultureInfo.InvariantCulture,
-                $"  {ToonString(mapping.TrmComponent!.DisplayCode)}\t{ToonString(mapping.TrmComponent.Name)}"));
+                $"  {ToonString(component.DisplayCode)}\t{ToonString(component.Name)}"));
         }
 
         return builder.ToString().TrimEnd();
