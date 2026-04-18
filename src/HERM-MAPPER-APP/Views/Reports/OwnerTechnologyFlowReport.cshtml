@@ -1,0 +1,101 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Owner technology flow";
+    ViewData["BodyClass"] = "reports-page";
+
+    var ownerOptions = Model.Paths
+        .Select(x => x.OwnerName)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    var ownerTechnologyFlowPayload = JsonSerializer.Serialize(Model.Paths);
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-owner-technology-flow" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Owner path explorer</span>
+            <h2>Owner to component flow</h2>
+            <p>Select an owner, then narrow domain, capability, and component levels while keeping the owner to domain to capability to component chain visible.</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body" data-owner-technology-flow-report>
+        @if (ownerOptions.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No complete owner mappings available</h3>
+                <p>Add complete mappings with owners to explore technology paths by owner.</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@ownerOptions.Count</strong> owners</span>
+                <span class="report-summary-chip"><strong>@Model.Paths.Select(x => x.DomainId).Distinct().Count()</strong> domains</span>
+                <span class="report-summary-chip"><strong>@Model.Paths.Select(x => x.ComponentId).Distinct().Count()</strong> components</span>
+            </div>
+
+            <div class="owner-sankey-shell">
+                <div class="owner-sankey-filters">
+                    <div>
+                        <label class="form-label" for="ownerTechnologyOwnerFilter">Owner</label>
+                        <select class="form-select" id="ownerTechnologyOwnerFilter" data-owner-technology-filter="owner">
+                            @foreach (var owner in ownerOptions)
+                            {
+                                <option value="@owner">@owner</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="ownerTechnologyDomainFilter">Domain</label>
+                        <select class="form-select" id="ownerTechnologyDomainFilter" data-owner-technology-filter="domain">
+                            <option value="">All domains</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="ownerTechnologyCapabilityFilter">Capability</label>
+                        <select class="form-select" id="ownerTechnologyCapabilityFilter" data-owner-technology-filter="capability">
+                            <option value="">All capabilities</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="ownerTechnologyComponentFilter">Component</label>
+                        <select class="form-select" id="ownerTechnologyComponentFilter" data-owner-technology-filter="component">
+                            <option value="">All components</option>
+                        </select>
+                    </div>
+                    <div class="owner-sankey-filter-actions">
+                        <button class="btn btn-outline-secondary" type="button" data-owner-technology-reset>Show all levels</button>
+                    </div>
+                </div>
+
+                <div class="owner-sankey-filter-summary" data-owner-technology-summary></div>
+
+                <div class="application-radial-tree-shell" data-owner-technology-flow-shell>
+                    <div class="application-radial-tree-toolbar">
+                        <button type="button"
+                                class="application-radial-tree-fullscreen-button"
+                                data-owner-technology-flow-fullscreen
+                                aria-label="Enter full screen"
+                                title="Enter full screen">
+                            <span class="application-radial-tree-fullscreen-icon" aria-hidden="true"></span>
+                            <span data-owner-technology-flow-fullscreen-label>Full screen</span>
+                        </button>
+                    </div>
+                    <div class="application-radial-tree" data-owner-technology-chart></div>
+                    <script type="application/json" data-owner-technology-payload>@Html.Raw(ownerTechnologyFlowPayload)</script>
+                    <p class="application-radial-tree-note">Drag to pan and use the mouse wheel to zoom. The tree reads from left to right in owner, domain, capability, and component order.</p>
+                </div>
+            </div>
+        }
+    </div>
+</details>
+
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/js/reports-owner-technology-flow.js" asp-append-version="true"></script>
+}

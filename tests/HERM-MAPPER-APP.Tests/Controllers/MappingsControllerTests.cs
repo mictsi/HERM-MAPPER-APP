@@ -87,6 +87,7 @@ public sealed class MappingsControllerTests
         var model = Assert.IsType<MappingEditViewModel>(view.Model);
         Assert.Equal(product.Id, model.ProductId);
         Assert.Equal(product.Name, model.ProductName);
+        Assert.False(model.AllowOwnerEditing.GetValueOrDefault());
     }
 
     [Fact]
@@ -471,6 +472,35 @@ public sealed class MappingsControllerTests
     }
 
     [Fact]
+    public async Task CreatePostDoesNotSynchronizeOwnersWhenSelectionChangesAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.SeedOwnerOptionsAsync();
+        var domain = new TrmDomain { Code = "TD001", Name = "Technology" };
+        var capability = new TrmCapability { Code = "TP001", Name = "Observability", ParentDomain = domain, ParentDomainCode = domain.Code };
+        var component = new TrmComponent { Code = "TC001", Name = "Monitoring", ParentCapability = capability, ParentCapabilityCode = capability.Code };
+        var product = new ProductCatalogItem { Name = "Sentinel" };
+        product.Owners.Add(new ProductCatalogItemOwner { OwnerValue = "Team Blue" });
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateController();
+        var result = await controller.CreateAsync(new MappingEditViewModel
+        {
+            ProductId = product.Id,
+            Owners = ["Team Green"],
+            SelectedDomainId = domain.Id,
+            SelectedCapabilityId = capability.Id,
+            SelectedComponentId = component.Id,
+            MappingStatus = MappingStatus.Complete
+        });
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var owners = await fixture.DbContext.ProductCatalogItemOwners.OrderBy(x => x.OwnerValue).Select(x => x.OwnerValue).ToListAsync();
+        Assert.Equal(["Team Blue"], owners);
+    }
+
+    [Fact]
     public async Task EditGetReturnsExistingMappingAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -490,6 +520,7 @@ public sealed class MappingsControllerTests
         var model = Assert.IsType<MappingEditViewModel>(view.Model);
         Assert.Equal(mapping.Id, model.MappingId);
         Assert.Equal(component.Id, model.SelectedComponentId);
+        Assert.True(model.AllowOwnerEditing.GetValueOrDefault());
     }
 
     [Fact]
@@ -870,7 +901,7 @@ public sealed class MappingsControllerTests
         Assert.Single(component.CapabilityLinks);
         Assert.Single(versions);
         Assert.Equal("Created", versions[0].ChangeType);
-        Assert.Equal(["Team Blue"], persistedProduct.GetOwnerValues());
+        Assert.Empty(persistedProduct.GetOwnerValues());
         Assert.Equal(2, audits.Count);
         Assert.Contains(audits, entry => entry.Category == "Mapping" && entry.Action == "Create");
         Assert.Contains(audits, entry => entry.Category == "Component" && entry.Action == "Create");

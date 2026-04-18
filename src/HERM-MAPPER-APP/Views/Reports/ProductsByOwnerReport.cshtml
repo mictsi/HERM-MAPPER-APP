@@ -1,0 +1,69 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Products by owner";
+    ViewData["BodyClass"] = "reports-page";
+
+    var ownerOptions = Model.Paths
+        .Select(x => x.OwnerName)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    var ownerProductsPayload = JsonSerializer.Serialize(Model.Paths);
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-products-by-owner" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Owner network</span>
+            <h2>Products connected to owner</h2>
+            <p>Select an owner to visualize every mapped product connected to that owner in a single ECharts network.</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body" data-owner-products-report>
+        @if (ownerOptions.Count == 0)
+        {
+            <div class="empty-state compact">
+                <h3>No complete owner mappings available</h3>
+                <p>Add complete mappings with owners to populate this owner-to-product report.</p>
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@ownerOptions.Count</strong> owners</span>
+                <span class="report-summary-chip"><strong>@Model.Paths.Select(x => x.ProductId).Distinct().Count()</strong> mapped products</span>
+                <span class="report-summary-chip"><strong>@Model.Paths.Count</strong> mapping paths</span>
+            </div>
+
+            <div class="owner-sankey-shell">
+                <div class="owner-report-filters">
+                    <div>
+                        <label class="form-label" for="ownerProductsFilter">Owner</label>
+                        <select class="form-select" id="ownerProductsFilter" data-owner-products-filter>
+                            @foreach (var owner in ownerOptions)
+                            {
+                                <option value="@owner">@owner</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="owner-sankey-filter-summary" data-owner-products-summary></div>
+
+                <div class="reports-echarts-shell" data-owner-products-shell>
+                    <div class="reports-echarts-frame" data-owner-products-chart></div>
+                    <script type="application/json" data-owner-products-payload>@Html.Raw(ownerProductsPayload)</script>
+                </div>
+            </div>
+        }
+    </div>
+</details>
+
+@section Scripts {
+    <script src="~/lib/echarts/echarts.min.js" asp-append-version="true"></script>
+    <script src="~/js/reports-products-by-owner-graph.js" asp-append-version="true"></script>
+}

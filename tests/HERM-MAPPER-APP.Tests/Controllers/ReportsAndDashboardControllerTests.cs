@@ -242,6 +242,73 @@ public sealed class ReportsAndDashboardControllerTests
     }
 
     [Fact]
+    public async Task OwnerFocusedReportsReturnViewsBackedByMappingPathsAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+
+        var domain = new TrmDomain
+        {
+            Code = "TD001",
+            Name = "Technology"
+        };
+        var capability = new TrmCapability
+        {
+            Code = "TP001",
+            Name = "Data Platforms",
+            ParentDomain = domain,
+            ParentDomainCode = domain.Code
+        };
+        var component = new TrmComponent
+        {
+            Code = "TC001",
+            Name = "Warehouse",
+            ParentCapability = capability,
+            ParentCapabilityCode = capability.Code
+        };
+        var product = new ProductCatalogItem
+        {
+            Name = "Insights Hub",
+            Owners =
+            [
+                new ProductCatalogItemOwner { OwnerValue = "Team Blue" }
+            ]
+        };
+
+        await fixture.DbContext.AddRangeAsync(domain, capability, component, product);
+        await fixture.DbContext.SaveChangesAsync();
+
+        fixture.DbContext.ProductMappings.Add(new ProductMapping
+        {
+            ProductCatalogItemId = product.Id,
+            TrmDomainId = domain.Id,
+            TrmCapabilityId = capability.Id,
+            TrmComponentId = component.Id,
+            MappingStatus = MappingStatus.Complete
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var controller = fixture.CreateReportsController();
+
+        var productsResult = await controller.ProductsByOwnerReportAsync();
+        var productsView = Assert.IsType<ViewResult>(productsResult);
+        Assert.Equal("ProductsByOwnerReport", productsView.ViewName);
+        var productsModel = Assert.IsType<ReportsViewModel>(productsView.Model);
+        Assert.Single(productsModel.Paths);
+        Assert.Contains(productsModel.Paths, path =>
+            path.OwnerName == "Team Blue" &&
+            path.DomainLabel == "TD001 Technology" &&
+            path.ComponentLabel == "TC001 Warehouse" &&
+            path.ProductName == "Insights Hub");
+
+        var flowResult = await controller.OwnerTechnologyFlowReportAsync();
+        var flowView = Assert.IsType<ViewResult>(flowResult);
+        Assert.Equal("OwnerTechnologyFlowReport", flowView.ViewName);
+        var flowModel = Assert.IsType<ReportsViewModel>(flowView.Model);
+        Assert.Single(flowModel.Paths);
+        Assert.Equal(["Team Blue"], flowModel.AvailableOwners.Where(owner => owner == "Team Blue").ToArray());
+    }
+
+    [Fact]
     public async Task ReportsIndexAndPosterUseSelectedBrmModelAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -532,6 +599,8 @@ public sealed class ReportsAndDashboardControllerTests
         var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
         Assert.Equal(selectedService.Id, posterModel.ServiceId);
         Assert.Equal("TrmServiceDiagramReport", posterModel.BackReportAction);
+        Assert.Contains("<svg", posterModel.PosterSvgMarkup);
+        Assert.Contains("Service Product", posterModel.PosterSvgMarkup);
     }
 
     [Fact]
@@ -688,6 +757,8 @@ public sealed class ReportsAndDashboardControllerTests
         var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
         Assert.Equal(applicationA.Id, posterModel.ApplicationId);
         Assert.Equal("ArmApplicationDiagramReport", posterModel.BackReportAction);
+        Assert.Contains("<svg", posterModel.PosterSvgMarkup);
+        Assert.Contains("TD001 Identity", posterModel.PosterSvgMarkup);
     }
 
     [Fact]
@@ -764,6 +835,53 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Contains(
             "<rect x=\"1236.218\" y=\"200.782\" width=\"177.165\" height=\"107.866\" rx=\"16\" ry=\"16\" fill=\"#ffffff\" stroke=\"#c92d39\" stroke-width=\"4\" />",
             svg);
+    }
+
+    [Fact]
+    public void ModelDiagramPosterSvgStripsHiddenUrlEncodedGraphPayloadFromTrmLabels()
+    {
+        var templateRoot = CreateTemporaryPosterTemplateRoot(
+            "HERM-TRM-V320-model.drawio",
+            """
+            <mxfile host="app.diagrams.net">
+                <diagram id="trm" name="Page-1">
+                    <mxGraphModel>
+                        <root>
+                            <mxCell id="0" />
+                            <mxCell id="1" parent="0" />
+                            <mxCell id="bg" value="" style="fillColor=#b2b2b2;strokeColor=#666666;strokeWidth=2;" vertex="1" parent="1">
+                                <mxGeometry x="0" y="0" width="400" height="260" as="geometry" />
+                            </mxCell>
+                            <mxCell id="component" value="&lt;span style=&quot;color: rgba(0, 0, 0, 0); font-family: monospace; font-size: 0px; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%22%20style%3D%22html%3D1%3BfillColor%3D%23ffffff%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%220%22%20y%3D%220%22%20width%3D%22165.354%22%20height%3D%2259.055%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;ArtificialIntelligenceAgent (TC153)" style="html=1;whiteSpace=wrap;fontSize=16;fontFamily=Open Sans;fillColor=#ffffff;rounded=1;" vertex="1" parent="1">
+                                <mxGeometry x="20" y="20" width="165.354" height="59.055" as="geometry" />
+                            </mxCell>
+                        </root>
+                    </mxGraphModel>
+                </diagram>
+            </mxfile>
+            """);
+
+        try
+        {
+            var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
+            {
+                ContentRootPath = templateRoot
+            });
+
+            var svg = service.BuildSvg(new ModelDiagramReportViewModel
+            {
+                ScopeKey = "trm"
+            });
+
+            Assert.Contains("ArtificialIntelligenceAgent", svg);
+            Assert.Contains("TC153", svg);
+            Assert.DoesNotContain("%3CmxGraphModel%3E", svg);
+            Assert.DoesNotContain("%3CmxCell", svg);
+        }
+        finally
+        {
+            Directory.Delete(templateRoot, recursive: true);
+        }
     }
 
     [Fact]
@@ -971,6 +1089,15 @@ public sealed class ReportsAndDashboardControllerTests
         }
 
         throw new DirectoryNotFoundException("Could not locate the BRM poster template test data.");
+    }
+
+    private static string CreateTemporaryPosterTemplateRoot(string fileName, string content)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "herm-mapper-tests", Guid.NewGuid().ToString("N"));
+        var modelDirectory = Path.Combine(root, ".local.data", "Model");
+        Directory.CreateDirectory(modelDirectory);
+        File.WriteAllText(Path.Combine(modelDirectory, fileName), content);
+        return root;
     }
 
     private static string GetSvgWindow(string svg, string marker, int radius = 600)

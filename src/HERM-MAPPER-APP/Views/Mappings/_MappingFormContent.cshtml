@@ -58,12 +58,15 @@
                     </select>
                     <span asp-validation-for="SelectedComponentId" class="text-danger"></span>
                 </div>
+                @if (Model.AllowOwnerEditing == true)
+                {
                 <div class="col-md-4">
                     <label asp-for="Owners" class="form-label"></label>
                     <select asp-for="Owners" asp-items="Model.OwnerOptions" class="form-select" multiple size="6"></select>
                     <div class="form-note">Select one or more owners for this product.</div>
                     <span asp-validation-for="Owners" class="text-danger"></span>
                 </div>
+                }
                 <div class="col-md-4">
                     <label asp-for="MappingStatus" class="form-label"></label>
                     <select asp-for="MappingStatus" asp-items="Html.GetEnumSelectList<MappingStatus>()" class="form-select"></select>

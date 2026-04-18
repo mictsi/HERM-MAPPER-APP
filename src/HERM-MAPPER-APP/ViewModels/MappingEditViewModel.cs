@@ -8,6 +8,8 @@ public sealed class MappingEditViewModel
 {
     public int? MappingId { get; init; }
 
+    public bool? AllowOwnerEditing { get; init; }
+
     [Required]
     public int? ProductId { get; init; }
     public string ProductName { get; init; } = string.Empty;

@@ -122,6 +122,12 @@ public sealed class ReportsController(
     public async Task<IActionResult> MappingByOwnerReportAsync()
         => View("MappingByOwnerReport", await BuildReportsViewModelAsync());
 
+    public async Task<IActionResult> ProductsByOwnerReportAsync()
+        => View("ProductsByOwnerReport", await BuildReportsViewModelAsync());
+
+    public async Task<IActionResult> OwnerTechnologyFlowReportAsync()
+        => View("OwnerTechnologyFlowReport", await BuildReportsViewModelAsync());
+
     public async Task<IActionResult> SankeyReportAsync()
         => View("SankeyReport", await BuildReportsViewModelAsync());
 

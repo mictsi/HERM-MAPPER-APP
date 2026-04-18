@@ -124,8 +124,6 @@ public sealed class MappingsController(
             return NotFound();
         }
 
-        model.Owners = NormalizeSelections(model.Owners);
-
         var mapping = new ProductMapping
         {
             ProductCatalogItemId = product.Id,
@@ -140,7 +138,6 @@ public sealed class MappingsController(
         }
 
         dbContext.ProductMappings.Add(mapping);
-        SynchronizeOwners(product, model.Owners);
         product.UpdatedUtc = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
         await WriteMappingAuditAsync(mapping, "Create", "Created mapping.");
@@ -767,6 +764,7 @@ public sealed class MappingsController(
         return new MappingEditViewModel
         {
             MappingId = mappingIdOverride ?? mapping?.Id,
+            AllowOwnerEditing = (mappingIdOverride ?? mapping?.Id).HasValue,
             ProductId = product.Id,
             ProductName = product.Name,
             Vendor = product.Vendor,
@@ -788,6 +786,9 @@ public sealed class MappingsController(
 
     private async Task<MappingEditViewModel> BuildMappingEditViewModelAsync(ProductCatalogItem product, MappingEditViewModel postedModel, int? mappingIdOverride = null)
     {
+        var allowOwnerEditing = (mappingIdOverride ?? postedModel.MappingId).HasValue;
+        var ownerValues = allowOwnerEditing ? postedModel.Owners : product.GetOwnerValues().ToList();
+
         var domains = await dbContext.TrmDomains
             .AsNoTracking()
             .ForReferenceModel(ReferenceModelKind.Trm)
@@ -829,13 +830,14 @@ public sealed class MappingsController(
         return new MappingEditViewModel
         {
             MappingId = mappingIdOverride ?? postedModel.MappingId,
+            AllowOwnerEditing = allowOwnerEditing,
             ProductId = product.Id,
             ProductName = product.Name,
             Vendor = product.Vendor,
             Version = product.Version,
             Description = product.Description,
             LifecycleStatus = product.LifecycleStatus,
-            Owners = postedModel.Owners,
+            Owners = ownerValues,
             SelectedDomainId = postedModel.SelectedDomainId,
             SelectedCapabilityId = postedModel.SelectedCapabilityId,
             SelectedComponentId = postedModel.SelectedComponentId,
@@ -846,7 +848,7 @@ public sealed class MappingsController(
             Domains = domains,
             Capabilities = capabilities,
             Components = components,
-            OwnerOptions = await configurableFieldService.GetMultiSelectListAsync(ConfigurableFieldNames.Owner, postedModel.Owners)
+            OwnerOptions = await configurableFieldService.GetMultiSelectListAsync(ConfigurableFieldNames.Owner, ownerValues)
         };
     }
 
