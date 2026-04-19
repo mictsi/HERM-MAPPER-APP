@@ -21,7 +21,8 @@ public sealed class ProgramHostIntegrationTests
         using var factory = new HermAppFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false
+            AllowAutoRedirect = false,
+            HandleCookies = true
         });
 
         using var response = await client.GetAsync("/");
@@ -32,15 +33,84 @@ public sealed class ProgramHostIntegrationTests
     }
 
     [Fact]
+    public async Task ApplicationStartupRedirectsAnonymousBasePathRequestToLoginAsync()
+    {
+        using var factory = new HermAppFactory("/herm");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+
+        using var response = await client.GetAsync("/herm/");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.NotNull(response.Headers.Location);
+        Assert.StartsWith("http://localhost/herm/Account/Login", response.Headers.Location!.OriginalString, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ApplicationStartupRedirectsRootRequestIntoConfiguredBasePathAsync()
+    {
+        using var factory = new HermAppFactory("/herm");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+
+        using var response = await client.GetAsync("/");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.NotNull(response.Headers.Location);
+        Assert.Equal("/herm/", response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
     public async Task ApplicationStartupServesLoginPageAsync()
     {
         using var factory = new HermAppFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false
+            AllowAutoRedirect = false,
+            HandleCookies = true
         });
 
         using var response = await client.GetAsync("/Account/Login");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("<form", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ApplicationStartupRedirectsUnprefixedLoginPathIntoConfiguredBasePathAsync()
+    {
+        using var factory = new HermAppFactory("/herm");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+
+        using var response = await client.GetAsync("/Account/Login");
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.NotNull(response.Headers.Location);
+        Assert.Equal("/herm/Account/Login", response.Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task ApplicationStartupServesLoginPageUnderConfiguredBasePathAsync()
+    {
+        using var factory = new HermAppFactory("/herm");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+
+        using var response = await client.GetAsync("/herm/Account/Login");
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -53,7 +123,8 @@ public sealed class ProgramHostIntegrationTests
         using var factory = new HermAppFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false
+            AllowAutoRedirect = false,
+            HandleCookies = true
         });
 
         using var response = await client.GetAsync("/health");
@@ -69,7 +140,8 @@ public sealed class ProgramHostIntegrationTests
         using var factory = new HermAppFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false
+            AllowAutoRedirect = false,
+            HandleCookies = true
         });
 
         using var response = await client.GetAsync("/health");
@@ -86,7 +158,8 @@ public sealed class ProgramHostIntegrationTests
         var productIds = await factory.SeedProductsAsync("Bulk Edit Alpha", "Bulk Edit Beta");
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
-            AllowAutoRedirect = false
+            AllowAutoRedirect = false,
+            HandleCookies = true
         });
 
         await AuthenticateLocalAdminAsync(client);
@@ -108,6 +181,7 @@ public sealed class ProgramHostIntegrationTests
     private static async Task AuthenticateLocalAdminAsync(HttpClient client)
     {
         using var loginPage = await client.GetAsync("/Account/Login");
+        Assert.Equal(HttpStatusCode.OK, loginPage.StatusCode);
         var loginBody = await loginPage.Content.ReadAsStringAsync();
         var tokenMatch = Regex.Match(
             loginBody,
@@ -122,20 +196,40 @@ public sealed class ProgramHostIntegrationTests
             {
                 ["UserName"] = "admin",
                 ["Password"] = "ChangeMeNow!123",
+                ["ReturnUrl"] = string.Empty,
                 ["__RequestVerificationToken"] = tokenMatch.Groups[1].Value
             })
         };
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/html"));
+        if (loginPage.Headers.TryGetValues("Set-Cookie", out var setCookieValues))
+        {
+            request.Headers.TryAddWithoutValidation(
+                "Cookie",
+                string.Join("; ", setCookieValues.Select(value => value.Split(';', 2)[0])));
+        }
 
         using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
+        if (response.Headers.TryGetValues("Set-Cookie", out var responseCookieValues))
+        {
+            client.DefaultRequestHeaders.Remove("Cookie");
+            client.DefaultRequestHeaders.TryAddWithoutValidation(
+                "Cookie",
+                string.Join("; ", responseCookieValues.Select(value => value.Split(';', 2)[0])));
+        }
     }
 
     private sealed class HermAppFactory : WebApplicationFactory<Program>
     {
+        private readonly string appBasePath;
         private readonly TemporaryDirectory contentRoot = new();
+
+        public HermAppFactory(string appBasePath = "/")
+        {
+            this.appBasePath = appBasePath;
+        }
 
         public async Task<int[]> SeedProductsAsync(params string[] names)
         {
@@ -163,6 +257,7 @@ public sealed class ProgramHostIntegrationTests
             {
                 configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
                 {
+                    ["App:BasePath"] = appBasePath,
                     ["Database:Provider"] = "Sqlite",
                     ["Database:ConnectionString"] = $"Data Source={Path.Combine(contentRoot.Path, "herm-integration.db")}",
                     ["Security:Authentication:Local:Enabled"] = "true",

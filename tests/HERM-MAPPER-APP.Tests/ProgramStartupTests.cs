@@ -107,6 +107,21 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
+    public void BuildAppBasePathDefaultsToRootAndNormalizesConfiguredValues()
+    {
+        var defaultConfiguration = new ConfigurationBuilder().Build();
+        var configuredConfiguration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["App:BasePath"] = " //apps/herm// "
+            })
+            .Build();
+
+        Assert.Equal("/", Program.BuildAppBasePath(defaultConfiguration));
+        Assert.Equal("/apps/herm", Program.BuildAppBasePath(configuredConfiguration));
+    }
+
+    [Fact]
     public void BuildOpenIdConnectAuthenticationOptionsUsesConfiguredRoleMappings()
     {
         var configuration = new ConfigurationBuilder()
@@ -225,6 +240,14 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
+    public void BuildAuthenticationFailureRedirectUriIncludesConfiguredBasePath()
+    {
+        var redirectUri = Program.BuildAuthenticationFailureRedirectUri("/Products", "OpenID Connect sign-in failed.", "/herm");
+
+        Assert.Equal("/herm/Account/Login?error=OpenID%20Connect%20sign-in%20failed.&returnUrl=%2FProducts", redirectUri);
+    }
+
+    [Fact]
     public void BuildCookieSecurePolicyUsesEnvironmentDefaultAndAllowsOverride()
     {
         var configuration = new ConfigurationBuilder().Build();
@@ -247,8 +270,17 @@ public sealed class ProgramStartupTests
     [Fact]
     public void BuildCookieNameUsesHostPrefixOnlyWhenCookiesRequireHttps()
     {
-        Assert.Equal("HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.SameAsRequest));
-        Assert.Equal("__Host-HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.Always));
+        Assert.Equal("HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.SameAsRequest, "/"));
+        Assert.Equal("__Host-HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.Always, "/"));
+        Assert.Equal("HERM.Mapper.Antiforgery", Program.BuildCookieName("HERM.Mapper.Antiforgery", CookieSecurePolicy.Always, "/herm"));
+    }
+
+    [Fact]
+    public void BuildAppBasePathRedirectPathPrefixesUnscopedRequests()
+    {
+        Assert.Equal("/herm/", Program.BuildAppBasePathRedirectPath("/herm", new PathString("/"), QueryString.Empty));
+        Assert.Equal("/herm/Account/Login?returnUrl=%2FProducts", Program.BuildAppBasePathRedirectPath("/herm", new PathString("/Account/Login"), new QueryString("?returnUrl=%2FProducts")));
+        Assert.Equal("/Account/Login", Program.BuildAppBasePathRedirectPath("/", new PathString("/Account/Login"), QueryString.Empty));
     }
 
     [Fact]
@@ -429,6 +461,36 @@ public sealed class ProgramStartupTests
         Assert.Equal(CookieSecurePolicy.SameAsRequest, antiforgeryOptions.Cookie.SecurePolicy);
         Assert.Equal(SameSiteMode.Strict, antiforgeryOptions.Cookie.SameSite);
         Assert.Equal("Microsoft.EntityFrameworkCore.Sqlite", dbContext.Database.ProviderName);
+    }
+
+    [Fact]
+    public void ConfigureApplicationServicesScopesCookiesToConfiguredBasePath()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["App:BasePath"] = "/herm"
+            })
+            .Build();
+
+        Program.ConfigureApplicationServices(
+            services,
+            configuration,
+            "Production",
+            new ResolvedDatabaseConfiguration(DatabaseProviderKind.Sqlite, "Data Source=:memory:"),
+            new StartupDiagnosticsOptions(false, LogLevel.Information, false, LogLevel.Information, false, false));
+
+        using var provider = services.BuildServiceProvider();
+        var antiforgeryOptions = provider.GetRequiredService<IOptions<AntiforgeryOptions>>().Value;
+        var authenticationOptions = provider.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(CookieAuthenticationDefaults.AuthenticationScheme);
+
+        Assert.Equal("HERM.Mapper.Antiforgery", antiforgeryOptions.Cookie.Name);
+        Assert.Equal("/herm", antiforgeryOptions.Cookie.Path);
+        Assert.Equal("HERM.Mapper.Auth", authenticationOptions.Cookie.Name);
+        Assert.Equal("/herm", authenticationOptions.Cookie.Path);
     }
 
     [Fact]

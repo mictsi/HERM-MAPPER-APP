@@ -4,6 +4,9 @@
     "SqliteFilePath": "|DataDirectory|/herm-mapper.db",
     "ConnectionString": ""
   },
+  "App": {
+    "BasePath": "/"
+  },
   "Security": {
     "Authentication": {
       "SessionTimeoutMinutes": 60,

@@ -67,6 +67,32 @@ public partial class Program
         new(
             RefreshIntervalMinutes: Math.Max(1, configuration.GetValue<int?>("Caching:LookupRefreshIntervalMinutes") ?? 2));
 
+    public static string BuildAppBasePath(IConfiguration configuration)
+    {
+        var configuredValue = configuration["App:BasePath"];
+        if (string.IsNullOrWhiteSpace(configuredValue))
+        {
+            return "/";
+        }
+
+        var normalizedValue = configuredValue.Trim();
+        if (!normalizedValue.StartsWith('/'))
+        {
+            normalizedValue = "/" + normalizedValue;
+        }
+
+        while (normalizedValue.Contains("//", StringComparison.Ordinal))
+        {
+            normalizedValue = normalizedValue.Replace("//", "/", StringComparison.Ordinal);
+        }
+
+        normalizedValue = normalizedValue.TrimEnd('/');
+
+        return string.IsNullOrEmpty(normalizedValue)
+            ? "/"
+            : normalizedValue;
+    }
+
     public static LocalAuthenticationOptions BuildLocalAuthenticationOptions(IConfiguration configuration) =>
         new()
         {
@@ -156,10 +182,38 @@ public partial class Program
     public static SameSiteMode BuildAuthenticationCookieSameSite(bool openIdConnectEnabled) =>
         openIdConnectEnabled ? SameSiteMode.Lax : SameSiteMode.Strict;
 
-    public static string BuildCookieName(string cookieName, CookieSecurePolicy securePolicy) =>
-        securePolicy == CookieSecurePolicy.Always
+    public static string BuildCookieName(string cookieName, CookieSecurePolicy securePolicy, string cookiePath) =>
+        securePolicy == CookieSecurePolicy.Always && string.Equals(cookiePath, "/", StringComparison.Ordinal)
             ? $"__Host-{cookieName}"
             : cookieName;
+
+    public static string BuildAppRelativePath(string appBasePath, string path) =>
+        string.Equals(appBasePath, "/", StringComparison.Ordinal)
+            ? path
+            : string.Concat(appBasePath, path);
+
+    public static string BuildAppBasePathRedirectPath(string appBasePath, PathString requestPath, QueryString queryString)
+    {
+        if (string.Equals(appBasePath, "/", StringComparison.Ordinal))
+        {
+            return requestPath.Add(queryString);
+        }
+
+        var normalizedPath = requestPath.HasValue
+            ? requestPath.Value!
+            : "/";
+
+        if (string.IsNullOrEmpty(normalizedPath))
+        {
+            normalizedPath = "/";
+        }
+
+        var redirectPath = string.Equals(normalizedPath, "/", StringComparison.Ordinal)
+            ? string.Concat(appBasePath, "/")
+            : string.Concat(appBasePath, normalizedPath);
+
+        return string.Concat(redirectPath, queryString.Value);
+    }
 
     public static void ConfigureLogging(
         ILoggingBuilder logging,
@@ -199,10 +253,11 @@ public partial class Program
         var lookupCacheRefreshOptions = BuildLookupCacheRefreshOptions(configuration);
         var localAuthenticationOptions = BuildLocalAuthenticationOptions(configuration);
         var openIdConnectAuthenticationOptions = BuildOpenIdConnectAuthenticationOptions(configuration);
+        var appBasePath = BuildAppBasePath(configuration);
         var cookieSecurePolicy = BuildCookieSecurePolicy(configuration, environmentName);
         var authenticationCookieSameSite = BuildAuthenticationCookieSameSite(openIdConnectAuthenticationOptions.Enabled);
-        var antiforgeryCookieName = BuildCookieName(AntiforgeryCookieName, cookieSecurePolicy);
-        var authenticationCookieName = BuildCookieName(AuthenticationCookieName, cookieSecurePolicy);
+        var antiforgeryCookieName = BuildCookieName(AntiforgeryCookieName, cookieSecurePolicy, appBasePath);
+        var authenticationCookieName = BuildCookieName(AuthenticationCookieName, cookieSecurePolicy, appBasePath);
 
         if (!localAuthenticationOptions.Enabled && !openIdConnectAuthenticationOptions.Enabled)
         {
@@ -210,7 +265,7 @@ public partial class Program
         }
 
         services.AddSingleton(authenticationSecurityOptions);
-    services.AddSingleton(lookupCacheRefreshOptions);
+        services.AddSingleton(lookupCacheRefreshOptions);
         services.AddSingleton(localAuthenticationOptions);
         services.AddSingleton(openIdConnectAuthenticationOptions);
         services.AddHttpContextAccessor();
@@ -224,7 +279,7 @@ public partial class Program
         {
             options.Cookie.Name = antiforgeryCookieName;
             options.Cookie.HttpOnly = true;
-            options.Cookie.Path = "/";
+            options.Cookie.Path = appBasePath;
             options.Cookie.SecurePolicy = cookieSecurePolicy;
             options.Cookie.SameSite = SameSiteMode.Strict;
         });
@@ -288,7 +343,7 @@ public partial class Program
             options.AccessDeniedPath = "/Account/Login";
             options.Cookie.Name = authenticationCookieName;
             options.Cookie.HttpOnly = true;
-            options.Cookie.Path = "/";
+            options.Cookie.Path = appBasePath;
             options.Cookie.SecurePolicy = cookieSecurePolicy;
             options.Cookie.SameSite = authenticationCookieSameSite;
             options.Cookie.IsEssential = true;
@@ -352,7 +407,7 @@ public partial class Program
                         catch (InvalidOperationException exception)
                         {
                             context.HandleResponse();
-                            context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, exception.Message));
+                            context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, exception.Message, appBasePath));
                         }
 
                         return Task.CompletedTask;
@@ -360,13 +415,13 @@ public partial class Program
                     OnAuthenticationFailed = context =>
                     {
                         context.HandleResponse();
-                        context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, "OpenID Connect sign-in failed."));
+                        context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, "OpenID Connect sign-in failed.", appBasePath));
                         return Task.CompletedTask;
                     },
                     OnRemoteFailure = context =>
                     {
                         context.HandleResponse();
-                        context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, "OpenID Connect sign-in failed."));
+                        context.Response.Redirect(BuildAuthenticationFailureRedirectUri(context.Properties?.RedirectUri, "OpenID Connect sign-in failed.", appBasePath));
                         return Task.CompletedTask;
                     },
                     OnRedirectToIdentityProviderForSignOut = async context =>
@@ -407,6 +462,23 @@ public partial class Program
 
     public static void ConfigurePipeline(WebApplication app)
     {
+        var appBasePath = BuildAppBasePath(app.Configuration);
+        if (!string.Equals(appBasePath, "/", StringComparison.Ordinal))
+        {
+            app.Use(async (context, next) =>
+            {
+                if (!context.Request.Path.StartsWithSegments(appBasePath, out _))
+                {
+                    context.Response.Redirect(BuildAppBasePathRedirectPath(appBasePath, context.Request.Path, context.Request.QueryString), permanent: false);
+                    return;
+                }
+
+                await next();
+            });
+
+            app.UsePathBase(appBasePath);
+        }
+
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Home");
@@ -450,7 +522,7 @@ public partial class Program
             ? parsedLevel
             : fallback;
 
-    public static string BuildAuthenticationFailureRedirectUri(string? returnUrl, string errorMessage)
+    public static string BuildAuthenticationFailureRedirectUri(string? returnUrl, string errorMessage, string appBasePath = "/")
     {
         var querySegments = new List<string>
         {
@@ -462,7 +534,7 @@ public partial class Program
             querySegments.Add($"returnUrl={Uri.EscapeDataString(returnUrl)}");
         }
 
-        return $"/Account/Login?{string.Join("&", querySegments)}";
+        return $"{BuildAppRelativePath(appBasePath, "/Account/Login")}?{string.Join("&", querySegments)}";
     }
 
     public static void LogOpenIdConnectDebugDetails(TokenValidatedContext context, OpenIdConnectAuthenticationOptions options)

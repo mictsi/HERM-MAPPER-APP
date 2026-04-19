@@ -31,6 +31,15 @@ SQLite path tokens supported by the app:
 
 `|HomeDirectory|/data/...` is suitable for durable Azure App Service storage.
 
+## App Base Path
+
+The application base path can be configured with:
+
+- `App:BasePath`
+- `HERM_App__BasePath`
+
+Use `/` for the site root, or a subpath such as `/herm` when the app is hosted below the domain root.
+
 ## Diagnostics
 
 Console logging can be controlled with:
@@ -46,6 +55,7 @@ SQL command logging can be controlled with:
 ## Example Environment Variables
 
 ```powershell
+$env:HERM_App__BasePath = "/herm"
 $env:HERM_Database__Provider = "SqlServer"
 $env:HERM_Database__ConnectionString = "Server=localhost;Database=HermMapper;Trusted_Connection=True;TrustServerCertificate=True"
 $env:HERM_Diagnostics__Sql__Enabled = "true"

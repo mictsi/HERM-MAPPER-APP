@@ -65,3 +65,4 @@ src/HERM-MAPPER-APP/.artifacts/
 .playwright-mcp
 .editorconfig
 src/HERM-MAPPER-APP/appsettings.json
+.tmp/
