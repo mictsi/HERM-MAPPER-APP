@@ -3454,10 +3454,21 @@ a {
 }
 
 .login-logo {
-  width: min(100%, 14rem);
+  width: min(100%, 18rem);
   height: auto;
   display: block;
   object-fit: contain;
+}
+
+.login-page .btn-primary {
+  border-color: #12374d;
+  background: linear-gradient(135deg, #102f43, #12374d);
+}
+
+.login-page .btn-primary:hover,
+.login-page .btn-primary:focus {
+  border-color: #0d293a;
+  background: linear-gradient(135deg, #0d293a, #102f43);
 }
 
 .login-form {
