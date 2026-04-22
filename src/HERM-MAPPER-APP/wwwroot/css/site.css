@@ -3426,16 +3426,18 @@ a {
 }
 
 .login-shell {
-  width: min(100%, 30rem);
+  width: min(100%, 34rem);
   padding: 1.5rem;
 }
 
 .login-card {
-  padding: 2rem;
-  border: 1px solid var(--border);
-  border-radius: 1.8rem;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--shadow);
+  display: grid;
+  gap: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .login-card h1 {
@@ -3454,7 +3456,7 @@ a {
 }
 
 .login-logo {
-  width: min(100%, 18rem);
+  width: min(100%, 30.6rem);
   height: auto;
   display: block;
   object-fit: contain;
