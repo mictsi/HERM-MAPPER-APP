@@ -66,6 +66,10 @@ dotnet run --project ./src/HERM-MAPPER-APP/HERM-MAPPER-APP.csproj
 
 ## Documentation
 
+### Usage
+
+- [User Guide](docs/user-guide.md)
+
 ### Installation
 
 - [Installation Guide](docs/installation.md)
