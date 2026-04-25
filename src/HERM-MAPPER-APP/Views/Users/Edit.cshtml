@@ -11,10 +11,13 @@
     @await Html.PartialAsync("_AdminSidebar")
     <div class="admin-content">
         <section class="page-header">
-                <p>Update profile details and role assignment for this local workspace account.</p>
             <div>
                 <span class="eyebrow">Administration</span>
                 <h1>Edit user</h1>
+                <p>Update profile details and role assignment for this local workspace account.</p>
+            </div>
+        </section>
+
         <section class="stats-grid stats-grid-compact admin-overview-grid">
             <article class="stat-card admin-overview-card">
                 <span class="stat-label">User record</span>
@@ -40,8 +43,8 @@
 
         <form asp-action="Edit" method="post" class="editor-form-shell">
             <section class="row g-4 editor-panel-grid">
-
-        <section class="content-card">
+                @Html.AntiForgeryToken()
+                <input asp-for="Id" type="hidden" />
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
                 <div class="col-xl-8">
                     <section class="content-card editor-main-card mb-0">
@@ -81,7 +84,7 @@
                             </div>
                         </div>
                     </section>
-                <div class="col-12 d-flex justify-content-end gap-2">
+                </div>
                 <div class="col-xl-4">
                     <aside class="content-card editor-side-card h-100 mb-0">
                         <div class="section-heading">
