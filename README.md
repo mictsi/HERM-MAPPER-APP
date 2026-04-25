@@ -1,7 +1,5 @@
 # HERM-MAPPER-APP
 
-> **⚠️ WARNING: Use this project at your own risk.**
-
 ## Overview
 
 HERM-MAPPER-APP is a .NET web application for mapping product relationships and capabilities. It includes reference catalogues, import/export workflows, dashboards, and AI-assisted mapping features.
