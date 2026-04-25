@@ -12,6 +12,7 @@ The web application lives under `src/HERM-MAPPER-APP` and automated tests live u
 - [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
 - [Documentation](#documentation)
+- [Attribution](#attribution)
 - [License](#license)
 
 ## Features
@@ -95,6 +96,10 @@ dotnet run --project ./src/HERM-MAPPER-APP/HERM-MAPPER-APP.csproj
   - [03-TRM-Component.md](docs/trm_model/3.2/03-TRM-Component.md)
   - [HERM-TRM-V320-explainer.md](docs/trm_model/3.2/HERM-TRM-V320-explainer.md)
   - [TRM-LLM-Instructions-v2.md](docs/trm_model/3.2/TRM-LLM-Instructions-v2.md)
+
+## Attribution
+
+HERM-MAPPER-APP uses Higher Education Reference Model concepts and reference material with attribution to [EUNIS](https://eunis.org/), the European University Information Systems organisation.
 
 ## License
 
