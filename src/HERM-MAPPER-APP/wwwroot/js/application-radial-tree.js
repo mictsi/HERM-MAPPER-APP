@@ -479,6 +479,41 @@ const getNodeVisual = (cssType, nodeType, isRoot) => {
         line: "rgba(179, 141, 242, 0.48)",
         symbolSize: 10
       };
+    case "drm-model":
+      return {
+        fill: "#174a69",
+        border: "#10374f",
+        line: "rgba(23, 74, 105, 0.6)",
+        symbolSize: 16
+      };
+    case "drm-domain":
+      return {
+        fill: "#226d68",
+        border: "#16524e",
+        line: "rgba(34, 109, 104, 0.56)",
+        symbolSize: 14
+      };
+    case "drm-capability":
+      return {
+        fill: "#4c8c74",
+        border: "#326b56",
+        line: "rgba(76, 140, 116, 0.52)",
+        symbolSize: 12
+      };
+    case "drm-component":
+      return {
+        fill: "#b18b45",
+        border: "#87662b",
+        line: "rgba(177, 139, 69, 0.48)",
+        symbolSize: 10
+      };
+    case "drm-subclass":
+      return {
+        fill: "#d0a85b",
+        border: "#9b7838",
+        line: "rgba(208, 168, 91, 0.46)",
+        symbolSize: 9
+      };
     case "product":
       return {
         fill: "#e7a35f",

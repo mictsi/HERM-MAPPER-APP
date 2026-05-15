@@ -113,6 +113,23 @@ public sealed class ReferenceControllerTests
     }
 
     [Fact]
+    public async Task IndexSearchIncludesDrmTopicEntityAndCommonSubClassResultsAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, entity, subClass) = await fixture.SeedDrmEntityAsync("DY001", "Data", "DT001", "Customer", "DE001", "Customer record", "DE101", "Customer profile");
+        await fixture.SeedComponentAsync("TD001", "Technology", "TP001", "Observability", "TC001", "Monitoring", isCustom: false);
+
+        using var controller = fixture.CreateController();
+        var result = await controller.IndexAsync("data customer", null, null);
+
+        var model = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Contains(model.Components, component => component.ModelKind == ReferenceModelKind.Drm && component.Code == entity.Code);
+        Assert.Contains(model.Components, component => component.ModelKind == ReferenceModelKind.Drm && component.Code == subClass.Code);
+        Assert.DoesNotContain(model.Components, component => component.ModelKind == ReferenceModelKind.Trm);
+        Assert.Contains(model.ModelGroups, group => group.ModelKind == ReferenceModelKind.Drm && group.IsExpanded);
+    }
+
+    [Fact]
     public async Task RestoreReturnsDeletedComponentsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();

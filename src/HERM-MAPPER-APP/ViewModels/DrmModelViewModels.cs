@@ -54,6 +54,8 @@ public sealed class DrmModelDetailsViewModel
     public int CommonSubClassCount { get; init; }
     public string? StatusMessage { get; init; }
     public IReadOnlyList<DrmModelDataEntityRowViewModel> DataEntities { get; init; } = [];
+    public ApplicationHierarchyNodeViewModel HierarchyRoot { get; init; } = new();
+    public bool HasHierarchy => HierarchyRoot.Children.Count != 0;
 }
 
 public sealed class DrmModelDataEntityRowViewModel
@@ -94,7 +96,19 @@ public sealed class DrmDataEntityEditViewModel
     public string? Notes { get; set; }
 
     public IReadOnlyList<SelectListItem> EntityOptions { get; set; } = [];
-    public IReadOnlyList<SelectListItem> CommonSubClassOptions { get; set; } = [];
+    public IReadOnlyList<DrmCommonSubClassOptionViewModel> CommonSubClassOptions { get; set; } = [];
+
+    public IEnumerable<DrmCommonSubClassOptionViewModel> SelectedEntityCommonSubClassOptions =>
+        SelectedDrmEntityId.HasValue
+            ? CommonSubClassOptions.Where(option => option.ParentEntityId == SelectedDrmEntityId.Value)
+            : Enumerable.Empty<DrmCommonSubClassOptionViewModel>();
+}
+
+public sealed class DrmCommonSubClassOptionViewModel
+{
+    public int Id { get; init; }
+    public int ParentEntityId { get; init; }
+    public string Label { get; init; } = string.Empty;
 }
 
 public sealed class DrmDataEntityDeleteViewModel

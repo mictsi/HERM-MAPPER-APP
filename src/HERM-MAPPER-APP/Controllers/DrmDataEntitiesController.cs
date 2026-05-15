@@ -273,18 +273,20 @@ public sealed class DrmDataEntitiesController(
             .ThenInclude(x => x!.TopicType)
             .OrderBy(x => x.Code)
             .Select(x => new SelectListItem(
-                $"{x.Code} {x.Name} ({x.ParentTopic!.TopicType!.Code}/{x.ParentTopic.Code})",
+                $"{x.Code} {x.Name} (Topic Type = {x.ParentTopic!.TopicType!.Name} --> Topic = {x.ParentTopic.Code} {x.ParentTopic.Name})",
                 x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
         model.CommonSubClassOptions = await dbContext.DrmCommonSubClasses
             .AsNoTracking()
-            .Where(x => !x.IsDeleted && x.ParentEntity != null && !x.ParentEntity.IsDeleted)
-            .Include(x => x.ParentEntity)
+            .Where(x => !x.IsDeleted && x.ParentEntityId.HasValue && x.ParentEntity != null && !x.ParentEntity.IsDeleted)
             .OrderBy(x => x.Code)
-            .Select(x => new SelectListItem(
-                $"{x.Code} {x.Name} ({x.ParentEntity!.Code} {x.ParentEntity.Name})",
-                x.Id.ToString(CultureInfo.InvariantCulture)))
+            .Select(x => new DrmCommonSubClassOptionViewModel
+            {
+                Id = x.Id,
+                ParentEntityId = x.ParentEntityId ?? 0,
+                Label = $"{x.Code} {x.Name} ({x.ParentEntity!.Code} {x.ParentEntity.Name})"
+            })
             .ToListAsync();
     }
 

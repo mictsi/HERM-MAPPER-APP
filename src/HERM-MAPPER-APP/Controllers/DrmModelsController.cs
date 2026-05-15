@@ -111,7 +111,8 @@ public sealed class DrmModelsController(
                 CommonSubClassLabel = x.DrmCommonSubClass?.DisplayLabel,
                 Description = x.Description,
                 UpdatedUtc = x.UpdatedUtc
-            }).ToList()
+            }).ToList(),
+            HierarchyRoot = BuildDrmModelHierarchy(drmModel, dataEntities)
         });
     }
 
@@ -380,4 +381,101 @@ public sealed class DrmModelsController(
             Status = source?.Status ?? SuggestedStatuses[0],
             SuggestedStatuses = SuggestedStatuses
         };
+
+    private static ApplicationHierarchyNodeViewModel BuildDrmModelHierarchy(
+        DrmModel drmModel,
+        List<DrmModelDataEntity> dataEntities)
+    {
+        var rows = dataEntities
+            .Select(x => new DrmModelHierarchyRow(
+                x.DrmEntity?.ParentTopic?.TopicType?.Code ?? "unassigned-topic-type",
+                x.DrmEntity?.ParentTopic?.TopicType?.DisplayLabel ?? "Unassigned topic type",
+                x.DrmEntity?.ParentTopic?.Code ?? "unassigned-topic",
+                x.DrmEntity?.ParentTopic?.DisplayLabel ?? "Unassigned topic",
+                x.DrmEntity?.Code ?? $"entity-{x.DrmEntityId}",
+                x.DrmEntity?.DisplayLabel ?? x.Name,
+                x.DrmCommonSubClass?.Code,
+                x.DrmCommonSubClass?.DisplayLabel))
+            .ToList();
+
+        var topicTypeNodes = rows
+            .GroupBy(row => new { row.TopicTypeKey, row.TopicTypeLabel })
+            .OrderBy(group => group.Key.TopicTypeKey, StringComparer.OrdinalIgnoreCase)
+            .Select(topicTypeGroup => new ApplicationHierarchyNodeViewModel
+            {
+                Key = $"drm-model-{drmModel.Id}-topic-type-{NormalizeHierarchyKey(topicTypeGroup.Key.TopicTypeKey)}",
+                NodeType = "Topic type",
+                CssType = "drm-domain",
+                Label = topicTypeGroup.Key.TopicTypeLabel,
+                PathCount = topicTypeGroup.Count(),
+                IsExpanded = true,
+                Children = topicTypeGroup
+                    .GroupBy(row => new { row.TopicKey, row.TopicLabel })
+                    .OrderBy(group => group.Key.TopicKey, StringComparer.OrdinalIgnoreCase)
+                    .Select(topicGroup => new ApplicationHierarchyNodeViewModel
+                    {
+                        Key = $"drm-model-{drmModel.Id}-topic-{NormalizeHierarchyKey(topicGroup.Key.TopicKey)}",
+                        NodeType = "Topic",
+                        CssType = "drm-capability",
+                        Label = topicGroup.Key.TopicLabel,
+                        PathCount = topicGroup.Count(),
+                        IsExpanded = true,
+                        Children = topicGroup
+                            .GroupBy(row => new { row.EntityKey, row.EntityLabel })
+                            .OrderBy(group => group.Key.EntityKey, StringComparer.OrdinalIgnoreCase)
+                            .Select(entityGroup => new ApplicationHierarchyNodeViewModel
+                            {
+                                Key = $"drm-model-{drmModel.Id}-entity-{NormalizeHierarchyKey(entityGroup.Key.EntityKey)}",
+                                NodeType = "Data entity",
+                                CssType = "drm-component",
+                                Label = entityGroup.Key.EntityLabel,
+                                PathCount = entityGroup.Count(),
+                                IsExpanded = true,
+                                Children = entityGroup
+                                    .Where(row => !string.IsNullOrWhiteSpace(row.SubClassKey))
+                                    .GroupBy(row => new { row.SubClassKey, row.SubClassLabel })
+                                    .OrderBy(group => group.Key.SubClassKey, StringComparer.OrdinalIgnoreCase)
+                                    .Select(subClassGroup => new ApplicationHierarchyNodeViewModel
+                                    {
+                                        Key = $"drm-model-{drmModel.Id}-subclass-{NormalizeHierarchyKey(subClassGroup.Key.SubClassKey!)}",
+                                        NodeType = "Common sub-class",
+                                        CssType = "drm-subclass",
+                                        Label = subClassGroup.Key.SubClassLabel ?? subClassGroup.Key.SubClassKey!,
+                                        PathCount = subClassGroup.Count(),
+                                        IsExpanded = true
+                                    })
+                                    .ToList()
+                            })
+                            .ToList()
+                    })
+                    .ToList()
+            })
+            .ToList();
+
+        return new ApplicationHierarchyNodeViewModel
+        {
+            Key = $"drm-model-{drmModel.Id}",
+            NodeType = "DRM model",
+            CssType = "drm-model",
+            Label = drmModel.Name,
+            PathCount = dataEntities.Count,
+            IsExpanded = true,
+            Children = topicTypeNodes
+        };
+    }
+
+    private static string NormalizeHierarchyKey(string value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? "unknown"
+            : value.Trim().ToLowerInvariant().Replace(' ', '-');
+
+    private sealed record DrmModelHierarchyRow(
+        string TopicTypeKey,
+        string TopicTypeLabel,
+        string TopicKey,
+        string TopicLabel,
+        string EntityKey,
+        string EntityLabel,
+        string? SubClassKey,
+        string? SubClassLabel);
 }

@@ -54,33 +54,13 @@
 
 <section class="content-card reference-browser-filter-card">
     <form method="get" action="@searchFormAction" class="row g-3 align-items-end reference-browser-filter-form">
-        @if (Model.SelectedModelKind.HasValue)
-        {
-            <input type="hidden" name="modelKind" value="@Model.SelectedModelKind" />
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.SelectedDomainCode))
-        {
-            <input type="hidden" name="domainCode" value="@Model.SelectedDomainCode" />
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.SelectedCapabilityCode))
-        {
-            <input type="hidden" name="capabilityCode" value="@Model.SelectedCapabilityCode" />
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.SelectedComponentCode))
-        {
-            <input type="hidden" name="componentCode" value="@Model.SelectedComponentCode" />
-        }
-        @if (!string.IsNullOrWhiteSpace(Model.SelectedSubClassCode))
-        {
-            <input type="hidden" name="subClassCode" value="@Model.SelectedSubClassCode" />
-        }
         <div class="col-lg-9">
             <label class="form-label" for="search">Search browser</label>
             <input class="form-control"
                    id="search"
                    name="search"
                    value="@Model.Search"
-                   placeholder="Model, domain, capability, component, description, or product example" />
+                   placeholder="Model, topic type, topic, entity, description, or product example" />
         </div>
         <div class="col-lg-3 d-flex gap-2">
             <button class="btn btn-primary flex-grow-1" type="submit">Search</button>

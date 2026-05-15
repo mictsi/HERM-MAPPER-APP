@@ -4269,10 +4269,13 @@ a {
 .services-page .editor-side-card,
 .brm-models-page .editor-main-card,
 .brm-models-page .editor-side-card,
+.drm-models-page .editor-main-card,
+.drm-models-page .editor-side-card,
 .products-page .details-primary-card,
 .applications-page .details-primary-card,
 .services-page .details-primary-card,
-.brm-models-page .details-primary-card {
+.brm-models-page .details-primary-card,
+.drm-models-page .details-primary-card {
   border-radius: 1.2rem;
 }
 
@@ -4326,6 +4329,7 @@ a {
 .applications-overview-grid,
 .services-overview-grid,
 .brm-models-overview-grid,
+.drm-models-overview-grid,
 .reference-browser-overview-grid,
 .details-overview-grid {
   margin-bottom: 1rem;
@@ -4349,6 +4353,8 @@ a {
 .services-page .services-results-card,
 .brm-models-page .brm-models-results-card,
 .brm-models-page .brm-models-status-card,
+.drm-models-page .drm-models-results-card,
+.drm-models-page .drm-models-status-card,
 .reference-browser-page .reference-browser-filter-card,
 .reference-browser-page .reference-browser-status-card,
 .reference-browser-page .browser-sidebar,
@@ -4361,10 +4367,13 @@ a {
 .services-page .editor-side-card,
 .brm-models-page .editor-main-card,
 .brm-models-page .editor-side-card,
+.drm-models-page .editor-main-card,
+.drm-models-page .editor-side-card,
 .products-page .details-primary-card,
 .applications-page .details-primary-card,
 .services-page .details-primary-card,
 .brm-models-page .details-primary-card,
+.drm-models-page .details-primary-card,
 .reports-page .report-panel {
   position: relative;
   overflow: hidden;
@@ -4378,6 +4387,8 @@ a {
 .services-page .services-results-card::before,
 .brm-models-page .brm-models-results-card::before,
 .brm-models-page .brm-models-status-card::before,
+.drm-models-page .drm-models-results-card::before,
+.drm-models-page .drm-models-status-card::before,
 .reference-browser-page .reference-browser-filter-card::before,
 .reference-browser-page .reference-browser-status-card::before,
 .reference-browser-page .browser-sidebar::before,
@@ -4390,10 +4401,13 @@ a {
 .services-page .editor-side-card::before,
 .brm-models-page .editor-main-card::before,
 .brm-models-page .editor-side-card::before,
+.drm-models-page .editor-main-card::before,
+.drm-models-page .editor-side-card::before,
 .products-page .details-primary-card::before,
 .applications-page .details-primary-card::before,
 .services-page .details-primary-card::before,
 .brm-models-page .details-primary-card::before,
+.drm-models-page .details-primary-card::before,
 .reports-page .report-panel::before {
   content: "";
   position: absolute;

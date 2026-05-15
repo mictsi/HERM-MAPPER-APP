@@ -100,6 +100,129 @@ public sealed class DrmModelsControllerTests
             error => string.Equals("This DRM entity selection already exists in the model.", error.ErrorMessage, StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task CreateDataEntityOptionsDescribeTopicTypeAndTopicRelationshipAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedDrmCatalogueAsync();
+        var drmModel = new DrmModel
+        {
+            Name = "Institution DRM",
+            Area = "Student data",
+            Status = "Draft"
+        };
+
+        await fixture.DbContext.DrmModels.AddAsync(drmModel);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateDrmDataEntitiesController();
+        var result = await controller.CreateAsync(drmModel.Id);
+
+        var model = Assert.IsType<DrmDataEntityEditViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var option = Assert.Single(model.EntityOptions);
+        Assert.Equal(
+            $"{seeded.Entity.Code} {seeded.Entity.Name} (Topic Type = {seeded.TopicType.Name} --> Topic = {seeded.Topic.Code} {seeded.Topic.Name})",
+            option.Text);
+    }
+
+    [Fact]
+    public async Task DetailsBuildsDrmModelHierarchyForSelectedEntitiesAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedDrmCatalogueAsync();
+        var drmModel = new DrmModel
+        {
+            Name = "Institution DRM",
+            Area = "Student data",
+            Status = "Draft",
+            DataEntities =
+            [
+                new DrmModelDataEntity
+                {
+                    DrmEntity = seeded.Entity,
+                    DrmCommonSubClass = seeded.CommonSubClass,
+                    Name = seeded.CommonSubClass.DisplayLabel
+                }
+            ]
+        };
+
+        await fixture.DbContext.DrmModels.AddAsync(drmModel);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateDrmModelsController();
+        var result = await controller.DetailsAsync(drmModel.Id);
+
+        var model = Assert.IsType<DrmModelDetailsViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.True(model.HasHierarchy);
+        Assert.Equal(drmModel.Name, model.HierarchyRoot.Label);
+
+        var topicTypeNode = Assert.Single(model.HierarchyRoot.Children);
+        Assert.Equal(seeded.TopicType.DisplayLabel, topicTypeNode.Label);
+        Assert.Equal("Topic type", topicTypeNode.NodeType);
+
+        var topicNode = Assert.Single(topicTypeNode.Children);
+        Assert.Equal(seeded.Topic.DisplayLabel, topicNode.Label);
+        Assert.Equal("Topic", topicNode.NodeType);
+
+        var entityNode = Assert.Single(topicNode.Children);
+        Assert.Equal(seeded.Entity.DisplayLabel, entityNode.Label);
+        Assert.Equal("Data entity", entityNode.NodeType);
+
+        var subClassNode = Assert.Single(entityNode.Children);
+        Assert.Equal(seeded.CommonSubClass.DisplayLabel, subClassNode.Label);
+        Assert.Equal("Common sub-class", subClassNode.NodeType);
+    }
+
+    [Fact]
+    public async Task InvalidDataEntitySelectionPostbackFiltersCommonSubClassesToSelectedEntityAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedDrmCatalogueAsync();
+        var siblingEntity = new DrmEntity
+        {
+            Code = "DE002",
+            Name = "Account",
+            ParentTopic = seeded.Topic,
+            ParentTopicCode = seeded.Topic.Code
+        };
+        var siblingSubClass = new DrmCommonSubClass
+        {
+            Code = "DE102",
+            Name = "Account Number",
+            ParentEntity = siblingEntity,
+            ParentEntityCode = siblingEntity.Code
+        };
+        var drmModel = new DrmModel
+        {
+            Name = "Institution DRM",
+            Area = "Student data",
+            Status = "Draft"
+        };
+
+        await fixture.DbContext.AddRangeAsync(siblingEntity, siblingSubClass, drmModel);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateDrmDataEntitiesController();
+        var result = await controller.CreateAsync(drmModel.Id, new DrmDataEntityEditViewModel
+        {
+            SelectedDrmEntityId = seeded.Entity.Id,
+            SelectedDrmCommonSubClassId = siblingSubClass.Id
+        });
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<DrmDataEntityEditViewModel>(view.Model);
+        var visibleSubClassIds = model.SelectedEntityCommonSubClassOptions.Select(option => option.Id).ToArray();
+
+        Assert.Equal([seeded.CommonSubClass.Id], visibleSubClassIds);
+        Assert.Contains(
+            model.CommonSubClassOptions,
+            option => option.Id == siblingSubClass.Id && option.ParentEntityId == siblingEntity.Id);
+        Assert.True(controller.ModelState.ContainsKey(nameof(DrmDataEntityEditViewModel.SelectedDrmCommonSubClassId)));
+        Assert.Contains(
+            controller.ModelState[nameof(DrmDataEntityEditViewModel.SelectedDrmCommonSubClassId)]!.Errors,
+            error => string.Equals("The selected common sub-class does not belong to the selected entity.", error.ErrorMessage, StringComparison.Ordinal));
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

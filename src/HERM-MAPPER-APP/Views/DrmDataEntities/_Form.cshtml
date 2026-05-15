@@ -1,8 +1,23 @@
+@using System.Text.Json
 @model DrmDataEntityEditViewModel
+@{
+    var commonSubClassOptionsJson = JsonSerializer.Serialize(
+        Model.CommonSubClassOptions.Select(option => new
+        {
+            option.Id,
+            option.ParentEntityId,
+            option.Label
+        }),
+        new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+}
 
 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
-<div class="row g-4">
+<div class="row g-4" data-drm-data-entity-editor>
+    <script type="application/json" data-drm-common-subclass-options>@Html.Raw(commonSubClassOptionsJson)</script>
     <div class="col-xl-8">
         <div class="content-card mb-4">
             <div class="section-heading">
@@ -30,15 +45,19 @@
                 </div>
                 <div class="col-12">
                     <label asp-for="SelectedDrmEntityId" class="form-label"></label>
-                    <select asp-for="SelectedDrmEntityId" class="form-select" asp-items="Model.EntityOptions">
+                    <select asp-for="SelectedDrmEntityId" class="form-select" asp-items="Model.EntityOptions" data-drm-entity-select>
                         <option value="">Choose a DRM entity</option>
                     </select>
                     <span asp-validation-for="SelectedDrmEntityId" class="text-danger"></span>
                 </div>
                 <div class="col-12">
                     <label asp-for="SelectedDrmCommonSubClassId" class="form-label"></label>
-                    <select asp-for="SelectedDrmCommonSubClassId" class="form-select" asp-items="Model.CommonSubClassOptions">
-                        <option value="">Use the entity itself</option>
+                    <select asp-for="SelectedDrmCommonSubClassId" class="form-select" data-drm-common-subclass-select>
+                        <option value="">@(Model.SelectedDrmEntityId.HasValue ? "Use the entity itself" : "Choose a DRM entity first")</option>
+                        @foreach (var option in Model.SelectedEntityCommonSubClassOptions)
+                        {
+                            <option value="@option.Id" selected="@(Model.SelectedDrmCommonSubClassId == option.Id ? "selected" : null)">@option.Label</option>
+                        }
                     </select>
                     <span asp-validation-for="SelectedDrmCommonSubClassId" class="text-danger"></span>
                     <div class="form-note mt-2">Choose a common sub-class only when this model should include that sub-class under the selected entity.</div>
