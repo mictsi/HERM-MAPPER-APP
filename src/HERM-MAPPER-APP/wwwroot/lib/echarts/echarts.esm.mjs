@@ -242,6 +242,8 @@ var nativeMap = arrayProto.map;
 var ctorFunction = function () { }.constructor;
 var protoFunction = ctorFunction ? ctorFunction.prototype : null;
 var protoKey = '__proto__';
+var constructorKey = 'constructor';
+var prototypeKey = 'prototype';
 var idStart = 0x0907;
 function guid() {
     return idStart++;
@@ -286,7 +288,7 @@ function clone(source) {
     else if (!BUILTIN_OBJECT[typeStr] && !isPrimitive(source) && !isDom(source)) {
         result = {};
         for (var key in source) {
-            if (source.hasOwnProperty(key) && key !== protoKey) {
+            if (source.hasOwnProperty(key) && key !== protoKey && key !== constructorKey && key !== prototypeKey) {
                 result[key] = clone(source[key]);
             }
         }
@@ -298,7 +300,7 @@ function merge(target, source, overwrite) {
         return overwrite ? clone(source) : target;
     }
     for (var key in source) {
-        if (source.hasOwnProperty(key) && key !== protoKey) {
+        if (source.hasOwnProperty(key) && key !== protoKey && key !== constructorKey && key !== prototypeKey) {
             var targetProp = target[key];
             var sourceProp = source[key];
             if (isObject(sourceProp)
@@ -328,14 +330,9 @@ function mergeAll(targetAndSources, overwrite) {
     return result;
 }
 function extend(target, source) {
-    if (Object.assign) {
-        Object.assign(target, source);
-    }
-    else {
-        for (var key in source) {
-            if (source.hasOwnProperty(key) && key !== protoKey) {
-                target[key] = source[key];
-            }
+    for (var key in source) {
+        if (source.hasOwnProperty(key) && key !== protoKey && key !== constructorKey && key !== prototypeKey) {
+            target[key] = source[key];
         }
     }
     return target;
@@ -344,7 +341,7 @@ function defaults(target, source, overlay) {
     var keysArr = keys(source);
     for (var i = 0, len = keysArr.length; i < len; i++) {
         var key = keysArr[i];
-        if ((overlay ? source[key] != null : target[key] == null)) {
+        if (key !== protoKey && key !== constructorKey && key !== prototypeKey && (overlay ? source[key] != null : target[key] == null)) {
             target[key] = source[key];
         }
     }
