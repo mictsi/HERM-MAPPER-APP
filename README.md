@@ -29,6 +29,7 @@ The web application lives under `src/HERM-MAPPER-APP` and automated tests live u
 
 - `src/HERM-MAPPER-APP/`: ASP.NET Core MVC application
 - `tests/HERM-MAPPER-APP.Tests/`: unit tests
+- `docker/`: Dockerfile, Docker Compose files, and env-file generation script
 - `scripts/`: deployment and automation scripts
 - `docs/`: project documentation
 
@@ -64,6 +65,30 @@ dotnet restore ./HERM-MAPPER-APP.sln
 dotnet build ./HERM-MAPPER-APP.sln
 dotnet run --project ./src/HERM-MAPPER-APP/HERM-MAPPER-APP.csproj
 ```
+
+## Docker
+
+Build the image directly:
+
+```powershell
+docker build -f .\docker\Dockerfile -t herm-mapper-app:local .
+```
+
+Run with SQLite stored in a Docker volume:
+
+```powershell
+.\docker\Convert-AppSettingsToDockerEnv.ps1 -Mode sqlite -Force
+docker compose -f .\docker\docker-compose.sqlite.yml up --build
+```
+
+Run with an external SQL Server database:
+
+```powershell
+.\docker\Convert-AppSettingsToDockerEnv.ps1 -Mode external-db -SqlServerConnectionString "Server=tcp:<sql-server-host>,1433;Database=herm-mapper;User ID=<sql-user>;Password=<sql-password>;Encrypt=True;TrustServerCertificate=False;MultipleActiveResultSets=True" -Force
+docker compose -f .\docker\docker-compose.external-db.yml up --build
+```
+
+The app listens on `http://localhost:8080` by default. Set `HERM_HTTP_PORT` in your shell before running Docker Compose, or edit the compose file, to use a different host port. Generated `docker/.env*` files are local-only and should not be committed.
 
 ## Reference Models And Artifacts
 

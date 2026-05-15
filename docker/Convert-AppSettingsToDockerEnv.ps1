@@ -1,0 +1,164 @@
+[CmdletBinding()]
+param(
+    [ValidateSet('sqlite', 'external-db')]
+    [string] $Mode = 'sqlite',
+
+    [string] $AppSettingsPath = (Join-Path $PSScriptRoot '..\src\HERM-MAPPER-APP\appsettings.json'),
+
+    [string] $OutputPath,
+
+    [string] $SqlServerConnectionString,
+
+    [string] $AspNetCoreEnvironment = 'Production',
+
+    [switch] $IncludeEmpty,
+
+    [switch] $Force
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function ConvertTo-ConfigScalar {
+    param([object] $Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    if ($Value -is [bool]) {
+        return $Value.ToString().ToLowerInvariant()
+    }
+
+    return [string] $Value
+}
+
+function Add-ConfigValue {
+    param(
+        [System.Collections.Specialized.OrderedDictionary] $Target,
+        [string[]] $Path,
+        [object] $Value
+    )
+
+    if ($null -eq $Value) {
+        return
+    }
+
+    if ($Value -is [System.Management.Automation.PSCustomObject]) {
+        foreach ($property in $Value.PSObject.Properties) {
+            Add-ConfigValue -Target $Target -Path ($Path + $property.Name) -Value $property.Value
+        }
+
+        return
+    }
+
+    if ($Value -is [System.Array]) {
+        for ($i = 0; $i -lt $Value.Count; $i++) {
+            Add-ConfigValue -Target $Target -Path ($Path + [string] $i) -Value $Value[$i]
+        }
+
+        return
+    }
+
+    $scalarValue = ConvertTo-ConfigScalar -Value $Value
+    if (-not $IncludeEmpty -and [string]::IsNullOrWhiteSpace($scalarValue)) {
+        return
+    }
+
+    $Target["HERM_$($Path -join '__')"] = $scalarValue
+}
+
+function Set-EnvValue {
+    param(
+        [System.Collections.Specialized.OrderedDictionary] $Target,
+        [string] $Key,
+        [string] $Value
+    )
+
+    if ($IncludeEmpty -or -not [string]::IsNullOrWhiteSpace($Value)) {
+        $Target[$Key] = $Value
+    }
+}
+
+function Get-EnvValue {
+    param(
+        [System.Collections.Specialized.OrderedDictionary] $Source,
+        [string] $Key
+    )
+
+    if ($Source.Contains($Key)) {
+        return [string] $Source[$Key]
+    }
+
+    return ''
+}
+
+function Format-EnvLine {
+    param(
+        [string] $Key,
+        [string] $Value
+    )
+
+    $rawValue = if ($null -eq $Value) { '' } else { $Value }
+    $normalizedValue = $rawValue.Replace("`r", '').Replace("`n", '\n')
+    return "$Key=$normalizedValue"
+}
+
+if (-not $OutputPath) {
+    $fileName = if ($Mode -eq 'sqlite') { '.env.sqlite' } else { '.env.external-db' }
+    $OutputPath = Join-Path $PSScriptRoot $fileName
+}
+
+$resolvedAppSettingsPath = Resolve-Path -LiteralPath $AppSettingsPath
+$resolvedOutputPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputPath)
+$outputDirectory = Split-Path -Parent $resolvedOutputPath
+
+if (-not (Test-Path -LiteralPath $outputDirectory)) {
+    New-Item -ItemType Directory -Path $outputDirectory | Out-Null
+}
+
+if ((Test-Path -LiteralPath $resolvedOutputPath) -and -not $Force) {
+    throw "Output file '$resolvedOutputPath' already exists. Use -Force to overwrite it."
+}
+
+$settings = Get-Content -LiteralPath $resolvedAppSettingsPath -Raw | ConvertFrom-Json
+$envValues = [ordered] @{}
+Add-ConfigValue -Target $envValues -Path @() -Value $settings
+
+Set-EnvValue -Target $envValues -Key 'ASPNETCORE_ENVIRONMENT' -Value $AspNetCoreEnvironment
+Set-EnvValue -Target $envValues -Key 'ASPNETCORE_URLS' -Value 'http://+:8080'
+
+if ($Mode -eq 'sqlite') {
+    Set-EnvValue -Target $envValues -Key 'HERM_Database__Provider' -Value 'Sqlite'
+    Set-EnvValue -Target $envValues -Key 'HERM_Database__SqliteFilePath' -Value '/app/App_Data/herm-mapper.db'
+    Set-EnvValue -Target $envValues -Key 'HERM_Database__ConnectionString' -Value 'Data Source=/app/App_Data/herm-mapper.db'
+    Set-EnvValue -Target $envValues -Key 'HERM_ConnectionStrings__Sqlite' -Value 'Data Source=/app/App_Data/herm-mapper.db'
+    Set-EnvValue -Target $envValues -Key 'HERM_ConnectionStrings__DefaultConnection' -Value 'Data Source=/app/App_Data/herm-mapper.db'
+}
+else {
+    $connectionString = $SqlServerConnectionString
+    if ([string]::IsNullOrWhiteSpace($connectionString)) {
+        $connectionString = Get-EnvValue -Source $envValues -Key 'HERM_Database__ConnectionString'
+    }
+
+    if ([string]::IsNullOrWhiteSpace($connectionString) -or $connectionString -like 'Data Source=*') {
+        $connectionString = 'Server=tcp:<sql-server-host>,1433;Database=herm-mapper;User ID=<sql-user>;Password=<sql-password>;Encrypt=True;TrustServerCertificate=False;MultipleActiveResultSets=True'
+    }
+
+    Set-EnvValue -Target $envValues -Key 'HERM_Database__Provider' -Value 'SqlServer'
+    Set-EnvValue -Target $envValues -Key 'HERM_Database__ConnectionString' -Value $connectionString
+    Set-EnvValue -Target $envValues -Key 'HERM_ConnectionStrings__SqlServer' -Value $connectionString
+    Set-EnvValue -Target $envValues -Key 'HERM_ConnectionStrings__DefaultConnection' -Value $connectionString
+}
+
+$lines = @(
+    '# Generated by docker/Convert-AppSettingsToDockerEnv.ps1'
+    '# This file can contain secrets. Do not commit generated .env files.'
+)
+
+foreach ($entry in $envValues.GetEnumerator()) {
+    $lines += Format-EnvLine -Key ([string] $entry.Key) -Value ([string] $entry.Value)
+}
+
+Set-Content -LiteralPath $resolvedOutputPath -Value $lines -Encoding utf8
+Write-Host "Wrote $resolvedOutputPath"

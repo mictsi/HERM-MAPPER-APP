@@ -1,0 +1,26 @@
+name: herm-mapper-sqlite
+
+services:
+  herm-mapper:
+    image: herm-mapper-app:local
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - ./.env.sqlite
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+      HERM_Database__Provider: Sqlite
+      HERM_Database__SqliteFilePath: /app/App_Data/herm-mapper.db
+      HERM_Database__ConnectionString: Data Source=/app/App_Data/herm-mapper.db
+      HERM_ConnectionStrings__Sqlite: Data Source=/app/App_Data/herm-mapper.db
+      HERM_ConnectionStrings__DefaultConnection: Data Source=/app/App_Data/herm-mapper.db
+    ports:
+      - "${HERM_HTTP_PORT:-8080}:8080"
+    volumes:
+      - herm-mapper-app-data:/app/App_Data
+    restart: unless-stopped
+
+volumes:
+  herm-mapper-app-data:
