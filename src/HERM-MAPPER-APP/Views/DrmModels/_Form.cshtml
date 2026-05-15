@@ -1,0 +1,60 @@
+@model DrmModelEditViewModel
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+<div class="row g-4 editor-panel-grid">
+    <div class="col-xl-8">
+        <div class="content-card editor-main-card">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">DRM model</span>
+                    <h2>Details</h2>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label"></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Area" class="form-label"></label>
+                    <input asp-for="Area" class="form-control" />
+                    <span asp-validation-for="Area" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Status" class="form-label"></label>
+                    <select asp-for="Status" class="form-select">
+                        <option value="">Choose a status</option>
+                        @foreach (var status in Model.SuggestedStatuses)
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Status" class="text-danger"></span>
+                </div>
+                <div class="col-12">
+                    <label asp-for="Description" class="form-label"></label>
+                    <textarea asp-for="Description" class="form-control" rows="5"></textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <aside class="content-card h-100 editor-side-card">
+            <div class="section-heading">
+                <div>
+                    <span class="eyebrow">Workflow</span>
+                    <h2>What this creates</h2>
+                </div>
+            </div>
+            <p class="mb-3">Each DRM model becomes its own data-reference workspace built only from imported DRM topic types, topics, entities, and common sub-classes.</p>
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Save DRM model</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </div>
+        </aside>
+    </div>
+</div>

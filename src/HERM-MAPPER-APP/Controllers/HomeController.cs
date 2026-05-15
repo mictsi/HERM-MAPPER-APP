@@ -40,6 +40,11 @@ public sealed class HomeController(AppDbContext dbContext) : Controller
             BrmDomainCount = await dbContext.BrmDomains.CountAsync(),
             BrmCapabilityCount = await dbContext.BrmCapabilities.CountAsync(),
             BrmComponentCount = await dbContext.BrmComponents.CountAsync(x => !x.IsDeleted),
+            DrmTopicTypeCount = await dbContext.DrmTopicTypes.CountAsync(),
+            DrmTopicCount = await dbContext.DrmTopics.CountAsync(),
+            DrmDataEntityCount =
+                await dbContext.DrmEntities.CountAsync(x => !x.IsDeleted) +
+                await dbContext.DrmCommonSubClasses.CountAsync(x => !x.IsDeleted),
             RecentProducts = await dbContext.ProductCatalogItems
                 .AsNoTracking()
                 .Where(x => !x.IsDeleted)

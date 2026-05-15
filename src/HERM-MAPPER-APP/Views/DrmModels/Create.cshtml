@@ -1,0 +1,22 @@
+@model DrmModelEditViewModel
+@{
+    ViewData["Title"] = "Create DRM Model";
+    ViewData["BodyClass"] = "drm-models-page";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Data Layer</span>
+        <h1>Create DRM model</h1>
+        <p>Create a new data-reference workspace.</p>
+    </div>
+</section>
+
+<form asp-action="Create" method="post">
+    @Html.AntiForgeryToken()
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

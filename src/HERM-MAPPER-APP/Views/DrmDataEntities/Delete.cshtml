@@ -1,0 +1,32 @@
+@using HERMMapperApp.Services
+@model DrmDataEntityDeleteViewModel
+@{
+    ViewData["Title"] = "Remove DRM Data Entity";
+    ViewData["BodyClass"] = "drm-models-page";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Data Layer</span>
+        <h1>Remove data entity</h1>
+        <p>This removes the selection from the custom DRM model. It does not delete the imported DRM catalogue row.</p>
+    </div>
+</section>
+
+<section class="content-card">
+    <dl class="detail-grid">
+        <dt>Model</dt>
+        <dd>@Model.DrmModelName</dd>
+        <dt>Data entity</dt>
+        <dd>@Model.Name</dd>
+        <dt>Description</dt>
+        <dd>@(string.IsNullOrWhiteSpace(Model.Description) ? "-" : Model.Description)</dd>
+        <dt>Updated</dt>
+        <dd>@await TimeZoneDisplay.FormatUtcAsync(Model.UpdatedUtc)</dd>
+    </dl>
+    <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-flex gap-2 mt-4">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-danger">Remove</button>
+        <a class="btn btn-outline-secondary" asp-controller="DrmModels" asp-action="Details" asp-route-id="@Model.DrmModelId">Cancel</a>
+    </form>
+</section>

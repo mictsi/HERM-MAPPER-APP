@@ -1,0 +1,22 @@
+@model DrmDataEntityEditViewModel
+@{
+    ViewData["Title"] = "Add DRM Data Entity";
+    ViewData["BodyClass"] = "drm-models-page";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Data Layer</span>
+        <h1>Add data entity</h1>
+        <p>Add a DRM entity or common sub-class to this model.</p>
+    </div>
+</section>
+
+<form asp-action="Create" asp-route-drmModelId="@Model.SelectedDrmModelId" method="post">
+    @Html.AntiForgeryToken()
+    <partial name="_Form" model="Model" />
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

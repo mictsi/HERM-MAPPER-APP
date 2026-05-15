@@ -368,6 +368,92 @@ public sealed class TrmWorkbookImportServiceTests
         Assert.Empty(await fixture.DbContext.TrmComponents.ToListAsync());
     }
 
+    [Fact]
+    public async Task ImportAsyncImportsDrmWorkbookIntoDedicatedTablesAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var workbookPath = fixture.WriteWorkbook(
+            new WorkbookSheet(
+                "Topic Type",
+                [
+                    ["Topic Type", "Topic Type ID", "Topic Type Description"],
+                    ["Core", "DY001", "Core data"]
+                ]),
+            new WorkbookSheet(
+                "Topic",
+                [
+                    ["Title", "Topic Name", "Topic Type", "Topic ID", "Alternative Names", "Topic Description", "Comments"],
+                    ["Curriculum", "Curriculum", "Core", "DT007", "Courses", "Topic description", "Topic comments"]
+                ]),
+            new WorkbookSheet(
+                "Entity",
+                [
+                    ["Title", "Data Entity Name", "Parent Topic", "Parent Topic Type", "Data Entity ID", "Alternative Names", "Data Entity Description", "Comments", "TOGAF Enterprise Metamodel Entity"],
+                    ["Programme", "Programme of Learning", "DT007 Curriculum", "Core", "DE161", "Programme", "Entity description", "Entity comments", "Course"]
+                ]),
+            new WorkbookSheet(
+                "Common Sub-Class",
+                [
+                    ["Title", "Sub-Class Name", "Sub-Class ID", "Parent Data Entity", "Alternative Names", "Sub-Class Description", "Sub-Class Comments"],
+                    ["Award", "Award Programme", "DE901", "DE161 Programme of Learning", "Award", "Sub-class description", "Sub-class comments"]
+                ]));
+
+        var summary = await fixture.CreateService().ImportAsync(workbookPath, ReferenceModelKind.Drm);
+
+        var topicType = await fixture.DbContext.DrmTopicTypes.SingleAsync();
+        var topic = await fixture.DbContext.DrmTopics.Include(x => x.TopicType).SingleAsync();
+        var entity = await fixture.DbContext.DrmEntities.Include(x => x.ParentTopic).SingleAsync();
+        var subClass = await fixture.DbContext.DrmCommonSubClasses.Include(x => x.ParentEntity).SingleAsync();
+
+        Assert.Equal(ReferenceModelKind.Drm, summary.ModelKind);
+        Assert.Equal(1, summary.DomainsAdded);
+        Assert.Equal(1, summary.CapabilitiesAdded);
+        Assert.Equal(2, summary.ComponentsAdded);
+        Assert.Equal("DY001", topicType.Code);
+        Assert.Equal(topicType.Id, topic.TopicTypeId);
+        Assert.Equal("DT007", topic.Code);
+        Assert.Equal(topic.Id, entity.ParentTopicId);
+        Assert.Equal("DE161", entity.Code);
+        Assert.Equal(entity.Id, subClass.ParentEntityId);
+        Assert.Equal("DE901", subClass.Code);
+    }
+
+    [Fact]
+    public async Task VerifyAsyncRejectsDrmDuplicateDataEntityCodesAcrossSheetsAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var workbookPath = fixture.WriteWorkbook(
+            new WorkbookSheet(
+                "Topic Type",
+                [
+                    ["Topic Type", "Topic Type ID", "Topic Type Description"],
+                    ["Core", "DY001", "Core data"]
+                ]),
+            new WorkbookSheet(
+                "Topic",
+                [
+                    ["Title", "Topic Name", "Topic Type", "Topic ID", "Alternative Names", "Topic Description", "Comments"],
+                    ["Curriculum", "Curriculum", "Core", "DT007", "", "", ""]
+                ]),
+            new WorkbookSheet(
+                "Entity",
+                [
+                    ["Title", "Data Entity Name", "Parent Topic", "Parent Topic Type", "Data Entity ID", "Alternative Names", "Data Entity Description", "Comments", "TOGAF Enterprise Metamodel Entity"],
+                    ["Programme", "Programme of Learning", "DT007 Curriculum", "Core", "DE161", "", "", "", ""]
+                ]),
+            new WorkbookSheet(
+                "Common Sub-Class",
+                [
+                    ["Title", "Sub-Class Name", "Sub-Class ID", "Parent Data Entity", "Alternative Names", "Sub-Class Description", "Sub-Class Comments"],
+                    ["Award", "Award Programme", "DE161", "DE161 Programme of Learning", "", "", ""]
+                ]));
+
+        var verification = await fixture.CreateService().VerifyAsync(workbookPath, ReferenceModelKind.Drm);
+
+        Assert.False(verification.IsValid);
+        Assert.Contains(verification.Errors, error => error.Contains("duplicate data entity code 'DE161'", StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

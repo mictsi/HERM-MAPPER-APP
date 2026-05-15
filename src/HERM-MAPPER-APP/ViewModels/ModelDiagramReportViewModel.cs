@@ -4,6 +4,7 @@ public sealed class ModelDiagramReportViewModel
 {
     public string ScopeKey { get; init; } = "trm";
     public int? BrmModelId { get; init; }
+    public int? DrmModelId { get; init; }
     public int? ServiceId { get; init; }
     public int? ApplicationId { get; init; }
     public string ReportFragmentId { get; init; } = "report-product-model";

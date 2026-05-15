@@ -1,0 +1,111 @@
+@using HERMMapperApp
+@using HERMMapperApp.Services
+@model DrmModelsIndexViewModel
+@{
+    ViewData["Title"] = "DRM Models";
+    ViewData["BodyClass"] = "drm-models-page";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+    var totalDataEntities = Model.Models.Sum(model => model.DataEntityCount);
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Data Layer</span>
+        <h1>DRM models</h1>
+        <p>Create separate DRM model workspaces and manage each model's data entities independently.</p>
+    </div>
+    @if (canManageProductsAndServices)
+    {
+        <div class="d-flex gap-2">
+            <a class="btn btn-primary" asp-action="Create">Add DRM model</a>
+        </div>
+    }
+</section>
+
+<section class="stats-grid stats-grid-compact brm-models-overview-grid">
+    <article class="stat-card brm-models-overview-card">
+        <span class="stat-label">Visible models</span>
+        <span class="stat-value">@Model.Models.Count</span>
+        <span class="stat-meta">data workspaces in view</span>
+    </article>
+    <article class="stat-card brm-models-overview-card">
+        <span class="stat-label">Data entities</span>
+        <span class="stat-value">@totalDataEntities</span>
+        <span class="stat-meta">across visible model(s)</span>
+    </article>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <section class="content-card brm-models-status-card">
+        <div class="alert alert-success mb-0" role="status">@Model.StatusMessage</div>
+    </section>
+}
+
+<section class="content-card brm-models-results-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Catalogue</span>
+            <h2>@Model.Models.Count DRM model(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.Models.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No DRM models yet</h3>
+            <p>Create the first DRM model to start grouping data entities by area.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Area</th>
+                        <th>Status</th>
+                        <th>Data entities</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var modelRow in Model.Models)
+                {
+                    <tr>
+                        <td>
+                            <strong>@modelRow.Name</strong>
+                            <div class="table-subline">@(string.IsNullOrWhiteSpace(modelRow.Description) ? "No description provided." : modelRow.Description)</div>
+                        </td>
+                        <td>@modelRow.Area</td>
+                        <td>@modelRow.Status</td>
+                        <td>@modelRow.DataEntityCount</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(modelRow.UpdatedUtc)</td>
+                        <td class="text-end">
+                            <div class="table-action-group">
+                                <a class="table-action-button" asp-action="Details" asp-route-id="@modelRow.Id" title="Show details for @modelRow.Name" aria-label="Show details for @modelRow.Name">
+                                    <partial name="_ActionIcon" model="@("details")" />
+                                    <span class="visually-hidden">Show details</span>
+                                </a>
+                                @if (canManageProductsAndServices)
+                                {
+                                    <a class="table-action-button" asp-action="Edit" asp-route-id="@modelRow.Id" title="Edit @modelRow.Name" aria-label="Edit @modelRow.Name">
+                                        <partial name="_ActionIcon" model="@("edit")" />
+                                        <span class="visually-hidden">Edit</span>
+                                    </a>
+                                    <a class="table-action-button table-action-button-danger" asp-action="Delete" asp-route-id="@modelRow.Id" title="Move @modelRow.Name to trash" aria-label="Move @modelRow.Name to trash">
+                                        <partial name="_ActionIcon" model="@("trash")" />
+                                        <span class="visually-hidden">Move to trash</span>
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

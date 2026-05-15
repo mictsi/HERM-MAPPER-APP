@@ -118,9 +118,7 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
                 ShowUnmappedItems = true,
                 ShowComponentMappedSummary = false,
                 UnmappedSectionTitle = "Service Products Without TRM Placement",
-                UnmappedSummaryLabel = "service product(s) still need a component placement",
-                DrawIoDownloadAction = null,
-                ArchiDownloadAction = null
+                UnmappedSummaryLabel = "service product(s) still need a component placement"
             };
         }
 
@@ -144,9 +142,7 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
                 ShowUnmappedItems = true,
                 ShowComponentMappedSummary = false,
                 UnmappedSectionTitle = "Service Products Without TRM Placement",
-                UnmappedSummaryLabel = "service product(s) still need a component placement",
-                DrawIoDownloadAction = null,
-                ArchiDownloadAction = null
+                UnmappedSummaryLabel = "service product(s) still need a component placement"
             };
         }
 
@@ -170,9 +166,7 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
                 ShowUnmappedItems: true,
                 ShowComponentMappedSummary: false,
                 UnmappedSectionTitle: "Service Products Without TRM Placement",
-                UnmappedSummaryLabel: "service product(s) still need a component placement",
-                DrawIoDownloadAction: null,
-                ArchiDownloadAction: null));
+                UnmappedSummaryLabel: "service product(s) still need a component placement"));
     }
 
     public async Task<byte[]> BuildDrawIoAsync(CancellationToken cancellationToken = default)
@@ -1288,8 +1282,8 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
         bool ShowComponentMappedSummary,
         string UnmappedSectionTitle,
         string UnmappedSummaryLabel,
-        string? DrawIoDownloadAction,
-        string? ArchiDownloadAction);
+        string? DrawIoDownloadAction = "DownloadDrawIo",
+        string? ArchiDownloadAction = "DownloadArchiXml");
 
     private sealed class DiagramDomainNode(int domainId, string code, string name)
     {

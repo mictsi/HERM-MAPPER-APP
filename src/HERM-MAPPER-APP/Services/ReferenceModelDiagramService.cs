@@ -114,9 +114,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
                 OnlyShowMappedNodes = true,
                 UseCompactMappedSummary = true,
                 ShowComponentMappedSummary = false,
-                ShowBranchEmptyStates = false,
-                DrawIoDownloadAction = null,
-                ArchiDownloadAction = null
+                ShowBranchEmptyStates = false
             };
         }
 
@@ -194,9 +192,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
                 OnlyShowMappedNodes = true,
                 UseCompactMappedSummary = true,
                 ShowComponentMappedSummary = false,
-                ShowBranchEmptyStates = false,
-                DrawIoDownloadAction = null,
-                ArchiDownloadAction = null
+                ShowBranchEmptyStates = false
             };
         }
 
@@ -223,9 +219,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
                 ShowComponentMappedSummary: false,
                 ShowBranchEmptyStates: false,
                 EmptyStateTitle: $"No ARM structure available for {selectedApplication.Name}",
-                EmptyStateBody: "Import the ARM reference model and add application mappings to render this report.",
-                DrawIoDownloadAction: null,
-                ArchiDownloadAction: null));
+                EmptyStateBody: "Import the ARM reference model and add application mappings to render this report."));
     }
 
     public async Task<ModelDiagramReportViewModel> BuildBrmAsync(CancellationToken cancellationToken = default)
@@ -327,9 +321,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
                 OnlyShowMappedNodes = true,
                 UseCompactMappedSummary = true,
                 ShowComponentMappedSummary = false,
-                ShowBranchEmptyStates = false,
-                DrawIoDownloadAction = null,
-                ArchiDownloadAction = null
+                ShowBranchEmptyStates = false
             };
         }
 
@@ -396,6 +388,120 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         return report;
     }
 
+    public async Task<ModelDiagramReportViewModel> BuildDrmModelAsync(int? drmModelId, CancellationToken cancellationToken = default)
+    {
+        var selectedDrmModel = drmModelId is > 0
+            ? await dbContext.DrmModels
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == drmModelId.Value && !x.IsDeleted, cancellationToken)
+            : await dbContext.DrmModels
+                .AsNoTracking()
+                .Where(x => !x.IsDeleted)
+                .OrderBy(x => x.Name)
+                .ThenBy(x => x.Area)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        if (selectedDrmModel is null)
+        {
+            return new ModelDiagramReportViewModel
+            {
+                ScopeKey = "drm",
+                ReportFragmentId = "report-drm-model",
+                DiagramTitle = "DRM diagram",
+                DiagramDescription = "Choose one of your DRM models to review its data-reference structure.",
+                PosterTitle = "DRM model poster",
+                PosterDescription = "Full-screen poster view of the selected DRM model.",
+                MappedItemLabel = "selected record(s)",
+                EmptyStateTitle = "No DRM models available",
+                EmptyStateBody = "Create a DRM model and add data entities to populate this report.",
+                BackReportAction = "DrmModelReport",
+                BackReportLabel = "Back to DRM report",
+                OnlyShowMappedNodes = false,
+                UseCompactMappedSummary = true,
+                ShowComponentMappedSummary = false,
+                ShowBranchEmptyStates = false
+            };
+        }
+
+        var topicTypes = await dbContext.DrmTopicTypes
+            .AsNoTracking()
+            .OrderBy(x => x.Code)
+            .ThenBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+        var topics = await dbContext.DrmTopics
+            .AsNoTracking()
+            .OrderBy(x => x.TopicTypeId)
+            .ThenBy(x => x.Code)
+            .ThenBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+        var entities = await dbContext.DrmEntities
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.ParentTopicId)
+            .ThenBy(x => x.Code)
+            .ThenBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+        var subClasses = await dbContext.DrmCommonSubClasses
+            .AsNoTracking()
+            .Include(x => x.ParentEntity)
+            .Where(x => !x.IsDeleted && x.ParentEntity != null && !x.ParentEntity.IsDeleted)
+            .OrderBy(x => x.ParentEntityId)
+            .ThenBy(x => x.Code)
+            .ThenBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+        var selectedItems = await dbContext.DrmModelDataEntities
+            .AsNoTracking()
+            .Where(x => x.DrmModelId == selectedDrmModel.Id)
+            .Include(x => x.DrmEntity)
+            .Include(x => x.DrmCommonSubClass)
+            .ToListAsync(cancellationToken);
+
+        var componentSeeds = entities
+            .Select(x => new DiagramComponentSeed(x.Id, x.ParentTopicId, x.Code, x.Name))
+            .Concat(subClasses.Select(x => new DiagramComponentSeed(
+                -x.Id,
+                x.ParentEntity?.ParentTopicId,
+                x.Code,
+                x.Name)))
+            .ToList();
+
+        var placements = selectedItems
+            .Select(x => new DiagramLeafPlacement(
+                x.DrmCommonSubClassId.HasValue ? -x.DrmCommonSubClassId.Value : x.DrmEntityId,
+                x.Id,
+                x.Name,
+                "DrmDataEntities",
+                "Edit",
+                x.Id))
+            .ToList();
+
+        return BuildReport(
+            topicTypes.Select(x => new DiagramDomainSeed(x.Id, x.Code, x.Name)).ToList(),
+            topics.Select(x => new DiagramCapabilitySeed(x.Id, x.TopicTypeId, x.Code, x.Name)).ToList(),
+            componentSeeds,
+            placements,
+            new DiagramMetadata(
+                ScopeKey: "drm",
+                BrmModelId: null,
+                ServiceId: null,
+                ApplicationId: null,
+                ReportFragmentId: "report-drm-model",
+                DiagramTitle: "DRM diagram",
+                DiagramDescription: BuildDrmModelDescription(selectedDrmModel),
+                PosterTitle: $"{selectedDrmModel.Name} DRM model poster",
+                PosterDescription: $"Full-screen poster view of {selectedDrmModel.Name} across the DRM reference model with selected data entities highlighted.",
+                MappedItemLabel: "selected record(s)",
+                BackReportAction: "DrmModelReport",
+                BackReportLabel: "Back to DRM report",
+                OnlyShowMappedNodes: false,
+                UseCompactMappedSummary: true,
+                ShowComponentMappedSummary: false,
+                ShowBranchEmptyStates: false,
+                EmptyStateTitle: $"No DRM structure available for {selectedDrmModel.Name}",
+                EmptyStateBody: "Import the DRM reference model and add data entities to populate the selected-record summary.",
+                DrmModelId: selectedDrmModel.Id));
+    }
+
     private static IEnumerable<DiagramLeafPlacement> ResolveArmPlacements(ApplicationCatalogItemMapping mapping)
     {
         if (mapping.ArmComponentId <= 0)
@@ -460,6 +566,12 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
     {
         var areaLabel = string.IsNullOrWhiteSpace(brmModel.Area) ? brmModel.Name : $"{brmModel.Name} - {brmModel.Area}";
         return $"Review {areaLabel} across the full BRM poster with mapped ARM domains shown inside the configured BRM capabilities.";
+    }
+
+    private static string BuildDrmModelDescription(DrmModel drmModel)
+    {
+        var areaLabel = string.IsNullOrWhiteSpace(drmModel.Area) ? drmModel.Name : $"{drmModel.Name} - {drmModel.Area}";
+        return $"Review {areaLabel} across the full DRM poster with selected data entities shown inside the configured DRM model.";
     }
 
     private static string BuildApplicationDiagramDescription(ApplicationCatalogItem application) =>
@@ -544,6 +656,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         {
             ScopeKey = metadata.ScopeKey,
             BrmModelId = metadata.BrmModelId,
+            DrmModelId = metadata.DrmModelId,
             ServiceId = metadata.ServiceId,
             ApplicationId = metadata.ApplicationId,
             ReportFragmentId = metadata.ReportFragmentId,
@@ -624,7 +737,8 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         string? EmptyStateTitle = null,
         string? EmptyStateBody = null,
         string? DrawIoDownloadAction = "DownloadDrawIo",
-        string? ArchiDownloadAction = "DownloadArchiXml");
+        string? ArchiDownloadAction = "DownloadArchiXml",
+        int? DrmModelId = null);
 
     private sealed record DiagramDomainSeed(int Id, string Code, string Name);
     private sealed record DiagramCapabilitySeed(int Id, int? ParentDomainId, string Code, string Name);

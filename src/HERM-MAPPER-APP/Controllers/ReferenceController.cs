@@ -23,7 +23,9 @@ public sealed class ReferenceController(
         int? capabilityId,
         ReferenceModelKind? modelKind = null,
         string? domainCode = null,
-        string? capabilityCode = null)
+        string? capabilityCode = null,
+        string? componentCode = null,
+        string? subClassCode = null)
     {
         if (!ModelState.IsValid)
         {
@@ -37,6 +39,8 @@ public sealed class ReferenceController(
             modelKind,
             domainCode,
             capabilityCode,
+            componentCode,
+            subClassCode,
             null,
             TempData["ImportStatusMessage"] as string));
     }
@@ -66,6 +70,14 @@ public sealed class ReferenceController(
     }
 
     [Authorize(Policy = AppPolicies.AdminOnly)]
+    public async Task<IActionResult> RestoreDrmAsync()
+    {
+        return View("Restore", await BuildRestoreViewModelAsync(
+            ReferenceModelKind.Drm,
+            TempData["ImportStatusMessage"] as string));
+    }
+
+    [Authorize(Policy = AppPolicies.AdminOnly)]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> VerifyImportAsync(IFormFile? workbook)
@@ -78,6 +90,8 @@ public sealed class ReferenceController(
         if (workbook is null || workbook.Length == 0)
         {
             return View("Index", await BuildViewModelAsync(
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -97,6 +111,8 @@ public sealed class ReferenceController(
         if (!string.Equals(Path.GetExtension(workbook.FileName), ".xlsx", StringComparison.OrdinalIgnoreCase))
         {
             return View("Index", await BuildViewModelAsync(
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -144,6 +160,8 @@ public sealed class ReferenceController(
             null,
             null,
             null,
+            null,
+            null,
             new WorkbookImportReviewViewModel
             {
                 PendingImportToken = verification.IsValid ? pendingImportToken : null,
@@ -181,6 +199,8 @@ public sealed class ReferenceController(
         {
             System.IO.File.Delete(pendingPath);
             return View("Index", await BuildViewModelAsync(
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -294,6 +314,58 @@ public sealed class ReferenceController(
                 TempData["ImportStatusMessage"] = $"Moved BRM component {component.DisplayLabel} to trash.";
                 break;
             }
+            case ReferenceModelKind.Drm:
+            {
+                if (id < 0)
+                {
+                    var subClassId = Math.Abs(id);
+                    var subClass = await dbContext.DrmCommonSubClasses
+                        .FirstOrDefaultAsync(x => x.Id == subClassId && !x.IsDeleted);
+                    if (subClass is null)
+                    {
+                        return NotFound();
+                    }
+
+                    subClass.IsDeleted = true;
+                    subClass.DeletedUtc = DateTime.UtcNow;
+                    subClass.DeletedReason = "Moved to trash from the DRM model catalogue.";
+
+                    await dbContext.SaveChangesAsync();
+                    await auditLogService.WriteAsync(
+                        "Component",
+                        "Delete",
+                        nameof(DrmCommonSubClass),
+                        subClass.Id,
+                        $"Moved DRM common sub-class {subClass.DisplayLabel} to trash.",
+                        subClass.DeletedReason);
+
+                    TempData["ImportStatusMessage"] = $"Moved DRM common sub-class {subClass.DisplayLabel} to trash.";
+                    break;
+                }
+
+                var entity = await dbContext.DrmEntities
+                    .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+                if (entity is null)
+                {
+                    return NotFound();
+                }
+
+                entity.IsDeleted = true;
+                entity.DeletedUtc = DateTime.UtcNow;
+                entity.DeletedReason = "Moved to trash from the DRM model catalogue.";
+
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "Delete",
+                    nameof(DrmEntity),
+                    entity.Id,
+                    $"Moved DRM entity {entity.DisplayLabel} to trash.",
+                    entity.DeletedReason);
+
+                TempData["ImportStatusMessage"] = $"Moved DRM entity {entity.DisplayLabel} to trash.";
+                break;
+            }
             default:
                 return BadRequest();
         }
@@ -385,6 +457,56 @@ public sealed class ReferenceController(
                     $"Restored BRM component {component.DisplayLabel} from trash.");
 
                 TempData["ImportStatusMessage"] = $"Restored BRM component {component.DisplayLabel}.";
+                break;
+            }
+            case ReferenceModelKind.Drm:
+            {
+                if (id < 0)
+                {
+                    var subClassId = Math.Abs(id);
+                    var subClass = await dbContext.DrmCommonSubClasses
+                        .FirstOrDefaultAsync(x => x.Id == subClassId && x.IsDeleted);
+                    if (subClass is null)
+                    {
+                        return NotFound();
+                    }
+
+                    subClass.IsDeleted = false;
+                    subClass.DeletedUtc = null;
+                    subClass.DeletedReason = null;
+
+                    await dbContext.SaveChangesAsync();
+                    await auditLogService.WriteAsync(
+                        "Component",
+                        "Restore",
+                        nameof(DrmCommonSubClass),
+                        subClass.Id,
+                        $"Restored DRM common sub-class {subClass.DisplayLabel} from trash.");
+
+                    TempData["ImportStatusMessage"] = $"Restored DRM common sub-class {subClass.DisplayLabel}.";
+                    break;
+                }
+
+                var entity = await dbContext.DrmEntities
+                    .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+                if (entity is null)
+                {
+                    return NotFound();
+                }
+
+                entity.IsDeleted = false;
+                entity.DeletedUtc = null;
+                entity.DeletedReason = null;
+
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "Restore",
+                    nameof(DrmEntity),
+                    entity.Id,
+                    $"Restored DRM entity {entity.DisplayLabel} from trash.");
+
+                TempData["ImportStatusMessage"] = $"Restored DRM entity {entity.DisplayLabel}.";
                 break;
             }
             default:
@@ -488,6 +610,50 @@ public sealed class ReferenceController(
                 TempData["ImportStatusMessage"] = $"Permanently deleted BRM component {component.DisplayLabel}.";
                 break;
             }
+            case ReferenceModelKind.Drm:
+            {
+                if (id < 0)
+                {
+                    var subClassId = Math.Abs(id);
+                    var subClass = await dbContext.DrmCommonSubClasses
+                        .FirstOrDefaultAsync(x => x.Id == subClassId && x.IsDeleted);
+                    if (subClass is null)
+                    {
+                        return NotFound();
+                    }
+
+                    dbContext.DrmCommonSubClasses.Remove(subClass);
+                    await dbContext.SaveChangesAsync();
+                    await auditLogService.WriteAsync(
+                        "Component",
+                        "PermanentDelete",
+                        nameof(DrmCommonSubClass),
+                        subClass.Id,
+                        $"Permanently deleted DRM common sub-class {subClass.DisplayLabel}.");
+
+                    TempData["ImportStatusMessage"] = $"Permanently deleted DRM common sub-class {subClass.DisplayLabel}.";
+                    break;
+                }
+
+                var entity = await dbContext.DrmEntities
+                    .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted);
+                if (entity is null)
+                {
+                    return NotFound();
+                }
+
+                dbContext.DrmEntities.Remove(entity);
+                await dbContext.SaveChangesAsync();
+                await auditLogService.WriteAsync(
+                    "Component",
+                    "PermanentDelete",
+                    nameof(DrmEntity),
+                    entity.Id,
+                    $"Permanently deleted DRM entity {entity.DisplayLabel}.");
+
+                TempData["ImportStatusMessage"] = $"Permanently deleted DRM entity {entity.DisplayLabel}.";
+                break;
+            }
             default:
                 return BadRequest();
         }
@@ -533,6 +699,8 @@ public sealed class ReferenceController(
         ReferenceModelKind? modelKind,
         string? domainCode,
         string? capabilityCode,
+        string? componentCode,
+        string? subClassCode,
         WorkbookImportReviewViewModel? importReview,
         string? importStatusMessage)
     {
@@ -592,10 +760,37 @@ public sealed class ReferenceController(
             .OrderBy(x => x.Code)
             .ToListAsync();
 
+        var drmTopicTypes = await dbContext.DrmTopicTypes
+            .AsNoTracking()
+            .OrderBy(x => x.Code)
+            .ToListAsync();
+        var drmTopics = await dbContext.DrmTopics
+            .AsNoTracking()
+            .Include(x => x.TopicType)
+            .OrderBy(x => x.Code)
+            .ToListAsync();
+        var drmEntities = await dbContext.DrmEntities
+            .AsNoTracking()
+            .Include(x => x.ParentTopic)
+            .ThenInclude(x => x!.TopicType)
+            .Include(x => x.CommonSubClasses)
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Code)
+            .ToListAsync();
+        var drmSubClasses = await dbContext.DrmCommonSubClasses
+            .AsNoTracking()
+            .Include(x => x.ParentEntity)
+            .ThenInclude(x => x!.ParentTopic)
+            .ThenInclude(x => x!.TopicType)
+            .Where(x => !x.IsDeleted && x.ParentEntity != null && !x.ParentEntity.IsDeleted)
+            .OrderBy(x => x.Code)
+            .ToListAsync();
+
         var domainDefinitions = trmDomains
             .Select(domain => new BrowserDomainDefinition(ReferenceModelKind.Trm, domain.Id, domain.Code, domain.Name))
             .Concat(armDomains.Select(domain => new BrowserDomainDefinition(ReferenceModelKind.Arm, domain.Id, domain.Code, domain.Name)))
             .Concat(brmDomains.Select(domain => new BrowserDomainDefinition(ReferenceModelKind.Brm, domain.Id, domain.Code, domain.Name)))
+            .Concat(drmTopicTypes.Select(topicType => new BrowserDomainDefinition(ReferenceModelKind.Drm, topicType.Id, topicType.Code, topicType.Name)))
             .OrderBy(domain => domain.ModelKind)
             .ThenBy(domain => domain.Code)
             .ToList();
@@ -604,6 +799,7 @@ public sealed class ReferenceController(
             .Select(capability => new BrowserCapabilityDefinition(ReferenceModelKind.Trm, capability.Id, capability.Code, capability.Name, capability.ParentDomainCode))
             .Concat(armCapabilities.Select(capability => new BrowserCapabilityDefinition(ReferenceModelKind.Arm, capability.Id, capability.Code, capability.Name, capability.ParentDomainCode)))
             .Concat(brmCapabilities.Select(capability => new BrowserCapabilityDefinition(ReferenceModelKind.Brm, capability.Id, capability.Code, capability.Name, capability.ParentDomainCode)))
+            .Concat(drmTopics.Select(topic => new BrowserCapabilityDefinition(ReferenceModelKind.Drm, topic.Id, topic.Code, topic.Name, topic.TopicTypeCode)))
             .OrderBy(capability => capability.ModelKind)
             .ThenBy(capability => capability.Code)
             .ToList();
@@ -614,6 +810,8 @@ public sealed class ReferenceController(
             modelKind,
             domainCode,
             capabilityCode,
+            componentCode,
+            subClassCode,
             trmDomains,
             trmCapabilities,
             domainDefinitions,
@@ -622,6 +820,7 @@ public sealed class ReferenceController(
         var allComponents = BuildTrmComponentItems(trmComponents)
             .Concat(BuildArmComponentItems(armComponents))
             .Concat(BuildBrmComponentItems(brmComponents))
+            .Concat(BuildDrmComponentItems(drmEntities, drmSubClasses))
             .OrderBy(component => component.ModelKind)
             .ThenBy(component => component.IsCustom)
             .ThenBy(component => component.SecondaryCode ?? component.Code)
@@ -657,6 +856,8 @@ public sealed class ReferenceController(
             SelectedModelKind = selection.ModelKind,
             SelectedDomainCode = selection.DomainCode,
             SelectedCapabilityCode = selection.CapabilityCode,
+            SelectedComponentCode = selection.ComponentCode,
+            SelectedSubClassCode = selection.SubClassCode,
             SelectionTitle = selectionTitle,
             SelectionDescription = selectionDescription,
             ActiveTreeAnchorId = BuildAnchorId(selection),
@@ -673,6 +874,8 @@ public sealed class ReferenceController(
         ReferenceModelKind? requestedModelKind,
         string? requestedDomainCode,
         string? requestedCapabilityCode,
+        string? requestedComponentCode,
+        string? requestedSubClassCode,
         IReadOnlyList<TrmDomain> trmDomains,
         IReadOnlyList<TrmCapability> trmCapabilities,
         IReadOnlyList<BrowserDomainDefinition> domainDefinitions,
@@ -680,6 +883,8 @@ public sealed class ReferenceController(
     {
         var domainCode = NormalizeCode(requestedDomainCode);
         var capabilityCode = NormalizeCode(requestedCapabilityCode);
+        var componentCode = NormalizeCode(requestedComponentCode);
+        var subClassCode = NormalizeCode(requestedSubClassCode);
         var modelKind = requestedModelKind;
 
         if (domainCode is null && legacyDomainId.HasValue)
@@ -725,7 +930,12 @@ public sealed class ReferenceController(
                     ?.ParentDomainCode;
         }
 
-        return new BrowserSelection(modelKind, domainCode, capabilityCode);
+        if (componentCode is not null || subClassCode is not null)
+        {
+            modelKind ??= ReferenceModelKind.Drm;
+        }
+
+        return new BrowserSelection(modelKind, domainCode, capabilityCode, componentCode, subClassCode);
     }
 
     private static List<ReferenceComponentBrowserItemViewModel> BuildTrmComponentItems(IEnumerable<TrmComponent> components) =>
@@ -864,6 +1074,97 @@ public sealed class ReferenceController(
             })
             .ToList();
 
+    private static List<ReferenceComponentBrowserItemViewModel> BuildDrmComponentItems(
+        IEnumerable<DrmEntity> entities,
+        IEnumerable<DrmCommonSubClass> subClasses)
+    {
+        var entityItems = entities
+            .Select(entity =>
+            {
+                var capabilities = entity.ParentTopic is null
+                    ? []
+                    : new List<ReferenceBrowserLabelViewModel>
+                    {
+                        new()
+                        {
+                            Code = entity.ParentTopic.Code,
+                            Name = entity.ParentTopic.Name
+                        }
+                    };
+
+                var domains = entity.ParentTopic?.TopicType is null
+                    ? []
+                    : new List<ReferenceBrowserLabelViewModel>
+                    {
+                        new()
+                        {
+                            Code = entity.ParentTopic.TopicType.Code,
+                            Name = entity.ParentTopic.TopicType.Name
+                        }
+                    };
+
+                return new ReferenceComponentBrowserItemViewModel
+                {
+                    ModelKind = ReferenceModelKind.Drm,
+                    NativeId = entity.Id,
+                    ModelLabel = ReferenceModelCatalog.GetShortName(ReferenceModelKind.Drm),
+                    Code = entity.Code,
+                    Name = entity.Name,
+                    Description = entity.Description,
+                    ProductExamples = entity.AlternativeNames,
+                    TypeLabel = "Entity",
+                    SupportsDelete = true,
+                    Capabilities = capabilities,
+                    Domains = domains
+                };
+            });
+
+        var subClassItems = subClasses
+            .Select(subClass =>
+            {
+                var capabilities = subClass.ParentEntity?.ParentTopic is null
+                    ? []
+                    : new List<ReferenceBrowserLabelViewModel>
+                    {
+                        new()
+                        {
+                            Code = subClass.ParentEntity.ParentTopic.Code,
+                            Name = subClass.ParentEntity.ParentTopic.Name
+                        }
+                    };
+
+                var domains = subClass.ParentEntity?.ParentTopic?.TopicType is null
+                    ? []
+                    : new List<ReferenceBrowserLabelViewModel>
+                    {
+                        new()
+                        {
+                            Code = subClass.ParentEntity.ParentTopic.TopicType.Code,
+                            Name = subClass.ParentEntity.ParentTopic.TopicType.Name
+                        }
+                    };
+
+                return new ReferenceComponentBrowserItemViewModel
+                {
+                    ModelKind = ReferenceModelKind.Drm,
+                    NativeId = -subClass.Id,
+                    ModelLabel = ReferenceModelCatalog.GetShortName(ReferenceModelKind.Drm),
+                    Code = subClass.Code,
+                    ParentComponentCode = subClass.ParentEntity?.Code,
+                    SecondaryCode = subClass.ParentEntity?.DisplayLabel,
+                    Name = subClass.Name,
+                    Description = subClass.Description,
+                    ProductExamples = subClass.AlternativeNames,
+                    TypeLabel = "Common sub-class",
+                    SupportsDelete = true,
+                    Capabilities = capabilities,
+                    Domains = domains
+                };
+            });
+
+        return entityItems.Concat(subClassItems).ToList();
+    }
+
     private static List<ReferenceBrowserModelViewModel> BuildModelGroups(
         IReadOnlyList<BrowserDomainDefinition> domainDefinitions,
         IReadOnlyList<BrowserCapabilityDefinition> capabilityDefinitions,
@@ -903,21 +1204,30 @@ public sealed class ReferenceController(
                                 ParentDomainCode = domain.Code,
                                 Code = capability.Code,
                                 Name = capability.Name,
+                                Components = modelKind == ReferenceModelKind.Drm
+                                    ? BuildDrmTreeComponentNodes(searchScopedComponents, domain.Code, capability.Code, selection)
+                                    : [],
                                 IsSelected =
                                     selection.ModelKind == modelKind &&
                                     selection.DomainCode is not null &&
                                     selection.CapabilityCode is not null &&
+                                    selection.ComponentCode is null &&
+                                    selection.SubClassCode is null &&
                                     string.Equals(selection.DomainCode, domain.Code, StringComparison.OrdinalIgnoreCase) &&
                                     string.Equals(selection.CapabilityCode, capability.Code, StringComparison.OrdinalIgnoreCase)
                             })
                             .ToList();
 
-                        var hasSelectedCapability = capabilities.Any(capability => capability.IsSelected);
+                        var hasSelectedCapability = capabilities.Any(capability =>
+                            capability.IsSelected ||
+                            capability.Components.Any(component => component.IsSelected || component.Children.Any(child => child.IsSelected)));
 
                         var isSelectedDomain =
                             selection.ModelKind == modelKind &&
                             selection.DomainCode is not null &&
                             selection.CapabilityCode is null &&
+                            selection.ComponentCode is null &&
+                            selection.SubClassCode is null &&
                             string.Equals(selection.DomainCode, domain.Code, StringComparison.OrdinalIgnoreCase);
                         var expandFromSearch = limitTreeToSearch && selection.ModelKind is null && capabilities.Count > 0;
 
@@ -936,7 +1246,9 @@ public sealed class ReferenceController(
                 var isSelectedModel =
                     selection.ModelKind == modelKind &&
                     selection.DomainCode is null &&
-                    selection.CapabilityCode is null;
+                    selection.CapabilityCode is null &&
+                    selection.ComponentCode is null &&
+                    selection.SubClassCode is null;
                 var hasSelectedBranch = domains.Any(domain => domain.IsSelected || domain.IsExpanded);
                 var hasVisibleContent = domains.Count > 0;
 
@@ -966,6 +1278,20 @@ public sealed class ReferenceController(
         int resultCount,
         string? normalizedSearch)
     {
+        if (selection.SubClassCode is not null)
+        {
+            return (
+                selection.SubClassCode,
+                $"Showing {resultCount} result(s) from the DRM common sub-class selection{FormatSearchSuffix(normalizedSearch)}.");
+        }
+
+        if (selection.ComponentCode is not null)
+        {
+            return (
+                selection.ComponentCode,
+                $"Showing {resultCount} result(s) from the DRM entity selection{FormatSearchSuffix(normalizedSearch)}.");
+        }
+
         if (selection.CapabilityCode is not null)
         {
             var capability = capabilityDefinitions.FirstOrDefault(item =>
@@ -1007,12 +1333,68 @@ public sealed class ReferenceController(
         {
             return (
                 "Search results",
-                $"Showing {resultCount} result(s) across TRM, ARM, and BRM for \"{normalizedSearch}\".");
+                $"Showing {resultCount} result(s) across TRM, ARM, BRM, and DRM for \"{normalizedSearch}\".");
         }
 
         return (
             "All reference models",
-            $"Showing {resultCount} imported result(s) across TRM, ARM, and BRM.");
+            $"Showing {resultCount} imported result(s) across TRM, ARM, BRM, and DRM.");
+    }
+
+    private static List<ReferenceBrowserComponentNodeViewModel> BuildDrmTreeComponentNodes(
+        IReadOnlyList<ReferenceComponentBrowserItemViewModel> components,
+        string domainCode,
+        string capabilityCode,
+        BrowserSelection selection)
+    {
+        var drmComponents = components
+            .Where(component =>
+                component.ModelKind == ReferenceModelKind.Drm &&
+                component.Domains.Any(domain => string.Equals(domain.Code, domainCode, StringComparison.OrdinalIgnoreCase)) &&
+                component.Capabilities.Any(capability => string.Equals(capability.Code, capabilityCode, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        var subClasses = drmComponents
+            .Where(component => string.Equals(component.TypeLabel, "Common sub-class", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return drmComponents
+            .Where(component => string.Equals(component.TypeLabel, "Entity", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(component => component.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(entity => new ReferenceBrowserComponentNodeViewModel
+            {
+                ModelKind = ReferenceModelKind.Drm,
+                ParentDomainCode = domainCode,
+                ParentCapabilityCode = capabilityCode,
+                Code = entity.Code,
+                Name = entity.Name,
+                IsSelected =
+                    selection.ModelKind == ReferenceModelKind.Drm &&
+                    selection.SubClassCode is null &&
+                    string.Equals(selection.DomainCode, domainCode, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(selection.CapabilityCode, capabilityCode, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(selection.ComponentCode, entity.Code, StringComparison.OrdinalIgnoreCase),
+                Children = subClasses
+                    .Where(subClass => string.Equals(subClass.ParentComponentCode, entity.Code, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(subClass => subClass.Code, StringComparer.OrdinalIgnoreCase)
+                    .Select(subClass => new ReferenceBrowserComponentNodeViewModel
+                    {
+                        ModelKind = ReferenceModelKind.Drm,
+                        ParentDomainCode = domainCode,
+                        ParentCapabilityCode = capabilityCode,
+                        ParentComponentCode = entity.Code,
+                        Code = subClass.Code,
+                        Name = subClass.Name,
+                        IsSelected =
+                            selection.ModelKind == ReferenceModelKind.Drm &&
+                            string.Equals(selection.DomainCode, domainCode, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(selection.CapabilityCode, capabilityCode, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(selection.ComponentCode, entity.Code, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(selection.SubClassCode, subClass.Code, StringComparison.OrdinalIgnoreCase)
+                    })
+                    .ToList()
+            })
+            .ToList();
     }
 
     private static bool MatchesSelection(ReferenceComponentBrowserItemViewModel component, BrowserSelection selection)
@@ -1032,6 +1414,26 @@ public sealed class ReferenceController(
             !component.Capabilities.Any(capability => string.Equals(capability.Code, selection.CapabilityCode, StringComparison.OrdinalIgnoreCase)))
         {
             return false;
+        }
+
+        if (selection.SubClassCode is not null)
+        {
+            return component.ModelKind == ReferenceModelKind.Drm &&
+                string.Equals(component.TypeLabel, "Common sub-class", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(component.Code, selection.SubClassCode, StringComparison.OrdinalIgnoreCase) &&
+                (selection.ComponentCode is null ||
+                    string.Equals(component.ParentComponentCode, selection.ComponentCode, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (selection.ComponentCode is not null)
+        {
+            if (component.ModelKind != ReferenceModelKind.Drm)
+            {
+                return string.Equals(component.Code, selection.ComponentCode, StringComparison.OrdinalIgnoreCase);
+            }
+
+            return string.Equals(component.Code, selection.ComponentCode, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(component.ParentComponentCode, selection.ComponentCode, StringComparison.OrdinalIgnoreCase);
         }
 
         return true;
@@ -1174,6 +1576,43 @@ public sealed class ReferenceController(
                     DeletedReason = component.DeletedReason
                 })
                 .ToList(),
+            ReferenceModelKind.Drm => (await dbContext.DrmEntities
+                    .AsNoTracking()
+                    .Include(x => x.ParentTopic)
+                    .Where(x => x.IsDeleted)
+                    .OrderByDescending(x => x.DeletedUtc)
+                    .ThenBy(x => x.Name)
+                    .ToListAsync())
+                .Select(entity => new ReferenceRestoreItemViewModel
+                {
+                    ModelKind = ReferenceModelKind.Drm,
+                    Id = entity.Id,
+                    DisplayLabel = entity.DisplayLabel,
+                    CapabilitiesText = entity.ParentTopic != null
+                        ? $"{entity.ParentTopic.Code} {entity.ParentTopic.Name}"
+                        : "-",
+                    DeletedUtc = entity.DeletedUtc,
+                    DeletedReason = entity.DeletedReason
+                })
+                .Concat((await dbContext.DrmCommonSubClasses
+                    .AsNoTracking()
+                    .Include(x => x.ParentEntity)
+                    .Where(x => x.IsDeleted)
+                    .OrderByDescending(x => x.DeletedUtc)
+                    .ThenBy(x => x.Name)
+                    .ToListAsync())
+                .Select(subClass => new ReferenceRestoreItemViewModel
+                {
+                    ModelKind = ReferenceModelKind.Drm,
+                    Id = -subClass.Id,
+                    DisplayLabel = subClass.DisplayLabel,
+                    CapabilitiesText = subClass.ParentEntity != null
+                        ? $"{subClass.ParentEntity.Code} {subClass.ParentEntity.Name}"
+                        : "-",
+                    DeletedUtc = subClass.DeletedUtc,
+                    DeletedReason = subClass.DeletedReason
+                }))
+                .ToList(),
             _ => []
         };
 
@@ -1213,13 +1652,26 @@ public sealed class ReferenceController(
             return domainAnchor;
         }
 
-        return $"{domainAnchor}-capability-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(selection.CapabilityCode)}";
+        var capabilityAnchor = $"{domainAnchor}-capability-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(selection.CapabilityCode)}";
+        if (string.IsNullOrWhiteSpace(selection.ComponentCode))
+        {
+            return capabilityAnchor;
+        }
+
+        var componentAnchor = $"{capabilityAnchor}-component-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(selection.ComponentCode)}";
+        if (string.IsNullOrWhiteSpace(selection.SubClassCode))
+        {
+            return componentAnchor;
+        }
+
+        return $"{componentAnchor}-subclass-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(selection.SubClassCode)}";
     }
 
     private static string GetRestoreActionName(ReferenceModelKind modelKind) => modelKind switch
     {
         ReferenceModelKind.Arm => "RestoreArm",
         ReferenceModelKind.Brm => "RestoreBrm",
+        ReferenceModelKind.Drm => "RestoreDrm",
         _ => "Restore"
     };
 
@@ -1227,6 +1679,7 @@ public sealed class ReferenceController(
     {
         ReferenceModelKind.Arm => "RestoreArmModelObjects",
         ReferenceModelKind.Brm => "RestoreBrmModelObjects",
+        ReferenceModelKind.Drm => "RestoreDrmModelObjects",
         _ => "RestoreTrmModelObjects"
     };
 
@@ -1247,7 +1700,12 @@ public sealed class ReferenceController(
         return directory;
     }
 
-    private sealed record BrowserSelection(ReferenceModelKind? ModelKind, string? DomainCode, string? CapabilityCode);
+    private sealed record BrowserSelection(
+        ReferenceModelKind? ModelKind,
+        string? DomainCode,
+        string? CapabilityCode,
+        string? ComponentCode,
+        string? SubClassCode);
 
     private sealed record BrowserDomainDefinition(ReferenceModelKind ModelKind, int NativeId, string Code, string Name)
     {

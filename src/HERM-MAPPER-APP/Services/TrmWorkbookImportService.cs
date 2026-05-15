@@ -188,6 +188,20 @@ public sealed partial class TrmWorkbookImportService(
                     .AsNoTracking()
                     .Select(x => x.Code)
                     .ToListAsync(cancellationToken)),
+            ReferenceModelKind.Drm => new ExistingReferenceCodes(
+                await dbContext.DrmTopicTypes
+                    .AsNoTracking()
+                    .Select(x => x.Code)
+                    .ToListAsync(cancellationToken),
+                await dbContext.DrmTopics
+                    .AsNoTracking()
+                    .Select(x => x.Code)
+                    .ToListAsync(cancellationToken),
+                await dbContext.DrmEntities
+                    .AsNoTracking()
+                    .Select(x => x.Code)
+                    .Concat(dbContext.DrmCommonSubClasses.AsNoTracking().Select(x => x.Code))
+                    .ToListAsync(cancellationToken)),
             _ => throw new InvalidOperationException($"Unsupported reference model '{modelKind}'.")
         };
     }
@@ -200,6 +214,7 @@ public sealed partial class TrmWorkbookImportService(
             ReferenceModelKind.Trm => await UpsertTrmSnapshotAsync(snapshot, cancellationToken),
             ReferenceModelKind.Arm => await UpsertArmSnapshotAsync(snapshot, cancellationToken),
             ReferenceModelKind.Brm => await UpsertBrmSnapshotAsync(snapshot, cancellationToken),
+            ReferenceModelKind.Drm => await UpsertDrmSnapshotAsync(snapshot, cancellationToken),
             _ => throw new InvalidOperationException($"Unsupported reference model '{snapshot.ModelKind}'.")
         };
 
@@ -721,6 +736,180 @@ public sealed partial class TrmWorkbookImportService(
         return BuildImportSummary(snapshot, domainsAdded, domainsUpdated, capabilitiesAdded, capabilitiesUpdated, componentsAdded, componentsUpdated);
     }
 
+    private async Task<TrmWorkbookImportSummary> UpsertDrmSnapshotAsync(
+        CatalogueWorkbookSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        var topicTypesByCode = await dbContext.DrmTopicTypes
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var domainsAdded = 0;
+        var domainsUpdated = 0;
+        foreach (var row in snapshot.Domains)
+        {
+            if (topicTypesByCode.TryGetValue(row.Code, out var existingTopicType))
+            {
+                existingTopicType.Name = row.Name;
+                existingTopicType.Description = row.Description;
+                domainsUpdated++;
+                continue;
+            }
+
+            var topicType = new DrmTopicType
+            {
+                Code = row.Code,
+                Name = row.Name,
+                Description = row.Description
+            };
+
+            dbContext.DrmTopicTypes.Add(topicType);
+            topicTypesByCode[row.Code] = topicType;
+            domainsAdded++;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var trackedTopicTypesByCode = await dbContext.DrmTopicTypes
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        var topicsByCode = await dbContext.DrmTopics
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var capabilitiesAdded = 0;
+        var capabilitiesUpdated = 0;
+        foreach (var row in snapshot.DrmTopics)
+        {
+            trackedTopicTypesByCode.TryGetValue(row.TopicTypeCode, out var topicType);
+
+            if (topicsByCode.TryGetValue(row.Code, out var existingTopic))
+            {
+                existingTopic.SourceTitle = row.SourceTitle;
+                existingTopic.Name = row.Name;
+                existingTopic.TopicTypeCode = row.TopicTypeCode;
+                existingTopic.TopicTypeName = row.TopicTypeName;
+                existingTopic.TopicTypeId = topicType?.Id;
+                existingTopic.AlternativeNames = row.AlternativeNames;
+                existingTopic.Description = row.Description;
+                existingTopic.Comments = row.Comments;
+                capabilitiesUpdated++;
+                continue;
+            }
+
+            var topic = new DrmTopic
+            {
+                SourceTitle = row.SourceTitle,
+                Code = row.Code,
+                Name = row.Name,
+                TopicTypeCode = row.TopicTypeCode,
+                TopicTypeName = row.TopicTypeName,
+                TopicTypeId = topicType?.Id,
+                AlternativeNames = row.AlternativeNames,
+                Description = row.Description,
+                Comments = row.Comments
+            };
+
+            dbContext.DrmTopics.Add(topic);
+            topicsByCode[row.Code] = topic;
+            capabilitiesAdded++;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var trackedTopicsByCode = await dbContext.DrmTopics
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        var entitiesByCode = await dbContext.DrmEntities
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var entitiesAdded = 0;
+        var entitiesUpdated = 0;
+        foreach (var row in snapshot.DrmEntities)
+        {
+            trackedTopicsByCode.TryGetValue(row.ParentTopicCode, out var parentTopic);
+
+            if (entitiesByCode.TryGetValue(row.Code, out var existingEntity))
+            {
+                existingEntity.SourceTitle = row.SourceTitle;
+                existingEntity.Name = row.Name;
+                existingEntity.ParentTopicCode = row.ParentTopicCode;
+                existingEntity.ParentTopicTypeName = row.ParentTopicTypeName;
+                existingEntity.ParentTopicId = parentTopic?.Id;
+                existingEntity.AlternativeNames = row.AlternativeNames;
+                existingEntity.Description = row.Description;
+                existingEntity.Comments = row.Comments;
+                existingEntity.TogafEnterpriseMetamodelEntity = row.TogafEnterpriseMetamodelEntity;
+                entitiesUpdated++;
+                continue;
+            }
+
+            var entity = new DrmEntity
+            {
+                SourceTitle = row.SourceTitle,
+                Code = row.Code,
+                Name = row.Name,
+                ParentTopicCode = row.ParentTopicCode,
+                ParentTopicTypeName = row.ParentTopicTypeName,
+                ParentTopicId = parentTopic?.Id,
+                AlternativeNames = row.AlternativeNames,
+                Description = row.Description,
+                Comments = row.Comments,
+                TogafEnterpriseMetamodelEntity = row.TogafEnterpriseMetamodelEntity
+            };
+
+            dbContext.DrmEntities.Add(entity);
+            entitiesByCode[row.Code] = entity;
+            entitiesAdded++;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var trackedEntitiesByCode = await dbContext.DrmEntities
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        var subClassesByCode = await dbContext.DrmCommonSubClasses
+            .ToDictionaryAsync(x => x.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        var subClassesAdded = 0;
+        var subClassesUpdated = 0;
+        foreach (var row in snapshot.DrmCommonSubClasses)
+        {
+            trackedEntitiesByCode.TryGetValue(row.ParentEntityCode, out var parentEntity);
+
+            if (subClassesByCode.TryGetValue(row.Code, out var existingSubClass))
+            {
+                existingSubClass.SourceTitle = row.SourceTitle;
+                existingSubClass.Name = row.Name;
+                existingSubClass.ParentEntityCode = row.ParentEntityCode;
+                existingSubClass.ParentEntityId = parentEntity?.Id;
+                existingSubClass.AlternativeNames = row.AlternativeNames;
+                existingSubClass.Description = row.Description;
+                existingSubClass.Comments = row.Comments;
+                subClassesUpdated++;
+                continue;
+            }
+
+            var subClass = new DrmCommonSubClass
+            {
+                SourceTitle = row.SourceTitle,
+                Code = row.Code,
+                Name = row.Name,
+                ParentEntityCode = row.ParentEntityCode,
+                ParentEntityId = parentEntity?.Id,
+                AlternativeNames = row.AlternativeNames,
+                Description = row.Description,
+                Comments = row.Comments
+            };
+
+            dbContext.DrmCommonSubClasses.Add(subClass);
+            subClassesByCode[row.Code] = subClass;
+            subClassesAdded++;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var componentsAdded = entitiesAdded + subClassesAdded;
+        var componentsUpdated = entitiesUpdated + subClassesUpdated;
+        await WriteImportAuditAsync(snapshot, domainsAdded, domainsUpdated, capabilitiesAdded, capabilitiesUpdated, componentsAdded, componentsUpdated, cancellationToken);
+        return BuildImportSummary(snapshot, domainsAdded, domainsUpdated, capabilitiesAdded, capabilitiesUpdated, componentsAdded, componentsUpdated);
+    }
+
     private static TrmWorkbookImportSummary BuildImportSummary(
         CatalogueWorkbookSnapshot snapshot,
         int domainsAdded,
@@ -781,6 +970,7 @@ public sealed partial class TrmWorkbookImportService(
         return modelKind switch
         {
             ReferenceModelKind.Brm => LoadBrmSnapshot(archive, sheetLookup, sharedStrings),
+            ReferenceModelKind.Drm => LoadDrmSnapshot(archive, sheetLookup, sharedStrings),
             _ => LoadHierarchicalSnapshot(archive, sheetLookup, sharedStrings, GetDefinition(modelKind))
         };
     }
@@ -827,7 +1017,7 @@ public sealed partial class TrmWorkbookImportService(
             .Where(x => !string.IsNullOrWhiteSpace(x.Code))
             .ToList();
 
-        return new CatalogueWorkbookSnapshot(definition.ModelKind, domains, capabilities, components, []);
+        return new CatalogueWorkbookSnapshot(definition.ModelKind, domains, capabilities, components, [], [], [], []);
     }
 
     private static CatalogueWorkbookSnapshot LoadBrmSnapshot(
@@ -891,12 +1081,130 @@ public sealed partial class TrmWorkbookImportService(
                 string.Empty))
             .ToList();
 
-        return new CatalogueWorkbookSnapshot(ReferenceModelKind.Brm, domains, capabilities, components, rows);
+        return new CatalogueWorkbookSnapshot(ReferenceModelKind.Brm, domains, capabilities, components, rows, [], [], []);
+    }
+
+    private static CatalogueWorkbookSnapshot LoadDrmSnapshot(
+        ZipArchive archive,
+        Dictionary<string, string> sheetLookup,
+        IReadOnlyList<string> sharedStrings)
+    {
+        var topicTypes = ReadRows(archive, GetRequiredSheetPath(sheetLookup, "Topic Type"), sharedStrings)
+            .Skip(1)
+            .Select(row => new TrmDomainRow(
+                GetValue(row, "A"),
+                GetValue(row, "B"),
+                GetValue(row, "A"),
+                GetValue(row, "C"),
+                string.Empty))
+            .Where(x => !string.IsNullOrWhiteSpace(x.Code))
+            .ToList();
+
+        var topicTypeCodesByName = topicTypes
+            .Where(x => !string.IsNullOrWhiteSpace(x.Name))
+            .GroupBy(x => x.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First().Code, StringComparer.OrdinalIgnoreCase);
+
+        var topics = ReadRows(archive, GetRequiredSheetPath(sheetLookup, "Topic"), sharedStrings)
+            .Skip(1)
+            .Select(row =>
+            {
+                var topicTypeName = GetValue(row, "C");
+                topicTypeCodesByName.TryGetValue(topicTypeName, out var topicTypeCode);
+                return new DrmTopicRow(
+                    GetValue(row, "A"),
+                    GetValue(row, "D"),
+                    GetValue(row, "B"),
+                    topicTypeCode ?? string.Empty,
+                    topicTypeName,
+                    GetValue(row, "E"),
+                    GetValue(row, "F"),
+                    GetValue(row, "G"));
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.Code))
+            .ToList();
+
+        var entities = ReadRows(archive, GetRequiredSheetPath(sheetLookup, "Entity"), sharedStrings)
+            .Skip(1)
+            .Select(row => new DrmEntityRow(
+                GetValue(row, "A"),
+                GetValue(row, "E"),
+                GetValue(row, "B"),
+                ExtractCode(GetValue(row, "C")) ?? string.Empty,
+                GetValue(row, "D"),
+                GetValue(row, "F"),
+                GetValue(row, "G"),
+                GetValue(row, "H"),
+                GetValue(row, "I")))
+            .Where(x => !string.IsNullOrWhiteSpace(x.Code))
+            .ToList();
+
+        var subClasses = sheetLookup.ContainsKey("Common Sub-Class")
+            ? ReadRows(archive, GetRequiredSheetPath(sheetLookup, "Common Sub-Class"), sharedStrings)
+                .Skip(1)
+                .Select(row => new DrmCommonSubClassRow(
+                    GetValue(row, "A"),
+                    GetValue(row, "C"),
+                    GetValue(row, "B"),
+                    ExtractCode(GetValue(row, "D")) ?? string.Empty,
+                    GetValue(row, "E"),
+                    GetValue(row, "F"),
+                    GetValue(row, "G")))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Code))
+                .ToList()
+            : [];
+
+        var entityTopicCodes = entities
+            .Where(x => !string.IsNullOrWhiteSpace(x.Code))
+            .ToDictionary(x => x.Code, x => x.ParentTopicCode, StringComparer.OrdinalIgnoreCase);
+
+        var components = entities
+            .Select(row => new TrmComponentRow(
+                row.SourceTitle,
+                row.Code,
+                row.Name,
+                string.IsNullOrWhiteSpace(row.ParentTopicCode) ? [] : [row.ParentTopicCode],
+                row.Description,
+                row.Comments,
+                string.Empty))
+            .Concat(subClasses.Select(row => new TrmComponentRow(
+                row.SourceTitle,
+                row.Code,
+                row.Name,
+                entityTopicCodes.TryGetValue(row.ParentEntityCode, out var topicCode) && !string.IsNullOrWhiteSpace(topicCode)
+                    ? [topicCode]
+                    : [],
+                row.Description,
+                row.Comments,
+                string.Empty)))
+            .ToList();
+
+        var capabilities = topics
+            .Select(row => new TrmCapabilityRow(
+                row.SourceTitle,
+                row.Code,
+                row.Name,
+                row.TopicTypeCode,
+                row.Description,
+                row.Comments))
+            .ToList();
+
+        return new CatalogueWorkbookSnapshot(ReferenceModelKind.Drm, topicTypes, capabilities, components, [], topics, entities, subClasses);
     }
 
     private static List<string> ValidateSnapshot(CatalogueWorkbookSnapshot snapshot)
     {
         var errors = new List<string>();
+
+        if (snapshot.ModelKind == ReferenceModelKind.Drm)
+        {
+            errors.AddRange(ValidateDrmSnapshot(snapshot));
+            return errors
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         var definition = GetDefinition(snapshot.ModelKind);
 
         if (snapshot.ModelKind == ReferenceModelKind.Brm)
@@ -953,6 +1261,68 @@ public sealed partial class TrmWorkbookImportService(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static List<string> ValidateDrmSnapshot(CatalogueWorkbookSnapshot snapshot)
+    {
+        var errors = new List<string>();
+
+        errors.AddRange(ValidateCodes(snapshot.Domains.Select(x => x.Code), "topic type"));
+        errors.AddRange(ValidateCodes(snapshot.DrmTopics.Select(x => x.Code), "topic"));
+        errors.AddRange(ValidateCodes(
+            snapshot.DrmEntities.Select(x => x.Code).Concat(snapshot.DrmCommonSubClasses.Select(x => x.Code)),
+            "data entity"));
+
+        errors.AddRange(ValidateCodePrefixes(snapshot.Domains.Select(x => x.Code), "DY", "topic type"));
+        errors.AddRange(ValidateCodePrefixes(snapshot.DrmTopics.Select(x => x.Code), "DT", "topic"));
+        errors.AddRange(ValidateCodePrefixes(snapshot.DrmEntities.Select(x => x.Code), "DE", "entity"));
+        errors.AddRange(ValidateCodePrefixes(snapshot.DrmCommonSubClasses.Select(x => x.Code), "DE", "common sub-class"));
+
+        foreach (var row in snapshot.Domains.Where(x => string.IsNullOrWhiteSpace(x.Name)))
+        {
+            errors.Add($"Topic type {row.Code} is missing a name.");
+        }
+
+        foreach (var row in snapshot.DrmTopics.Where(x => string.IsNullOrWhiteSpace(x.Name)))
+        {
+            errors.Add($"Topic {row.Code} is missing a name.");
+        }
+
+        foreach (var row in snapshot.DrmEntities.Where(x => string.IsNullOrWhiteSpace(x.Name)))
+        {
+            errors.Add($"Entity {row.Code} is missing a name.");
+        }
+
+        foreach (var row in snapshot.DrmCommonSubClasses.Where(x => string.IsNullOrWhiteSpace(x.Name)))
+        {
+            errors.Add($"Common sub-class {row.Code} is missing a name.");
+        }
+
+        var topicTypeCodes = snapshot.Domains
+            .Select(x => x.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in snapshot.DrmTopics.Where(x => string.IsNullOrWhiteSpace(x.TopicTypeCode) || !topicTypeCodes.Contains(x.TopicTypeCode)))
+        {
+            errors.Add($"Topic {row.Code} references a missing topic type '{row.TopicTypeName}'.");
+        }
+
+        var topicCodes = snapshot.DrmTopics
+            .Select(x => x.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in snapshot.DrmEntities.Where(x => string.IsNullOrWhiteSpace(x.ParentTopicCode) || !topicCodes.Contains(x.ParentTopicCode)))
+        {
+            errors.Add($"Entity {row.Code} references a missing topic code '{row.ParentTopicCode}'.");
+        }
+
+        var entityCodes = snapshot.DrmEntities
+            .Select(x => x.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in snapshot.DrmCommonSubClasses.Where(x => string.IsNullOrWhiteSpace(x.ParentEntityCode) || !entityCodes.Contains(x.ParentEntityCode)))
+        {
+            errors.Add($"Common sub-class {row.Code} references a missing parent entity code '{row.ParentEntityCode}'.");
+        }
+
+        return errors;
     }
 
     private static IEnumerable<string> ValidateBrmRows(IReadOnlyList<BrmWorkbookRow> rows)
@@ -1058,7 +1428,14 @@ public sealed partial class TrmWorkbookImportService(
             return ReferenceModelKind.Brm;
         }
 
-        throw new InvalidOperationException("The workbook does not match a supported TRM, ARM, or BRM catalogue structure.");
+        if (sheetLookup.ContainsKey("Topic Type") &&
+            sheetLookup.ContainsKey("Topic") &&
+            sheetLookup.ContainsKey("Entity"))
+        {
+            return ReferenceModelKind.Drm;
+        }
+
+        throw new InvalidOperationException("The workbook does not match a supported TRM, ARM, BRM, or DRM catalogue structure.");
     }
 
     private static CatalogueModelDefinition GetDefinition(ReferenceModelKind modelKind) =>
@@ -1067,6 +1444,7 @@ public sealed partial class TrmWorkbookImportService(
             ReferenceModelKind.Trm => new CatalogueModelDefinition(modelKind, "TRM Domain", "TRM Capability", "TRM Component", "TD", "TP", "TC"),
             ReferenceModelKind.Arm => new CatalogueModelDefinition(modelKind, "ARM Domain", "ARM Capability", "ARM Component", "AD", "AP", "AC"),
             ReferenceModelKind.Brm => new CatalogueModelDefinition(modelKind, "BRM", "BRM", "BRM", "BD", "BC", "BC"),
+            ReferenceModelKind.Drm => new CatalogueModelDefinition(modelKind, "Topic Type", "Topic", "Entity", "DY", "DT", "DE"),
             _ => throw new InvalidOperationException($"Unsupported reference model '{modelKind}'.")
         };
 
@@ -1439,7 +1817,10 @@ public sealed partial class TrmWorkbookImportService(
         IReadOnlyList<TrmDomainRow> Domains,
         IReadOnlyList<TrmCapabilityRow> Capabilities,
         IReadOnlyList<TrmComponentRow> Components,
-        IReadOnlyList<BrmWorkbookRow> BrmRows);
+        IReadOnlyList<BrmWorkbookRow> BrmRows,
+        IReadOnlyList<DrmTopicRow> DrmTopics,
+        IReadOnlyList<DrmEntityRow> DrmEntities,
+        IReadOnlyList<DrmCommonSubClassRow> DrmCommonSubClasses);
 
     private sealed record TrmDomainRow(
         string SourceTitle,
@@ -1464,6 +1845,36 @@ public sealed partial class TrmWorkbookImportService(
         string Description,
         string Comments,
         string ProductExamples);
+
+    private sealed record DrmTopicRow(
+        string SourceTitle,
+        string Code,
+        string Name,
+        string TopicTypeCode,
+        string TopicTypeName,
+        string AlternativeNames,
+        string Description,
+        string Comments);
+
+    private sealed record DrmEntityRow(
+        string SourceTitle,
+        string Code,
+        string Name,
+        string ParentTopicCode,
+        string ParentTopicTypeName,
+        string AlternativeNames,
+        string Description,
+        string Comments,
+        string TogafEnterpriseMetamodelEntity);
+
+    private sealed record DrmCommonSubClassRow(
+        string SourceTitle,
+        string Code,
+        string Name,
+        string ParentEntityCode,
+        string AlternativeNames,
+        string Description,
+        string Comments);
 
     private sealed record BrmWorkbookRow(
         string SourceTitle,

@@ -24,6 +24,8 @@ public sealed partial class DatabaseInitializer(
         await EnsureBrmModelTablesAsync(cancellationToken);
         await EnsureBusinessCapabilityTablesAsync(cancellationToken);
         await EnsureLegacyBusinessCapabilitiesHaveBrmModelAsync(cancellationToken);
+        await EnsureDrmReferenceTablesAsync(cancellationToken);
+        await EnsureDrmModelTablesAsync(cancellationToken);
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureProductSoftDeleteColumnsAsync(cancellationToken);
         await EnsureServiceSoftDeleteColumnsAsync(cancellationToken);
@@ -1410,6 +1412,461 @@ public sealed partial class DatabaseInitializer(
                 BEGIN
                     CREATE INDEX [IX_BusinessCapabilityCatalogItemMappings_ArmCapabilityId]
                     ON [BusinessCapabilityCatalogItemMappings] ([ArmCapabilityId]);
+                END
+                """,
+                cancellationToken);
+        }
+    }
+
+    private async Task EnsureDrmReferenceTablesAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "DrmTopicTypes" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_DrmTopicTypes" PRIMARY KEY AUTOINCREMENT,
+                    "Code" TEXT NOT NULL,
+                    "Name" TEXT NOT NULL,
+                    "Description" TEXT NULL
+                )
+                """,
+                cancellationToken);
+
+            await EnsureSqliteColumnAsync("DrmTopicTypes", "Description", "TEXT NULL", cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_DrmTopicTypes_Code"
+                ON "DrmTopicTypes" ("Code")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "DrmTopics" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_DrmTopics" PRIMARY KEY AUTOINCREMENT,
+                    "Code" TEXT NOT NULL,
+                    "Name" TEXT NOT NULL,
+                    "SourceTitle" TEXT NULL,
+                    "TopicTypeCode" TEXT NULL,
+                    "TopicTypeName" TEXT NULL,
+                    "TopicTypeId" INTEGER NULL,
+                    "AlternativeNames" TEXT NULL,
+                    "Description" TEXT NULL,
+                    "Comments" TEXT NULL,
+                    CONSTRAINT "FK_DrmTopics_DrmTopicTypes_TopicTypeId" FOREIGN KEY ("TopicTypeId") REFERENCES "DrmTopicTypes" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await EnsureSqliteColumnAsync("DrmTopics", "SourceTitle", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmTopics", "TopicTypeCode", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmTopics", "TopicTypeName", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmTopics", "TopicTypeId", "INTEGER NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmTopics", "AlternativeNames", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmTopics", "Description", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmTopics", "Comments", "TEXT NULL", cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_DrmTopics_Code"
+                ON "DrmTopics" ("Code")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_DrmTopics_TopicTypeId"
+                ON "DrmTopics" ("TopicTypeId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "DrmEntities" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_DrmEntities" PRIMARY KEY AUTOINCREMENT,
+                    "Code" TEXT NOT NULL,
+                    "Name" TEXT NOT NULL,
+                    "SourceTitle" TEXT NULL,
+                    "ParentTopicCode" TEXT NULL,
+                    "ParentTopicTypeName" TEXT NULL,
+                    "ParentTopicId" INTEGER NULL,
+                    "AlternativeNames" TEXT NULL,
+                    "Description" TEXT NULL,
+                    "Comments" TEXT NULL,
+                    "TogafEnterpriseMetamodelEntity" TEXT NULL,
+                    "IsDeleted" INTEGER NOT NULL DEFAULT 0,
+                    "DeletedUtc" TEXT NULL,
+                    "DeletedReason" TEXT NULL,
+                    CONSTRAINT "FK_DrmEntities_DrmTopics_ParentTopicId" FOREIGN KEY ("ParentTopicId") REFERENCES "DrmTopics" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await EnsureSqliteColumnAsync("DrmEntities", "SourceTitle", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "ParentTopicCode", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "ParentTopicTypeName", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "ParentTopicId", "INTEGER NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "AlternativeNames", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "Description", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "Comments", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "TogafEnterpriseMetamodelEntity", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "IsDeleted", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "DeletedUtc", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmEntities", "DeletedReason", "TEXT NULL", cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_DrmEntities_Code"
+                ON "DrmEntities" ("Code")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_DrmEntities_ParentTopicId"
+                ON "DrmEntities" ("ParentTopicId")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "DrmCommonSubClasses" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_DrmCommonSubClasses" PRIMARY KEY AUTOINCREMENT,
+                    "Code" TEXT NOT NULL,
+                    "Name" TEXT NOT NULL,
+                    "SourceTitle" TEXT NULL,
+                    "ParentEntityCode" TEXT NULL,
+                    "ParentEntityId" INTEGER NULL,
+                    "AlternativeNames" TEXT NULL,
+                    "Description" TEXT NULL,
+                    "Comments" TEXT NULL,
+                    "IsDeleted" INTEGER NOT NULL DEFAULT 0,
+                    "DeletedUtc" TEXT NULL,
+                    "DeletedReason" TEXT NULL,
+                    CONSTRAINT "FK_DrmCommonSubClasses_DrmEntities_ParentEntityId" FOREIGN KEY ("ParentEntityId") REFERENCES "DrmEntities" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "SourceTitle", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "ParentEntityCode", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "ParentEntityId", "INTEGER NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "AlternativeNames", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "Description", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "Comments", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "IsDeleted", "INTEGER NOT NULL DEFAULT 0", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "DeletedUtc", "TEXT NULL", cancellationToken);
+            await EnsureSqliteColumnAsync("DrmCommonSubClasses", "DeletedReason", "TEXT NULL", cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_DrmCommonSubClasses_Code"
+                ON "DrmCommonSubClasses" ("Code")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_DrmCommonSubClasses_ParentEntityId"
+                ON "DrmCommonSubClasses" ("ParentEntityId")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[DrmTopicTypes]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [DrmTopicTypes] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_DrmTopicTypes] PRIMARY KEY,
+                        [Code] NVARCHAR(16) NOT NULL,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [Description] NVARCHAR(4000) NULL
+                    );
+                    CREATE UNIQUE INDEX [IX_DrmTopicTypes_Code] ON [DrmTopicTypes] ([Code]);
+                END
+                """,
+                cancellationToken);
+
+            await EnsureSqlServerColumnAsync("DrmTopicTypes", "Description", "NVARCHAR(4000) NULL", cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[DrmTopics]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [DrmTopics] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_DrmTopics] PRIMARY KEY,
+                        [Code] NVARCHAR(16) NOT NULL,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [SourceTitle] NVARCHAR(200) NULL,
+                        [TopicTypeCode] NVARCHAR(16) NULL,
+                        [TopicTypeName] NVARCHAR(200) NULL,
+                        [TopicTypeId] INT NULL,
+                        [AlternativeNames] NVARCHAR(1000) NULL,
+                        [Description] NVARCHAR(4000) NULL,
+                        [Comments] NVARCHAR(4000) NULL,
+                        CONSTRAINT [FK_DrmTopics_DrmTopicTypes_TopicTypeId] FOREIGN KEY ([TopicTypeId]) REFERENCES [DrmTopicTypes] ([Id]) ON DELETE CASCADE
+                    );
+                    CREATE UNIQUE INDEX [IX_DrmTopics_Code] ON [DrmTopics] ([Code]);
+                    CREATE INDEX [IX_DrmTopics_TopicTypeId] ON [DrmTopics] ([TopicTypeId]);
+                END
+                """,
+                cancellationToken);
+
+            await EnsureSqlServerColumnAsync("DrmTopics", "SourceTitle", "NVARCHAR(200) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmTopics", "TopicTypeCode", "NVARCHAR(16) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmTopics", "TopicTypeName", "NVARCHAR(200) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmTopics", "TopicTypeId", "INT NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmTopics", "AlternativeNames", "NVARCHAR(1000) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmTopics", "Description", "NVARCHAR(4000) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmTopics", "Comments", "NVARCHAR(4000) NULL", cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[DrmEntities]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [DrmEntities] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_DrmEntities] PRIMARY KEY,
+                        [Code] NVARCHAR(32) NOT NULL,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [SourceTitle] NVARCHAR(200) NULL,
+                        [ParentTopicCode] NVARCHAR(16) NULL,
+                        [ParentTopicTypeName] NVARCHAR(200) NULL,
+                        [ParentTopicId] INT NULL,
+                        [AlternativeNames] NVARCHAR(1000) NULL,
+                        [Description] NVARCHAR(4000) NULL,
+                        [Comments] NVARCHAR(4000) NULL,
+                        [TogafEnterpriseMetamodelEntity] NVARCHAR(400) NULL,
+                        [IsDeleted] BIT NOT NULL CONSTRAINT [DF_DrmEntities_IsDeleted] DEFAULT 0,
+                        [DeletedUtc] DATETIME2 NULL,
+                        [DeletedReason] NVARCHAR(400) NULL,
+                        CONSTRAINT [FK_DrmEntities_DrmTopics_ParentTopicId] FOREIGN KEY ([ParentTopicId]) REFERENCES [DrmTopics] ([Id]) ON DELETE CASCADE
+                    );
+                    CREATE UNIQUE INDEX [IX_DrmEntities_Code] ON [DrmEntities] ([Code]);
+                    CREATE INDEX [IX_DrmEntities_ParentTopicId] ON [DrmEntities] ([ParentTopicId]);
+                END
+                """,
+                cancellationToken);
+
+            await EnsureSqlServerColumnAsync("DrmEntities", "SourceTitle", "NVARCHAR(200) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "ParentTopicCode", "NVARCHAR(16) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "ParentTopicTypeName", "NVARCHAR(200) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "ParentTopicId", "INT NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "AlternativeNames", "NVARCHAR(1000) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "Description", "NVARCHAR(4000) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "Comments", "NVARCHAR(4000) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "TogafEnterpriseMetamodelEntity", "NVARCHAR(400) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "IsDeleted", "BIT NOT NULL CONSTRAINT [DF_DrmEntities_IsDeleted] DEFAULT 0", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "DeletedUtc", "DATETIME2 NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmEntities", "DeletedReason", "NVARCHAR(400) NULL", cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[DrmCommonSubClasses]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [DrmCommonSubClasses] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_DrmCommonSubClasses] PRIMARY KEY,
+                        [Code] NVARCHAR(32) NOT NULL,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [SourceTitle] NVARCHAR(200) NULL,
+                        [ParentEntityCode] NVARCHAR(32) NULL,
+                        [ParentEntityId] INT NULL,
+                        [AlternativeNames] NVARCHAR(1000) NULL,
+                        [Description] NVARCHAR(4000) NULL,
+                        [Comments] NVARCHAR(4000) NULL,
+                        [IsDeleted] BIT NOT NULL CONSTRAINT [DF_DrmCommonSubClasses_IsDeleted] DEFAULT 0,
+                        [DeletedUtc] DATETIME2 NULL,
+                        [DeletedReason] NVARCHAR(400) NULL,
+                        CONSTRAINT [FK_DrmCommonSubClasses_DrmEntities_ParentEntityId] FOREIGN KEY ([ParentEntityId]) REFERENCES [DrmEntities] ([Id]) ON DELETE CASCADE
+                    );
+                    CREATE UNIQUE INDEX [IX_DrmCommonSubClasses_Code] ON [DrmCommonSubClasses] ([Code]);
+                    CREATE INDEX [IX_DrmCommonSubClasses_ParentEntityId] ON [DrmCommonSubClasses] ([ParentEntityId]);
+                END
+                """,
+                cancellationToken);
+
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "SourceTitle", "NVARCHAR(200) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "ParentEntityCode", "NVARCHAR(32) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "ParentEntityId", "INT NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "AlternativeNames", "NVARCHAR(1000) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "Description", "NVARCHAR(4000) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "Comments", "NVARCHAR(4000) NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "IsDeleted", "BIT NOT NULL CONSTRAINT [DF_DrmCommonSubClasses_IsDeleted] DEFAULT 0", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "DeletedUtc", "DATETIME2 NULL", cancellationToken);
+            await EnsureSqlServerColumnAsync("DrmCommonSubClasses", "DeletedReason", "NVARCHAR(400) NULL", cancellationToken);
+
+            await EnsureSqlServerIndexAsync("DrmTopicTypes", "IX_DrmTopicTypes_Code", "[Code]", unique: true, cancellationToken);
+            await EnsureSqlServerIndexAsync("DrmTopics", "IX_DrmTopics_Code", "[Code]", unique: true, cancellationToken);
+            await EnsureSqlServerIndexAsync("DrmTopics", "IX_DrmTopics_TopicTypeId", "[TopicTypeId]", unique: false, cancellationToken);
+            await EnsureSqlServerIndexAsync("DrmEntities", "IX_DrmEntities_Code", "[Code]", unique: true, cancellationToken);
+            await EnsureSqlServerIndexAsync("DrmEntities", "IX_DrmEntities_ParentTopicId", "[ParentTopicId]", unique: false, cancellationToken);
+            await EnsureSqlServerIndexAsync("DrmCommonSubClasses", "IX_DrmCommonSubClasses_Code", "[Code]", unique: true, cancellationToken);
+            await EnsureSqlServerIndexAsync("DrmCommonSubClasses", "IX_DrmCommonSubClasses_ParentEntityId", "[ParentEntityId]", unique: false, cancellationToken);
+        }
+    }
+
+    private async Task EnsureSqliteColumnAsync(
+        string tableName,
+        string columnName,
+        string columnDefinition,
+        CancellationToken cancellationToken)
+    {
+        if (await SqliteColumnExistsAsync(tableName, columnName, cancellationToken))
+        {
+            return;
+        }
+
+        var sql = $"""ALTER TABLE "{tableName}" ADD COLUMN "{columnName}" {columnDefinition}""";
+        await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
+    private async Task EnsureSqlServerColumnAsync(
+        string tableName,
+        string columnName,
+        string columnDefinition,
+        CancellationToken cancellationToken)
+    {
+        var sql =
+            $"""
+             IF COL_LENGTH(N'[{tableName}]', N'{columnName}') IS NULL
+             BEGIN
+                 ALTER TABLE [{tableName}]
+                 ADD [{columnName}] {columnDefinition};
+             END
+             """;
+        await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
+    private async Task EnsureSqlServerIndexAsync(
+        string tableName,
+        string indexName,
+        string columns,
+        bool unique,
+        CancellationToken cancellationToken)
+    {
+        var uniqueness = unique ? "UNIQUE " : string.Empty;
+        var sql =
+            $"""
+             IF NOT EXISTS (
+                 SELECT 1
+                 FROM sys.indexes
+                 WHERE name = N'{indexName}'
+                   AND object_id = OBJECT_ID(N'[{tableName}]')
+             )
+             BEGIN
+                 CREATE {uniqueness}INDEX [{indexName}]
+                 ON [{tableName}] ({columns});
+             END
+             """;
+        await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
+    private async Task EnsureDrmModelTablesAsync(CancellationToken cancellationToken)
+    {
+        if (dbContext.Database.IsSqlite())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "DrmModels" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_DrmModels" PRIMARY KEY AUTOINCREMENT,
+                    "Name" TEXT NOT NULL,
+                    "Area" TEXT NOT NULL,
+                    "Description" TEXT NULL,
+                    "Status" TEXT NOT NULL,
+                    "IsDeleted" INTEGER NOT NULL DEFAULT 0,
+                    "DeletedUtc" TEXT NULL,
+                    "DeletedReason" TEXT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_DrmModels_Name"
+                ON "DrmModels" ("Name")
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "DrmModelDataEntities" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK_DrmModelDataEntities" PRIMARY KEY AUTOINCREMENT,
+                    "DrmModelId" INTEGER NOT NULL,
+                    "DrmEntityId" INTEGER NOT NULL,
+                    "DrmCommonSubClassId" INTEGER NULL,
+                    "Name" TEXT NOT NULL,
+                    "Description" TEXT NULL,
+                    "Notes" TEXT NULL,
+                    "CreatedUtc" TEXT NOT NULL,
+                    "UpdatedUtc" TEXT NOT NULL,
+                    CONSTRAINT "FK_DrmModelDataEntities_DrmModels_DrmModelId" FOREIGN KEY ("DrmModelId") REFERENCES "DrmModels" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_DrmModelDataEntities_DrmEntities_DrmEntityId" FOREIGN KEY ("DrmEntityId") REFERENCES "DrmEntities" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_DrmModelDataEntities_DrmCommonSubClasses_DrmCommonSubClassId" FOREIGN KEY ("DrmCommonSubClassId") REFERENCES "DrmCommonSubClasses" ("Id") ON DELETE NO ACTION
+                )
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_DrmModelDataEntities_DrmModelId_DrmEntityId_DrmCommonSubClassId"
+                ON "DrmModelDataEntities" ("DrmModelId", "DrmEntityId", "DrmCommonSubClassId")
+                """,
+                cancellationToken);
+
+            return;
+        }
+
+        if (dbContext.Database.IsSqlServer())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[DrmModels]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [DrmModels] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_DrmModels] PRIMARY KEY,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [Area] NVARCHAR(120) NOT NULL,
+                        [Description] NVARCHAR(2000) NULL,
+                        [Status] NVARCHAR(80) NOT NULL,
+                        [IsDeleted] BIT NOT NULL CONSTRAINT [DF_DrmModels_IsDeleted] DEFAULT 0,
+                        [DeletedUtc] DATETIME2 NULL,
+                        [DeletedReason] NVARCHAR(400) NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL
+                    );
+                    CREATE INDEX [IX_DrmModels_Name] ON [DrmModels] ([Name]);
+                END
+                """,
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                IF OBJECT_ID(N'[DrmModelDataEntities]', N'U') IS NULL
+                BEGIN
+                    CREATE TABLE [DrmModelDataEntities] (
+                        [Id] INT NOT NULL IDENTITY(1,1) CONSTRAINT [PK_DrmModelDataEntities] PRIMARY KEY,
+                        [DrmModelId] INT NOT NULL,
+                        [DrmEntityId] INT NOT NULL,
+                        [DrmCommonSubClassId] INT NULL,
+                        [Name] NVARCHAR(200) NOT NULL,
+                        [Description] NVARCHAR(2000) NULL,
+                        [Notes] NVARCHAR(4000) NULL,
+                        [CreatedUtc] DATETIME2 NOT NULL,
+                        [UpdatedUtc] DATETIME2 NOT NULL,
+                        CONSTRAINT [FK_DrmModelDataEntities_DrmModels_DrmModelId] FOREIGN KEY ([DrmModelId]) REFERENCES [DrmModels] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_DrmModelDataEntities_DrmEntities_DrmEntityId] FOREIGN KEY ([DrmEntityId]) REFERENCES [DrmEntities] ([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_DrmModelDataEntities_DrmCommonSubClasses_DrmCommonSubClassId] FOREIGN KEY ([DrmCommonSubClassId]) REFERENCES [DrmCommonSubClasses] ([Id])
+                    );
+                    CREATE UNIQUE INDEX [IX_DrmModelDataEntities_DrmModelId_DrmEntityId_DrmCommonSubClassId]
+                    ON [DrmModelDataEntities] ([DrmModelId], [DrmEntityId], [DrmCommonSubClassId]);
                 END
                 """,
                 cancellationToken);

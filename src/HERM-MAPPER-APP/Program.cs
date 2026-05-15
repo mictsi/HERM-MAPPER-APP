@@ -330,7 +330,6 @@ public partial class Program
         services.AddScoped<ConfiguredTimeZoneService>();
         services.AddScoped<HermDrilldownService>();
         services.AddScoped<ModelDiagramReportService>();
-        services.AddScoped<ModelDiagramPosterSvgService>();
         services.AddScoped<ReferenceModelDiagramService>();
         services.AddScoped<RemoteSqlImportService>();
         services.AddSingleton<RemoteSqlImportExecutionGate>();

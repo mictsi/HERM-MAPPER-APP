@@ -10,8 +10,10 @@ public sealed class ReferenceCatalogueViewModel
     public ReferenceModelKind? SelectedModelKind { get; init; }
     public string? SelectedDomainCode { get; init; }
     public string? SelectedCapabilityCode { get; init; }
+    public string? SelectedComponentCode { get; init; }
+    public string? SelectedSubClassCode { get; init; }
     public string SelectionTitle { get; init; } = "All reference models";
-    public string SelectionDescription { get; init; } = "Browse imported catalogue entries across TRM, ARM, and BRM.";
+    public string SelectionDescription { get; init; } = "Browse imported catalogue entries across TRM, ARM, BRM, and DRM.";
     public string ActiveTreeAnchorId { get; init; } = "browser-navigation";
     public IReadOnlyList<ReferenceBrowserModelViewModel> ModelGroups { get; init; } = [];
     public IReadOnlyList<ReferenceComponentBrowserItemViewModel> Components { get; init; } = [];
@@ -56,6 +58,7 @@ public sealed class ReferenceBrowserCapabilityViewModel
     public string Code { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public bool IsSelected { get; init; }
+    public IReadOnlyList<ReferenceBrowserComponentNodeViewModel> Components { get; init; } = [];
 
     public string DisplayLabel => string.IsNullOrWhiteSpace(Code)
         ? Name
@@ -63,6 +66,39 @@ public sealed class ReferenceBrowserCapabilityViewModel
 
     public string AnchorId =>
         $"browser-model-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(ReferenceModelCatalog.GetShortName(ModelKind))}-domain-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(ParentDomainCode)}-capability-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(Code)}";
+}
+
+public sealed class ReferenceBrowserComponentNodeViewModel
+{
+    public ReferenceModelKind ModelKind { get; init; }
+    public string ParentDomainCode { get; init; } = string.Empty;
+    public string ParentCapabilityCode { get; init; } = string.Empty;
+    public string? ParentComponentCode { get; init; }
+    public string Code { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public bool IsSelected { get; init; }
+    public IReadOnlyList<ReferenceBrowserComponentNodeViewModel> Children { get; init; } = [];
+
+    public string DisplayLabel => string.IsNullOrWhiteSpace(Code)
+        ? Name
+        : $"{Code} {Name}";
+
+    public string AnchorId
+    {
+        get
+        {
+            var modelAnchor = $"browser-model-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(ReferenceModelCatalog.GetShortName(ModelKind))}";
+            var capabilityAnchor =
+                $"{modelAnchor}-domain-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(ParentDomainCode)}-capability-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(ParentCapabilityCode)}";
+
+            if (string.IsNullOrWhiteSpace(ParentComponentCode))
+            {
+                return $"{capabilityAnchor}-component-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(Code)}";
+            }
+
+            return $"{capabilityAnchor}-component-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(ParentComponentCode)}-subclass-{ReferenceBrowserAnchorUtility.NormalizeAnchorSegment(Code)}";
+        }
+    }
 }
 
 public sealed class ReferenceComponentBrowserItemViewModel
@@ -76,6 +112,7 @@ public sealed class ReferenceComponentBrowserItemViewModel
     public string? Description { get; init; }
     public string? ProductExamples { get; init; }
     public string TypeLabel { get; init; } = string.Empty;
+    public string? ParentComponentCode { get; init; }
     public bool IsCustom { get; init; }
     public bool SupportsHistory { get; init; }
     public bool SupportsDelete { get; init; }

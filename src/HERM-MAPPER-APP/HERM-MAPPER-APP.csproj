@@ -18,15 +18,19 @@
     <Compile Remove="obj\**\*.cs" />
     <Compile Remove="artifacts\**\*.cs" />
     <Compile Remove=".artifacts\**\*.cs" />
+    <Compile Remove=".tmp\**\*.cs" />
     <Content Remove="obj\**" />
     <Content Remove="artifacts\**" />
     <Content Remove=".artifacts\**" />
+    <Content Remove=".tmp\**" />
     <EmbeddedResource Remove="obj\**" />
     <EmbeddedResource Remove="artifacts\**" />
     <EmbeddedResource Remove=".artifacts\**" />
+    <EmbeddedResource Remove=".tmp\**" />
     <None Remove="obj\**" />
     <None Remove="artifacts\**" />
     <None Remove=".artifacts\**" />
+    <None Remove=".tmp\**" />
   </ItemGroup>
 
 </Project>

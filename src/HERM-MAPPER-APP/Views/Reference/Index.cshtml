@@ -15,8 +15,8 @@
 <section class="page-header">
     <div>
         <span class="eyebrow">HERM Browser</span>
-        <h1>Browse TRM, ARM, and BRM</h1>
-        <p>Search across imported HERM models, then drill into model, domain, and capability selections from the browser tree.</p>
+        <h1>Browse TRM, ARM, BRM, and DRM</h1>
+        <p>Search across imported HERM models, then drill into model hierarchy selections from the browser tree.</p>
     </div>
 </section>
 
@@ -24,7 +24,7 @@
     <article class="stat-card reference-browser-overview-card">
         <span class="stat-label">Model groups</span>
         <span class="stat-value">@Model.ModelGroups.Count</span>
-        <span class="stat-meta">TRM, ARM, and BRM collections loaded</span>
+        <span class="stat-meta">TRM, ARM, BRM, and DRM collections loaded</span>
     </article>
     <article class="stat-card reference-browser-overview-card">
         <span class="stat-label">Domains</span>
@@ -66,6 +66,14 @@
         {
             <input type="hidden" name="capabilityCode" value="@Model.SelectedCapabilityCode" />
         }
+        @if (!string.IsNullOrWhiteSpace(Model.SelectedComponentCode))
+        {
+            <input type="hidden" name="componentCode" value="@Model.SelectedComponentCode" />
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.SelectedSubClassCode))
+        {
+            <input type="hidden" name="subClassCode" value="@Model.SelectedSubClassCode" />
+        }
         <div class="col-lg-9">
             <label class="form-label" for="search">Search browser</label>
             <input class="form-control"
@@ -90,7 +98,7 @@
             </div>
         </div>
 
-        <a class="browser-reset-link @((Model.SelectedModelKind is null && string.IsNullOrWhiteSpace(Model.SelectedDomainCode) && string.IsNullOrWhiteSpace(Model.SelectedCapabilityCode)) ? "is-active" : null)"
+        <a class="browser-reset-link @((Model.SelectedModelKind is null && string.IsNullOrWhiteSpace(Model.SelectedDomainCode) && string.IsNullOrWhiteSpace(Model.SelectedCapabilityCode) && string.IsNullOrWhiteSpace(Model.SelectedComponentCode) && string.IsNullOrWhiteSpace(Model.SelectedSubClassCode)) ? "is-active" : null)"
            asp-action="Index"
            asp-route-search="@Model.Search"
            asp-fragment="browser-navigation">
@@ -171,6 +179,47 @@
                                                                     @capability.DisplayLabel
                                                                 </a>
                                                             </div>
+                                                            @if (capability.Components.Count != 0)
+                                                            {
+                                                                <ul class="browser-tree-list browser-tree-list-nested">
+                                                                    @foreach (var entity in capability.Components)
+                                                                    {
+                                                                        <li class="browser-tree-item browser-tree-component" id="@entity.AnchorId">
+                                                                            <a class="browser-tree-link @(entity.IsSelected ? "is-active" : null)"
+                                                                               asp-action="Index"
+                                                                               asp-route-search="@Model.Search"
+                                                                               asp-route-modelKind="@group.ModelKind"
+                                                                               asp-route-domainCode="@domain.Code"
+                                                                               asp-route-capabilityCode="@capability.Code"
+                                                                               asp-route-componentCode="@entity.Code"
+                                                                               asp-fragment="@entity.AnchorId">
+                                                                                @entity.DisplayLabel
+                                                                            </a>
+                                                                            @if (entity.Children.Count != 0)
+                                                                            {
+                                                                                <ul class="browser-tree-list browser-tree-list-nested">
+                                                                                    @foreach (var subClass in entity.Children)
+                                                                                    {
+                                                                                        <li class="browser-tree-item browser-tree-component" id="@subClass.AnchorId">
+                                                                                            <a class="browser-tree-link @(subClass.IsSelected ? "is-active" : null)"
+                                                                                               asp-action="Index"
+                                                                                               asp-route-search="@Model.Search"
+                                                                                               asp-route-modelKind="@group.ModelKind"
+                                                                                               asp-route-domainCode="@domain.Code"
+                                                                                               asp-route-capabilityCode="@capability.Code"
+                                                                                               asp-route-componentCode="@entity.Code"
+                                                                                               asp-route-subClassCode="@subClass.Code"
+                                                                                               asp-fragment="@subClass.AnchorId">
+                                                                                                @subClass.DisplayLabel
+                                                                                            </a>
+                                                                                        </li>
+                                                                                    }
+                                                                                </ul>
+                                                                            }
+                                                                        </li>
+                                                                    }
+                                                                </ul>
+                                                            }
                                                         </li>
                                                     }
                                                 </ul>
@@ -193,7 +242,7 @@
                 <h2>@Model.SelectionTitle</h2>
                 <p class="browser-selection-copy">@Model.SelectionDescription</p>
             </div>
-            @if (Model.SelectedModelKind.HasValue || !string.IsNullOrWhiteSpace(Model.SelectedDomainCode) || !string.IsNullOrWhiteSpace(Model.SelectedCapabilityCode) || !string.IsNullOrWhiteSpace(Model.Search))
+            @if (Model.SelectedModelKind.HasValue || !string.IsNullOrWhiteSpace(Model.SelectedDomainCode) || !string.IsNullOrWhiteSpace(Model.SelectedCapabilityCode) || !string.IsNullOrWhiteSpace(Model.SelectedComponentCode) || !string.IsNullOrWhiteSpace(Model.SelectedSubClassCode) || !string.IsNullOrWhiteSpace(Model.Search))
             {
                 <a class="btn btn-outline-secondary" asp-action="Index">Clear selection</a>
             }
@@ -213,10 +262,10 @@
                     <thead>
                         <tr>
                             <th>Model</th>
-                            <th>Component</th>
+                            <th>Object</th>
                             <th>Capabilities</th>
                             <th>Domains</th>
-                            <th>Product examples</th>
+                            <th>Details</th>
                             <th></th>
                         </tr>
                     </thead>

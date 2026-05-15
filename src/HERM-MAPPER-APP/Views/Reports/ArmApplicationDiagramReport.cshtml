@@ -31,6 +31,14 @@
 
         <div class="report-panel-actions">
             <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.ArmApplicationDiagram.ScopeKey" asp-route-applicationId="@Model.ArmApplicationDiagram.ApplicationId" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.ArmApplicationDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.ArmApplicationDiagram.DrawIoDownloadAction" asp-route-scope="@Model.ArmApplicationDiagram.ScopeKey" asp-route-applicationId="@Model.ArmApplicationDiagram.ApplicationId">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.ArmApplicationDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ArmApplicationDiagram.ArchiDownloadAction" asp-route-scope="@Model.ArmApplicationDiagram.ScopeKey" asp-route-applicationId="@Model.ArmApplicationDiagram.ApplicationId">Download Archi XML</a>
+            }
         </div>
 
         @if (!Model.ArmApplicationDiagram.HasAnyContent)

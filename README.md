@@ -18,8 +18,10 @@ The web application lives under `src/HERM-MAPPER-APP` and automated tests live u
 ## Features
 
 - Product mapping and relationship management
-- CSV export and workbook import services
-- Dashboard and catalogue views
+- CSV export and workbook import services for TRM, ARM, BRM, and DRM catalogues
+- Dashboard and catalogue views, including the HERM browser hierarchy for DRM Topic Type -> Topic -> Entity -> Common Sub-Class
+- Custom BRM and DRM model workspaces
+- Report diagrams and generated exports
 - AI-assisted mapping with configurable providers
 - Experimental status: subject to change
 
@@ -62,6 +64,12 @@ dotnet restore ./HERM-MAPPER-APP.sln
 dotnet build ./HERM-MAPPER-APP.sln
 dotnet run --project ./src/HERM-MAPPER-APP/HERM-MAPPER-APP.csproj
 ```
+
+## Reference Models And Artifacts
+
+The catalogue import workflow supports HERM TRM, ARM, BRM, and DRM workbooks. DRM imports use the workbook relationship hierarchy of Topic Type -> Topic -> Entity -> Common Sub-Class, and custom DRM models are stored in their own DRM schema without dependencies on ARM, BRM, TRM, products, services, or applications.
+
+Report diagrams are generated from imported catalogue data and custom model records. The app does not depend on deployed reference model files under a `Model` path; `.local.data/Model` remains local-development input storage only.
 
 ## Documentation
 

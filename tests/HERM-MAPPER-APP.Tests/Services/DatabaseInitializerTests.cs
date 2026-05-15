@@ -147,6 +147,64 @@ public sealed class DatabaseInitializerTests
         Assert.Equal(brmModel.Id, capability.BrmModelId);
     }
 
+    [Fact]
+    public async Task InitializeAsyncAddsMissingDrmTopicForeignKeyColumnAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        await fixture.DbContext.Database.ExecuteSqlRawAsync(@"DROP TABLE ""DrmModelDataEntities""");
+        await fixture.DbContext.Database.ExecuteSqlRawAsync(@"DROP TABLE ""DrmCommonSubClasses""");
+        await fixture.DbContext.Database.ExecuteSqlRawAsync(@"DROP TABLE ""DrmEntities""");
+        await fixture.DbContext.Database.ExecuteSqlRawAsync(@"DROP TABLE ""DrmTopics""");
+        await fixture.DbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE "DrmTopics" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_DrmTopics" PRIMARY KEY AUTOINCREMENT,
+                "Code" TEXT NOT NULL,
+                "Name" TEXT NOT NULL
+            )
+            """);
+
+        var initializer = fixture.CreateInitializer();
+
+        await initializer.InitializeAsync();
+
+        var columns = await GetSqliteColumnsAsync(fixture.DbContext, "DrmTopics");
+        Assert.Contains("TopicTypeId", columns);
+
+        fixture.DbContext.DrmTopicTypes.Add(new DrmTopicType { Code = "DY001", Name = "Topic type" });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var topicType = await fixture.DbContext.DrmTopicTypes.SingleAsync();
+        fixture.DbContext.DrmTopics.Add(new DrmTopic
+        {
+            Code = "DT001",
+            Name = "Topic",
+            TopicTypeId = topicType.Id
+        });
+        await fixture.DbContext.SaveChangesAsync();
+
+        var topic = await fixture.DbContext.DrmTopics
+            .Include(x => x.TopicType)
+            .SingleAsync();
+
+        Assert.Equal("DY001", topic.TopicType?.Code);
+    }
+
+    private static async Task<HashSet<string>> GetSqliteColumnsAsync(AppDbContext dbContext, string tableName)
+    {
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var command = dbContext.Database.GetDbConnection().CreateCommand();
+        command.CommandText = $"PRAGMA table_info('{tableName}')";
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        return columns;
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;

@@ -3,7 +3,6 @@ using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -16,9 +15,7 @@ namespace HERMMapperApp.Controllers;
 public sealed class ReportsController(
     AppDbContext dbContext,
     ModelDiagramReportService modelDiagramReportService,
-    ReferenceModelDiagramService referenceModelDiagramService,
-    ModelDiagramPosterSvgService modelDiagramPosterSvgService,
-    IWebHostEnvironment environment) : Controller
+    ReferenceModelDiagramService referenceModelDiagramService) : Controller
 {
     private static readonly IReadOnlyList<TabularExportColumn> CompletedMappingExportColumns =
     [
@@ -60,6 +57,16 @@ public sealed class ReportsController(
         new("description", "Description"),
         new("status", "Status"),
         new("capabilityCount", "Capability count"),
+        new("updatedUtc", "Updated UTC")
+    ];
+
+    private static readonly IReadOnlyList<TabularExportColumn> DrmModelExportColumns =
+    [
+        new("name", "Name"),
+        new("area", "Area"),
+        new("description", "Description"),
+        new("status", "Status"),
+        new("dataEntityCount", "Data entity count"),
         new("updatedUtc", "Updated UTC")
     ];
 
@@ -119,6 +126,16 @@ public sealed class ReportsController(
         return View("BrmModelReport", await BuildReportsViewModelAsync(brmModelId: brmModelId));
     }
 
+    public async Task<IActionResult> DrmModelReportAsync(int? drmModelId = null)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        return View("DrmModelReport", await BuildReportsViewModelAsync(drmModelId: drmModelId));
+    }
+
     public async Task<IActionResult> MappingByOwnerReportAsync()
         => View("MappingByOwnerReport", await BuildReportsViewModelAsync());
 
@@ -161,6 +178,7 @@ public sealed class ReportsController(
     private async Task<ReportsViewModel> BuildReportsViewModelAsync(
         string? lifecycleOwner = null,
         int? brmModelId = null,
+        int? drmModelId = null,
         int? serviceId = null,
         int? applicationId = null,
         bool showBrmModelReport = false)
@@ -229,6 +247,12 @@ public sealed class ReportsController(
             .OrderBy(x => x.Name)
             .ThenBy(x => x.Area)
             .ToListAsync();
+        var drmModels = await dbContext.DrmModels
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .ThenBy(x => x.Area)
+            .ToListAsync();
         var services = await dbContext.ServiceCatalogItems
             .AsNoTracking()
             .Where(x => !x.IsDeleted)
@@ -243,6 +267,9 @@ public sealed class ReportsController(
         var selectedBrmModelId = brmModels.Any(x => x.Id == brmModelId)
             ? brmModelId
             : brmModels.FirstOrDefault()?.Id;
+        var selectedDrmModelId = drmModels.Any(x => x.Id == drmModelId)
+            ? drmModelId
+            : drmModels.FirstOrDefault()?.Id;
         var selectedServiceId = services.Any(x => x.Id == serviceId)
             ? serviceId
             : services.FirstOrDefault()?.Id;
@@ -260,6 +287,7 @@ public sealed class ReportsController(
             MappingPathCount = paths.Count,
             ExpandBrmModelReport = showBrmModelReport,
             SelectedBrmModelId = selectedBrmModelId,
+            SelectedDrmModelId = selectedDrmModelId,
             SelectedServiceId = selectedServiceId,
             SelectedApplicationId = selectedApplicationId,
             SelectedLifecycleOwner = lifecycleOwner,
@@ -269,9 +297,11 @@ public sealed class ReportsController(
             TrmServiceDiagram = await modelDiagramReportService.BuildForServiceAsync(selectedServiceId),
             ArmApplicationDiagram = await referenceModelDiagramService.BuildArmApplicationAsync(selectedApplicationId),
             BrmModelOptions = BuildBrmModelOptions(brmModels, selectedBrmModelId),
+            DrmModelOptions = BuildDrmModelOptions(drmModels, selectedDrmModelId),
             ServiceOptions = BuildServiceOptions(services, selectedServiceId),
             ApplicationOptions = BuildApplicationOptions(applications, selectedApplicationId),
             BrmModelDiagram = await referenceModelDiagramService.BuildBrmModelAsync(selectedBrmModelId),
+            DrmModelDiagram = await referenceModelDiagramService.BuildDrmModelAsync(selectedDrmModelId),
             AvailableOwners = availableOwners,
             LifecycleStatuses = BuildLifecycleStatuses(lifecycleProducts),
             Owners = BuildReportsHierarchy(paths),
@@ -285,28 +315,25 @@ public sealed class ReportsController(
         return model;
     }
 
-    public async Task<IActionResult> ModelDiagramAsync(string? scope = null, int? brmModelId = null, int? serviceId = null, int? applicationId = null)
+    public async Task<IActionResult> ModelDiagramAsync(string? scope = null, int? brmModelId = null, int? drmModelId = null, int? serviceId = null, int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        var model = await BuildModelDiagramAsync(scope, brmModelId, serviceId, applicationId);
-        model.PosterSvgMarkup = modelDiagramPosterSvgService.BuildSvg(model);
-
-        return View("ModelDiagram", model);
+        return View("ModelDiagram", await BuildModelDiagramAsync(scope, brmModelId, drmModelId, serviceId, applicationId));
     }
 
-    public async Task<FileContentResult> DownloadModelDiagramSvgAsync(string? scope = null, int? brmModelId = null, int? serviceId = null, int? applicationId = null)
+    public async Task<FileContentResult> DownloadModelDiagramSvgAsync(string? scope = null, int? brmModelId = null, int? drmModelId = null, int? serviceId = null, int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
             return File(Array.Empty<byte>(), "image/svg+xml", "invalid-request.svg");
         }
 
-        var model = await BuildModelDiagramAsync(scope, brmModelId, serviceId, applicationId);
-        var content = Encoding.UTF8.GetBytes(modelDiagramPosterSvgService.BuildSvg(model));
+        var model = await BuildModelDiagramAsync(scope, brmModelId, drmModelId, serviceId, applicationId);
+        var content = Encoding.UTF8.GetBytes(ModelDiagramPosterSvgService.BuildSvg(model));
         return File(content, "image/svg+xml", ModelDiagramPosterSvgService.BuildDownloadFileName(model.ScopeKey));
     }
 
@@ -356,7 +383,7 @@ public sealed class ReportsController(
         };
     }
 
-    public async Task<FileContentResult> DownloadDrawIoAsync(string? scope = null, int? brmModelId = null)
+    public async Task<FileContentResult> DownloadDrawIoAsync(string? scope = null, int? brmModelId = null, int? drmModelId = null, int? serviceId = null, int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
@@ -364,17 +391,18 @@ public sealed class ReportsController(
         }
 
         var normalizedScope = NormalizeScope(scope);
-        if (normalizedScope is "arm" or "brm")
+        if (normalizedScope == "trm" && !serviceId.HasValue)
         {
-            var file = ResolveReferenceModelArtifact(normalizedScope, "drawio");
-            return File(await System.IO.File.ReadAllBytesAsync(file), "application/xml", Path.GetFileName(file));
+            var productContent = await modelDiagramReportService.BuildDrawIoAsync();
+            return File(productContent, "application/xml", "herm-product-model.drawio");
         }
 
-        var content = await modelDiagramReportService.BuildDrawIoAsync();
-        return File(content, "application/xml", "herm-product-model.drawio");
+        var model = await BuildModelDiagramAsync(scope, brmModelId, drmModelId, serviceId, applicationId);
+        var content = ModelDiagramExportService.BuildDrawIo(model);
+        return File(content, "application/xml", ModelDiagramExportService.BuildDrawIoFileName(model));
     }
 
-    public async Task<FileContentResult> DownloadArchiXmlAsync(string? scope = null, int? brmModelId = null)
+    public async Task<FileContentResult> DownloadArchiXmlAsync(string? scope = null, int? brmModelId = null, int? drmModelId = null, int? serviceId = null, int? applicationId = null)
     {
         if (!ModelState.IsValid)
         {
@@ -382,14 +410,15 @@ public sealed class ReportsController(
         }
 
         var normalizedScope = NormalizeScope(scope);
-        if (normalizedScope is "arm" or "brm")
+        if (normalizedScope == "trm" && !serviceId.HasValue)
         {
-            var file = ResolveReferenceModelArtifact(normalizedScope, "archimate.xml");
-            return File(await System.IO.File.ReadAllBytesAsync(file), "application/xml", Path.GetFileName(file));
+            var productContent = await modelDiagramReportService.BuildArchiXmlAsync();
+            return File(productContent, "application/xml", "herm-product-model.archimate.xml");
         }
 
-        var content = await modelDiagramReportService.BuildArchiXmlAsync();
-        return File(content, "application/xml", "herm-product-model.archimate.xml");
+        var model = await BuildModelDiagramAsync(scope, brmModelId, drmModelId, serviceId, applicationId);
+        var content = ModelDiagramExportService.BuildArchiXml(model);
+        return File(content, "application/xml", ModelDiagramExportService.BuildArchiXmlFileName(model));
     }
 
     private static IEnumerable<Models.ProductCatalogItem> FilterProductsByOwner(
@@ -756,6 +785,7 @@ public sealed class ReportsController(
         var applicationCount = await dbContext.ApplicationCatalogItems.AsNoTracking().CountAsync(x => !x.IsDeleted);
         var serviceCount = await dbContext.ServiceCatalogItems.AsNoTracking().CountAsync(x => !x.IsDeleted);
         var brmModelCount = await dbContext.BrmModels.AsNoTracking().CountAsync(x => !x.IsDeleted);
+        var drmModelCount = await dbContext.DrmModels.AsNoTracking().CountAsync(x => !x.IsDeleted);
 
         return new ExportDataViewModel
         {
@@ -796,6 +826,15 @@ public sealed class ReportsController(
                     RecordCount = brmModelCount,
                     RecordLabel = "BRM records",
                     IncludedFields = BrmModelExportColumns.Select(column => column.Header).ToList()
+                },
+                new ExportDatasetCardViewModel
+                {
+                    Dataset = ExportDataset.DrmModels,
+                    Title = "DRM models",
+                    Description = "Exports data reference models with area, status, and data-entity totals.",
+                    RecordCount = drmModelCount,
+                    RecordLabel = "DRM records",
+                    IncludedFields = DrmModelExportColumns.Select(column => column.Header).ToList()
                 }
             ]
         };
@@ -808,6 +847,7 @@ public sealed class ReportsController(
             ExportDataset.Applications => BuildApplicationExportTableAsync(),
             ExportDataset.Services => BuildServiceExportTableAsync(),
             ExportDataset.BrmModels => BuildBrmModelExportTableAsync(),
+            ExportDataset.DrmModels => BuildDrmModelExportTableAsync(),
             _ => throw new InvalidOperationException($"Unsupported export dataset '{dataset}'.")
         };
 
@@ -942,6 +982,37 @@ public sealed class ReportsController(
         return new TabularExportTable("BRM Models", BrmModelExportColumns, rows);
     }
 
+    private async Task<TabularExportTable> BuildDrmModelExportTableAsync()
+    {
+        var models = await dbContext.DrmModels
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .ThenBy(x => x.Area)
+            .Select(model => new
+            {
+                model.Name,
+                model.Area,
+                model.Description,
+                model.Status,
+                DataEntityCount = model.DataEntities.Count,
+                model.UpdatedUtc
+            })
+            .ToListAsync();
+
+        var rows = models
+            .Select(model => BuildExportRow(
+                ("name", model.Name),
+                ("area", model.Area),
+                ("description", model.Description),
+                ("status", model.Status),
+                ("dataEntityCount", model.DataEntityCount.ToString(CultureInfo.InvariantCulture)),
+                ("updatedUtc", FormatUtc(model.UpdatedUtc))))
+            .ToList();
+
+        return new TabularExportTable("DRM Models", DrmModelExportColumns, rows);
+    }
+
     private static Dictionary<string, string?> BuildExportRow(params (string Key, string? Value)[] values)
     {
         var row = new Dictionary<string, string?>(StringComparer.Ordinal);
@@ -960,6 +1031,7 @@ public sealed class ReportsController(
             ExportDataset.Applications => "herm-applications",
             ExportDataset.Services => "herm-services",
             ExportDataset.BrmModels => "herm-brm-models",
+            ExportDataset.DrmModels => "herm-drm-models",
             _ => "herm-export"
         };
 
@@ -1185,6 +1257,18 @@ public sealed class ReportsController(
                 x.Id == selectedBrmModelId))
             .ToList();
 
+    private static List<SelectListItem> BuildDrmModelOptions(
+        IReadOnlyList<DrmModel> drmModels,
+        int? selectedDrmModelId) =>
+        drmModels
+            .Select(x => new SelectListItem(
+                string.IsNullOrWhiteSpace(x.Area)
+                    ? $"{x.Name} ({x.Status})"
+                    : $"{x.Name} - {x.Area} ({x.Status})",
+                x.Id.ToString(CultureInfo.InvariantCulture),
+                x.Id == selectedDrmModelId))
+            .ToList();
+
     private static List<SelectListItem> BuildServiceOptions(
         IReadOnlyList<ServiceCatalogItem> services,
         int? selectedServiceId) =>
@@ -1207,7 +1291,7 @@ public sealed class ReportsController(
                 x.Id == selectedApplicationId))
             .ToList();
 
-    private async Task<ModelDiagramReportViewModel> BuildModelDiagramAsync(string? scope, int? brmModelId, int? serviceId, int? applicationId)
+    private async Task<ModelDiagramReportViewModel> BuildModelDiagramAsync(string? scope, int? brmModelId, int? drmModelId, int? serviceId, int? applicationId)
     {
         var normalizedScope = NormalizeScope(scope);
 
@@ -1216,6 +1300,7 @@ public sealed class ReportsController(
             "arm" when applicationId.HasValue => await referenceModelDiagramService.BuildArmApplicationAsync(applicationId),
             "arm" => await referenceModelDiagramService.BuildArmAsync(),
             "brm" => await referenceModelDiagramService.BuildBrmModelAsync(brmModelId),
+            "drm" => await referenceModelDiagramService.BuildDrmModelAsync(drmModelId),
             "trm" when serviceId.HasValue => await modelDiagramReportService.BuildForServiceAsync(serviceId),
             _ => await modelDiagramReportService.BuildAsync()
         };
@@ -1225,26 +1310,6 @@ public sealed class ReportsController(
         string.IsNullOrWhiteSpace(scope)
             ? "trm"
             : scope.Trim().ToLowerInvariant();
-
-    private string ResolveReferenceModelArtifact(string scope, string extension)
-    {
-        var fileName = $"HERM-{scope.ToUpperInvariant()}-V320-model.{extension}";
-        var candidates = new[]
-        {
-            Path.Combine(environment.ContentRootPath, "Model", fileName),
-            Path.Combine(environment.ContentRootPath, ".local.data", "Model", fileName),
-            Path.Combine(environment.ContentRootPath, "..", "Model", fileName),
-            Path.Combine(environment.ContentRootPath, "..", ".local.data", "Model", fileName),
-            Path.Combine(environment.ContentRootPath, "..", "..", "Model", fileName),
-            Path.Combine(environment.ContentRootPath, "..", "..", ".local.data", "Model", fileName)
-        };
-
-        var file = candidates
-            .Select(Path.GetFullPath)
-            .FirstOrDefault(System.IO.File.Exists);
-
-        return file ?? throw new FileNotFoundException($"Could not find the reference model artifact '{fileName}'.", fileName);
-    }
 
     private sealed record ServiceProductConnectionRecord(
         int ServiceId,

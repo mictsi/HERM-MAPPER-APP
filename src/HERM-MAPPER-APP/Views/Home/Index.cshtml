@@ -20,6 +20,7 @@
                 <a class="btn btn-outline-light btn-lg" asp-controller="Products" asp-action="Create">Add product</a>
                 <a class="btn btn-outline-light btn-lg" asp-controller="Applications" asp-action="Create">Add application</a>
                 <a class="btn btn-outline-light btn-lg" asp-controller="BrmModels" asp-action="Create">Add BRM model</a>
+                <a class="btn btn-outline-light btn-lg" asp-controller="DrmModels" asp-action="Create">Add DRM model</a>
             }
             @if (isAdministrator)
             {
@@ -50,6 +51,11 @@
         <span class="stat-label">BRM model</span>
         <span class="stat-value">@Model.BrmComponentCount</span>
         <span class="stat-meta">@Model.BrmDomainCount domain(s), @Model.BrmCapabilityCount capability node(s), @Model.BrmComponentCount component(s)</span>
+    </article>
+    <article class="stat-card">
+        <span class="stat-label">DRM model</span>
+        <span class="stat-value">@Model.DrmDataEntityCount</span>
+        <span class="stat-meta">@Model.DrmTopicTypeCount topic type(s), @Model.DrmTopicCount topic(s), @Model.DrmDataEntityCount data entities</span>
     </article>
     <article class="stat-card">
         <span class="stat-label">ARM model</span>

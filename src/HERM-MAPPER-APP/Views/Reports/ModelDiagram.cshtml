@@ -2,19 +2,13 @@
 @{
     ViewData["Title"] = Model.PosterTitle;
     ViewData["BodyClass"] = "report-poster-mode";
-    var usesSvgPoster = !string.IsNullOrWhiteSpace(Model.PosterSvgMarkup);
-    var posterPageClass = usesSvgPoster
-        ? "model-report-poster-page"
-        : "model-report-poster-page model-report-poster-page-html-fallback";
-    var posterFrameClass = usesSvgPoster
-        ? "model-report-poster-frame"
-        : "model-report-poster-frame model-report-poster-frame-html-fallback";
-    var posterStageClass = usesSvgPoster
-        ? "model-report-poster-stage"
-        : "model-report-poster-stage model-report-poster-stage-html-fallback";
+    var isDrm = string.Equals(Model.ScopeKey, "drm", StringComparison.OrdinalIgnoreCase);
+    var domainSummaryLabel = isDrm ? "topic types" : "domains";
+    var capabilitySummaryLabel = isDrm ? "topics" : "capabilities";
+    var componentSummaryLabel = isDrm ? "data entities" : "components";
 }
 
-<section class="@posterPageClass">
+<section class="model-report-poster-page">
     <div class="model-report-poster-toolbar">
         <div>
             <span class="eyebrow">Reports</span>
@@ -22,16 +16,16 @@
             <p>@Model.PosterDescription</p>
         </div>
         <div class="report-toolbar-actions">
-            <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.BackReportAction" asp-route-brmModelId="@Model.BrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId" asp-fragment="@Model.ReportFragmentId">@Model.BackReportLabel</a>
-            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadModelDiagramSvg" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download SVG</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.BackReportAction" asp-route-brmModelId="@Model.BrmModelId" asp-route-drmModelId="@Model.DrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId" asp-fragment="@Model.ReportFragmentId">@Model.BackReportLabel</a>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadModelDiagramSvg" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-drmModelId="@Model.DrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download SVG</a>
             <button class="btn btn-outline-secondary btn-sm" type="button" onclick="window.print()">Print / Save PDF</button>
             @if (!string.IsNullOrWhiteSpace(Model.DrawIoDownloadAction))
             {
-                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download draw.io</a>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrawIoDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-drmModelId="@Model.DrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download draw.io</a>
             }
             @if (!string.IsNullOrWhiteSpace(Model.ArchiDownloadAction))
             {
-                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download Archi XML</a>
+                <a class="btn btn-primary btn-sm" asp-action="@Model.ArchiDownloadAction" asp-route-scope="@Model.ScopeKey" asp-route-brmModelId="@Model.BrmModelId" asp-route-drmModelId="@Model.DrmModelId" asp-route-serviceId="@Model.ServiceId" asp-route-applicationId="@Model.ApplicationId">Download Archi XML</a>
             }
         </div>
     </div>
@@ -45,19 +39,19 @@
     }
     else
     {
-        <div class="@posterFrameClass">
-            <div class="@posterStageClass">
-                @if (usesSvgPoster)
-                {
-                    <div class="model-report-poster-svg-shell">
-                        @Html.Raw(Model.PosterSvgMarkup)
-                    </div>
-                }
-                else
-                {
-                    <partial name="_ModelDiagramReport" model="Model" />
-                }
-            </div>
+        <div class="report-summary-chips model-report-poster-summary">
+            <span class="report-summary-chip"><strong>@Model.DomainCount</strong> @domainSummaryLabel</span>
+            <span class="report-summary-chip"><strong>@Model.CapabilityCount</strong> @capabilitySummaryLabel</span>
+            <span class="report-summary-chip"><strong>@Model.ComponentCount</strong> @componentSummaryLabel</span>
+            <span class="report-summary-chip"><strong>@Model.ItemCount</strong> @Model.MappedSummaryLabel</span>
+            @if (Model.ShowUnmappedItems)
+            {
+                <span class="report-summary-chip"><strong>@Model.UnmappedItemCount</strong> unmapped</span>
+            }
+        </div>
+
+        <div class="model-report-fullscreen-frame model-report-poster-report-frame">
+            <partial name="_ModelDiagramReport" model="Model" />
         </div>
     }
 </section>

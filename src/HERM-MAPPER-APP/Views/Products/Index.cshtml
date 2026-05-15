@@ -215,10 +215,10 @@
                                     <a class="table-action-button"
                                        asp-action="Details"
                                        asp-route-id="@item.Id"
-                                       title="Show details for @item.Name"
-                                       aria-label="Show details for @item.Name">
+                                       title="Show and modify mappings for product @item.Name"
+                                       aria-label="Show and modify mappings for product @item.Name">
                                         <partial name="_ActionIcon" model="@("details")" />
-                                        <span class="visually-hidden">Show details</span>
+                                        <span class="visually-hidden">Show and modify mappings for product</span>
                                     </a>
                                     <a class="table-action-button"
                                        asp-action="Visualize"
@@ -231,20 +231,20 @@
                                     <a class="table-action-button"
                                        asp-action="ShowDependencies"
                                        asp-route-id="@item.Id"
-                                       title="Show dependencies for @item.Name"
-                                       aria-label="Show dependencies for @item.Name">
+                                       title="Show service relationships for @item.Name"
+                                       aria-label="Show service relationships for @item.Name">
                                         <partial name="_ActionIcon" model="@("dependencies")" />
-                                        <span class="visually-hidden">Show dependencies</span>
+                                        <span class="visually-hidden">Show service relationships</span>
                                     </a>
                                     @if (canManageProductsAndServices)
                                     {
                                         <a class="table-action-button"
                                            asp-action="Edit"
                                            asp-route-id="@item.Id"
-                                           title="Edit @item.Name"
-                                           aria-label="Edit @item.Name">
+                                           title="Edit metadata for product @item.Name"
+                                           aria-label="Edit metadata for product @item.Name">
                                             <partial name="_ActionIcon" model="@("edit")" />
-                                            <span class="visually-hidden">Edit</span>
+                                            <span class="visually-hidden">Edit metadata for product</span>
                                         </a>
                                         <a class="table-action-button table-action-button-danger"
                                            asp-action="Delete"

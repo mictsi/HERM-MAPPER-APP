@@ -4,7 +4,8 @@ public enum ReferenceModelKind
 {
     Trm = 0,
     Arm = 1,
-    Brm = 2
+    Brm = 2,
+    Drm = 3
 }
 
 public static class ReferenceModelCatalog
@@ -13,7 +14,8 @@ public static class ReferenceModelCatalog
     [
         ReferenceModelKind.Trm,
         ReferenceModelKind.Arm,
-        ReferenceModelKind.Brm
+        ReferenceModelKind.Brm,
+        ReferenceModelKind.Drm
     ];
 
     public static string GetDisplayName(ReferenceModelKind modelKind) =>
@@ -22,6 +24,7 @@ public static class ReferenceModelCatalog
             ReferenceModelKind.Trm => "Technology Reference Model",
             ReferenceModelKind.Arm => "Application Reference Model",
             ReferenceModelKind.Brm => "Business Reference Model",
+            ReferenceModelKind.Drm => "Data Reference Model",
             _ => "Reference Model"
         };
 
@@ -31,6 +34,7 @@ public static class ReferenceModelCatalog
             ReferenceModelKind.Trm => "TRM",
             ReferenceModelKind.Arm => "ARM",
             ReferenceModelKind.Brm => "BRM",
+            ReferenceModelKind.Drm => "DRM",
             _ => "Model"
         };
 
@@ -40,6 +44,7 @@ public static class ReferenceModelCatalog
         modelKind switch
         {
             ReferenceModelKind.Brm => "Groups",
+            ReferenceModelKind.Drm => "Topic types",
             _ => "Domains"
         };
 
@@ -47,6 +52,7 @@ public static class ReferenceModelCatalog
         modelKind switch
         {
             ReferenceModelKind.Brm => "Level 1 capabilities",
+            ReferenceModelKind.Drm => "Topics",
             _ => "Capabilities"
         };
 
@@ -54,6 +60,7 @@ public static class ReferenceModelCatalog
         modelKind switch
         {
             ReferenceModelKind.Brm => "Level 2 capabilities",
+            ReferenceModelKind.Drm => "Data entities",
             _ => "Components"
         };
 
@@ -63,6 +70,7 @@ public static class ReferenceModelCatalog
             ReferenceModelKind.Trm => "TD",
             ReferenceModelKind.Arm => "AD",
             ReferenceModelKind.Brm => "BD",
+            ReferenceModelKind.Drm => "DY",
             _ => string.Empty
         };
 
@@ -72,6 +80,7 @@ public static class ReferenceModelCatalog
             ReferenceModelKind.Trm => "TP",
             ReferenceModelKind.Arm => "AP",
             ReferenceModelKind.Brm => "BC",
+            ReferenceModelKind.Drm => "DT",
             _ => string.Empty
         };
 
@@ -81,6 +90,7 @@ public static class ReferenceModelCatalog
             ReferenceModelKind.Trm => "TC",
             ReferenceModelKind.Arm => "AC",
             ReferenceModelKind.Brm => "BC",
+            ReferenceModelKind.Drm => "DE",
             _ => string.Empty
         };
 }

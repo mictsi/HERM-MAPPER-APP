@@ -31,6 +31,14 @@
 
         <div class="report-panel-actions">
             <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.TrmServiceDiagram.ScopeKey" asp-route-serviceId="@Model.TrmServiceDiagram.ServiceId" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.TrmServiceDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.TrmServiceDiagram.DrawIoDownloadAction" asp-route-scope="@Model.TrmServiceDiagram.ScopeKey" asp-route-serviceId="@Model.TrmServiceDiagram.ServiceId">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.TrmServiceDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.TrmServiceDiagram.ArchiDownloadAction" asp-route-scope="@Model.TrmServiceDiagram.ScopeKey" asp-route-serviceId="@Model.TrmServiceDiagram.ServiceId">Download Archi XML</a>
+            }
         </div>
 
         @if (!Model.TrmServiceDiagram.HasAnyContent)

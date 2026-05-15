@@ -1,0 +1,34 @@
+@using HERMMapperApp.Services
+@model HERMMapperApp.Models.DrmModel
+@{
+    ViewData["Title"] = "Delete DRM Model";
+    ViewData["BodyClass"] = "drm-models-page";
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Data Layer</span>
+        <h1>Move DRM model to trash</h1>
+        <p>This keeps the model restorable from the admin restore page.</p>
+    </div>
+</section>
+
+<section class="content-card">
+    <dl class="detail-grid">
+        <dt>Name</dt>
+        <dd>@Model.Name</dd>
+        <dt>Area</dt>
+        <dd>@Model.Area</dd>
+        <dt>Status</dt>
+        <dd>@Model.Status</dd>
+        <dt>Data entities</dt>
+        <dd>@Model.DataEntities.Count</dd>
+        <dt>Updated</dt>
+        <dd>@await TimeZoneDisplay.FormatUtcAsync(Model.UpdatedUtc)</dd>
+    </dl>
+    <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-flex gap-2 mt-4">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-danger">Move to trash</button>
+        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Id">Cancel</a>
+    </form>
+</section>

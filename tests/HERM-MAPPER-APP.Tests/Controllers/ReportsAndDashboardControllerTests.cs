@@ -3,11 +3,10 @@ using HERMMapperApp.Data;
 using HERMMapperApp.Models;
 using HERMMapperApp.Services;
 using HERMMapperApp.ViewModels;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileProviders;
+using System.Globalization;
 using System.Text;
 using Xunit;
 
@@ -579,7 +578,7 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Equal(selectedService.Id, model.SelectedServiceId);
         Assert.Equal(2, model.ServiceOptions.Count);
         Assert.Equal("TRM diagram per service", model.TrmServiceDiagram.DiagramTitle);
-        Assert.Null(model.TrmServiceDiagram.DrawIoDownloadAction);
+        Assert.Equal("DownloadDrawIo", model.TrmServiceDiagram.DrawIoDownloadAction);
         Assert.Contains("Student onboarding", model.TrmServiceDiagram.DiagramDescription);
 
         var mappedProducts = model.TrmServiceDiagram.Domains
@@ -599,8 +598,18 @@ public sealed class ReportsAndDashboardControllerTests
         var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
         Assert.Equal(selectedService.Id, posterModel.ServiceId);
         Assert.Equal("TrmServiceDiagramReport", posterModel.BackReportAction);
-        Assert.Contains("<svg", posterModel.PosterSvgMarkup);
-        Assert.Contains("Service Product", posterModel.PosterSvgMarkup);
+        Assert.Empty(posterModel.PosterSvgMarkup);
+
+        var svgResult = await fixture.CreateReportsController().DownloadModelDiagramSvgAsync(scope: "trm", serviceId: selectedService.Id);
+        var svg = Encoding.UTF8.GetString(svgResult.FileContents);
+        Assert.Contains("<svg", svg);
+        Assert.Contains("Service Product", svg);
+
+        var drawIoResult = await fixture.CreateReportsController().DownloadDrawIoAsync(scope: "trm", serviceId: selectedService.Id);
+        var drawIoXml = Encoding.UTF8.GetString(drawIoResult.FileContents);
+        Assert.EndsWith(".drawio", drawIoResult.FileDownloadName);
+        Assert.Contains("<mxfile", drawIoXml);
+        Assert.Contains("Service Product", drawIoXml);
     }
 
     [Fact]
@@ -738,7 +747,7 @@ public sealed class ReportsAndDashboardControllerTests
         Assert.Equal(applicationA.Id, model.SelectedApplicationId);
         Assert.Equal(2, model.ApplicationOptions.Count);
         Assert.Equal("ARM diagram per application", model.ArmApplicationDiagram.DiagramTitle);
-        Assert.Null(model.ArmApplicationDiagram.DrawIoDownloadAction);
+        Assert.Equal("DownloadDrawIo", model.ArmApplicationDiagram.DrawIoDownloadAction);
         Assert.Contains("Student app", model.ArmApplicationDiagram.DiagramDescription);
 
         var mappedDomains = model.ArmApplicationDiagram.Domains
@@ -757,45 +766,66 @@ public sealed class ReportsAndDashboardControllerTests
         var posterModel = Assert.IsType<ModelDiagramReportViewModel>(posterView.Model);
         Assert.Equal(applicationA.Id, posterModel.ApplicationId);
         Assert.Equal("ArmApplicationDiagramReport", posterModel.BackReportAction);
-        Assert.Contains("<svg", posterModel.PosterSvgMarkup);
-        Assert.Contains("TD001 Identity", posterModel.PosterSvgMarkup);
+        Assert.Empty(posterModel.PosterSvgMarkup);
+
+        var svgResult = await fixture.CreateReportsController().DownloadModelDiagramSvgAsync(scope: "arm", applicationId: applicationA.Id);
+        var svg = Encoding.UTF8.GetString(svgResult.FileContents);
+        Assert.Contains("<svg", svg);
+        Assert.Contains("TD001 Identity", svg);
+
+        var archiResult = await fixture.CreateReportsController().DownloadArchiXmlAsync(scope: "arm", applicationId: applicationA.Id);
+        var archiXml = Encoding.UTF8.GetString(archiResult.FileContents);
+        Assert.EndsWith(".archimate.xml", archiResult.FileDownloadName);
+        Assert.Contains("<model", archiXml);
+        Assert.Contains("Student app", archiXml);
+        Assert.Contains("TD001 Identity", archiXml);
     }
 
     [Fact]
     public void ModelDiagramPosterSvgBuildsImplicitWhiteCardsForBrmPosterNodes()
     {
-        var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
+        var svg = ModelDiagramPosterSvgService.BuildSvg(new ModelDiagramReportViewModel
         {
-            ContentRootPath = ResolvePosterTemplateRoot()
+            ScopeKey = "brm",
+            Domains =
+            [
+                new ModelDiagramDomainViewModel
+                {
+                    Code = "BD001",
+                    Name = "Student Lifecycle",
+                    Capabilities =
+                    [
+                        new ModelDiagramCapabilityViewModel
+                        {
+                            Code = "BC019",
+                            Name = "Student Enrolment",
+                            Components =
+                            [
+                                new ModelDiagramComponentViewModel
+                                {
+                                    Code = "BC021",
+                                    Name = "Student Academic"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         });
 
-        var svg = service.BuildSvg(new ModelDiagramReportViewModel
-        {
-            ScopeKey = "brm"
-        });
-
-        var studentAcademicCard = GetSvgWindow(svg, "(BC046)");
+        Assert.Contains("width=\"1760\"", svg);
+        Assert.Contains("height=\"", svg);
+        var studentAcademicCard = GetSvgWindow(svg, "BC021 Student Academic");
         Assert.Contains("Student Academic", studentAcademicCard);
         Assert.Contains("fill=\"#ffffff\"", studentAcademicCard);
         Assert.Contains("<rect", studentAcademicCard);
         Assert.Contains("<text", studentAcademicCard);
-
-        var housingCard = GetSvgWindow(svg, "(BC115)");
-        Assert.Contains("Housing", housingCard);
-        Assert.Contains("fill=\"#ffffff\"", housingCard);
-        Assert.Contains("<rect", housingCard);
-        Assert.Contains("<text", housingCard);
     }
 
     [Fact]
     public void ModelDiagramPosterSvgHighlightsMappedComponentsWithRedBorder()
     {
-        var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
-        {
-            ContentRootPath = ResolvePosterTemplateRoot()
-        });
-
-        var svg = service.BuildSvg(new ModelDiagramReportViewModel
+        var svg = ModelDiagramPosterSvgService.BuildSvg(new ModelDiagramReportViewModel
         {
             ScopeKey = "brm",
             Domains =
@@ -832,56 +862,45 @@ public sealed class ReportsAndDashboardControllerTests
             ]
         });
 
-        Assert.Contains(
-            "<rect x=\"1236.218\" y=\"200.782\" width=\"177.165\" height=\"107.866\" rx=\"16\" ry=\"16\" fill=\"#ffffff\" stroke=\"#c92d39\" stroke-width=\"4\" />",
-            svg);
+        Assert.Contains("#c92d39", svg);
+        Assert.Contains("AD003 Enabling", svg);
     }
 
     [Fact]
-    public void ModelDiagramPosterSvgStripsHiddenUrlEncodedGraphPayloadFromTrmLabels()
+    public void ModelDiagramPosterSvgWrapsCapabilityCardsAcrossTheDomain()
     {
-        var templateRoot = CreateTemporaryPosterTemplateRoot(
-            "HERM-TRM-V320-model.drawio",
-            """
-            <mxfile host="app.diagrams.net">
-                <diagram id="trm" name="Page-1">
-                    <mxGraphModel>
-                        <root>
-                            <mxCell id="0" />
-                            <mxCell id="1" parent="0" />
-                            <mxCell id="bg" value="" style="fillColor=#b2b2b2;strokeColor=#666666;strokeWidth=2;" vertex="1" parent="1">
-                                <mxGeometry x="0" y="0" width="400" height="260" as="geometry" />
-                            </mxCell>
-                            <mxCell id="component" value="&lt;span style=&quot;color: rgba(0, 0, 0, 0); font-family: monospace; font-size: 0px; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%22%20style%3D%22html%3D1%3BfillColor%3D%23ffffff%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%220%22%20y%3D%220%22%20width%3D%22165.354%22%20height%3D%2259.055%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;ArtificialIntelligenceAgent (TC153)" style="html=1;whiteSpace=wrap;fontSize=16;fontFamily=Open Sans;fillColor=#ffffff;rounded=1;" vertex="1" parent="1">
-                                <mxGeometry x="20" y="20" width="165.354" height="59.055" as="geometry" />
-                            </mxCell>
-                        </root>
-                    </mxGraphModel>
-                </diagram>
-            </mxfile>
-            """);
-
-        try
+        var svg = ModelDiagramPosterSvgService.BuildSvg(new ModelDiagramReportViewModel
         {
-            var service = new ModelDiagramPosterSvgService(new TestWebHostEnvironment
-            {
-                ContentRootPath = templateRoot
-            });
+            ScopeKey = "brm",
+            Domains =
+            [
+                new ModelDiagramDomainViewModel
+                {
+                    Code = "BD001",
+                    Name = "Student Lifecycle",
+                    Capabilities = Enumerable.Range(1, 5)
+                        .Select(index => new ModelDiagramCapabilityViewModel
+                        {
+                            CapabilityId = index,
+                            Code = $"BC{index:000}",
+                            Name = $"Capability {index}",
+                            Components =
+                            [
+                                new ModelDiagramComponentViewModel
+                                {
+                                    ComponentId = index,
+                                    Code = $"BE{index:000}",
+                                    Name = $"Entity {index}"
+                                }
+                            ]
+                        })
+                        .ToList()
+                }
+            ]
+        });
 
-            var svg = service.BuildSvg(new ModelDiagramReportViewModel
-            {
-                ScopeKey = "trm"
-            });
-
-            Assert.Contains("ArtificialIntelligenceAgent", svg);
-            Assert.Contains("TC153", svg);
-            Assert.DoesNotContain("%3CmxGraphModel%3E", svg);
-            Assert.DoesNotContain("%3CmxCell", svg);
-        }
-        finally
-        {
-            Directory.Delete(templateRoot, recursive: true);
-        }
+        Assert.InRange(ExtractSvgHeight(svg), 1, 800);
+        Assert.Contains("BC005 Capability 5", svg);
     }
 
     [Fact]
@@ -973,6 +992,32 @@ public sealed class ReportsAndDashboardControllerTests
             ParentCapabilityCode = capability.Code,
             IsDeleted = true
         };
+        var drmTopicType = new DrmTopicType
+        {
+            Code = "DY001",
+            Name = "Person data"
+        };
+        var drmTopic = new DrmTopic
+        {
+            Code = "DT001",
+            Name = "Student identity",
+            TopicType = drmTopicType,
+            TopicTypeCode = drmTopicType.Code
+        };
+        var drmEntity = new DrmEntity
+        {
+            Code = "DE001",
+            Name = "Student",
+            ParentTopic = drmTopic,
+            ParentTopicCode = drmTopic.Code
+        };
+        var drmCommonSubClass = new DrmCommonSubClass
+        {
+            Code = "DE101",
+            Name = "Legal Name",
+            ParentEntity = drmEntity,
+            ParentEntityCode = drmEntity.Code
+        };
 
         var products = Enumerable.Range(1, 7)
             .Select(index => new ProductCatalogItem
@@ -982,7 +1027,7 @@ public sealed class ReportsAndDashboardControllerTests
             })
             .ToList();
 
-        await fixture.DbContext.AddRangeAsync(domain, capability, activeComponent, deletedComponent);
+        await fixture.DbContext.AddRangeAsync(domain, capability, activeComponent, deletedComponent, drmTopicType, drmTopic, drmEntity, drmCommonSubClass);
         await fixture.DbContext.ProductCatalogItems.AddRangeAsync(products);
         await fixture.DbContext.SaveChangesAsync();
 
@@ -1012,10 +1057,14 @@ public sealed class ReportsAndDashboardControllerTests
 
         Assert.Equal(7, model.ProductCount);
         Assert.Equal(1, model.CompletedMappings);
-            Assert.Equal(1, model.TrmComponentCount);
-            Assert.Equal(1, model.TrmDomainCount);
-            Assert.Equal(1, model.TrmCapabilityCount);
-            Assert.True(model.HasTrmModel);
+        Assert.Equal(1, model.TrmComponentCount);
+        Assert.Equal(1, model.TrmDomainCount);
+        Assert.Equal(1, model.TrmCapabilityCount);
+        Assert.True(model.HasTrmModel);
+        Assert.Equal(1, model.DrmTopicTypeCount);
+        Assert.Equal(1, model.DrmTopicCount);
+        Assert.Equal(2, model.DrmDataEntityCount);
+        Assert.True(model.HasDrmModel);
         Assert.Equal(6, model.RecentProducts.Count);
         Assert.Equal("Product 7", model.RecentProducts[0].Name);
         Assert.Equal("Product 2", model.RecentProducts[^1].Name);
@@ -1051,9 +1100,7 @@ public sealed class ReportsAndDashboardControllerTests
         public ReportsController CreateReportsController() => new(
             DbContext,
             new ModelDiagramReportService(DbContext),
-            new ReferenceModelDiagramService(DbContext),
-            new ModelDiagramPosterSvgService(new TestWebHostEnvironment()),
-            new TestWebHostEnvironment());
+            new ReferenceModelDiagramService(DbContext));
 
         public HomeController CreateHomeController() => new(DbContext);
 
@@ -1064,42 +1111,6 @@ public sealed class ReportsAndDashboardControllerTests
         }
     }
 
-    private sealed class TestWebHostEnvironment : IWebHostEnvironment
-    {
-        public string ApplicationName { get; set; } = "HERM-MAPPER-APP.Tests";
-        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
-        public string WebRootPath { get; set; } = string.Empty;
-        public string EnvironmentName { get; set; } = "Development";
-        public string ContentRootPath { get; set; } = System.IO.Path.GetTempPath();
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
-    }
-
-    private static string ResolvePosterTemplateRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "Model", "HERM-BRM-V320-model.drawio")) ||
-                File.Exists(Path.Combine(current.FullName, ".local.data", "Model", "HERM-BRM-V320-model.drawio")))
-            {
-                return current.FullName;
-            }
-
-            current = current.Parent;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the BRM poster template test data.");
-    }
-
-    private static string CreateTemporaryPosterTemplateRoot(string fileName, string content)
-    {
-        var root = Path.Combine(Path.GetTempPath(), "herm-mapper-tests", Guid.NewGuid().ToString("N"));
-        var modelDirectory = Path.Combine(root, ".local.data", "Model");
-        Directory.CreateDirectory(modelDirectory);
-        File.WriteAllText(Path.Combine(modelDirectory, fileName), content);
-        return root;
-    }
-
     private static string GetSvgWindow(string svg, string marker, int radius = 600)
     {
         var index = svg.IndexOf(marker, StringComparison.Ordinal);
@@ -1108,5 +1119,18 @@ public sealed class ReportsAndDashboardControllerTests
         var start = Math.Max(0, index - radius);
         var length = Math.Min(svg.Length - start, radius * 2);
         return svg.Substring(start, length);
+    }
+
+    private static double ExtractSvgHeight(string svg)
+    {
+        const string marker = " height=\"";
+        var start = svg.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, "Expected the generated SVG to include a height attribute.");
+        start += marker.Length;
+
+        var end = svg.IndexOf('"', start);
+        Assert.True(end > start, "Expected the generated SVG height attribute to have a value.");
+
+        return double.Parse(svg[start..end], CultureInfo.InvariantCulture);
     }
 }

@@ -1,0 +1,69 @@
+@model HERMMapperApp.ViewModels.ReportsViewModel
+@{
+    ViewData["Title"] = "DRM diagram";
+    ViewData["BodyClass"] = "reports-page";
+}
+
+<partial name="_ReportsSummary" model="Model" />
+
+<details class="content-card report-panel" id="report-drm-model" open>
+    <summary class="report-panel-summary">
+        <div>
+            <span class="eyebrow">Model diagram</span>
+            <h2>@Model.DrmModelDiagram.DiagramTitle</h2>
+            <p>@Model.DrmModelDiagram.DiagramDescription</p>
+        </div>
+        <span class="report-panel-toggle" aria-hidden="true"></span>
+    </summary>
+    <div class="report-panel-body">
+        @if (Model.DrmModelOptions.Count != 0)
+        {
+            <form method="get" asp-action="DrmModelReport" class="owner-lifecycle-filter-form mb-3">
+                <div>
+                    <label class="form-label" for="drmModelId">DRM model</label>
+                    <select class="form-select" id="drmModelId" name="drmModelId" asp-items="Model.DrmModelOptions"></select>
+                </div>
+                <div class="owner-lifecycle-filter-actions">
+                    <button class="btn btn-primary" type="submit">View model</button>
+                </div>
+            </form>
+        }
+
+        <div class="report-panel-actions">
+            <a class="btn btn-outline-secondary btn-sm" asp-action="ModelDiagram" asp-route-scope="@Model.DrmModelDiagram.ScopeKey" asp-route-drmModelId="@Model.DrmModelDiagram.DrmModelId" target="_blank" rel="noopener noreferrer">Open full screen</a>
+            @if (!string.IsNullOrWhiteSpace(Model.DrmModelDiagram.DrawIoDownloadAction))
+            {
+                <a class="btn btn-outline-secondary btn-sm" asp-action="@Model.DrmModelDiagram.DrawIoDownloadAction" asp-route-scope="@Model.DrmModelDiagram.ScopeKey" asp-route-drmModelId="@Model.DrmModelDiagram.DrmModelId">Download draw.io</a>
+            }
+            @if (!string.IsNullOrWhiteSpace(Model.DrmModelDiagram.ArchiDownloadAction))
+            {
+                <a class="btn btn-primary btn-sm" asp-action="@Model.DrmModelDiagram.ArchiDownloadAction" asp-route-scope="@Model.DrmModelDiagram.ScopeKey" asp-route-drmModelId="@Model.DrmModelDiagram.DrmModelId">Download Archi XML</a>
+            }
+        </div>
+
+        @if (!Model.DrmModelDiagram.HasAnyContent)
+        {
+            <div class="empty-state compact">
+                <h3>@Model.DrmModelDiagram.EmptyStateTitle</h3>
+                <p>@Model.DrmModelDiagram.EmptyStateBody</p>
+                @if (Model.DrmModelOptions.Count == 0)
+                {
+                    <p><a asp-controller="DrmModels" asp-action="Create">Create a DRM model</a> to start building this diagram.</p>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="report-summary-chips">
+                <span class="report-summary-chip"><strong>@Model.DrmModelDiagram.DomainCount</strong> topic types</span>
+                <span class="report-summary-chip"><strong>@Model.DrmModelDiagram.CapabilityCount</strong> topics</span>
+                <span class="report-summary-chip"><strong>@Model.DrmModelDiagram.ComponentCount</strong> data entities</span>
+                <span class="report-summary-chip"><strong>@Model.DrmModelDiagram.ItemCount</strong> @Model.DrmModelDiagram.MappedSummaryLabel</span>
+            </div>
+
+            <div class="model-report-preview-frame">
+                <partial name="_ModelDiagramReport" model="Model.DrmModelDiagram" />
+            </div>
+        }
+    </div>
+</details>

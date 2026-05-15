@@ -1,0 +1,73 @@
+@using HERMMapperApp.Services
+@model DrmModelRestoreViewModel
+@{
+    ViewData["Title"] = "Restore DRM Models";
+    ViewData["AdminNav"] = "RestoreDrmModels";
+    ViewData["BodyClass"] = "admin-page restore-page";
+}
+
+<div class="admin-shell">
+    @await Html.PartialAsync("_AdminSidebar")
+    <div class="admin-content">
+        <section class="page-header">
+            <div>
+                <span class="eyebrow">Deleted DRM model workspaces</span>
+                <h1>Restore DRM models</h1>
+                <p>Restore deleted DRM model workspaces and their selected data entities.</p>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <section class="content-card">
+                <div class="alert alert-success mb-0">@Model.StatusMessage</div>
+            </section>
+        }
+
+        <section class="content-card">
+            @if (Model.Models.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <h3>No deleted DRM models</h3>
+                    <p>The DRM model trash is empty.</p>
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Area</th>
+                                <th>Status</th>
+                                <th>Data entities</th>
+                                <th>Deleted</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var modelRow in Model.Models)
+                        {
+                            <tr>
+                                <td>@modelRow.Name</td>
+                                <td>@modelRow.Area</td>
+                                <td>@modelRow.Status</td>
+                                <td>@modelRow.DataEntities.Count</td>
+                                <td>@await TimeZoneDisplay.FormatUtcAsync(modelRow.DeletedUtc)</td>
+                                <td class="text-end">
+                                    <form asp-action="RestoreDeleted" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@modelRow.Id" />
+                                        <button class="btn btn-outline-primary btn-sm" type="submit">Restore</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+</div>

@@ -5,7 +5,8 @@ public enum ExportDataset
     CompletedMappings = 1,
     Applications = 2,
     Services = 3,
-    BrmModels = 4
+    BrmModels = 4,
+    DrmModels = 5
 }
 
 public enum ExportFileFormat

@@ -7,13 +7,14 @@ HERM Mapper is an ASP.NET Core MVC web application for curating Higher Education
 - TRM, the Technology Reference Model, classifies products against technology domains, capabilities, and components.
 - ARM, the Application Reference Model, links applications to ARM components and the TRM products that support them.
 - BRM, the Business Reference Model, groups business capability work into BRM model workspaces and links capabilities through ARM to applications and products.
+- DRM, the Data Reference Model, keeps topic types, topics, entities, and common sub-classes in an independent model for data-focused catalogue and reporting work.
 
 The app also provides a searchable HERM browser, dashboards, visual diagrams, imports, exports, AI-assisted product mapping, user management, restore tools, and an audit change log.
 
 ## User Roles
 
 - Viewer: can sign in, browse catalogues, open the HERM browser, and view reports.
-- Contributor: can do Viewer tasks and maintain catalogue records such as products, services, applications, BRM models, and BRM capabilities.
+- Contributor: can do Viewer tasks and maintain catalogue records such as products, services, applications, BRM models, BRM capabilities, and DRM models.
 - Administrator: can do everything, including TRM mappings, imports, exports, users, configuration, AI configuration, restore tools, and the change log.
 
 ## Start the App
@@ -50,22 +51,23 @@ Local users can change their own password from `Profile`. Administrators can cre
 2. Open `Admin > Configuration` and review the display time zone.
 3. Add or reorder allowed owner and lifecycle status values.
 4. Open `Admin > Import data`.
-5. Import the HERM reference workbook for TRM, ARM, or BRM, or configure the remote SQL import source.
+5. Import the HERM reference workbook for TRM, ARM, BRM, or DRM, or configure the remote SQL import source.
 6. Add products, then create TRM mappings for them.
 7. Add services and connect their products.
 8. Add applications and link ARM components to mapped products.
 9. Add BRM models and BRM capabilities, then connect those capabilities to ARM.
-10. Use reports and exports to review coverage.
+10. Add DRM models and select data entities from the imported DRM hierarchy.
+11. Use reports and exports to review coverage.
 
 ## Main Navigation
 
 ### Dashboard
 
-The dashboard is the landing page after sign-in. It shows counts for products, completed mappings, and loaded BRM, ARM, and TRM reference data. Use it as a quick entry point to the mapping board, new product, new application, new BRM model, or export data when your role allows those actions.
+The dashboard is the landing page after sign-in. It shows counts for products, completed mappings, and loaded BRM, ARM, TRM, and DRM reference data. Use it as a quick entry point to the mapping board, new product, new application, new BRM model, new DRM model, or export data when your role allows those actions.
 
 ### HERM Browser
 
-Use `HERM Browser` to search and browse imported TRM, ARM, and BRM reference objects. The left tree lets you drill from model to domain to capability. The results table shows matching components, capabilities, domains, product examples, and component history when available.
+Use `HERM Browser` to search and browse imported TRM, ARM, BRM, and DRM reference objects. TRM, ARM, and BRM browse from model to domain to capability. DRM browses from Topic Type to Topic to Entity to Common Sub-Class. The results table shows matching reference objects, parent context, and history when available.
 
 ### Products
 
@@ -148,6 +150,24 @@ Typical BRM workflow:
 
 The BRM model details page can then show a dependency map through ARM, applications, TRM products, and product endpoints when enough links exist.
 
+### DRM Models and Data Entities
+
+Use `DRM Model > DRM Models` to maintain independent data reference model workspaces.
+
+Typical DRM workflow:
+
+1. Import the DRM catalogue workbook.
+2. Select `Add DRM model`.
+3. Enter name, area, status, and description.
+4. Save the model.
+5. Open the DRM model details page.
+6. Select `Add data entity`.
+7. Choose an imported DRM entity and, when needed, one common sub-class under that entity.
+8. Add description and notes.
+9. Save the data entity.
+
+DRM models use only DRM catalogue rows. They do not map data entities to ARM components, ARM capabilities, products, applications, services, TRM, or BRM records.
+
 ### Reports
 
 Use `Reports` to inspect diagrams and analytics:
@@ -155,6 +175,7 @@ Use `Reports` to inspect diagrams and analytics:
 - ARM diagram for all objects
 - ARM diagram per application
 - BRM diagram
+- DRM diagram
 - TRM diagram for all objects
 - TRM diagram per service
 - TRM mapping by owner
@@ -166,7 +187,7 @@ Use `Reports` to inspect diagrams and analytics:
 - Lifecycle status
 - Export data
 
-Administrators can export completed mappings, applications, services, and BRM models in CSV, JSON, or XLSX format.
+Administrators can export completed mappings, applications, services, BRM models, and DRM models in CSV, JSON, or XLSX format.
 
 ## Admin Workflows
 
@@ -180,7 +201,7 @@ Use `Admin > Import data` for three import paths:
 
 - Remote SQL import: configure a SQL Server source, test the connection and required schema, save settings, run manually, or schedule automatic imports. The expected source schema is documented in `docs/remote-sql-import-source-schema.sql`.
 - Product CSV import: upload a semicolon-separated CSV with `MODEL;DOMAIN;CAPABILITY;COMPONENT;PRODUCT`. The app verifies rows before applying them.
-- Catalogue workbook import: upload a HERM workbook for TRM, ARM, or BRM. The app verifies the proposed domain, capability, and component changes before importing.
+- Catalogue workbook import: upload a HERM workbook for TRM, ARM, BRM, or DRM. The app verifies the proposed changes before importing. DRM verification follows Topic Type -> Topic -> Entity -> Common Sub-Class relationships from the workbook.
 
 Always review verification results before importing. Imports are blocked when validation errors are present.
 
@@ -201,7 +222,7 @@ When AI lookup is ready, product details pages show an enabled `Add mappings wit
 
 ### Restore Tools
 
-Administrator restore pages are available for deleted products, services, applications, BRM models, and reference model components. Use these pages to review deleted records and restore them. Some restore pages also expose permanent delete actions.
+Administrator restore pages are available for deleted products, services, applications, BRM models, DRM models, and reference model components. Use these pages to review deleted records and restore them. Some restore pages also expose permanent delete actions.
 
 ### Change Log
 
@@ -209,13 +230,18 @@ Use `Admin > Change Log` to search audit entries for imports, product updates, m
 
 ## Practical Usage Patterns
 
-- Start with reference data. Product mappings, applications, and BRM dependency maps are only useful when TRM, ARM, and BRM reference data has been imported.
+- Start with reference data. Product mappings, applications, BRM dependency maps, and DRM model selections are only useful when the corresponding reference data has been imported.
 - Add products before mapping. TRM mappings are attached to products.
 - Complete product mappings before applications. Application mappings depend on products that already resolve to TRM components.
 - Use services for product flow diagrams. Services are best for showing product-to-product dependencies and branching flows.
 - Use BRM models for business views. BRM capabilities connect downstream to ARM, applications, TRM, and products.
+- Use DRM models for data views. DRM models stay inside the DRM schema and follow Topic Type -> Topic -> Entity -> Common Sub-Class.
 - Keep lifecycle and owner values clean in configuration. Those values drive filters, reports, and bulk edits.
 - Use exports for handoff. Completed mappings preserve the product CSV shape, and broader exports support CSV, JSON, and XLSX.
+
+## Reference Model Files
+
+Reports are generated from imported catalogue data and custom model records. The app does not require deployed reference model files under a `Model` path. Files under `.local.data/Model` are local-development inputs and are ignored by git.
 
 ## Related Documentation
 

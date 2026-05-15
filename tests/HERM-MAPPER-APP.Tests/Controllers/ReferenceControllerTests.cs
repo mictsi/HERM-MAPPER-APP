@@ -60,6 +60,59 @@ public sealed class ReferenceControllerTests
     }
 
     [Fact]
+    public async Task IndexFiltersDrmByEntitySelectionAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, entity, subClass) = await fixture.SeedDrmEntityAsync("DY001", "Data", "DT001", "Customer", "DE001", "Customer record", "DE101", "Customer profile");
+        var (_, _, siblingEntity, _) = await fixture.SeedDrmEntityAsync("DY001", "Data", "DT001", "Customer", "DE002", "Account record", "DE102", "Account profile");
+
+        using var controller = fixture.CreateController();
+        var result = await controller.IndexAsync(null, null, null, ReferenceModelKind.Drm, "DY001", "DT001", entity.Code);
+
+        var model = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(result).Model);
+        Assert.Equal(ReferenceModelKind.Drm, model.SelectedModelKind);
+        Assert.Equal("DY001", model.SelectedDomainCode);
+        Assert.Equal("DT001", model.SelectedCapabilityCode);
+        Assert.Equal(entity.Code, model.SelectedComponentCode);
+        Assert.Equal("browser-model-drm-domain-dy001-capability-dt001-component-de001", model.ActiveTreeAnchorId);
+        Assert.Contains(model.Components, component => component.Code == entity.Code && component.TypeLabel == "Entity");
+        Assert.Contains(model.Components, component => component.Code == subClass.Code && component.TypeLabel == "Common sub-class");
+        Assert.DoesNotContain(model.Components, component => component.Code == siblingEntity.Code);
+
+        var drmGroup = Assert.Single(model.ModelGroups, group => group.ModelKind == ReferenceModelKind.Drm);
+        var topicType = Assert.Single(drmGroup.Domains);
+        var topic = Assert.Single(topicType.Capabilities);
+        var selectedEntity = Assert.Single(topic.Components, component => component.Code == entity.Code);
+        Assert.True(selectedEntity.IsSelected);
+    }
+
+    [Fact]
+    public async Task IndexFiltersDrmByCommonSubClassSelectionAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var (_, _, entity, subClass) = await fixture.SeedDrmEntityAsync("DY001", "Data", "DT001", "Customer", "DE001", "Customer record", "DE101", "Customer profile");
+        await fixture.SeedDrmEntityAsync("DY001", "Data", "DT001", "Customer", "DE002", "Account record", "DE102", "Account profile");
+
+        using var controller = fixture.CreateController();
+        var result = await controller.IndexAsync(null, null, null, ReferenceModelKind.Drm, "DY001", "DT001", entity.Code, subClass.Code);
+
+        var model = Assert.IsType<ReferenceCatalogueViewModel>(Assert.IsType<ViewResult>(result).Model);
+        var component = Assert.Single(model.Components);
+        Assert.Equal(subClass.Code, component.Code);
+        Assert.Equal("Common sub-class", component.TypeLabel);
+        Assert.Equal(entity.Code, component.ParentComponentCode);
+        Assert.Equal("browser-model-drm-domain-dy001-capability-dt001-component-de001-subclass-de101", model.ActiveTreeAnchorId);
+
+        var selectedSubClass = model.ModelGroups
+            .Single(group => group.ModelKind == ReferenceModelKind.Drm)
+            .Domains.Single()
+            .Capabilities.Single()
+            .Components.Single(treeEntity => treeEntity.Code == entity.Code)
+            .Children.Single(child => child.Code == subClass.Code);
+        Assert.True(selectedSubClass.IsSelected);
+    }
+
+    [Fact]
     public async Task RestoreReturnsDeletedComponentsAsync()
     {
         await using var fixture = await TestFixture.CreateAsync();
@@ -742,6 +795,50 @@ public sealed class ReferenceControllerTests
             await DbContext.AddRangeAsync(domain, capability, component);
             await DbContext.SaveChangesAsync();
             return (domain, capability, component);
+        }
+
+        public async Task<(DrmTopicType TopicType, DrmTopic Topic, DrmEntity Entity, DrmCommonSubClass SubClass)> SeedDrmEntityAsync(
+            string topicTypeCode,
+            string topicTypeName,
+            string topicCode,
+            string topicName,
+            string entityCode,
+            string entityName,
+            string subClassCode,
+            string subClassName)
+        {
+            var topicType = await DbContext.DrmTopicTypes
+                .SingleOrDefaultAsync(x => x.Code == topicTypeCode)
+                ?? new DrmTopicType { Code = topicTypeCode, Name = topicTypeName };
+            var topic = await DbContext.DrmTopics
+                .SingleOrDefaultAsync(x => x.Code == topicCode)
+                ?? new DrmTopic
+                {
+                    Code = topicCode,
+                    Name = topicName,
+                    TopicType = topicType,
+                    TopicTypeCode = topicType.Code,
+                    TopicTypeName = topicType.Name
+                };
+            var entity = new DrmEntity
+            {
+                Code = entityCode,
+                Name = entityName,
+                ParentTopic = topic,
+                ParentTopicCode = topic.Code,
+                ParentTopicTypeName = topicType.Name
+            };
+            var subClass = new DrmCommonSubClass
+            {
+                Code = subClassCode,
+                Name = subClassName,
+                ParentEntity = entity,
+                ParentEntityCode = entity.Code
+            };
+
+            await DbContext.AddRangeAsync(entity, subClass);
+            await DbContext.SaveChangesAsync();
+            return (topicType, topic, entity, subClass);
         }
 
         public ReferenceController CreateController()

@@ -189,10 +189,10 @@
                                 <a class="table-action-button"
                                    asp-action="Visualize"
                                    asp-route-id="@service.Id"
-                                   title="Visualize @service.Name"
-                                   aria-label="Visualize @service.Name">
+                                   title="Visualise and connect @service.Name"
+                                   aria-label="Visualise and connect @service.Name">
                                     <partial name="_ActionIcon" model="@("visualize")" />
-                                    <span class="visually-hidden">Visualize</span>
+                                    <span class="visually-hidden">Visualise and connect</span>
                                 </a>
                                 @if (canManageProductsAndServices)
                                 {
@@ -207,10 +207,10 @@
                                     <a class="table-action-button"
                                        asp-action="Edit"
                                        asp-route-id="@service.Id"
-                                       title="Edit details for @service.Name"
-                                       aria-label="Edit details for @service.Name">
+                                       title="Edit metadata for service @service.Name"
+                                       aria-label="Edit metadata for service @service.Name">
                                         <partial name="_ActionIcon" model="@("edit")" />
-                                        <span class="visually-hidden">Edit details</span>
+                                        <span class="visually-hidden">Edit metadata for service</span>
                                     </a>
                                     <a class="table-action-button table-action-button-danger"
                                        asp-action="Delete"

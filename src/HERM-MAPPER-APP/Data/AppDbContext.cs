@@ -18,6 +18,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<BrmDomain> BrmDomains => Set<BrmDomain>();
     public DbSet<BrmCapability> BrmCapabilities => Set<BrmCapability>();
     public DbSet<BrmComponent> BrmComponents => Set<BrmComponent>();
+    public DbSet<DrmTopicType> DrmTopicTypes => Set<DrmTopicType>();
+    public DbSet<DrmTopic> DrmTopics => Set<DrmTopic>();
+    public DbSet<DrmEntity> DrmEntities => Set<DrmEntity>();
+    public DbSet<DrmCommonSubClass> DrmCommonSubClasses => Set<DrmCommonSubClass>();
+    public DbSet<DrmModel> DrmModels => Set<DrmModel>();
+    public DbSet<DrmModelDataEntity> DrmModelDataEntities => Set<DrmModelDataEntity>();
     public DbSet<AuditLogEntry> AuditLogEntries => Set<AuditLogEntry>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<AiProviderConfiguration> AiProviderConfigurations => Set<AiProviderConfiguration>();
@@ -189,6 +195,90 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(x => x.Components)
                 .HasForeignKey(x => x.ParentCapabilityId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DrmTopicType>(entity =>
+        {
+            entity.ToTable("DrmTopicTypes");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(16);
+            entity.Property(x => x.Name).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<DrmTopic>(entity =>
+        {
+            entity.ToTable("DrmTopics");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(16);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.TopicTypeCode).HasMaxLength(16);
+            entity.Property(x => x.TopicTypeName).HasMaxLength(200);
+            entity.HasOne(x => x.TopicType)
+                .WithMany(x => x.Topics)
+                .HasForeignKey(x => x.TopicTypeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DrmEntity>(entity =>
+        {
+            entity.ToTable("DrmEntities");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(32);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.ParentTopicCode).HasMaxLength(16);
+            entity.Property(x => x.ParentTopicTypeName).HasMaxLength(200);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
+            entity.HasOne(x => x.ParentTopic)
+                .WithMany(x => x.Entities)
+                .HasForeignKey(x => x.ParentTopicId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DrmCommonSubClass>(entity =>
+        {
+            entity.ToTable("DrmCommonSubClasses");
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.Property(x => x.Code).HasMaxLength(32);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.ParentEntityCode).HasMaxLength(32);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
+            entity.HasOne(x => x.ParentEntity)
+                .WithMany(x => x.CommonSubClasses)
+                .HasForeignKey(x => x.ParentEntityId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<DrmModel>(entity =>
+        {
+            entity.ToTable("DrmModels");
+            entity.HasIndex(x => x.Name);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Area).HasMaxLength(120);
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.Status).HasMaxLength(80);
+            entity.Property(x => x.DeletedReason).HasMaxLength(400);
+        });
+
+        modelBuilder.Entity<DrmModelDataEntity>(entity =>
+        {
+            entity.ToTable("DrmModelDataEntities");
+            entity.HasIndex(x => x.DrmModelId);
+            entity.HasIndex(x => new { x.DrmModelId, x.DrmEntityId, x.DrmCommonSubClassId }).IsUnique();
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.Notes).HasMaxLength(4000);
+            entity.HasOne(x => x.DrmModel)
+                .WithMany(x => x.DataEntities)
+                .HasForeignKey(x => x.DrmModelId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.DrmEntity)
+                .WithMany(x => x.ModelDataEntities)
+                .HasForeignKey(x => x.DrmEntityId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.DrmCommonSubClass)
+                .WithMany(x => x.ModelDataEntities)
+                .HasForeignKey(x => x.DrmCommonSubClassId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<AuditLogEntry>(entity =>

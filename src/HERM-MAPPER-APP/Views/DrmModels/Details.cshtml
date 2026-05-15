@@ -1,0 +1,142 @@
+@using HERMMapperApp
+@using HERMMapperApp.Services
+@model DrmModelDetailsViewModel
+@{
+    ViewData["Title"] = "DRM Model Details";
+    ViewData["BodyClass"] = "drm-models-page drm-models-details-page";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Data Layer</span>
+        <h1>@Model.Name</h1>
+        <p>@(string.IsNullOrWhiteSpace(Model.Description) ? "No description provided." : Model.Description)</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary" asp-action="Index">Back to DRM models</a>
+        @if (canManageProductsAndServices)
+        {
+            <a class="btn btn-outline-secondary" asp-controller="DrmDataEntities" asp-action="Create" asp-route-drmModelId="@Model.Id">Add data entity</a>
+            <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">Edit DRM model</a>
+            <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@Model.Id">Move to trash</a>
+        }
+    </div>
+</section>
+
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Topic types</span>
+        <span class="stat-value">@Model.TopicTypeCount</span>
+        <span class="stat-meta">represented in this model</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Topics</span>
+        <span class="stat-value">@Model.TopicCount</span>
+        <span class="stat-meta">represented in this model</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Entities</span>
+        <span class="stat-value">@Model.EntityCount</span>
+        <span class="stat-meta">selected parent entities</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Sub-classes</span>
+        <span class="stat-value">@Model.CommonSubClassCount</span>
+        <span class="stat-meta">selected common sub-classes</span>
+    </article>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <section class="content-card">
+        <div class="alert alert-success mb-0" role="status">@Model.StatusMessage</div>
+    </section>
+}
+
+<section class="content-card mb-4 details-primary-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Summary</span>
+            <h2>Model overview</h2>
+        </div>
+    </div>
+    <dl class="detail-grid">
+        <dt>Area</dt>
+        <dd>@Model.Area</dd>
+        <dt>Status</dt>
+        <dd>@Model.Status</dd>
+        <dt>Data entities</dt>
+        <dd>@Model.DataEntities.Count</dd>
+        <dt>Last updated</dt>
+        <dd>@await TimeZoneDisplay.FormatUtcAsync(Model.UpdatedUtc)</dd>
+        <dt>Description</dt>
+        <dd>@(string.IsNullOrWhiteSpace(Model.Description) ? "-" : Model.Description)</dd>
+    </dl>
+</section>
+
+<section class="content-card details-primary-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Data entities</span>
+            <h2>@Model.DataEntities.Count data-entity record(s)</h2>
+        </div>
+    </div>
+
+    @if (Model.DataEntities.Count == 0)
+    {
+        <div class="empty-state compact">
+            <h3>No data entities in this model yet</h3>
+            <p>Add the first data entity from the imported DRM catalogue.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Selection</th>
+                        <th>Topic type</th>
+                        <th>Topic</th>
+                        <th>Entity</th>
+                        <th>Sub-class</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var dataEntity in Model.DataEntities)
+                {
+                    <tr>
+                        <td>
+                            <strong>@dataEntity.Name</strong>
+                            <div class="table-subline">@(string.IsNullOrWhiteSpace(dataEntity.Description) ? "No description provided." : dataEntity.Description)</div>
+                        </td>
+                        <td>@dataEntity.TopicTypeLabel</td>
+                        <td>@dataEntity.TopicLabel</td>
+                        <td>@dataEntity.EntityLabel</td>
+                        <td>@(dataEntity.CommonSubClassLabel ?? "-")</td>
+                        <td>@await TimeZoneDisplay.FormatUtcAsync(dataEntity.UpdatedUtc)</td>
+                        <td class="text-end">
+                            @if (canManageProductsAndServices)
+                            {
+                                <div class="table-action-group">
+                                    <a class="table-action-button" asp-controller="DrmDataEntities" asp-action="Edit" asp-route-id="@dataEntity.Id" title="Edit @dataEntity.Name" aria-label="Edit @dataEntity.Name">
+                                        <partial name="_ActionIcon" model="@("edit")" />
+                                        <span class="visually-hidden">Edit</span>
+                                    </a>
+                                    <a class="table-action-button table-action-button-danger" asp-controller="DrmDataEntities" asp-action="Delete" asp-route-id="@dataEntity.Id" title="Remove @dataEntity.Name" aria-label="Remove @dataEntity.Name">
+                                        <partial name="_ActionIcon" model="@("trash")" />
+                                        <span class="visually-hidden">Remove</span>
+                                    </a>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
