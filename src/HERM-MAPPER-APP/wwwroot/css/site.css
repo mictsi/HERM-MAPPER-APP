@@ -3675,6 +3675,7 @@ a {
 }
 
 #browser-navigation,
+#browser-results,
 [id^="browser-model-"] {
   scroll-margin-top: 5.5rem;
 }

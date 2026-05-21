@@ -6,7 +6,8 @@
     ViewData["Title"] = "HERM Browser";
     ViewData["BodyClass"] = "reference-browser-page";
     var isAdministrator = AppRoles.IsAdministrator(User);
-    var searchFormAction = $"{Url.Action("Index", "Reference")}#{Model.ActiveTreeAnchorId}";
+    const string resultsAnchorId = "browser-results";
+    var searchFormAction = $"{Url.Action("Index", "Reference")}#{resultsAnchorId}";
     var domainCount = Model.ModelGroups.Sum(group => group.Domains.Count);
     var capabilityCount = Model.ModelGroups.Sum(group => group.Domains.Sum(domain => domain.Capabilities.Count));
     var searchSummary = string.IsNullOrWhiteSpace(Model.Search) ? Model.SelectionTitle : $"Search: {Model.Search}";
@@ -105,7 +106,7 @@
                                    asp-action="Index"
                                    asp-route-search="@Model.Search"
                                    asp-route-modelKind="@group.ModelKind"
-                                   asp-fragment="@group.AnchorId">
+                                   asp-fragment="@resultsAnchorId">
                                     @group.Label
                                 </a>
                                 <span class="browser-tree-toggle" aria-hidden="true"></span>
@@ -125,7 +126,7 @@
                                                    asp-route-search="@Model.Search"
                                                    asp-route-modelKind="@group.ModelKind"
                                                    asp-route-domainCode="@domain.Code"
-                                                   asp-fragment="@domain.AnchorId">
+                                                   asp-fragment="@resultsAnchorId">
                                                     @domain.DisplayLabel
                                                 </a>
                                             </div>
@@ -139,7 +140,7 @@
                                                        asp-route-search="@Model.Search"
                                                        asp-route-modelKind="@group.ModelKind"
                                                        asp-route-domainCode="@domain.Code"
-                                                       asp-fragment="@domain.AnchorId">
+                                                       asp-fragment="@resultsAnchorId">
                                                         @domain.DisplayLabel
                                                     </a>
                                                     <span class="browser-tree-toggle" aria-hidden="true"></span>
@@ -155,7 +156,7 @@
                                                                    asp-route-modelKind="@group.ModelKind"
                                                                    asp-route-domainCode="@domain.Code"
                                                                    asp-route-capabilityCode="@capability.Code"
-                                                                   asp-fragment="@capability.AnchorId">
+                                                                   asp-fragment="@resultsAnchorId">
                                                                     @capability.DisplayLabel
                                                                 </a>
                                                             </div>
@@ -172,7 +173,7 @@
                                                                                asp-route-domainCode="@domain.Code"
                                                                                asp-route-capabilityCode="@capability.Code"
                                                                                asp-route-componentCode="@entity.Code"
-                                                                               asp-fragment="@entity.AnchorId">
+                                                                               asp-fragment="@resultsAnchorId">
                                                                                 @entity.DisplayLabel
                                                                             </a>
                                                                             @if (entity.Children.Count != 0)
@@ -189,7 +190,7 @@
                                                                                                asp-route-capabilityCode="@capability.Code"
                                                                                                asp-route-componentCode="@entity.Code"
                                                                                                asp-route-subClassCode="@subClass.Code"
-                                                                                               asp-fragment="@subClass.AnchorId">
+                                                                                               asp-fragment="@resultsAnchorId">
                                                                                                 @subClass.DisplayLabel
                                                                                             </a>
                                                                                         </li>
@@ -215,7 +216,7 @@
         }
     </aside>
 
-    <section class="content-card browser-results">
+    <section class="content-card browser-results" id="@resultsAnchorId">
         <div class="section-heading browser-results-heading">
             <div>
                 <span class="eyebrow">Selection</span>
