@@ -25,6 +25,7 @@ src/HERM-MAPPER-APP/appsettings*.json_
 
 docker/.env*
 !docker/.env*.example
+docker/images/
 
 *.user
 *.suo

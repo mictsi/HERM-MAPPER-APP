@@ -67,4 +67,5 @@ src/HERM-MAPPER-APP/.artifacts/
 src/HERM-MAPPER-APP/appsettings.json
 docker/.env*
 !docker/.env*.example
+docker/images/
 .tmp/

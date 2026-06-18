@@ -74,6 +74,38 @@ Build the image directly:
 docker build -f .\docker\Dockerfile -t herm-mapper-app:local .
 ```
 
+Build loadable image archives for x64 and arm64:
+
+```powershell
+.\docker\Build-DockerImages.ps1
+```
+
+```sh
+sh ./docker/Build-DockerImages.sh
+```
+
+The scripts write `docker/images/herm-mapper-app_local_linux-amd64.tar` and `docker/images/herm-mapper-app_local_linux-arm64.tar`. Each archive includes the `herm-mapper-app:local` tag used by the compose files. On a target machine, load the matching archive before running compose:
+
+```powershell
+docker load --input .\docker\images\herm-mapper-app_local_linux-amd64.tar
+docker compose -f .\docker\docker-compose.sqlite.yml up --no-build
+```
+
+```sh
+docker load --input ./docker/images/herm-mapper-app_local_linux-amd64.tar
+docker compose -f ./docker/docker-compose.sqlite.yml up --no-build
+```
+
+To build both archives and load the image matching the local Docker engine:
+
+```powershell
+.\docker\Build-DockerImages.ps1 -Load
+```
+
+```sh
+sh ./docker/Build-DockerImages.sh --load
+```
+
 Run with SQLite stored in a Docker volume:
 
 ```powershell
