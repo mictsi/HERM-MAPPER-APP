@@ -25,6 +25,7 @@ public sealed partial class DatabaseInitializer(
         await EnsureBusinessCapabilityTablesAsync(cancellationToken);
         await EnsureLegacyBusinessCapabilitiesHaveBrmModelAsync(cancellationToken);
         await EnsureDrmReferenceTablesAsync(cancellationToken);
+        await EnsureDrmParentLinksAsync(cancellationToken);
         await EnsureDrmModelTablesAsync(cancellationToken);
         await EnsureProductOwnerTableAsync(cancellationToken);
         await EnsureProductSoftDeleteColumnsAsync(cancellationToken);
@@ -1416,6 +1417,37 @@ public sealed partial class DatabaseInitializer(
                 """,
                 cancellationToken);
         }
+    }
+
+    private async Task EnsureDrmParentLinksAsync(CancellationToken cancellationToken)
+    {
+        // Catalogues imported before the parent key columns existed only carry the parent code,
+        // which leaves the entity and sub-class dropdowns unable to filter on each other.
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE "DrmEntities"
+            SET "ParentTopicId" = (
+                SELECT t."Id"
+                FROM "DrmTopics" t
+                WHERE t."Code" = "DrmEntities"."ParentTopicCode"
+            )
+            WHERE "ParentTopicId" IS NULL
+              AND "ParentTopicCode" IS NOT NULL
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE "DrmCommonSubClasses"
+            SET "ParentEntityId" = (
+                SELECT e."Id"
+                FROM "DrmEntities" e
+                WHERE e."Code" = "DrmCommonSubClasses"."ParentEntityCode"
+            )
+            WHERE "ParentEntityId" IS NULL
+              AND "ParentEntityCode" IS NOT NULL
+            """,
+            cancellationToken);
     }
 
     private async Task EnsureDrmReferenceTablesAsync(CancellationToken cancellationToken)

@@ -277,17 +277,60 @@ public sealed class DrmDataEntitiesController(
                 x.Id.ToString(CultureInfo.InvariantCulture)))
             .ToListAsync();
 
-        model.CommonSubClassOptions = await dbContext.DrmCommonSubClasses
+        var entityLookups = await dbContext.DrmEntities
             .AsNoTracking()
-            .Where(x => !x.IsDeleted && x.ParentEntityId.HasValue && x.ParentEntity != null && !x.ParentEntity.IsDeleted)
-            .OrderBy(x => x.Code)
-            .Select(x => new DrmCommonSubClassOptionViewModel
+            .Where(x => !x.IsDeleted)
+            .Select(x => new
             {
-                Id = x.Id,
-                ParentEntityId = x.ParentEntityId ?? 0,
-                Label = $"{x.Code} {x.Name} ({x.ParentEntity!.Code} {x.ParentEntity.Name})"
+                x.Id,
+                x.Code,
+                x.Name
             })
             .ToListAsync();
+
+        var entitiesById = entityLookups.ToDictionary(x => x.Id);
+        var entitiesByCode = entityLookups
+            .Where(x => !string.IsNullOrWhiteSpace(x.Code))
+            .GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+
+        var subClassLookups = await dbContext.DrmCommonSubClasses
+            .AsNoTracking()
+            .Where(x => !x.IsDeleted)
+            .OrderBy(x => x.Code)
+            .Select(x => new
+            {
+                x.Id,
+                x.Code,
+                x.Name,
+                x.ParentEntityId,
+                x.ParentEntityCode
+            })
+            .ToListAsync();
+
+        model.CommonSubClassOptions = subClassLookups
+            .Select(subClass =>
+            {
+                // Catalogues imported before the parent key existed only carry the parent code,
+                // so fall back to the code when the identifier is missing.
+                var parent = subClass.ParentEntityId.HasValue && entitiesById.TryGetValue(subClass.ParentEntityId.Value, out var byId)
+                    ? byId
+                    : !string.IsNullOrWhiteSpace(subClass.ParentEntityCode) && entitiesByCode.TryGetValue(subClass.ParentEntityCode, out var byCode)
+                        ? byCode
+                        : null;
+
+                return parent is null
+                    ? null
+                    : new DrmCommonSubClassOptionViewModel
+                    {
+                        Id = subClass.Id,
+                        ParentEntityId = parent.Id,
+                        Label = $"{subClass.Code} {subClass.Name} ({parent.Code} {parent.Name})"
+                    };
+            })
+            .Where(option => option is not null)
+            .Select(option => option!)
+            .ToList();
     }
 
     private async Task<DrmSelection?> ValidateSelectionAsync(DrmDataEntityEditViewModel input, int? existingItemId = null)
@@ -333,7 +376,7 @@ public sealed class DrmDataEntitiesController(
             {
                 ModelState.AddModelError(nameof(input.SelectedDrmCommonSubClassId), "The selected common sub-class could not be found.");
             }
-            else if (entity is not null && subClass.ParentEntityId != entity.Id)
+            else if (entity is not null && !BelongsToEntity(subClass, entity))
             {
                 ModelState.AddModelError(nameof(input.SelectedDrmCommonSubClassId), "The selected common sub-class does not belong to the selected entity.");
             }
@@ -359,6 +402,12 @@ public sealed class DrmDataEntitiesController(
             ? new DrmSelection(entity, subClass)
             : null;
     }
+
+    private static bool BelongsToEntity(DrmCommonSubClass subClass, DrmEntity entity) =>
+        subClass.ParentEntityId.HasValue
+            ? subClass.ParentEntityId.Value == entity.Id
+            : !string.IsNullOrWhiteSpace(subClass.ParentEntityCode) &&
+              string.Equals(subClass.ParentEntityCode, entity.Code, StringComparison.OrdinalIgnoreCase);
 
     private static void NormalizeInput(DrmDataEntityEditViewModel input)
     {

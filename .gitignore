@@ -69,3 +69,6 @@ docker/.env*
 !docker/.env*.example
 docker/images/
 .tmp/
+
+# Local run.sh artefacts
+.run/
