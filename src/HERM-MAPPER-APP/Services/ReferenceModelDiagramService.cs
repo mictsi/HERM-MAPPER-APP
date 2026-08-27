@@ -388,7 +388,10 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         return report;
     }
 
-    public async Task<ModelDiagramReportViewModel> BuildDrmModelAsync(int? drmModelId, CancellationToken cancellationToken = default)
+    public async Task<ModelDiagramReportViewModel> BuildDrmModelAsync(
+        int? drmModelId,
+        bool onlySelectedNodes = false,
+        CancellationToken cancellationToken = default)
     {
         var selectedDrmModel = drmModelId is > 0
             ? await dbContext.DrmModels
@@ -419,7 +422,8 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
                 OnlyShowMappedNodes = false,
                 UseCompactMappedSummary = true,
                 ShowComponentMappedSummary = false,
-                ShowBranchEmptyStates = false
+                ShowBranchEmptyStates = false,
+                HideRedundantLeafLabels = true
             };
         }
 
@@ -486,19 +490,26 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
                 ServiceId: null,
                 ApplicationId: null,
                 ReportFragmentId: "report-drm-model",
-                DiagramTitle: "DRM diagram",
-                DiagramDescription: BuildDrmModelDescription(selectedDrmModel),
+                DiagramTitle: onlySelectedNodes ? $"{selectedDrmModel.Name} data structure" : "DRM diagram",
+                DiagramDescription: onlySelectedNodes
+                    ? $"Only the DRM entities and common sub-classes added to {selectedDrmModel.Name}."
+                    : BuildDrmModelDescription(selectedDrmModel),
                 PosterTitle: $"{selectedDrmModel.Name} DRM model poster",
                 PosterDescription: $"Full-screen poster view of {selectedDrmModel.Name} across the DRM reference model with selected data entities highlighted.",
                 MappedItemLabel: "selected record(s)",
                 BackReportAction: "DrmModelReport",
                 BackReportLabel: "Back to DRM report",
-                OnlyShowMappedNodes: false,
+                OnlyShowMappedNodes: onlySelectedNodes,
                 UseCompactMappedSummary: true,
                 ShowComponentMappedSummary: false,
                 ShowBranchEmptyStates: false,
-                EmptyStateTitle: $"No DRM structure available for {selectedDrmModel.Name}",
-                EmptyStateBody: "Import the DRM reference model and add data entities to populate the selected-record summary.",
+                HideRedundantLeafLabels: true,
+                EmptyStateTitle: onlySelectedNodes
+                    ? $"No data entities in {selectedDrmModel.Name}"
+                    : $"No DRM structure available for {selectedDrmModel.Name}",
+                EmptyStateBody: onlySelectedNodes
+                    ? "Add DRM entities or common sub-classes to this model to render its structure."
+                    : "Import the DRM reference model and add data entities to populate the selected-record summary.",
                 DrmModelId: selectedDrmModel.Id));
     }
 
@@ -674,6 +685,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
             UseCompactMappedSummary = metadata.UseCompactMappedSummary,
             ShowComponentMappedSummary = metadata.ShowComponentMappedSummary,
             ShowBranchEmptyStates = metadata.ShowBranchEmptyStates,
+            HideRedundantLeafLabels = metadata.HideRedundantLeafLabels,
             DrawIoDownloadAction = metadata.DrawIoDownloadAction,
             ArchiDownloadAction = metadata.ArchiDownloadAction,
             DomainCount = domainNodes.Count,
@@ -734,6 +746,7 @@ public sealed class ReferenceModelDiagramService(AppDbContext dbContext)
         bool UseCompactMappedSummary,
         bool ShowComponentMappedSummary,
         bool ShowBranchEmptyStates,
+        bool HideRedundantLeafLabels = false,
         string? EmptyStateTitle = null,
         string? EmptyStateBody = null,
         string? DrawIoDownloadAction = "DownloadDrawIo",

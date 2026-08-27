@@ -73,19 +73,35 @@
                                 <div class="model-report-component-list">
                                     @foreach (var component in visibleComponents)
                                     {
+                                        // A leaf that repeats its own component label adds nothing, so the
+                                        // component header carries its link instead of listing it twice.
+                                        var redundantLeaf = Model.HideRedundantLeafLabels
+                                            ? component.Products.FirstOrDefault(x => string.Equals(x.Name, component.DisplayLabel, StringComparison.OrdinalIgnoreCase))
+                                            : null;
+                                        var visibleProducts = redundantLeaf is null
+                                            ? component.Products
+                                            : component.Products.Where(x => !ReferenceEquals(x, redundantLeaf)).ToList();
+
                                         <article class="model-report-component @(component.ProductCount > 0 ? "is-mapped" : string.Empty)">
                                             <div class="model-report-component-header">
-                                                <strong>@component.DisplayLabel</strong>
+                                                @if (redundantLeaf is not null && redundantLeaf.HasLink)
+                                                {
+                                                    <strong><a class="model-report-product-link" asp-controller="@redundantLeaf.LinkController" asp-action="@redundantLeaf.LinkAction" asp-route-id="@redundantLeaf.LinkId">@component.DisplayLabel</a></strong>
+                                                }
+                                                else
+                                                {
+                                                    <strong>@component.DisplayLabel</strong>
+                                                }
                                                 @if (Model.ShowComponentMappedSummary && component.ProductCount > 0)
                                                 {
                                                     <span class="table-subline">@Model.FormatMappedSummary(component.ProductCount)</span>
                                                 }
                                             </div>
 
-                                            @if (component.Products.Count > 0)
+                                            @if (visibleProducts.Count > 0)
                                             {
                                                 <ul class="model-report-product-list">
-                                                    @foreach (var product in component.Products)
+                                                    @foreach (var product in visibleProducts)
                                                     {
                                                         <li class="model-report-product">
                                                             @if (product.HasLink)

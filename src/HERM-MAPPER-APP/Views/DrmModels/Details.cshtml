@@ -22,6 +22,8 @@
     </div>
     <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-outline-secondary" asp-action="Index">Back to DRM models</a>
+        <a class="btn btn-outline-primary" asp-action="Structure" asp-route-id="@Model.Id">View model</a>
+        <a class="btn btn-outline-secondary" asp-controller="Reports" asp-action="ModelDiagram" asp-route-scope="drm" asp-route-drmModelId="@Model.Id" target="_blank" rel="noopener noreferrer">Poster view</a>
         @if (canManageProductsAndServices)
         {
             <a class="btn btn-outline-secondary" asp-controller="DrmDataEntities" asp-action="Create" asp-route-drmModelId="@Model.Id">Add data entity</a>

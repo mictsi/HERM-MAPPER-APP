@@ -11,7 +11,8 @@ namespace HERMMapperApp.Controllers;
 [Authorize(Policy = AppPolicies.CatalogueRead)]
 public sealed class DrmModelsController(
     AppDbContext dbContext,
-    AuditLogService auditLogService) : Controller
+    AuditLogService auditLogService,
+    ReferenceModelDiagramService referenceModelDiagramService) : Controller
 {
     private static readonly IReadOnlyList<string> SuggestedStatuses =
     [
@@ -44,6 +45,56 @@ public sealed class DrmModelsController(
                     UpdatedUtc = x.UpdatedUtc
                 })
                 .ToListAsync()
+        });
+    }
+
+    public async Task<IActionResult> StructureAsync(int id, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var drmModel = await dbContext.DrmModels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, cancellationToken);
+        if (drmModel is null)
+        {
+            return NotFound();
+        }
+
+        var dataEntities = await dbContext.DrmModelDataEntities
+            .AsNoTracking()
+            .Where(x => x.DrmModelId == id)
+            .Select(x => new
+            {
+                x.DrmEntityId,
+                x.DrmCommonSubClassId
+            })
+            .ToListAsync(cancellationToken);
+
+        return View(new DrmModelStructureViewModel
+        {
+            Id = drmModel.Id,
+            Name = drmModel.Name,
+            Area = drmModel.Area,
+            Description = drmModel.Description,
+            Status = drmModel.Status,
+            UpdatedUtc = drmModel.UpdatedUtc,
+            DataEntityCount = dataEntities.Count,
+            EntityCount = dataEntities
+                .Select(x => x.DrmEntityId)
+                .Distinct()
+                .Count(),
+            CommonSubClassCount = dataEntities
+                .Where(x => x.DrmCommonSubClassId.HasValue)
+                .Select(x => x.DrmCommonSubClassId!.Value)
+                .Distinct()
+                .Count(),
+            Diagram = await referenceModelDiagramService.BuildDrmModelAsync(
+                drmModel.Id,
+                onlySelectedNodes: true,
+                cancellationToken)
         });
     }
 

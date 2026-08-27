@@ -223,6 +223,98 @@ public sealed class DrmModelsControllerTests
             error => string.Equals("The selected common sub-class does not belong to the selected entity.", error.ErrorMessage, StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task StructureShowsOnlyTheEntitiesAndSubClassesAddedToTheModelAsync()
+    {
+        await using var fixture = await TestFixture.CreateAsync();
+        var seeded = await fixture.SeedDrmCatalogueAsync();
+
+        var unusedTopicType = new DrmTopicType
+        {
+            Code = "DY002",
+            Name = "Estate data"
+        };
+        var unusedTopic = new DrmTopic
+        {
+            Code = "DT002",
+            Name = "Location",
+            TopicType = unusedTopicType,
+            TopicTypeCode = unusedTopicType.Code
+        };
+        var unusedEntity = new DrmEntity
+        {
+            Code = "DE002",
+            Name = "Building",
+            ParentTopic = unusedTopic,
+            ParentTopicCode = unusedTopic.Code
+        };
+        var unusedSubClass = new DrmCommonSubClass
+        {
+            Code = "DE102",
+            Name = "Lecture Theatre",
+            ParentEntity = seeded.Entity,
+            ParentEntityCode = seeded.Entity.Code
+        };
+
+        await fixture.DbContext.AddRangeAsync(unusedTopicType, unusedTopic, unusedEntity, unusedSubClass);
+
+        var drmModel = new DrmModel
+        {
+            Name = "Institution DRM",
+            Area = "Student data",
+            Status = "Draft",
+            DataEntities =
+            [
+                new DrmModelDataEntity
+                {
+                    DrmEntity = seeded.Entity,
+                    DrmCommonSubClass = seeded.CommonSubClass,
+                    Name = seeded.CommonSubClass.DisplayLabel
+                }
+            ]
+        };
+
+        await fixture.DbContext.DrmModels.AddAsync(drmModel);
+        await fixture.DbContext.SaveChangesAsync();
+
+        using var controller = fixture.CreateDrmModelsController();
+        var result = await controller.StructureAsync(drmModel.Id, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<DrmModelStructureViewModel>(view.Model);
+
+        Assert.Equal(drmModel.Id, model.Id);
+        Assert.Equal(1, model.DataEntityCount);
+        Assert.Equal(1, model.EntityCount);
+        Assert.Equal(1, model.CommonSubClassCount);
+        Assert.True(model.Diagram.OnlyShowMappedNodes);
+        Assert.True(model.Diagram.HasAnyContent);
+
+        var visibleDomains = model.Diagram.Domains.Where(x => x.ProductCount > 0).ToList();
+        Assert.Equal(seeded.TopicType.Code, Assert.Single(visibleDomains).Code);
+
+        var visibleTopics = visibleDomains
+            .SelectMany(x => x.Capabilities)
+            .Where(x => x.ProductCount > 0)
+            .ToList();
+        Assert.Equal(seeded.Topic.Code, Assert.Single(visibleTopics).Code);
+
+        var visibleComponents = visibleTopics
+            .SelectMany(x => x.Components)
+            .Where(x => x.ProductCount > 0)
+            .ToList();
+        Assert.Equal(seeded.CommonSubClass.Code, Assert.Single(visibleComponents).Code);
+
+        var allComponentCodes = model.Diagram.Domains
+            .SelectMany(x => x.Capabilities)
+            .SelectMany(x => x.Components)
+            .Where(x => x.ProductCount > 0)
+            .Select(x => x.Code)
+            .ToList();
+        Assert.DoesNotContain(unusedEntity.Code, allComponentCodes);
+        Assert.DoesNotContain(unusedSubClass.Code, allComponentCodes);
+    }
+
     private sealed class TestFixture : IAsyncDisposable
     {
         private readonly SqliteConnection connection;
@@ -252,7 +344,10 @@ public sealed class DrmModelsControllerTests
 
         public DrmModelsController CreateDrmModelsController()
         {
-            var controller = new DrmModelsController(DbContext, new AuditLogService(DbContext));
+            var controller = new DrmModelsController(
+                DbContext,
+                new AuditLogService(DbContext),
+                new ReferenceModelDiagramService(DbContext));
             controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new TestTempDataProvider());
             return controller;
         }

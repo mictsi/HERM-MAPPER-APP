@@ -1,0 +1,83 @@
+@using HERMMapperApp
+@model DrmModelStructureViewModel
+@{
+    ViewData["Title"] = $"{Model.Name} data structure";
+    ViewData["BodyClass"] = "drm-models-page drm-models-structure-page";
+    var canManageProductsAndServices = AppRoles.CanManageProductsAndServices(User);
+}
+
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Data Layer</span>
+        <h1>@Model.Name</h1>
+        <p>Only the DRM entities and common sub-classes added to this model, grouped by their topic type and topic.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Id">Back to model details</a>
+        <a class="btn btn-outline-secondary" asp-controller="Reports" asp-action="ModelDiagram" asp-route-scope="drm" asp-route-drmModelId="@Model.Id" target="_blank" rel="noopener noreferrer">Poster view</a>
+        @if (canManageProductsAndServices)
+        {
+            <a class="btn btn-primary" asp-controller="DrmDataEntities" asp-action="Create" asp-route-drmModelId="@Model.Id">Add data entity</a>
+        }
+    </div>
+</section>
+
+<section class="stats-grid stats-grid-compact details-overview-grid">
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Topic types</span>
+        <span class="stat-value">@Model.TopicTypeCount</span>
+        <span class="stat-meta">used by this model</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Topics</span>
+        <span class="stat-value">@Model.TopicCount</span>
+        <span class="stat-meta">used by this model</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Data entities</span>
+        <span class="stat-value">@Model.EntityCount</span>
+        <span class="stat-meta">distinct DRM entities</span>
+    </article>
+    <article class="stat-card details-overview-card">
+        <span class="stat-label">Common sub-classes</span>
+        <span class="stat-value">@Model.CommonSubClassCount</span>
+        <span class="stat-meta">distinct sub-classes</span>
+    </article>
+</section>
+
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">Model view</span>
+            <h2>@Model.Diagram.DiagramTitle</h2>
+            <p>@Model.Diagram.DiagramDescription</p>
+        </div>
+        <div class="table-subline">@Model.Area &middot; @Model.Status &middot; updated @await TimeZoneDisplay.FormatUtcAsync(Model.UpdatedUtc)</div>
+    </div>
+
+    @if (!Model.Diagram.HasAnyContent)
+    {
+        <div class="empty-state compact">
+            <h3>@Model.Diagram.EmptyStateTitle</h3>
+            <p>@Model.Diagram.EmptyStateBody</p>
+            @if (canManageProductsAndServices)
+            {
+                <a class="btn btn-primary" asp-controller="DrmDataEntities" asp-action="Create" asp-route-drmModelId="@Model.Id">Add the first data entity</a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="report-summary-chips">
+            <span class="report-summary-chip"><strong>@Model.TopicTypeCount</strong> topic types</span>
+            <span class="report-summary-chip"><strong>@Model.TopicCount</strong> topics</span>
+            <span class="report-summary-chip"><strong>@Model.EntityCount</strong> entities</span>
+            <span class="report-summary-chip"><strong>@Model.CommonSubClassCount</strong> sub-classes</span>
+            <span class="report-summary-chip"><strong>@Model.DataEntityCount</strong> records</span>
+        </div>
+
+        <div class="model-report-preview-frame">
+            <partial name="/Views/Reports/_ModelDiagramReport.cshtml" model="Model.Diagram" />
+        </div>
+    }
+</section>

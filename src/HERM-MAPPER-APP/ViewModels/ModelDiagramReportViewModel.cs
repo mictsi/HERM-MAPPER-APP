@@ -22,6 +22,7 @@ public sealed class ModelDiagramReportViewModel
     public bool UseCompactMappedSummary { get; init; }
     public bool ShowComponentMappedSummary { get; init; } = true;
     public bool ShowBranchEmptyStates { get; init; } = true;
+    public bool HideRedundantLeafLabels { get; init; }
     public string UnmappedSectionTitle { get; init; } = "Unmapped Products";
     public string UnmappedSummaryLabel { get; init; } = "item(s) still need a component placement";
     public string? DrawIoDownloadAction { get; init; } = "DownloadDrawIo";

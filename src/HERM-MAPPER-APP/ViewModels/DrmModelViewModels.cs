@@ -58,6 +58,26 @@ public sealed class DrmModelDetailsViewModel
     public bool HasHierarchy => HierarchyRoot.Children.Count != 0;
 }
 
+public sealed class DrmModelStructureViewModel
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Area { get; init; } = string.Empty;
+    public string? Description { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public DateTime UpdatedUtc { get; init; }
+    public int DataEntityCount { get; init; }
+    public int EntityCount { get; init; }
+    public int CommonSubClassCount { get; init; }
+    public ModelDiagramReportViewModel Diagram { get; init; } = new();
+
+    public int TopicTypeCount => Diagram.Domains.Count(x => x.ProductCount > 0);
+
+    public int TopicCount => Diagram.Domains
+        .SelectMany(x => x.Capabilities)
+        .Count(x => x.ProductCount > 0);
+}
+
 public sealed class DrmModelDataEntityRowViewModel
 {
     public int Id { get; init; }
