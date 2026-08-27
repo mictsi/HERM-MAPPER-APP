@@ -50,7 +50,7 @@ public sealed class ProgramHostIntegrationTests
     }
 
     [Fact]
-    public async Task ApplicationStartupRedirectsRootRequestIntoConfiguredBasePathAsync()
+    public async Task ApplicationStartupRefusesRootRequestOutsideConfiguredBasePathAsync()
     {
         using var factory = new HermAppFactory("/herm");
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -61,9 +61,7 @@ public sealed class ProgramHostIntegrationTests
 
         using var response = await client.GetAsync("/");
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.NotNull(response.Headers.Location);
-        Assert.Equal("/herm/", response.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -84,7 +82,7 @@ public sealed class ProgramHostIntegrationTests
     }
 
     [Fact]
-    public async Task ApplicationStartupRedirectsUnprefixedLoginPathIntoConfiguredBasePathAsync()
+    public async Task ApplicationStartupRefusesUnprefixedLoginPathAsync()
     {
         using var factory = new HermAppFactory("/herm");
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -95,9 +93,24 @@ public sealed class ProgramHostIntegrationTests
 
         using var response = await client.GetAsync("/Account/Login");
 
-        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
-        Assert.NotNull(response.Headers.Location);
-        Assert.Equal("/herm/Account/Login", response.Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ApplicationStartupRefusesHealthEndpointOutsideConfiguredBasePathAsync()
+    {
+        using var factory = new HermAppFactory("/herm");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true
+        });
+
+        using var outsideResponse = await client.GetAsync("/health");
+        using var insideResponse = await client.GetAsync("/herm/health");
+
+        Assert.Equal(HttpStatusCode.NotFound, outsideResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, insideResponse.StatusCode);
     }
 
     [Fact]

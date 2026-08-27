@@ -21,12 +21,16 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 ENV ASPNETCORE_URLS=http://+:8080 \
-    DOTNET_RUNNING_IN_CONTAINER=true
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_EnableDiagnostics=0 \
+    HERM_App__DataProtectionKeysPath=/app/keys
 
 COPY --from=build /app/publish .
 
-RUN mkdir -p /app/App_Data /app/output \
-    && chown -R ${APP_UID}:${APP_UID} /app/App_Data /app/output
+# App_Data, output and keys are the only writable paths, so the container can run
+# with a read-only root filesystem.
+RUN mkdir -p /app/App_Data /app/output /app/keys \
+    && chown -R ${APP_UID}:${APP_UID} /app/App_Data /app/output /app/keys
 
 USER ${APP_UID}
 EXPOSE 8080

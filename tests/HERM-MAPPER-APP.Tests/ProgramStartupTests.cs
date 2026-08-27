@@ -276,11 +276,30 @@ public sealed class ProgramStartupTests
     }
 
     [Fact]
-    public void BuildAppBasePathRedirectPathPrefixesUnscopedRequests()
+    public void DeploymentHelpersReadAppSection()
     {
-        Assert.Equal("/herm/", Program.BuildAppBasePathRedirectPath("/herm", new PathString("/"), QueryString.Empty));
-        Assert.Equal("/herm/Account/Login?returnUrl=%2FProducts", Program.BuildAppBasePathRedirectPath("/herm", new PathString("/Account/Login"), new QueryString("?returnUrl=%2FProducts")));
-        Assert.Equal("/Account/Login", Program.BuildAppBasePathRedirectPath("/", new PathString("/Account/Login"), QueryString.Empty));
+        var defaults = new ConfigurationBuilder().Build();
+        Assert.False(Program.BuildForwardedHeadersEnabled(defaults));
+        Assert.True(Program.BuildHttpsRedirectionEnabled(defaults));
+        Assert.Null(Program.BuildDataProtectionKeysPath(defaults));
+
+        var configured = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:UseForwardedHeaders"] = "true",
+            ["App:HttpsRedirection"] = "false",
+            ["App:DataProtectionKeysPath"] = "  /app/keys  "
+        }).Build();
+
+        Assert.True(Program.BuildForwardedHeadersEnabled(configured));
+        Assert.False(Program.BuildHttpsRedirectionEnabled(configured));
+        Assert.Equal("/app/keys", Program.BuildDataProtectionKeysPath(configured));
+
+        var blank = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:DataProtectionKeysPath"] = "   "
+        }).Build();
+
+        Assert.Null(Program.BuildDataProtectionKeysPath(blank));
     }
 
     [Fact]

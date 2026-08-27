@@ -45,6 +45,17 @@ Key application folders:
 
 ## Quick Start
 
+The `run.sh` helper wraps both runtimes:
+
+```bash
+./run.sh start            # build and run with dotnet on http://localhost:5143
+./run.sh status           # dotnet and docker state
+./run.sh logs -f
+./run.sh stop
+./run.sh docker start     # same app in the hardened container stack
+```
+
+
 1. Clone the repository.
 2. Install the .NET SDK 10.0 or later.
 3. Restore and build the solution.
@@ -67,6 +78,45 @@ dotnet run --project ./src/HERM-MAPPER-APP/HERM-MAPPER-APP.csproj
 ```
 
 ## Docker
+
+### Hardened compose stack (recommended)
+
+`docker/docker-compose.yml` runs the app as a non-root user with a read-only root
+filesystem, all Linux capabilities dropped, `no-new-privileges`, a tmpfs `/tmp`,
+CPU/memory limits, log rotation and a health check. State lives on three named
+volumes: `app-data` (database), `app-keys` (data-protection key ring, so restarts
+do not sign everybody out) and `app-output`.
+
+```bash
+cp docker/.env.example docker/.env.prod   # .env.prod is git-ignored - keep secrets there
+./run.sh docker start prod                # or: ./run.sh docker start example
+./run.sh docker logs -f
+./run.sh docker stop
+```
+
+Equivalent without the helper script:
+
+```bash
+docker compose --project-directory docker -f docker/docker-compose.yml \
+  --env-file docker/.env.prod up -d --build
+```
+
+### Publishing under a sub-path
+
+Set `HERM_APP_BASE_PATH` in the env file to serve the app from a path instead of
+the host root - `/hermapp` gives `https://myapp/hermapp`, `/mytestapp` gives
+`http://localhost/mytestapp`. Cookies are scoped to that path, and **every route,
+static file and the health endpoint is served only under it** - anything outside
+returns 404, so two instances can share one hostname safely.
+
+Behind a TLS-terminating reverse proxy also keep the defaults
+`HERM_USE_FORWARDED_HEADERS=true`, `HERM_HTTPS_REDIRECTION=false` and
+`HERM_Security__Authentication__RequireHttpsCookies=false`, which let the
+forwarded scheme decide the links the app renders and how cookies are marked.
+The health endpoint is `${HERM_APP_BASE_PATH}/health`.
+
+### Legacy compose files
+
 
 Build the image directly:
 

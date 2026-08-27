@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -66,6 +68,23 @@ public partial class Program
     public static LookupCacheRefreshOptions BuildLookupCacheRefreshOptions(IConfiguration configuration) =>
         new(
             RefreshIntervalMinutes: Math.Max(1, configuration.GetValue<int?>("Caching:LookupRefreshIntervalMinutes") ?? 2));
+
+    // Behind a reverse proxy the app only sees plain HTTP, so the proxy headers decide
+    // the scheme and host it renders links with.
+    public static bool BuildForwardedHeadersEnabled(IConfiguration configuration) =>
+        configuration.GetValue<bool?>("App:UseForwardedHeaders") ?? false;
+
+    // A TLS-terminating proxy already redirects to HTTPS, and redirecting again inside
+    // the container turns into a loop.
+    public static bool BuildHttpsRedirectionEnabled(IConfiguration configuration) =>
+        configuration.GetValue<bool?>("App:HttpsRedirection") ?? true;
+
+    // Without a stable key ring every container restart signs out everybody.
+    public static string? BuildDataProtectionKeysPath(IConfiguration configuration)
+    {
+        var configuredValue = configuration["App:DataProtectionKeysPath"];
+        return string.IsNullOrWhiteSpace(configuredValue) ? null : configuredValue.Trim();
+    }
 
     public static string BuildAppBasePath(IConfiguration configuration)
     {
@@ -192,29 +211,6 @@ public partial class Program
             ? path
             : string.Concat(appBasePath, path);
 
-    public static string BuildAppBasePathRedirectPath(string appBasePath, PathString requestPath, QueryString queryString)
-    {
-        if (string.Equals(appBasePath, "/", StringComparison.Ordinal))
-        {
-            return requestPath.Add(queryString);
-        }
-
-        var normalizedPath = requestPath.HasValue
-            ? requestPath.Value!
-            : "/";
-
-        if (string.IsNullOrEmpty(normalizedPath))
-        {
-            normalizedPath = "/";
-        }
-
-        var redirectPath = string.Equals(normalizedPath, "/", StringComparison.Ordinal)
-            ? string.Concat(appBasePath, "/")
-            : string.Concat(appBasePath, normalizedPath);
-
-        return string.Concat(redirectPath, queryString.Value);
-    }
-
     public static void ConfigureLogging(
         ILoggingBuilder logging,
         IConfiguration configuration,
@@ -269,7 +265,28 @@ public partial class Program
         services.AddSingleton(localAuthenticationOptions);
         services.AddSingleton(openIdConnectAuthenticationOptions);
         services.AddHttpContextAccessor();
-        services.AddDataProtection();
+        var dataProtectionBuilder = services.AddDataProtection();
+        var dataProtectionKeysPath = BuildDataProtectionKeysPath(configuration);
+        if (dataProtectionKeysPath is not null)
+        {
+            dataProtectionBuilder.PersistKeysToFileSystem(Directory.CreateDirectory(dataProtectionKeysPath));
+        }
+
+        if (BuildForwardedHeadersEnabled(configuration))
+        {
+            services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders =
+                    ForwardedHeaders.XForwardedFor |
+                    ForwardedHeaders.XForwardedProto |
+                    ForwardedHeaders.XForwardedHost;
+
+                // The proxy address is not known up front in a container network.
+                options.KnownNetworks.Clear();
+                options.KnownProxies.Clear();
+            });
+        }
+
         services.AddMemoryCache();
         services.AddSingleton<ApplicationLookupCache>();
         services.AddHealthChecks()
@@ -461,14 +478,21 @@ public partial class Program
 
     public static void ConfigurePipeline(WebApplication app)
     {
+        if (BuildForwardedHeadersEnabled(app.Configuration))
+        {
+            app.UseForwardedHeaders();
+        }
+
         var appBasePath = BuildAppBasePath(app.Configuration);
         if (!string.Equals(appBasePath, "/", StringComparison.Ordinal))
         {
+            // Everything the app serves lives under the configured base path;
+            // anything outside it does not exist.
             app.Use(async (context, next) =>
             {
                 if (!context.Request.Path.StartsWithSegments(appBasePath, out _))
                 {
-                    context.Response.Redirect(BuildAppBasePathRedirectPath(appBasePath, context.Request.Path, context.Request.QueryString), permanent: false);
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
                     return;
                 }
 
@@ -484,7 +508,11 @@ public partial class Program
             app.UseHsts();
         }
 
-        app.UseHttpsRedirection();
+        if (BuildHttpsRedirectionEnabled(app.Configuration))
+        {
+            app.UseHttpsRedirection();
+        }
+
         app.UseRouting();
 
         app.UseAuthentication();

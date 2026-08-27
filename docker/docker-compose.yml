@@ -1,0 +1,79 @@
+# Hardened compose stack for HERM Mapper.
+#
+#   docker compose -f docker/docker-compose.yml --env-file docker/.env.example up -d --build
+#
+# Everything is configured through the env file: copy docker/.env.example to
+# docker/.env.prod, edit it, and point --env-file at it (or use ./run.sh docker start prod).
+name: ${COMPOSE_PROJECT_NAME:-herm-mapper}
+
+services:
+  herm-mapper:
+    image: ${HERM_IMAGE:-herm-mapper-app:local}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+      # Publish under a sub-path, e.g. / , /hermapp or /mytestapp.
+      HERM_App__BasePath: ${HERM_APP_BASE_PATH:-/}
+      HERM_App__UseForwardedHeaders: ${HERM_USE_FORWARDED_HEADERS:-true}
+      HERM_App__HttpsRedirection: ${HERM_HTTPS_REDIRECTION:-false}
+      HERM_App__DataProtectionKeysPath: /app/keys
+      HERM_AllowedHosts: ${HERM_ALLOWED_HOSTS:-*}
+    env_file:
+      - ${HERM_ENV_FILE:-./.env.example}
+    ports:
+      # Bind to loopback by default; a reverse proxy in front terminates TLS.
+      - "${HERM_HTTP_BIND:-127.0.0.1}:${HERM_HTTP_PORT:-8080}:8080"
+    user: "${HERM_RUN_AS_UID:-1654}:${HERM_RUN_AS_GID:-1654}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    volumes:
+      - app-data:/app/App_Data
+      - app-keys:/app/keys
+      - app-output:/app/output
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    stop_grace_period: 30s
+    init: true
+    healthcheck:
+      # The runtime image ships no curl or wget, so bash talks HTTP itself.
+      test:
+        - CMD-SHELL
+        - >-
+          timeout 5 bash -c 'b="${HERM_APP_BASE_PATH:-/}"; b="$${b%/}";
+          exec 3<>/dev/tcp/127.0.0.1/8080;
+          printf "GET %s/health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" "$$b" >&3;
+          grep -q healthy <&3'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "${HERM_LOG_MAX_SIZE:-10m}"
+        max-file: "${HERM_LOG_MAX_FILE:-5}"
+    deploy:
+      resources:
+        limits:
+          cpus: "${HERM_CPU_LIMIT:-2}"
+          memory: ${HERM_MEMORY_LIMIT:-1g}
+        reservations:
+          memory: ${HERM_MEMORY_RESERVATION:-256m}
+    networks:
+      - herm
+
+networks:
+  herm:
+    driver: bridge
+
+volumes:
+  app-data:
+  app-keys:
+  app-output:
