@@ -3,3 +3,8 @@ is_global = true
 # Keep SonarAnalyzer active across the solution, but make the default posture
 # non-blocking unless a path-specific override promotes a rule.
 dotnet_analyzer_diagnostic.category-SonarAnalyzer.CSharp.severity = suggestion
+
+# EF Core's DbSet.Add/AddRange are the documented APIs - AddAsync exists only for
+# value generators such as HiLo - so VSTHRD103 has nothing to fix at those call
+# sites. Keep it as an editor hint instead of a build warning.
+dotnet_diagnostic.VSTHRD103.severity = suggestion
