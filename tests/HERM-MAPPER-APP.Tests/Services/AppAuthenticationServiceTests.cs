@@ -47,7 +47,7 @@ public sealed class AppAuthenticationServiceTests
         var maximum = after.AddMinutes(60).AddSeconds(1);
 
         Assert.NotNull(properties.ExpiresUtc);
-        Assert.InRange(properties.ExpiresUtc!.Value, minimum, maximum);
+        Assert.InRange(properties.ExpiresUtc.Value, minimum, maximum);
     }
 
     [Fact]

@@ -122,7 +122,9 @@ public static class AppDatabaseConfiguration
             {
                 var variableName = match.Groups["name"].Value;
                 return Environment.GetEnvironmentVariable(variableName) ?? match.Value;
-            });
+            },
+            System.Text.RegularExpressions.RegexOptions.None,
+            TimeSpan.FromSeconds(1));
     }
 
     private static void EnsureSqliteDataDirectoryExists(string connectionString)

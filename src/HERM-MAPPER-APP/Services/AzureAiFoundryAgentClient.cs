@@ -37,8 +37,8 @@ public sealed class AzureAiFoundryAgentClient : IAiFoundryAgentClient
             });
 
         var responsesClient = openAiClient.GetProjectResponsesClientForAgent(agentReference);
-        var response = await Task
-            .Run(() => responsesClient.CreateResponse(prompt), CancellationToken.None)
+        var response = await responsesClient
+            .CreateResponseAsync(prompt, cancellationToken: cancellationToken)
             .WaitAsync(cancellationToken);
         var output = response.Value.GetOutputText();
         if (string.IsNullOrWhiteSpace(output))

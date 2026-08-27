@@ -1059,7 +1059,7 @@ public sealed class MappingsControllerTests
     private static List<Dictionary<string, object?>> ToDictionaryList(object? value)
     {
         Assert.NotNull(value);
-        return ((System.Collections.IEnumerable)value!)
+        return ((System.Collections.IEnumerable)value)
             .Cast<object>()
             .Select(item => item.GetType()
                 .GetProperties()
@@ -1073,7 +1073,7 @@ public sealed class MappingsControllerTests
         var method = typeof(MappingsController).GetMethod("NormalizeSelections", BindingFlags.NonPublic | BindingFlags.Static);
 
         Assert.NotNull(method);
-        var empty = Assert.IsType<List<string>>(method!.Invoke(null, [null])!);
+        var empty = Assert.IsType<List<string>>(method.Invoke(null, [null])!);
         var normalized = Assert.IsType<List<string>>(method.Invoke(null, [DuplicateOwnerSelections])!);
 
         Assert.Empty(empty);

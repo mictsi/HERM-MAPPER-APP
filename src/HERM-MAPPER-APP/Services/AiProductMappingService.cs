@@ -646,7 +646,7 @@ public sealed class AiProductMappingService(
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, modelsEndpoint);
-        ApplyAuthentication(request, provider.ProviderType, apiKey!, modelsEndpoint);
+        ApplyAuthentication(request, provider.ProviderType, apiKey, modelsEndpoint);
 
         var timeoutSeconds = Math.Min(MaxModelDiscoveryTimeoutSeconds, NormalizeTimeoutSeconds(provider.TimeoutSeconds));
         using var timeoutCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

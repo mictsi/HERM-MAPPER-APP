@@ -697,7 +697,7 @@ public sealed class AiProductMappingServiceTests
             {
                 AiProviderConfigurationId = settings.ActiveProviderId,
                 ProviderName = settings.ActiveProviderName ?? "Open WebUI",
-                ProviderType = settings.ActiveProviderType!.Value,
+                ProviderType = settings.ActiveProviderType.Value,
                 Model = settings.Model,
                 RequestKind = "SuggestProductTrmMappings",
                 RequestSummary = "SuggestProductTrmMappings: Exchange",
@@ -711,7 +711,7 @@ public sealed class AiProductMappingServiceTests
             {
                 AiProviderConfigurationId = settings.ActiveProviderId,
                 ProviderName = settings.ActiveProviderName ?? "Open WebUI",
-                ProviderType = settings.ActiveProviderType!.Value,
+                ProviderType = settings.ActiveProviderType.Value,
                 Model = settings.Model,
                 RequestKind = "SuggestProductTrmMappings",
                 RequestSummary = "SuggestProductTrmMappings: SharePoint",
@@ -725,7 +725,7 @@ public sealed class AiProductMappingServiceTests
             {
                 AiProviderConfigurationId = settings.ActiveProviderId,
                 ProviderName = settings.ActiveProviderName ?? "Open WebUI",
-                ProviderType = settings.ActiveProviderType!.Value,
+                ProviderType = settings.ActiveProviderType.Value,
                 Model = settings.Model,
                 RequestKind = "SuggestProductTrmMappings",
                 RequestSummary = "SuggestProductTrmMappings: Teams",
@@ -794,7 +794,7 @@ public sealed class AiProductMappingServiceTests
             {
                 AiProviderConfigurationId = settings.ActiveProviderId,
                 ProviderName = settings.ActiveProviderName ?? "Open WebUI",
-                ProviderType = settings.ActiveProviderType!.Value,
+                ProviderType = settings.ActiveProviderType.Value,
                 Model = settings.Model,
                 RequestKind = "SuggestProductTrmMappings",
                 RequestSummary = "SuggestProductTrmMappings: Exchange",
@@ -813,7 +813,7 @@ public sealed class AiProductMappingServiceTests
             {
                 AiProviderConfigurationId = settings.ActiveProviderId,
                 ProviderName = settings.ActiveProviderName ?? "Open WebUI",
-                ProviderType = settings.ActiveProviderType!.Value,
+                ProviderType = settings.ActiveProviderType.Value,
                 Model = settings.Model,
                 RequestKind = "SuggestProductTrmMappings",
                 RequestSummary = "SuggestProductTrmMappings: Teams",
@@ -832,7 +832,7 @@ public sealed class AiProductMappingServiceTests
             {
                 AiProviderConfigurationId = settings.ActiveProviderId,
                 ProviderName = settings.ActiveProviderName ?? "Open WebUI",
-                ProviderType = settings.ActiveProviderType!.Value,
+                ProviderType = settings.ActiveProviderType.Value,
                 Model = settings.Model,
                 RequestKind = "SuggestProductTrmMappings",
                 RequestSummary = "SuggestProductTrmMappings: Legacy",

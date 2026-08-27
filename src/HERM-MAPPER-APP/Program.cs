@@ -282,7 +282,7 @@ public partial class Program
                     ForwardedHeaders.XForwardedHost;
 
                 // The proxy address is not known up front in a container network.
-                options.KnownNetworks.Clear();
+                options.KnownIPNetworks.Clear();
                 options.KnownProxies.Clear();
             });
         }

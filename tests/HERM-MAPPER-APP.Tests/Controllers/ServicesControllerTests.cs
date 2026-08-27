@@ -224,7 +224,7 @@ public sealed class ServicesControllerTests
             service.GetOrderedProductLinks().Select(x => x.ProductCatalogItem.Name).ToArray());
         Assert.Equal(3, service.ProductConnections.Count);
         Assert.NotNull(service.ConnectionLayoutJson);
-        using (var document = JsonDocument.Parse(service.ConnectionLayoutJson!))
+        using (var document = JsonDocument.Parse(service.ConnectionLayoutJson))
         {
             Assert.Equal(4, document.RootElement.GetProperty("nodes").GetArrayLength());
             Assert.Equal(3, document.RootElement.GetProperty("connections").GetArrayLength());
@@ -1234,7 +1234,7 @@ public sealed class ServicesControllerTests
     {
         var method = typeof(ServicesController).GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
-        return method!;
+        return method;
     }
 
     private static Array CreateConnectionPairs(params (int FromProductId, int ToProductId)[] connections)
@@ -1242,10 +1242,10 @@ public sealed class ServicesControllerTests
         var type = typeof(ServicesController).GetNestedType("ConnectionPair", BindingFlags.NonPublic);
         Assert.NotNull(type);
 
-        var array = Array.CreateInstance(type!, connections.Length);
+        var array = Array.CreateInstance(type, connections.Length);
         for (var index = 0; index < connections.Length; index++)
         {
-            array.SetValue(Activator.CreateInstance(type!, connections[index].FromProductId, connections[index].ToProductId), index);
+            array.SetValue(Activator.CreateInstance(type, connections[index].FromProductId, connections[index].ToProductId), index);
         }
 
         return array;

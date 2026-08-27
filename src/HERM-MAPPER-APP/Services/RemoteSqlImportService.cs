@@ -862,7 +862,11 @@ public sealed partial class RemoteSqlImportService
     }
 
     private static string BuildQualifiedTableName(IReadOnlyDictionary<string, string> tableSchemas, string tableName) =>
-        $"[{tableSchemas[tableName]}].[{tableName}]";
+        $"[{EscapeSqlIdentifier(tableSchemas[tableName])}].[{EscapeSqlIdentifier(tableName)}]";
+
+    // The schema name comes back from the remote server, so close the bracket the way QUOTENAME does.
+    private static string EscapeSqlIdentifier(string identifier) =>
+        identifier.Replace("]", "]]", StringComparison.Ordinal);
 
     private static async Task<int> ExecuteScalarIntAsync(SqlConnection connection, string commandText, CancellationToken cancellationToken)
     {
@@ -1716,6 +1720,7 @@ public sealed partial class RemoteSqlImportService
         return new RemoteSqlSnapshot(products, ownersByProductId, mappings, schemaValidation.OwnersTableAvailable, schemaValidation.Warnings);
     }
 
+    [SuppressMessage("Major Code Smell", "S2077:Formatting SQL queries is security-sensitive", Justification = "Only the schema-qualified table name is interpolated, and it is escaped by BuildQualifiedTableName; SQL Server cannot parameterise an identifier.")]
     private static async Task<List<RemoteProductRow>> ReadRemoteProductsAsync(
         SqlConnection connection,
         IReadOnlyDictionary<string, string> tableSchemas,
@@ -1755,6 +1760,7 @@ public sealed partial class RemoteSqlImportService
         return products;
     }
 
+    [SuppressMessage("Major Code Smell", "S2077:Formatting SQL queries is security-sensitive", Justification = "Only the schema-qualified table name is interpolated, and it is escaped by BuildQualifiedTableName; SQL Server cannot parameterise an identifier.")]
     private static async Task<Dictionary<int, IReadOnlyList<string>>> ReadRemoteOwnersAsync(
         SqlConnection connection,
         IReadOnlyDictionary<string, string> tableSchemas,
@@ -1797,6 +1803,7 @@ public sealed partial class RemoteSqlImportService
             pair => (IReadOnlyList<string>)pair.Value.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList());
     }
 
+    [SuppressMessage("Major Code Smell", "S2077:Formatting SQL queries is security-sensitive", Justification = "Only the schema-qualified table name is interpolated, and it is escaped by BuildQualifiedTableName; SQL Server cannot parameterise an identifier.")]
     private static async Task<List<RemoteMappingRow>> ReadRemoteMappingsAsync(
         SqlConnection connection,
         IReadOnlyDictionary<string, string> tableSchemas,

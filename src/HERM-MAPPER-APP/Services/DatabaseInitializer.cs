@@ -385,6 +385,7 @@ public sealed partial class DatabaseInitializer(
         }
     }
 
+    [SuppressMessage("Major Code Smell", "S2077:Formatting SQL queries is security-sensitive", Justification = "Table, column and index names cannot be parameterised; every value is a compile-time constant from this class.")]
     private static async Task<HashSet<string>> GetSqliteTableColumnsAsync(
         System.Data.Common.DbConnection connection,
         string tableName,
@@ -1743,6 +1744,7 @@ public sealed partial class DatabaseInitializer(
         }
     }
 
+    [SuppressMessage("Major Code Smell", "S2077:Formatting SQL queries is security-sensitive", Justification = "Table, column and index names cannot be parameterised; every value is a compile-time constant from this class.")]
     private async Task EnsureSqliteColumnAsync(
         string tableName,
         string columnName,
@@ -1758,6 +1760,7 @@ public sealed partial class DatabaseInitializer(
         await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
     }
 
+    [SuppressMessage("Major Code Smell", "S2077:Formatting SQL queries is security-sensitive", Justification = "Table, column and index names cannot be parameterised; every value is a compile-time constant from this class.")]
     private async Task EnsureSqlServerColumnAsync(
         string tableName,
         string columnName,
@@ -1775,6 +1778,7 @@ public sealed partial class DatabaseInitializer(
         await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
     }
 
+    [SuppressMessage("Major Code Smell", "S2077:Formatting SQL queries is security-sensitive", Justification = "Table, column and index names cannot be parameterised; every value is a compile-time constant from this class.")]
     private async Task EnsureSqlServerIndexAsync(
         string tableName,
         string indexName,
@@ -3129,6 +3133,7 @@ public sealed partial class DatabaseInitializer(
     }
 
     [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP004:Don't ignore created IDisposable", Justification = "AppDbContext owns the relational connection lifetime.")]
+    [SuppressMessage("Major Code Smell", "S2077:Formatting SQL queries is security-sensitive", Justification = "Table, column and index names cannot be parameterised; every value is a compile-time constant from this class.")]
     private async Task<bool> SqliteColumnExistsAsync(string tableName, string columnName, CancellationToken cancellationToken)
     {
         var shouldClose = dbContext.Database.GetDbConnection().State != System.Data.ConnectionState.Open;

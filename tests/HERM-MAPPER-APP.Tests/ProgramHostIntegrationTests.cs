@@ -29,7 +29,7 @@ public sealed class ProgramHostIntegrationTests
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
-        Assert.StartsWith("http://localhost/Account/Login", response.Headers.Location!.OriginalString, StringComparison.Ordinal);
+        Assert.StartsWith("http://localhost/Account/Login", response.Headers.Location.OriginalString, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class ProgramHostIntegrationTests
 
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
         Assert.NotNull(response.Headers.Location);
-        Assert.StartsWith("http://localhost/herm/Account/Login", response.Headers.Location!.OriginalString, StringComparison.Ordinal);
+        Assert.StartsWith("http://localhost/herm/Account/Login", response.Headers.Location.OriginalString, StringComparison.Ordinal);
     }
 
     [Fact]

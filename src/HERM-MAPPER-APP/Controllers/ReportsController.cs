@@ -448,7 +448,7 @@ public sealed class ReportsController(
         }
 
         return products
-            .GroupBy(x => string.IsNullOrWhiteSpace(x.LifecycleStatus) ? "Not set" : x.LifecycleStatus!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .GroupBy(x => string.IsNullOrWhiteSpace(x.LifecycleStatus) ? "Not set" : x.LifecycleStatus.Trim(), StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(x => x.Count())
             .ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .Select(group => new LifecycleStatusReportRowViewModel

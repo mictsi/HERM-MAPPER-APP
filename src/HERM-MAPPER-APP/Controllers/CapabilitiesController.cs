@@ -550,7 +550,7 @@ public sealed class CapabilitiesController(
                 ArmCapabilityId = x!.Id,
                 ArmDomainLabel = $"{x.ParentDomain!.Code} {x.ParentDomain.Name}",
                 ArmCapabilityLabel = $"{x.Code} {x.Name}",
-                ConnectionLabel = $"{x.Code} {x.Name} ({x.ParentDomain!.Code} {x.ParentDomain.Name})"
+                ConnectionLabel = $"{x.Code} {x.Name} ({x.ParentDomain.Code} {x.ParentDomain.Name})"
             })
             .GroupBy(x => x.ArmCapabilityId)
             .Select(group => group.First())

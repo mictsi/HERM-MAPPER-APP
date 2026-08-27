@@ -104,7 +104,7 @@ public sealed class ControllerAuthorizationTests
     {
         var authorizeAttribute = typeof(TController).GetCustomAttribute<AuthorizeAttribute>();
         Assert.NotNull(authorizeAttribute);
-        Assert.Equal(expectedPolicy, authorizeAttribute!.Policy);
+        Assert.Equal(expectedPolicy, authorizeAttribute.Policy);
     }
 
     private static void AssertMethodPolicy<TController>(string methodName, string expectedPolicy, int parameterCount)
@@ -114,6 +114,6 @@ public sealed class ControllerAuthorizationTests
 
         var authorizeAttribute = method.GetCustomAttribute<AuthorizeAttribute>();
         Assert.NotNull(authorizeAttribute);
-        Assert.Equal(expectedPolicy, authorizeAttribute!.Policy);
+        Assert.Equal(expectedPolicy, authorizeAttribute.Policy);
     }
 }

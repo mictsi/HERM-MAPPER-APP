@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -76,6 +77,7 @@ public static class ModelDiagramExportService
         return SerializeXml(new XDocument(mxFile), includeDeclaration: false);
     }
 
+    [SuppressMessage("Minor Code Smell", "S5332:Using clear-text protocols is security-sensitive", Justification = "These are XML namespace identifiers defined by the ArchiMate and W3C schemas, not network endpoints.")]
     public static byte[] BuildArchiXml(ModelDiagramReportViewModel model)
     {
         XNamespace archimate = "http://www.opengroup.org/xsd/archimate/3.0/";

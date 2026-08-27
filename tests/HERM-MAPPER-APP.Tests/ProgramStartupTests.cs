@@ -308,7 +308,7 @@ public sealed class ProgramStartupTests
         var constructor = typeof(Program).GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, binder: null, Type.EmptyTypes, modifiers: null);
 
         Assert.NotNull(constructor);
-        Assert.IsType<Program>(constructor!.Invoke(null));
+        Assert.IsType<Program>(constructor.Invoke(null));
     }
 
     [Fact]
@@ -552,7 +552,7 @@ public sealed class ProgramStartupTests
         var connectionEntity = dbContext.Model.FindEntityType(typeof(ServiceCatalogItemConnection));
         Assert.NotNull(connectionEntity);
 
-        var productForeignKeys = connectionEntity!
+        var productForeignKeys = connectionEntity
             .GetForeignKeys()
             .Where(x => x.PrincipalEntityType.ClrType == typeof(ProductCatalogItem))
             .OrderBy(x => x.Properties[0].Name)
@@ -582,7 +582,7 @@ public sealed class ProgramStartupTests
         var mappingEntity = dbContext.Model.FindEntityType(typeof(ProductMapping));
         Assert.NotNull(mappingEntity);
 
-        var trmForeignKeys = mappingEntity!
+        var trmForeignKeys = mappingEntity
             .GetForeignKeys()
             .Where(x => x.PrincipalEntityType.ClrType == typeof(TrmDomain)
                 || x.PrincipalEntityType.ClrType == typeof(TrmCapability)
@@ -614,7 +614,7 @@ public sealed class ProgramStartupTests
         var linkEntity = dbContext.Model.FindEntityType(typeof(TrmComponentCapabilityLink));
         Assert.NotNull(linkEntity);
 
-        var componentForeignKey = linkEntity!
+        var componentForeignKey = linkEntity
             .GetForeignKeys()
             .Single(x => x.PrincipalEntityType.ClrType == typeof(TrmComponent));
 
@@ -642,7 +642,7 @@ public sealed class ProgramStartupTests
         var mappingEntity = dbContext.Model.FindEntityType(typeof(ApplicationCatalogItemMapping));
         Assert.NotNull(mappingEntity);
 
-        var productMappingForeignKey = mappingEntity!
+        var productMappingForeignKey = mappingEntity
             .GetForeignKeys()
             .Single(x => x.PrincipalEntityType.ClrType == typeof(ProductMapping));
 
@@ -800,7 +800,7 @@ public sealed class ProgramStartupTests
         await eventContext.Options.Events.OnTokenValidated(eventContext);
 
         Assert.NotNull(eventContext.Principal);
-        Assert.True(eventContext.Principal!.IsInRole(AppRoles.Viewer));
+        Assert.True(eventContext.Principal.IsInRole(AppRoles.Viewer));
         Assert.True(AppAuthenticationService.IsOpenIdConnectUser(eventContext.Principal));
         Assert.False(eventContext.Response.Headers.ContainsKey("Location"));
     }

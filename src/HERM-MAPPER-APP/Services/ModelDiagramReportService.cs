@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -788,6 +789,7 @@ public sealed class ModelDiagramReportService(AppDbContext dbContext)
 
     private static string BuildProductExportLabel(DiagramProductNode product) => product.Name;
 
+    [SuppressMessage("Minor Code Smell", "S5332:Using clear-text protocols is security-sensitive", Justification = "These are XML namespace identifiers defined by the ArchiMate and W3C schemas, not network endpoints.")]
     private static XDocument BuildArchiDocument(DiagramReportData data)
     {
         XNamespace archimate = "http://www.opengroup.org/xsd/archimate/3.0/";
